@@ -1,5 +1,4 @@
 import { useEffect, useState } from 'react'
-import styles from './Time.module.css'
 
 interface TimeProps {
   /** Unix milliseconds UTC. */
@@ -18,7 +17,7 @@ function relative(at: number, now: number): string {
   return new Date(at).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' })
 }
 
-/** Re-renders once a minute so "3m ago" keeps up. Shared across all instances. */
+/** Re-renders once a minute so "3m ago" keeps up. */
 function useNow(): number {
   const [now, setNow] = useState(() => Date.now())
   useEffect(() => {
@@ -33,7 +32,7 @@ export function Time({ at }: TimeProps) {
   const now = useNow()
   const iso = new Date(at).toISOString()
   return (
-    <time className={styles.time} dateTime={iso} title={iso}>
+    <time className="whitespace-nowrap text-mute" dateTime={iso} title={iso}>
       {relative(at, now)}
     </time>
   )

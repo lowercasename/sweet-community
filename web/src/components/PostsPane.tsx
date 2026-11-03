@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { createPost, getPosts, updatePost, type Post, type User } from '../api'
 import { useStreamEvents, useStreamStatus } from '../hooks/StreamContext'
-import { Button, Measure, Pane, Row, ScrollArea, Stack, Text } from '../ui'
+import { Button, Card, Measure, Pane, Row, ScrollArea, Stack, Text } from '../ui'
 import { Composer } from './Composer'
 import { ConnectionStatus } from './ConnectionStatus'
 import { PaneTitle } from './PaneTitle'
@@ -97,11 +97,13 @@ export function PostsPane({ me, onClose }: PostsPaneProps) {
       <PaneTitle title="Posts" onClose={onClose} />
       <ScrollArea>
         <Measure>
-          <Stack gap={4}>
-            <Stack gap={1}>
-              <ConnectionStatus status={status} />
-              <Composer disabled={status === 'offline'} onSubmit={submit} />
-            </Stack>
+          <Stack gap={3}>
+            <Card>
+              <Stack gap={1}>
+                <ConnectionStatus status={status} />
+                <Composer disabled={status === 'offline'} onSubmit={submit} />
+              </Stack>
+            </Card>
             <Stack gap={3}>
               {loading && posts.length === 0 ? (
                 <Text variant="secondary">Loading…</Text>

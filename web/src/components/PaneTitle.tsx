@@ -1,4 +1,4 @@
-import { Bar, Button, Heading, Row } from '../ui'
+import { Button, Heading, Row } from '../ui'
 
 interface PaneTitleProps {
   title: string
@@ -8,15 +8,13 @@ interface PaneTitleProps {
 
 export function PaneTitle({ title, onClose }: PaneTitleProps) {
   return (
-    <Bar edge="bottom">
-      <Row justify="between" align="baseline">
-        <Heading level={2}>{title}</Heading>
-        {onClose && (
-          <Button variant="quiet" onClick={onClose}>
-            Close
-          </Button>
-        )}
-      </Row>
-    </Bar>
+    <Row justify="between" align="baseline">
+      <Heading level={2}>{title}</Heading>
+      {onClose && (
+        <Button variant="quiet" onClick={onClose}>
+          Close
+        </Button>
+      )}
+    </Row>
   )
 }

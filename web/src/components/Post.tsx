@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import type { Post as PostData } from '../api'
-import { Box, Button, HtmlContent, Row, Stack, Text, Time } from '../ui'
+import { Button, Card, HtmlContent, Row, Stack, Text, Time } from '../ui'
 import { Composer } from './Composer'
 
 interface PostProps {
@@ -22,17 +22,20 @@ export function Post({ post, canEdit, disabled, onEdit }: PostProps) {
   }
 
   return (
-    <Box as="article">
-      <Stack gap={1}>
+    <Card as="article">
+      <Stack gap={2}>
         <Row justify="between" align="baseline">
           <Row gap={2} align="baseline">
-            <Text as="span" weight="bold">{post.author.username}</Text>
-            <Time at={post.created_at} />
-            {post.edited_at != null && (
-              <Text as="span" variant="small">
-                edited <Time at={post.edited_at} />
-              </Text>
-            )}
+            <Text as="span" variant="name">{post.author.username}</Text>
+            <Text as="span" variant="small">
+              <Time at={post.created_at} />
+              {post.edited_at != null && (
+                <>
+                  {' · edited '}
+                  <Time at={post.edited_at} />
+                </>
+              )}
+            </Text>
           </Row>
           {canEdit && !editing && (
             <Button variant="quiet" onClick={() => setEditing(true)}>
@@ -53,6 +56,6 @@ export function Post({ post, canEdit, disabled, onEdit }: PostProps) {
           <HtmlContent html={post.body_html} />
         )}
       </Stack>
-    </Box>
+    </Card>
   )
 }

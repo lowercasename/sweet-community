@@ -1,7 +1,8 @@
 import { useRef, useState } from 'react'
-import { useEditor, useEditorState, type Editor } from '@tiptap/react'
+import { useEditor, useEditorState } from '@tiptap/react'
 import { postExtensions } from '../editor/extensions'
 import { Button, EditorSurface, Form, Row, Stack, Text } from '../ui'
+import { EditorToolbar, promptLink } from './EditorToolbar'
 
 interface ComposerProps {
   /** True while offline; disables submit. */
@@ -16,19 +17,6 @@ interface ComposerProps {
   submitLabel?: string
   /** Edit mode only: shown as a Cancel button and bound to Escape. */
   onCancel?: () => void
-}
-
-const isMac = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform)
-const mod = isMac ? '⌘' : 'Ctrl+'
-
-/** Mod+K: prompt for a URL and set/unset the link mark on the selection. */
-function promptLink(editor: Editor) {
-  const previous = (editor.getAttributes('link').href as string | undefined) ?? ''
-  const href = window.prompt('Link URL', previous)
-  if (href === null) return
-  const chain = editor.chain().focus().extendMarkRange('link')
-  if (href.trim() === '') chain.unsetLink().run()
-  else chain.setLink({ href: href.trim() }).run()
 }
 
 export function Composer({ disabled, onSubmit, initialHtml, submitLabel, onCancel }: ComposerProps) {
@@ -98,10 +86,8 @@ export function Composer({ disabled, onSubmit, initialHtml, submitLabel, onCance
       <Stack gap={2}>
         <EditorSurface editor={editor} />
         <Row justify="between" align="center">
-          <Text as="span" variant="small">
-            Bold {mod}B · Italic {mod}I · Link {mod}K · {label} {mod}Enter{onCancel ? ' · Cancel Esc' : ''}
-          </Text>
-          <Row gap={2} align="center">
+          <EditorToolbar editor={editor} />
+          <Row gap={3} align="center">
             {onCancel && (
               <Button variant="quiet" disabled={busy} onClick={onCancel}>
                 Cancel

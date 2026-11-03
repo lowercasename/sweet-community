@@ -1,7 +1,0 @@
-.scroll {
-  flex: 1;
-  min-height: 0;
-  overflow-y: auto;
-  overscroll-behavior: contain;
-  padding: 16px var(--gutter) 48px;
-}

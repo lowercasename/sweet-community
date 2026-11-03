@@ -13,7 +13,7 @@ export function Message({ message, continued }: MessageProps) {
       <Stack gap={0}>
         {!continued && (
           <Row gap={2} align="baseline">
-            <Text as="span" weight="bold">{message.author.username}</Text>
+            <Text as="span" variant="name">{message.author.username}</Text>
             <Text as="span" variant="small">
               <Time at={message.created_at} />
             </Text>

@@ -1,6 +1,5 @@
-import { Fragment } from 'react'
 import type { Post as PostData, User } from '../api'
-import { Hairline, Stack, Text } from '../ui'
+import { Stack, Text } from '../ui'
 import { Post } from './Post'
 
 interface PostListProps {
@@ -13,19 +12,17 @@ interface PostListProps {
 }
 
 export function PostList({ posts, me, disabled, onEdit }: PostListProps) {
-  if (posts.length === 0) return <Text variant="secondary">Nothing here yet.</Text>
+  if (posts.length === 0) return <Text variant="secondary">Nothing here yet. Write the first post.</Text>
   return (
     <Stack gap={3}>
-      {posts.map((post, i) => (
-        <Fragment key={post.id}>
-          {i > 0 && <Hairline />}
-          <Post
-            post={post}
-            canEdit={me != null && post.author.id === me.id}
-            disabled={disabled}
-            onEdit={(html) => onEdit(post.id, html)}
-          />
-        </Fragment>
+      {posts.map((post) => (
+        <Post
+          key={post.id}
+          post={post}
+          canEdit={me != null && post.author.id === me.id}
+          disabled={disabled}
+          onEdit={(html) => onEdit(post.id, html)}
+        />
       ))}
     </Stack>
   )

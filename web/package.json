@@ -12,12 +12,16 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@fontsource/quicksand": "^5.3.0",
+    "@fontsource/ubuntu": "^5.3.0",
+    "@tailwindcss/vite": "^4.3.4",
     "@tiptap/core": "^3.32.2",
     "@tiptap/extension-link": "^3.32.2",
     "@tiptap/react": "^3.32.2",
     "@tiptap/starter-kit": "^3.32.2",
     "react": "^18.3.1",
-    "react-dom": "^18.3.1"
+    "react-dom": "^18.3.1",
+    "tailwindcss": "^4.3.4"
   },
   "devDependencies": {
     "@types/react": "^18.3.31",

@@ -1,6 +1,8 @@
 # Sweet v2 — web
 
-Frontend proof of concept. Vite + React 18 + TypeScript, TipTap for the editor, plain CSS modules. No UI framework.
+Frontend proof of concept. Vite + React 18 + TypeScript, TipTap for the editor, Tailwind v4 for styling. No component framework.
+
+The look is old Sweet's: Ubuntu (Quicksand for the wordmark), The Best Red `#ce1717` and pinks lightened from it, white 6px cards on dotted paper, sky-blue links that turn red on hover. The tokens live in `src/global.css` under `@theme`; fonts are bundled via fontsource so an instance never calls Google.
 
 ## Commands
 
@@ -19,7 +21,7 @@ Run the backend from the repo root (`make dev-backend`) alongside `pnpm dev`. Th
 
 Everything is a component, down to the smallest bit of HTML.
 
-- `src/ui/` — primitives. Each wraps one HTML element or one layout concern and is the **only** place that element appears: `Box`, `Stack`, `Row`, `Text`, `Heading`, `Link`, `Button`, `Time`, `Hairline`, `Form`, `HtmlContent`, `EditorSurface`. CSS lives next to each primitive as a CSS module.
+- `src/ui/` — primitives. Each wraps one HTML element or one layout concern and is the **only** place that element appears: `Box`, `Stack`, `Row`, `Text`, `Heading`, `Link`, `Button`, `Time`, `Hairline`, `Form`, `HtmlContent`, `EditorSurface`, `Panes`, `Pane`, `Card`, `Bar`, `ScrollArea`, `Measure`, `Bee`. Tailwind classes appear only here; `pnpm check:atomic` fails on a `className` or `style` prop anywhere in `components/` or `pages/`. The two non-utility rule sets (`.content` for rendered bodies, `.editor` for TipTap) are in `src/global.css`.
 - `src/components/` — composites built only from `src/ui/` primitives and other components: `Header`, `ConnectionStatus`, `Post`, `PostList`, `Composer`.
 - `src/pages/` — `Feed`.
 - `HtmlContent` is the one component allowed to use `dangerouslySetInnerHTML`. It renders HTML the server has already sanitised (bluemonday). Never pass it client-generated HTML.

@@ -1,15 +1,24 @@
 import { forwardRef, type ReactNode, type UIEvent } from 'react'
-import styles from './ScrollArea.module.css'
 
 interface ScrollAreaProps {
+  /** `cards` leaves room for card shadows; `inner` is inside a Card. */
+  pad?: 'cards' | 'inner'
   onScroll?: (e: UIEvent<HTMLDivElement>) => void
   children?: ReactNode
 }
 
-/** The scrolling region of a Pane. The ref is the scroll container. */
-export const ScrollArea = forwardRef<HTMLDivElement, ScrollAreaProps>(function ScrollArea({ onScroll, children }, ref) {
+const PADS: Record<NonNullable<ScrollAreaProps['pad']>, string> = {
+  cards: 'px-1 pt-1 pb-12',
+  inner: 'px-4 py-3',
+}
+
+/** The scrolling region of a Pane or Card. The ref is the scroll container. */
+export const ScrollArea = forwardRef<HTMLDivElement, ScrollAreaProps>(function ScrollArea(
+  { pad = 'cards', onScroll, children },
+  ref,
+) {
   return (
-    <div ref={ref} className={styles.scroll} onScroll={onScroll}>
+    <div ref={ref} data-scroll className={`min-h-0 flex-1 overflow-y-auto overscroll-contain ${PADS[pad]}`} onScroll={onScroll}>
       {children}
     </div>
   )

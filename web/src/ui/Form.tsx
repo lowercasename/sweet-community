@@ -1,5 +1,4 @@
 import type { FormEvent, ReactNode } from 'react'
-import styles from './Form.module.css'
 
 interface FormProps {
   onSubmit: () => void
@@ -13,7 +12,7 @@ export function Form({ onSubmit, children }: FormProps) {
     onSubmit()
   }
   return (
-    <form className={styles.form} onSubmit={handle}>
+    <form className="m-0 flex flex-col gap-2" onSubmit={handle}>
       {children}
     </form>
   )

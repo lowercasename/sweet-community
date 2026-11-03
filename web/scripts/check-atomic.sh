@@ -1,14 +1,21 @@
 #!/bin/sh
-# Component rule: raw HTML tags live only in src/ui/. Composites (src/components)
-# and pages (src/pages) must be built from ui primitives and other components.
-# Fails if any raw tag below appears in those directories.
+# Component rule: raw HTML tags and Tailwind classes live only in src/ui/.
+# Composites (src/components) and pages (src/pages) are built from ui
+# primitives and other components, and carry no className or style props.
 cd "$(dirname "$0")/.." || exit 1
 
-pattern='<(div|span|p|a|button|h[1-6]|form|input|textarea|label|time|hr|ul|ol|li|img|section|article|header|footer|nav|main)[[:space:]/>]'
+pattern='<(div|span|p|a|button|h[1-6]|form|input|textarea|label|time|hr|ul|ol|li|img|svg|section|article|header|footer|nav|main)[[:space:]/>]'
 
 hits=$(grep -rnE "$pattern" src/components src/pages 2>/dev/null)
 if [ -n "$hits" ]; then
   echo "check:atomic failed. Raw HTML tags outside src/ui/:"
+  echo "$hits"
+  exit 1
+fi
+
+hits=$(grep -rnE 'className=|style=' src/components src/pages 2>/dev/null)
+if [ -n "$hits" ]; then
+  echo "check:atomic failed. className/style outside src/ui/ (styling belongs in primitives):"
   echo "$hits"
   exit 1
 fi

@@ -1,5 +1,4 @@
 import { EditorContent, type Editor } from '@tiptap/react'
-import styles from './EditorSurface.module.css'
 
 interface EditorSurfaceProps {
   editor: Editor | null
@@ -7,7 +6,7 @@ interface EditorSurfaceProps {
   size?: 'post' | 'line'
 }
 
-/** The TipTap editing surface. Owns the editor's CSS so composites need none. */
+/** The TipTap editing surface. Its CSS is the .editor rules in global.css. */
 export function EditorSurface({ editor, size = 'post' }: EditorSurfaceProps) {
-  return <EditorContent editor={editor} className={`${styles.surface} ${styles[size]}`} />
+  return <EditorContent editor={editor} className={`editor editor-${size}`} />
 }

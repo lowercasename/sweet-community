@@ -1,15 +1,22 @@
 import type { ReactNode } from 'react'
-import styles from './Text.module.css'
 
 interface TextProps {
   as?: 'p' | 'span'
-  variant?: 'body' | 'secondary' | 'small'
+  /** `name` is an author name: Sweet red, medium weight. */
+  variant?: 'body' | 'secondary' | 'small' | 'name'
   weight?: 'normal' | 'bold'
   children?: ReactNode
 }
 
-/** Running text. `secondary` and `small` use the one grey. */
+const VARIANTS: Record<NonNullable<TextProps['variant']>, string> = {
+  body: 'text-ink',
+  secondary: 'text-mute',
+  small: 'text-mute text-sm',
+  name: 'text-sweet font-medium',
+}
+
+/** Running text. */
 export function Text({ as = 'p', variant = 'body', weight = 'normal', children }: TextProps) {
-  const cls = `${styles.text} ${styles[variant]} ${weight === 'bold' ? styles.bold : ''}`
+  const cls = `m-0 [overflow-wrap:anywhere] ${VARIANTS[variant]} ${weight === 'bold' ? 'font-medium' : ''}`
   return as === 'span' ? <span className={cls}>{children}</span> : <p className={cls}>{children}</p>
 }
