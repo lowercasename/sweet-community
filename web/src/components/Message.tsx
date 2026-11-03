@@ -1,5 +1,5 @@
 import type { Message as MessageData } from '../api'
-import { Box, HtmlContent, Row, Stack, Text, Time } from '../ui'
+import { Avatar, Box, HtmlContent, Row, Stack, Text, Time } from '../ui'
 
 interface MessageProps {
   message: MessageData
@@ -12,7 +12,8 @@ export function Message({ message, continued }: MessageProps) {
     <Box as="article">
       <Stack gap={0}>
         {!continued && (
-          <Row gap={2} align="baseline">
+          <Row gap={2} align="center">
+            <Avatar name={message.author.username} size="sm" />
             <Text as="span" variant="name">
               {message.author.username}
             </Text>

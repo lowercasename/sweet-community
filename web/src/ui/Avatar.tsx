@@ -1,17 +1,27 @@
+import donut from '../assets/donut.svg'
+
 interface AvatarProps {
-  /** The person's name; the first letter is shown until there are pictures. */
+  /** The person's name, for assistive tech and the tooltip. */
   name: string
+  /** URL of their picture. Without one, they are a donut, as on old Sweet. */
+  picture?: string | null
+  size?: 'sm' | 'md'
 }
 
-/** A round initial, grey until profile pictures exist. */
-export function Avatar({ name }: AvatarProps) {
+const SIZES: Record<NonNullable<AvatarProps['size']>, string> = {
+  sm: 'h-6 w-6',
+  md: 'h-8 w-8',
+}
+
+/** A round profile picture. The default is Sweet's donut, which matters. */
+export function Avatar({ name, picture, size = 'md' }: AvatarProps) {
   return (
-    <span
-      role="img"
-      aria-label={name}
-      className="flex h-8 w-8 flex-none items-center justify-center rounded-full bg-field text-sm font-medium text-ink uppercase select-none"
-    >
-      {name.charAt(0)}
-    </span>
+    <img
+      className={`${SIZES[size]} flex-none rounded-full object-cover select-none`}
+      src={picture || donut}
+      alt={name}
+      title={name}
+      draggable={false}
+    />
   )
 }
