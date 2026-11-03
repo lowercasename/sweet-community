@@ -1,10 +1,10 @@
-import { Fragment, useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { createMessage, getMessages, type Message as MessageData } from '../api'
 import { useStreamEvents, useStreamStatus } from '../hooks/StreamContext'
 import { Bar, Button, Card, Pane, Row, ScrollArea, Stack, Text } from '../ui'
 import { ChatInput } from './ChatInput'
 import { ConnectionStatus } from './ConnectionStatus'
-import { Message } from './Message'
+import { MessageGroup } from './MessageGroup'
 
 interface ChatPaneProps {
   /** Which outer edge is padded; `left`/`right` inside a Split. */
@@ -16,6 +16,18 @@ const STICK_THRESHOLD_PX = 80
 
 function isMessage(data: unknown): data is MessageData {
   return typeof data === 'object' && data !== null && typeof (data as MessageData).id === 'string'
+}
+
+/** Runs of messages by one person within GROUP_WINDOW_MS of the previous one. */
+function group(list: MessageData[]): MessageData[][] {
+  const groups: MessageData[][] = []
+  for (const m of list) {
+    const last = groups[groups.length - 1]
+    const prev = last?.[last.length - 1]
+    if (prev && prev.author.id === m.author.id && m.created_at - prev.created_at < GROUP_WINDOW_MS) last.push(m)
+    else groups.push([m])
+  }
+  return groups
 }
 
 /** Oldest first; ignores duplicates by id. */
@@ -102,7 +114,7 @@ export function ChatPane({ side = 'full' }: ChatPaneProps) {
     <Pane side={side}>
       <Card fill>
         <ScrollArea ref={scrollRef} pad="inner" onScroll={onScroll}>
-          <Stack gap={2}>
+          <Stack gap={3}>
             {nextBefore != null && (
               <Row>
                 <Button variant="secondary" disabled={loading} onClick={() => void loadEarlier()}>
@@ -114,16 +126,9 @@ export function ChatPane({ side = 'full' }: ChatPaneProps) {
             {!loading && messages.length === 0 && (
               <Text variant="secondary">Nobody has said anything yet. Say hello.</Text>
             )}
-            {messages.map((m, i) => {
-              const prev = messages[i - 1]
-              const continued =
-                !!prev && prev.author.id === m.author.id && m.created_at - prev.created_at < GROUP_WINDOW_MS
-              return (
-                <Fragment key={m.id}>
-                  <Message message={m} continued={continued} />
-                </Fragment>
-              )
-            })}
+            {group(messages).map((run) => (
+              <MessageGroup key={run[0].id} messages={run} />
+            ))}
           </Stack>
         </ScrollArea>
         <Bar as="footer" edge="footer">

@@ -9,6 +9,7 @@ import {
   Menu,
   MessagesSquare,
   Newspaper,
+  Pencil,
   Search,
   Settings,
   Users,
@@ -29,6 +30,7 @@ export type IconName =
   | 'posts'
   | 'chat'
   | 'menu'
+  | 'pencil'
 
 const ICONS: Record<IconName, LucideIcon> = {
   bold: Bold,
@@ -44,6 +46,7 @@ const ICONS: Record<IconName, LucideIcon> = {
   posts: Newspaper,
   chat: MessagesSquare,
   menu: Menu,
+  pencil: Pencil,
 }
 
 interface IconProps {

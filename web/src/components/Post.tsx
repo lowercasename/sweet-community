@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import type { Post as PostData } from '../api'
-import { Avatar, Button, Card, HtmlContent, Row, Stack, Text, Time } from '../ui'
+import { Avatar, Button, Card, HtmlContent, Icon, Row, Stack, Text, Time } from '../ui'
 import { Composer } from './Composer'
 
 interface PostProps {
@@ -24,7 +24,7 @@ export function Post({ post, canEdit, disabled, onEdit }: PostProps) {
   return (
     <Card as="article">
       <Stack gap={2}>
-        <Row justify="between" align="baseline">
+        <Row justify="between" align="center">
           <Row gap={2} align="center">
             <Avatar name={post.author.username} />
             <Text as="span" variant="name">
@@ -42,7 +42,7 @@ export function Post({ post, canEdit, disabled, onEdit }: PostProps) {
           </Row>
           {canEdit && !editing && (
             <Button variant="ghost" onClick={() => setEditing(true)}>
-              Edit
+              <Icon name="pencil" />
             </Button>
           )}
         </Row>

@@ -58,16 +58,15 @@
   .editor .ProseMirror {
     overflow-wrap: anywhere;
   }
-  .content > :first-child,
-  .editor .ProseMirror > :first-child {
-    margin-top: 0;
-  }
-  .content > :last-child,
-  .editor .ProseMirror > :last-child {
-    margin-bottom: 0;
-  }
   :is(.content, .editor .ProseMirror) :is(p, ul, ol, blockquote, h2, h3) {
     margin: 0 0 0.6em;
+  }
+  /* After the margin rule, and with the same :is() so they out-rank it. */
+  :is(.content, .editor .ProseMirror) > :first-child {
+    margin-top: 0;
+  }
+  :is(.content, .editor .ProseMirror) > :last-child {
+    margin-bottom: 0;
   }
   :is(.content, .editor .ProseMirror) h2 {
     font-size: 1.3rem;
