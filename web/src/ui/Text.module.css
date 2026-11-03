@@ -1,0 +1,21 @@
+.text {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.body {
+  color: var(--ink);
+}
+
+.secondary {
+  color: var(--grey);
+}
+
+.small {
+  color: var(--grey);
+  font-size: 14px;
+}
+
+.bold {
+  font-weight: 600;
+}

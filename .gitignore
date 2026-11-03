@@ -1,9 +1,12 @@
 .DS_Store
 data/
 *.db
-*.db-*
+*.db-wal
+*.db-shm
 node_modules/
-web/dist/
-internal/web/dist/*
-!internal/web/dist/index.html
 bin/
+# Built frontend lives here only so go:embed can find it; never committed.
+internal/web/dist/*
+!internal/web/dist/.gitkeep
+# Copied from migrations/ by the Makefile at build time.
+cmd/sweet/migrations/

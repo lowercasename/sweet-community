@@ -1,0 +1,36 @@
+.button {
+  font: inherit;
+  color: var(--ink);
+  background: var(--paper);
+  border: 0;
+  border-radius: 0;
+  padding: 0;
+  margin: 0;
+  cursor: pointer;
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+.button:disabled {
+  color: var(--grey);
+  cursor: default;
+}
+
+.button:focus-visible {
+  outline: var(--hairline);
+  outline-offset: 2px;
+}
+
+.primary {
+  border: 1px solid var(--ink);
+  padding: 4px 12px;
+}
+
+.primary:disabled {
+  border-color: var(--grey);
+}
+
+.quiet {
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
