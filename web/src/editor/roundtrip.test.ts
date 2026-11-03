@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 import { describe, expect, it } from 'vitest'
 import { Editor } from '@tiptap/core'
-import { extensions } from './extensions'
+import { chatExtensions, postExtensions } from './extensions'
 
 /**
  * Round-trip guard: setContent(html) then getHTML() must return the same
@@ -36,7 +36,7 @@ const fixtures: Record<string, string> = {
   ].join(''),
 }
 
-function roundTrip(html: string): string {
+function roundTrip(html: string, extensions = postExtensions): string {
   const editor = new Editor({ extensions, content: html })
   try {
     editor.commands.setContent(html)
@@ -59,4 +59,25 @@ describe('editor HTML round-trip', () => {
       expect(roundTrip(html)).toBe(html)
     })
   }
+})
+
+/** The chat schema is a subset: these must round-trip, and blocks outside it must not survive. */
+const chatFixtures: Record<string, string> = {
+  paragraph: '<p>hello</p>',
+  marks: '<p>a <strong>b</strong> <em>c</em> <s>d</s></p>',
+  link: '<p><a target="_blank" rel="noopener noreferrer nofollow" href="https://example.com">x</a></p>',
+  'hard break': '<p>one<br>two</p>',
+}
+
+describe('chat HTML round-trip', () => {
+  for (const [name, html] of Object.entries(chatFixtures)) {
+    it(name, () => {
+      expect(roundTrip(html, chatExtensions)).toBe(html)
+    })
+  }
+  it('flattens post-only blocks to paragraphs', () => {
+    expect(roundTrip('<h2>T</h2><ul><li><p>a</p></li></ul><blockquote><p>q</p></blockquote>', chatExtensions)).toBe(
+      '<p>T</p><p>a</p><p>q</p>',
+    )
+  })
 })

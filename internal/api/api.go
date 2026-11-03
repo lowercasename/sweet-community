@@ -65,6 +65,8 @@ func (s *Server) Routes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/posts", s.listPosts)
 	mux.HandleFunc("POST /api/posts", s.createPost)
 	mux.HandleFunc("PUT /api/posts/{id}", s.editPost)
+	mux.HandleFunc("GET /api/messages", s.listMessages)
+	mux.HandleFunc("POST /api/messages", s.createMessage)
 	mux.Handle("GET /api/events", s.Hub)
 }
 
@@ -133,7 +135,7 @@ func readBody(w http.ResponseWriter, r *http.Request) (clean string, ok bool) {
 	}
 	clean = sanitize.Body(in.BodyHTML)
 	if sanitize.IsEmpty(clean) {
-		writeErr(w, http.StatusBadRequest, "post is empty")
+		writeErr(w, http.StatusBadRequest, "body is empty")
 		return "", false
 	}
 	return clean, true

@@ -45,3 +45,10 @@
 .surface :global(.ProseMirror-focused) {
   border-color: var(--ink);
 }
+
+.line :global(.ProseMirror) {
+  min-height: 1.5em;
+  max-height: 10em;
+  overflow-y: auto;
+  padding: 6px 10px;
+}

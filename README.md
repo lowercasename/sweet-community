@@ -1,6 +1,6 @@
 # Sweet v2
 
-A small social network for one group: one feed, one chat room, long posts, run as one binary. Proof of concept.
+A small social network for one group: one feed of long posts, one chat room, side by side, run as one binary. Proof of concept.
 
 Design notes: `architecture.md`. Why: `sweet-retrospective.html`.
 

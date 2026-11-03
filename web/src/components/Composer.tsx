@@ -1,6 +1,6 @@
 import { useRef, useState } from 'react'
 import { useEditor, useEditorState, type Editor } from '@tiptap/react'
-import { extensions } from '../editor/extensions'
+import { postExtensions } from '../editor/extensions'
 import { Button, EditorSurface, Form, Row, Stack, Text } from '../ui'
 
 interface ComposerProps {
@@ -42,7 +42,7 @@ export function Composer({ disabled, onSubmit, initialHtml, submitLabel, onCance
   cancelRef.current = onCancel
 
   const editor = useEditor({
-    extensions,
+    extensions: postExtensions,
     content: initialHtml ?? '',
     autofocus: editing ? 'end' : false,
     editorProps: {

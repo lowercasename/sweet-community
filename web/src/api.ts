@@ -15,6 +15,19 @@ export interface Post {
   edited_at: number | null
 }
 
+export interface Message {
+  id: string
+  author: User
+  body_html: string
+  body_text: string
+  created_at: number
+}
+
+export interface MessagePage {
+  messages: Message[]
+  next_before: number | null
+}
+
 export interface PostPage {
   posts: Post[]
   next_before: number | null
@@ -67,6 +80,20 @@ export function createPost(bodyHtml: string): Promise<Post> {
 export function updatePost(id: string, bodyHtml: string): Promise<Post> {
   return request<Post>(`/api/posts/${encodeURIComponent(id)}`, {
     method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ body_html: bodyHtml }),
+  })
+}
+
+export function getMessages(before?: number | null, limit = 50): Promise<MessagePage> {
+  const params = new URLSearchParams({ limit: String(limit) })
+  if (before != null) params.set('before', String(before))
+  return request<MessagePage>(`/api/messages?${params}`)
+}
+
+export function createMessage(bodyHtml: string): Promise<Message> {
+  return request<Message>('/api/messages', {
+    method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ body_html: bodyHtml }),
   })

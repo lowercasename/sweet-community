@@ -19,6 +19,7 @@ html,
 body {
   margin: 0;
   padding: 0;
+  height: 100%;
 }
 
 body {
@@ -30,8 +31,9 @@ body {
   -webkit-text-size-adjust: 100%;
 }
 
+/* App shell: header on top, panes fill the rest and scroll internally. */
 #root {
-  max-width: var(--measure);
-  margin: 0 auto;
-  padding: 0 var(--gutter) 64px;
+  height: 100dvh;
+  display: flex;
+  flex-direction: column;
 }

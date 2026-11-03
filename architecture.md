@@ -69,6 +69,8 @@ Chat messages use a subset of the same TipTap schema (paragraph, text, link, men
 
 Replies: a `reply_to` column on messages, rendered as a quoted snippet above the reply, flat in the room (the WhatsApp/Telegram shape). No Slack-style threads; they would turn the room into a second feed.
 
+Layout: one page, posts on the left (2/5) and chat on the right (3/5), each pane scrolling on its own under a fixed header. Either pane can be closed and reopened from the header; the choice persists per browser. Below 800px only one pane shows and the header switches between them (chat by default). One SSE connection per page, fanned out to whichever panes are mounted; a pane that was closed refetches its first page when reopened rather than replaying events.
+
 ### Embeds and link previews
 
 An `embed` node that stores only the URL. The server fetches metadata (oEmbed where the provider has it, OpenGraph otherwise), stores title, description and a thumbnail copied into our S3, and renders a click-to-play placeholder: the YouTube/Vimeo iframe loads only when clicked, so third-party trackers stay off the page by default. An allow-list of providers get a player; everything else gets a link card. A bare URL on its own line becomes an embed automatically. The same fetcher does link previews.

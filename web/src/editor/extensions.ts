@@ -1,12 +1,14 @@
 import StarterKit from '@tiptap/starter-kit'
 import Link from '@tiptap/extension-link'
 
+const link = Link.configure({ openOnClick: false, autolink: true, defaultProtocol: 'https' })
+
 /**
- * The editor schema, shared by the Composer and the round-trip test.
+ * The post schema, shared by the Composer and the round-trip test.
  * Paragraph, h2/h3, bold, italic, strike, link, bullet/ordered lists,
  * blockquote, hard break, undo/redo. Nothing else.
  */
-export const extensions = [
+export const postExtensions = [
   StarterKit.configure({
     heading: { levels: [2, 3] },
     // StarterKit v3 bundles its own Link; disabled so the explicit one below is used.
@@ -20,5 +22,26 @@ export const extensions = [
     // getHTML() would then send to the server as part of the post body.
     trailingNode: false,
   }),
-  Link.configure({ openOnClick: false, autolink: true, defaultProtocol: 'https' }),
+  link,
+]
+
+/**
+ * The chat schema: a strict subset of the post schema (paragraph, bold,
+ * italic, strike, link, hard break). Same server policy, smaller editor.
+ */
+export const chatExtensions = [
+  StarterKit.configure({
+    heading: false,
+    blockquote: false,
+    bulletList: false,
+    orderedList: false,
+    listItem: false,
+    link: false,
+    underline: false,
+    code: false,
+    codeBlock: false,
+    horizontalRule: false,
+    trailingNode: false,
+  }),
+  link,
 ]
