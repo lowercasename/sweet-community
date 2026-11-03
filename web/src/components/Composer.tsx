@@ -6,8 +6,16 @@ import { Button, EditorSurface, Form, Row, Stack, Text } from '../ui'
 interface ComposerProps {
   /** True while offline; disables submit. */
   disabled: boolean
-  /** Resolves on 201; rejects with an Error whose message is shown under the editor. */
+  /** Resolves on success; rejects with an Error whose message is shown under the editor. */
   onSubmit: (bodyHtml: string) => Promise<void>
+  /**
+   * Edit mode: seed the editor with this stored HTML and keep it after a
+   * successful submit (the parent swaps the editor out). Create mode clears.
+   */
+  initialHtml?: string
+  submitLabel?: string
+  /** Edit mode only: shown as a Cancel button and bound to Escape. */
+  onCancel?: () => void
 }
 
 const isMac = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform)
@@ -23,15 +31,20 @@ function promptLink(editor: Editor) {
   else chain.setLink({ href: href.trim() }).run()
 }
 
-export function Composer({ disabled, onSubmit }: ComposerProps) {
+export function Composer({ disabled, onSubmit, initialHtml, submitLabel, onCancel }: ComposerProps) {
+  const editing = initialHtml !== undefined
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  // The keydown handler is created once by TipTap; read the latest submit via a ref.
+  // The keydown handler is created once by TipTap; read the latest callbacks via refs.
   const submitRef = useRef<() => void>(() => {})
+  const cancelRef = useRef<(() => void) | undefined>(onCancel)
+  cancelRef.current = onCancel
 
   const editor = useEditor({
     extensions,
+    content: initialHtml ?? '',
+    autofocus: editing ? 'end' : false,
     editorProps: {
       handleKeyDown(_view, event) {
         const modKey = event.metaKey || event.ctrlKey
@@ -43,6 +56,11 @@ export function Composer({ disabled, onSubmit }: ComposerProps) {
         if (modKey && (event.key === 'k' || event.key === 'K')) {
           event.preventDefault()
           if (editor) promptLink(editor)
+          return true
+        }
+        if (event.key === 'Escape' && cancelRef.current) {
+          event.preventDefault()
+          cancelRef.current()
           return true
         }
         return false
@@ -63,14 +81,17 @@ export function Composer({ disabled, onSubmit }: ComposerProps) {
     setError(null)
     try {
       await onSubmit(editor.getHTML())
-      editor.commands.clearContent(true)
+      if (!editing) editor.commands.clearContent(true)
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Could not post')
+      setError(e instanceof Error ? e.message : editing ? 'Could not save' : 'Could not post')
     } finally {
       setBusy(false)
     }
   }
   submitRef.current = () => void submit()
+
+  const label = submitLabel ?? (editing ? 'Save' : 'Post')
+  const busyLabel = editing ? 'Saving…' : 'Posting…'
 
   return (
     <Form onSubmit={() => void submit()}>
@@ -78,11 +99,18 @@ export function Composer({ disabled, onSubmit }: ComposerProps) {
         <EditorSurface editor={editor} />
         <Row justify="between" align="center">
           <Text as="span" variant="small">
-            Bold {mod}B · Italic {mod}I · Link {mod}K · Post {mod}Enter
+            Bold {mod}B · Italic {mod}I · Link {mod}K · {label} {mod}Enter{onCancel ? ' · Cancel Esc' : ''}
           </Text>
-          <Button type="submit" disabled={!canSubmit}>
-            {busy ? 'Posting…' : 'Post'}
-          </Button>
+          <Row gap={2} align="center">
+            {onCancel && (
+              <Button variant="quiet" disabled={busy} onClick={onCancel}>
+                Cancel
+              </Button>
+            )}
+            <Button type="submit" disabled={!canSubmit}>
+              {busy ? busyLabel : label}
+            </Button>
+          </Row>
         </Row>
         {error && <Text variant="secondary">{error}</Text>}
       </Stack>

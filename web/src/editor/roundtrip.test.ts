@@ -47,6 +47,13 @@ function roundTrip(html: string): string {
 }
 
 describe('editor HTML round-trip', () => {
+  it('normalises an API-authored link (server form) to TipTap attribute order, which the server then accepts verbatim', () => {
+    const stored = '<p><a href="https://sweet.sh" rel="noreferrer noopener" target="_blank">ok</a></p>'
+    const normalised = '<p><a target="_blank" rel="noreferrer noopener" href="https://sweet.sh">ok</a></p>'
+    expect(roundTrip(stored)).toBe(normalised)
+    expect(roundTrip(normalised)).toBe(normalised)
+  })
+
   for (const [name, html] of Object.entries(fixtures)) {
     it(name, () => {
       expect(roundTrip(html)).toBe(html)

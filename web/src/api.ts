@@ -11,6 +11,8 @@ export interface Post {
   body_html: string
   body_text: string
   created_at: number
+  /** Unix ms of the last edit, or null if never edited. */
+  edited_at: number | null
 }
 
 export interface PostPage {
@@ -57,6 +59,14 @@ export function getPosts(before?: number | null, limit = 20): Promise<PostPage> 
 export function createPost(bodyHtml: string): Promise<Post> {
   return request<Post>('/api/posts', {
     method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ body_html: bodyHtml }),
+  })
+}
+
+export function updatePost(id: string, bodyHtml: string): Promise<Post> {
+  return request<Post>(`/api/posts/${encodeURIComponent(id)}`, {
+    method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ body_html: bodyHtml }),
   })

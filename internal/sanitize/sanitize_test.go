@@ -7,10 +7,10 @@ import (
 
 func TestBody(t *testing.T) {
 	cases := []struct {
-		name     string
-		in       string
-		want     []string // substrings that must be present
-		wantNot  []string // substrings that must be absent
+		name    string
+		in      string
+		want    []string // substrings that must be present
+		wantNot []string // substrings that must be absent
 	}{
 		{
 			name:    "strips scripts, handlers, classes, styles",
@@ -19,10 +19,17 @@ func TestBody(t *testing.T) {
 			wantNot: []string{"script", "onclick", "class", "style"},
 		},
 		{
-			name:    "drops javascript: hrefs, keeps https and mailto, forces rel",
-			in:      `<a href="javascript:alert(1)" target="_blank">bad</a><a href="https://sweet.sh">ok</a><a href="mailto:a@b.c">m</a>`,
-			want:    []string{`<a href="https://sweet.sh" rel="noreferrer">ok</a>`, `<a href="mailto:a@b.c" rel="noreferrer">m</a>`},
-			wantNot: []string{"javascript", "target"},
+			name:    "drops javascript: hrefs; bare links get rel and, if external, target",
+			in:      `<a href="javascript:alert(1)" target="_blank">bad</a><a href="https://sweet.sh">ok</a><a href="mailto:a@b.c">m</a><a href="/p/x" target="_blank">rel</a>`,
+			want:    []string{`<a href="https://sweet.sh" rel="noreferrer noopener" target="_blank">ok</a>`, `<a href="mailto:a@b.c" rel="noreferrer">m</a>`, `<a href="/p/x" target="_blank" rel="noreferrer noopener">rel</a>`},
+			wantNot: []string{"javascript"}, // the bad anchor survives as an inert hrefless <a>
+
+		},
+		{
+			name:    "rejects target and rel values other than TipTap's",
+			in:      `<a href="https://sweet.sh" target="_top" rel="opener">x</a>`,
+			want:    []string{`<a href="https://sweet.sh" rel="noreferrer noopener" target="_blank">x</a>`},
+			wantNot: []string{"_top", `"opener"`},
 		},
 		{
 			name:    "mentions keep a valid uuid, lose an invalid one",
@@ -57,6 +64,34 @@ func TestBody(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+// TestFixedPoint: HTML as TipTap serialises it must come out of Body unchanged,
+// so an edit cycle (stored → editor → stored) is byte-stable. Fixtures mirror
+// web/src/editor/roundtrip.test.ts.
+func TestFixedPoint(t *testing.T) {
+	fixtures := []string{
+		`<p>Hello, world.</p>`,
+		`<h2>Heading two</h2><p>Body.</p>`,
+		`<p>Some <strong>bold</strong>, <em>italic</em> and <s>struck</s> text.</p>`,
+		`<p>See <a target="_blank" rel="noopener noreferrer nofollow" href="https://example.com/path?q=1">the docs</a>.</p>`,
+		`<p>Mail <a target="_blank" rel="noopener noreferrer nofollow" href="mailto:a@b.c">me</a>.</p>`,
+		`<ul><li><p>One</p></li><li><p>Two</p></li></ul>`,
+		`<ol><li><p>First</p></li><li><p>Second</p></li></ol>`,
+		`<blockquote><p>Quoted.</p></blockquote>`,
+		`<p>Line one<br>Line two</p>`,
+		`<p><strong><em>both</em></strong> and <strong><s>struck bold</s></strong></p>`,
+		// What TipTap emits after loading an API-authored link (see roundtrip.test.ts).
+		`<p><a target="_blank" rel="noreferrer noopener" href="https://sweet.sh">ok</a></p>`,
+	}
+	for _, f := range fixtures {
+		if got := Body(f); got != f {
+			t.Errorf("not a fixed point:\n in: %s\nout: %s", f, got)
+		}
+		if got := Body(Body(f)); got != f {
+			t.Errorf("not idempotent:\n in: %s\nout: %s", f, got)
+		}
 	}
 }
 
