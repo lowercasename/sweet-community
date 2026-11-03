@@ -6,7 +6,7 @@ The look is old Sweet's colour scheme on its dotted paper, nothing else: Ubuntu,
 
 Buttons have three variants and no others: `primary` (filled pink), `secondary` (outlined), `ghost` (bare; also the toggle style with `pressed`).
 
-There is no header. Posts and chat sit either side of a draggable divider (`ui/Split`): drag to resize, drag a pane past the edge and it folds into a vertical rail (`ui/Rail`) that reopens it; the divider is keyboard-operable (arrows, Home/End) and double-click resets. Below 800px one pane shows and a bottom tab bar (`ui/TabBar`) switches. Width and open panes persist per browser.
+There is no header. A collapsible nav column on the left (`components/Sidebar`: the S mark, Home, Search, Notifications, People, Settings, the account, and an expand control at the bottom; only Home is live) and then posts and chat either side of a draggable divider (`ui/Split`): drag to resize, drag a pane past the edge and it folds into a vertical rail (`ui/Rail`) that reopens it; the divider is keyboard-operable (arrows, Home/End) and double-click resets. Below 800px the nav column goes and a bottom tab bar (`ui/TabBar`) carries Posts, Chat, Search, Alerts and Menu. Width, open panes and nav expansion persist per browser.
 
 ## Commands
 
@@ -25,7 +25,7 @@ Run the backend from the repo root (`make dev-backend`) alongside `pnpm dev`. Th
 
 Everything is a component, down to the smallest bit of HTML.
 
-- `src/ui/` — primitives. Each wraps one HTML element or one layout concern and is the **only** place that element appears: `Box`, `Stack`, `Row`, `Text`, `Heading`, `Link`, `Button`, `Time`, `Hairline`, `Form`, `HtmlContent`, `EditorSurface`, `Icon`, `Split`, `Panes`, `Pane`, `Rail`, `TabBar`, `Card`, `Bar`, `ScrollArea`, `Measure`. Tailwind classes appear only here; `pnpm check:atomic` fails on a `className` or `style` prop anywhere in `components/` or `pages/`. The two non-utility rule sets (`.content` for rendered bodies, `.editor` for TipTap) are in `src/global.css`.
+- `src/ui/` — primitives. Each wraps one HTML element or one layout concern and is the **only** place that element appears: `Box`, `Stack`, `Row`, `Text`, `Heading`, `Link`, `Button`, `Time`, `Hairline`, `Form`, `HtmlContent`, `EditorSurface`, `Icon`, `Shell`, `NavBar`, `NavItem`, `NavAccount`, `Wordmark`, `Avatar`, `Split`, `Panes`, `Pane`, `Rail`, `TabBar`, `Card`, `Bar`, `ScrollArea`, `Measure`. Tailwind classes appear only here; `pnpm check:atomic` fails on a `className` or `style` prop anywhere in `components/` or `pages/`. The two non-utility rule sets (`.content` for rendered bodies, `.editor` for TipTap) are in `src/global.css`.
 - `src/components/` — composites built only from `src/ui/` primitives and other components: `Header`, `ConnectionStatus`, `Post`, `PostList`, `Composer`.
 - `src/pages/` — `Feed`.
 - `HtmlContent` is the one component allowed to use `dangerouslySetInnerHTML`. It renders HTML the server has already sanitised (bluemonday). Never pass it client-generated HTML.

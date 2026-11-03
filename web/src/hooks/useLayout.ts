@@ -5,6 +5,7 @@ export type Layout = 'both' | 'posts' | 'chat'
 
 const KEY = 'sweet.layout'
 const SPLIT_KEY = 'sweet.split'
+const NAV_KEY = 'sweet.nav'
 const NARROW = '(max-width: 799px)'
 
 function read(key: string): string | null {
@@ -38,15 +39,17 @@ export function useMediaQuery(query: string): boolean {
 }
 
 /**
- * Which panes are open, and how wide the posts pane is. Both persist per
- * browser; on a narrow screen only one pane shows, so `both` resolves to chat.
+ * Which panes are open, how wide the posts pane is, and whether the nav is
+ * expanded. All persist per browser; on a narrow screen only one pane shows, so `both` resolves to chat.
  */
 export function useLayout(): {
   layout: Layout
   narrow: boolean
   ratio: number
+  navExpanded: boolean
   setLayout: (l: Layout) => void
   setRatio: (r: number) => void
+  toggleNav: () => void
 } {
   const [stored, setStored] = useState<Layout>(() => {
     const v = read(KEY)
@@ -56,6 +59,7 @@ export function useLayout(): {
     const v = Number(read(SPLIT_KEY))
     return v >= SPLIT_MIN && v <= SPLIT_MAX ? v : SPLIT_DEFAULT
   })
+  const [navExpanded, setNavExpanded] = useState(() => read(NAV_KEY) === 'expanded')
   const narrow = useMediaQuery(NARROW)
 
   const setLayout = (l: Layout) => {
@@ -67,6 +71,12 @@ export function useLayout(): {
     write(SPLIT_KEY, String(r))
   }
 
+  const toggleNav = () => {
+    const next = !navExpanded
+    setNavExpanded(next)
+    write(NAV_KEY, next ? 'expanded' : 'collapsed')
+  }
+
   const layout: Layout = narrow && stored === 'both' ? 'chat' : stored
-  return { layout, narrow, ratio, setLayout, setRatio }
+  return { layout, narrow, ratio, navExpanded, setLayout, setRatio, toggleNav }
 }
