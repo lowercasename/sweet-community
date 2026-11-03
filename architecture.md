@@ -69,7 +69,7 @@ Chat messages use a subset of the same TipTap schema (paragraph, text, link, men
 
 Replies: a `reply_to` column on messages, rendered as a quoted snippet above the reply, flat in the room (the WhatsApp/Telegram shape). No Slack-style threads; they would turn the room into a second feed.
 
-Layout: one page, posts on the left (2/5) and chat on the right (3/5), each pane scrolling on its own under a fixed header. Either pane can be closed and reopened from the header; the choice persists per browser. Below 800px only one pane shows and the header switches between them (chat by default). One SSE connection per page, fanned out to whichever panes are mounted; a pane that was closed refetches its first page when reopened rather than replaying events.
+Layout: one page and no header. Posts on the left and chat on the right, each scrolling on its own, with a draggable divider between them (default 2:3, clamped 1:3 to 3:2). Dragging a pane past the edge folds it into a thin vertical rail that reopens it. Width and open panes persist per browser. Below 800px only one pane shows and a bottom tab bar switches between them (chat by default). Instance name and account controls have no home on this page yet; they arrive with accounts. One SSE connection per page, fanned out to whichever panes are mounted; a pane that was closed refetches its first page when reopened rather than replaying events.
 
 ### Embeds and link previews
 

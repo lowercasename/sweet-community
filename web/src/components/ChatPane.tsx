@@ -7,8 +7,8 @@ import { ConnectionStatus } from './ConnectionStatus'
 import { Message } from './Message'
 
 interface ChatPaneProps {
-  /** Rails shell: fold this pane into its rail. */
-  onCollapse?: () => void
+  /** Which outer edge is padded; `left`/`right` inside a Split. */
+  side?: 'left' | 'right' | 'full'
 }
 
 const GROUP_WINDOW_MS = 5 * 60_000
@@ -24,7 +24,7 @@ function append(list: MessageData[], m: MessageData): MessageData[] {
   return [...list, m].sort((a, b) => a.created_at - b.created_at)
 }
 
-export function ChatPane({ onCollapse }: ChatPaneProps) {
+export function ChatPane({ side = 'full' }: ChatPaneProps) {
   const status = useStreamStatus()
   const [messages, setMessages] = useState<MessageData[]>([])
   const [nextBefore, setNextBefore] = useState<number | null>(null)
@@ -99,13 +99,7 @@ export function ChatPane({ onCollapse }: ChatPaneProps) {
   }
 
   return (
-    <Pane>
-      {onCollapse && (
-        <Row justify="between">
-          <Row />
-          <Button variant="ghost" icon="panel-right-close" label="Hide chat" onClick={onCollapse} />
-        </Row>
-      )}
+    <Pane side={side}>
       <Card fill>
         <ScrollArea ref={scrollRef} pad="inner" onScroll={onScroll}>
           <Stack gap={2}>

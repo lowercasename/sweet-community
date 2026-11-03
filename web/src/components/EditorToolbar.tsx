@@ -30,23 +30,19 @@ export function EditorToolbar({ editor }: EditorToolbarProps) {
     <Row gap={0} align="center">
       <Button
         variant="ghost"
+        icon="bold"
         label="Bold"
         pressed={!!active?.bold}
         onClick={() => editor.chain().focus().toggleBold().run()}
-      >
-        <strong>B</strong>
-      </Button>
+      />
       <Button
         variant="ghost"
+        icon="italic"
         label="Italic"
         pressed={!!active?.italic}
         onClick={() => editor.chain().focus().toggleItalic().run()}
-      >
-        <em>I</em>
-      </Button>
-      <Button variant="ghost" label="Link" pressed={!!active?.link} onClick={() => promptLink(editor)}>
-        Link
-      </Button>
+      />
+      <Button variant="ghost" icon="link" label="Link" pressed={!!active?.link} onClick={() => promptLink(editor)} />
     </Row>
   )
 }

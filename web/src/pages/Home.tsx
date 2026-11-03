@@ -3,22 +3,18 @@ import { getMe, type User } from '../api'
 import { StreamProvider } from '../hooks/StreamContext'
 import { useLayout } from '../hooks/useLayout'
 import { ChatPane } from '../components/ChatPane'
-import { Header } from '../components/Header'
 import { PostsPane } from '../components/PostsPane'
-import { Button, Panes, Rail, Row, type PanesLayout } from '../ui'
+import { Panes, Rail, Split, TabBar } from '../ui'
 
 /**
- * The one page: posts on the left, chat on the right. Either pane can be
- * collapsed; on a narrow screen only one shows and the header switches.
- *
- * Two shell treatments are in here while we choose (localStorage sweet.ui):
- *   rails  – a collapse button at each pane's outer corner; a collapsed pane
- *            becomes a thin vertical rail that reopens it.
- *   header – panel toggles in the header; a collapsed pane just disappears.
+ * The one page, no header: posts on the left, chat on the right, a draggable
+ * divider between them. Drag a pane shut and it folds into a Rail; click the
+ * rail to bring it back. On a narrow screen one pane shows and a tab bar at
+ * the bottom switches.
  */
 export function Home() {
   const [me, setMe] = useState<User | null>(null)
-  const { layout, narrow, ui, setLayout } = useLayout()
+  const { layout, narrow, ratio, setLayout, setRatio } = useLayout()
 
   useEffect(() => {
     getMe()
@@ -26,64 +22,46 @@ export function Home() {
       .catch(() => setMe(null))
   }, [])
 
-  const showPosts = layout !== 'chat'
-  const showChat = layout !== 'posts'
-
-  // Narrow: a two-way switch in the header, whichever shell.
-  const narrowActions = (
-    <Row gap={0} align="center">
-      <Button variant="ghost" icon="posts" pressed={showPosts} onClick={() => setLayout('posts')}>
-        Posts
-      </Button>
-      <Button variant="ghost" icon="chat" pressed={showChat} onClick={() => setLayout('chat')}>
-        Chat
-      </Button>
-    </Row>
-  )
-
-  // Wide, header shell: two panel toggles.
-  const headerActions = (
-    <Row gap={0} align="center">
-      <Button
-        variant="ghost"
-        icon="panel-left"
-        label={showPosts ? 'Hide posts' : 'Show posts'}
-        pressed={showPosts}
-        onClick={() => setLayout(showPosts ? 'chat' : 'both')}
+  let body
+  if (narrow) {
+    body = (
+      <>
+        <Panes layout="single">{layout === 'posts' ? <PostsPane me={me} /> : <ChatPane />}</Panes>
+        <TabBar
+          tabs={[
+            { key: 'posts', label: 'Posts' },
+            { key: 'chat', label: 'Chat' },
+          ]}
+          active={layout === 'posts' ? 'posts' : 'chat'}
+          onSelect={setLayout}
+        />
+      </>
+    )
+  } else if (layout === 'both') {
+    body = (
+      <Split
+        ratio={ratio}
+        onRatio={setRatio}
+        onCollapse={(side) => setLayout(side === 'left' ? 'chat' : 'posts')}
+        left={<PostsPane me={me} side="left" />}
+        right={<ChatPane side="right" />}
       />
-      <Button
-        variant="ghost"
-        icon="panel-right"
-        label={showChat ? 'Hide chat' : 'Show chat'}
-        pressed={showChat}
-        onClick={() => setLayout(showChat ? 'posts' : 'both')}
-      />
-    </Row>
-  )
-
-  const rails = ui === 'rails' && !narrow
-  let panesLayout: PanesLayout = 'single'
-  if (showPosts && showChat) panesLayout = 'split'
-  else if (rails) panesLayout = showPosts ? 'right-rail' : 'left-rail'
-
-  return (
-    <StreamProvider>
-      <Header
-        username={me?.username ?? null}
-        actions={narrow ? narrowActions : ui === 'header' ? headerActions : undefined}
-      />
-      <Panes layout={panesLayout}>
-        {showPosts ? (
-          <PostsPane me={me} onCollapse={rails && showChat ? () => setLayout('chat') : undefined} />
-        ) : (
-          rails && <Rail side="left" label="Posts" onOpen={() => setLayout('both')} />
-        )}
-        {showChat ? (
-          <ChatPane onCollapse={rails && showPosts ? () => setLayout('posts') : undefined} />
-        ) : (
-          rails && <Rail side="right" label="Chat" onOpen={() => setLayout('both')} />
-        )}
+    )
+  } else if (layout === 'posts') {
+    body = (
+      <Panes layout="right-rail">
+        <PostsPane me={me} />
+        <Rail side="right" label="Chat" onOpen={() => setLayout('both')} />
       </Panes>
-    </StreamProvider>
-  )
+    )
+  } else {
+    body = (
+      <Panes layout="left-rail">
+        <Rail side="left" label="Posts" onOpen={() => setLayout('both')} />
+        <ChatPane />
+      </Panes>
+    )
+  }
+
+  return <StreamProvider>{body}</StreamProvider>
 }

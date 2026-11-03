@@ -8,8 +8,8 @@ import { PostList } from './PostList'
 
 interface PostsPaneProps {
   me: User | null
-  /** Rails shell: fold this pane into its rail. */
-  onCollapse?: () => void
+  /** Which outer edge is padded; `left`/`right` inside a Split. */
+  side?: 'left' | 'right' | 'full'
 }
 
 function isPost(data: unknown): data is Post {
@@ -27,7 +27,7 @@ function replace(posts: Post[], incoming: Post): Post[] {
   return posts.map((p) => (p.id === incoming.id ? incoming : p))
 }
 
-export function PostsPane({ me, onCollapse }: PostsPaneProps) {
+export function PostsPane({ me, side = 'full' }: PostsPaneProps) {
   const status = useStreamStatus()
   const [posts, setPosts] = useState<Post[]>([])
   const [nextBefore, setNextBefore] = useState<number | null>(null)
@@ -93,12 +93,7 @@ export function PostsPane({ me, onCollapse }: PostsPaneProps) {
   }
 
   return (
-    <Pane>
-      {onCollapse && (
-        <Row>
-          <Button variant="ghost" icon="panel-left-close" label="Hide posts" onClick={onCollapse} />
-        </Row>
-      )}
+    <Pane side={side}>
       <ScrollArea>
         <Measure>
           <Stack gap={3}>
