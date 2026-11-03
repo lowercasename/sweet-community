@@ -58,13 +58,13 @@ export function Home() {
     body = (
       <Panes layout="right-rail">
         <PostsPane me={me} />
-        <Rail side="right" label="Chat" onOpen={() => setLayout('both')} />
+        <Rail side="right" icon="chat" label="Chat" onOpen={() => setLayout('both')} />
       </Panes>
     )
   } else {
     body = (
       <Panes layout="left-rail">
-        <Rail side="left" label="Posts" onOpen={() => setLayout('both')} />
+        <Rail side="left" icon="posts" label="Posts" onOpen={() => setLayout('both')} />
         <ChatPane />
       </Panes>
     )
