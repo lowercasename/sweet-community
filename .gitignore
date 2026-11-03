@@ -1,0 +1,9 @@
+.DS_Store
+data/
+*.db
+*.db-*
+node_modules/
+web/dist/
+internal/web/dist/*
+!internal/web/dist/index.html
+bin/
