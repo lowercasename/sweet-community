@@ -1,7 +1,13 @@
 import type { ReactNode } from 'react'
 import type { Gap } from './Stack'
 
-const GAPS: Record<Gap, string> = { 0: 'gap-0', 1: 'gap-1', 2: 'gap-2', 3: 'gap-4', 4: 'gap-8' }
+const GAPS: Record<Gap, string> = {
+  0: 'gap-0',
+  1: 'gap-1',
+  2: 'gap-2',
+  3: 'gap-4',
+  4: 'gap-8',
+}
 
 interface RowProps {
   gap?: Gap

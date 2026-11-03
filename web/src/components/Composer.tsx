@@ -89,7 +89,7 @@ export function Composer({ disabled, onSubmit, initialHtml, submitLabel, onCance
           <EditorToolbar editor={editor} />
           <Row gap={3} align="center">
             {onCancel && (
-              <Button variant="quiet" disabled={busy} onClick={onCancel}>
+              <Button variant="ghost" disabled={busy} onClick={onCancel}>
                 Cancel
               </Button>
             )}

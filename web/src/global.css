@@ -1,13 +1,11 @@
 @import 'tailwindcss';
 
 /*
- * Sweet's kit, carried over from the 2019 stylesheet: Ubuntu, Quicksand for
- * the wordmark, The Best Red, pinks lightened from it, white cards on dotted
- * paper. Everything below is a token; the ui/ primitives spend them.
+ * Sweet's colours, carried over from the 2019 stylesheet, on Sweet's dotted
+ * paper. Nothing else is decorative. The ui/ primitives spend these tokens.
  */
 @theme {
   --font-sans: 'Ubuntu', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
-  --font-display: 'Quicksand', 'Ubuntu', system-ui, sans-serif;
 
   --color-ink: #1a1717;
   --color-paper: #fcfcfc;
@@ -23,9 +21,6 @@
   --color-sky: #2a8fcb;
 
   --radius-card: 6px;
-  --shadow-card: 0 0 6px rgba(0, 0, 0, 0.12);
-  --shadow-button: 2px 2px 3px rgba(0, 0, 0, 0.15);
-  --shadow-button-down: 1px 1px 1px rgba(0, 0, 0, 0.2);
 }
 
 @layer base {
@@ -107,16 +102,14 @@
     padding-left: 1.4em;
   }
 
-  /* The editing surface itself. */
+  /* The editing surface: white, a hairline, pink when focused. */
   .editor .ProseMirror {
     outline: none;
     padding: 0.5rem 0.75rem;
-    background: var(--color-field);
+    background: var(--color-card);
     border: 1px solid var(--color-line);
-    border-radius: 3px;
-    transition:
-      border-color 0.15s ease-in-out,
-      background-color 0.15s ease-in-out;
+    border-radius: 4px;
+    transition: border-color 0.15s ease-in-out;
   }
   .editor-post .ProseMirror {
     min-height: 6em;
@@ -128,7 +121,6 @@
   }
   .editor .ProseMirror-focused {
     border-color: var(--color-pink);
-    background: var(--color-card);
   }
 }
 

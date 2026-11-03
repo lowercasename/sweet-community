@@ -14,7 +14,11 @@ function relative(at: number, now: number): string {
   if (h < 24) return `${h}h ago`
   const d = Math.round(h / 24)
   if (d < 30) return `${d}d ago`
-  return new Date(at).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' })
+  return new Date(at).toLocaleDateString(undefined, {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+  })
 }
 
 /** Re-renders once a minute so "3m ago" keeps up. */

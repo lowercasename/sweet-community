@@ -8,9 +8,6 @@ importers:
 
   .:
     dependencies:
-      '@fontsource/quicksand':
-        specifier: ^5.3.0
-        version: 5.3.0
       '@fontsource/ubuntu':
         specifier: ^5.3.0
         version: 5.3.0
@@ -29,6 +26,9 @@ importers:
       '@tiptap/starter-kit':
         specifier: ^3.32.2
         version: 3.32.2
+      lucide-react:
+        specifier: ^1.66.0
+        version: 1.66.0(@types/react@18.3.31)(react@18.3.1)
       react:
         specifier: ^18.3.1
         version: 18.3.1
@@ -310,9 +310,6 @@ packages:
 
   '@floating-ui/utils@0.2.12':
     resolution: {integrity: sha512-HpCo8tmWzLVad5s2d19EhAz5zqrrQ6s69qd6moPMQvkOuSwDT1YgRfWSVuc4ennqrgv3OHppiOGMQ7oC13yIww==}
-
-  '@fontsource/quicksand@5.3.0':
-    resolution: {integrity: sha512-epmMUyXI39f88bZSCyKlHTZqUWg4O7DqrTXOKqsqbVKMLshX9RtIYCUIw+G2nOfEwdIHIjYbeWdwHRcEzRXBRQ==}
 
   '@fontsource/ubuntu@5.3.0':
     resolution: {integrity: sha512-LsjJXgE430QLs8LKfn1RIFbbdGAiZBU1gao8ASa4Z2kGNGh7lMb7Rzx09v3bLLuuK+3XA/JSLgPWTAbLD6r1fg==}
@@ -997,6 +994,15 @@ packages:
   lru-cache@5.1.1:
     resolution: {integrity: sha512-KpNARQA3Iwv+jTA0utUVVbrh+Jlrr1Fv0e56GGzAFOXN7dk/FviaDW8LHmK52DlcH4WP2n6gI8vN1aesBFgo9w==}
 
+  lucide-react@1.66.0:
+    resolution: {integrity: sha512-8zjbi/Us+ETXqfBwmXF/FHrWGIqOdE6zT1yUdRJLQVoptomSkB0zdFWVIM667t9K8djWDaXdkBkqi2qVTuDNiw==}
+    peerDependencies:
+      '@types/react': '*'
+      react: ^16.5.1 || ^17.0.0 || ^18.0.0 || ^19.0.0
+    peerDependenciesMeta:
+      '@types/react':
+        optional: true
+
   magic-string@1.4.5:
     resolution: {integrity: sha512-oLLC2+YvQUfAa+vxoufE/yc1icb87M9iXIRqAoR/2EhE/8cb3SF/+Gi0c2By1B+5Vz2e2vQtUvHiu1+63Znh+w==}
 
@@ -1455,8 +1461,6 @@ snapshots:
 
   '@floating-ui/utils@0.2.12':
     optional: true
-
-  '@fontsource/quicksand@5.3.0': {}
 
   '@fontsource/ubuntu@5.3.0': {}
 
@@ -2049,6 +2053,12 @@ snapshots:
   lru-cache@5.1.1:
     dependencies:
       yallist: 3.1.1
+
+  lucide-react@1.66.0(@types/react@18.3.31)(react@18.3.1):
+    dependencies:
+      react: 18.3.1
+    optionalDependencies:
+      '@types/react': 18.3.31
 
   magic-string@1.4.5:
     dependencies:

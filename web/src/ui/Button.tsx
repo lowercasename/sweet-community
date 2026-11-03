@@ -1,45 +1,59 @@
 import type { ReactNode } from 'react'
+import { Icon, type IconName } from './Icon'
 
 interface ButtonProps {
-  /** `primary` is the pink pill; `quiet` is grey text; `tool` is a toolbar toggle. */
-  variant?: 'primary' | 'quiet' | 'tool'
+  /** `primary` is filled pink; `secondary` is outlined; `ghost` is bare text or an icon. */
+  variant?: 'primary' | 'secondary' | 'ghost'
   type?: 'button' | 'submit'
   disabled?: boolean
-  /** Toolbar toggles only: the mark is active at the cursor. */
+  /** Toggles: the state is on (aria-pressed). */
   pressed?: boolean
-  /** Accessible name when the label is a symbol (toolbar). */
+  /** Accessible name; required when the button has no text. */
   label?: string
+  icon?: IconName
   onClick?: () => void
   children?: ReactNode
 }
 
 const BASE =
-  'm-0 cursor-pointer appearance-none font-sans text-[inherit] transition-colors duration-150 ' +
+  'inline-flex items-center justify-center gap-1.5 rounded-[4px] font-sans text-[inherit] leading-6 ' +
+  'cursor-pointer appearance-none transition-colors duration-150 ' +
   'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-pink disabled:cursor-default'
 
 const VARIANTS: Record<NonNullable<ButtonProps['variant']>, string> = {
   primary:
-    'rounded-[3px] border-0 bg-pink px-3 py-1 font-medium text-white shadow-button ' +
-    'hover:bg-sweet hover:shadow-button-down active:shadow-button-down ' +
-    'disabled:bg-line disabled:text-mute disabled:shadow-none',
-  quiet: 'border-0 bg-transparent p-0 text-mute underline-offset-2 hover:text-sweet hover:underline disabled:text-line',
-  tool:
-    'min-w-7 rounded-[3px] border border-line bg-card px-1.5 py-0 text-sm leading-6 text-ink ' +
-    'hover:border-pink hover:text-sweet aria-pressed:border-pink aria-pressed:bg-blush aria-pressed:text-sweet',
+    'border border-pink bg-pink font-medium text-white hover:border-sweet hover:bg-sweet disabled:border-line disabled:bg-line disabled:text-mute',
+  secondary:
+    'border border-line bg-card text-ink hover:border-pink hover:text-sweet disabled:text-mute disabled:hover:border-line',
+  ghost:
+    'border border-transparent bg-transparent text-mute hover:bg-field hover:text-ink ' +
+    'aria-pressed:bg-blush aria-pressed:text-sweet disabled:text-line disabled:hover:bg-transparent',
 }
 
-export function Button({ variant = 'primary', type = 'button', disabled, pressed, label, onClick, children }: ButtonProps) {
+export function Button({
+  variant = 'primary',
+  type = 'button',
+  disabled,
+  pressed,
+  label,
+  icon,
+  onClick,
+  children,
+}: ButtonProps) {
+  const iconOnly = icon !== undefined && children === undefined
+  const pad = iconOnly ? 'p-1.5' : 'px-3 py-1'
   return (
     <button
-      className={`${BASE} ${VARIANTS[variant]}`}
+      className={`${BASE} ${VARIANTS[variant]} ${pad}`}
       type={type}
       disabled={disabled}
-      aria-pressed={variant === 'tool' ? !!pressed : undefined}
-      aria-label={label}
+      aria-pressed={pressed === undefined ? undefined : pressed}
+      aria-label={iconOnly ? label : undefined}
       title={label}
-      onMouseDown={variant === 'tool' ? (e) => e.preventDefault() : undefined} // keep editor focus
+      onMouseDown={pressed === undefined ? undefined : (e) => e.preventDefault()} // toggles keep editor focus
       onClick={onClick}
     >
+      {icon && <Icon name={icon} />}
       {children}
     </button>
   )

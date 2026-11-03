@@ -18,7 +18,12 @@ export const ScrollArea = forwardRef<HTMLDivElement, ScrollAreaProps>(function S
   ref,
 ) {
   return (
-    <div ref={ref} data-scroll className={`min-h-0 flex-1 overflow-y-auto overscroll-contain ${PADS[pad]}`} onScroll={onScroll}>
+    <div
+      ref={ref}
+      data-scroll
+      className={`min-h-0 flex-1 overflow-y-auto overscroll-contain ${PADS[pad]}`}
+      onScroll={onScroll}
+    >
       {children}
     </div>
   )

@@ -36,7 +36,10 @@ export function ChatInput({ disabled, onSend }: ChatInputProps) {
     },
   })
 
-  const isEmpty = useEditorState({ editor, selector: ({ editor }) => (editor ? editor.isEmpty : true) })
+  const isEmpty = useEditorState({
+    editor,
+    selector: ({ editor }) => (editor ? editor.isEmpty : true),
+  })
   const canSend = !!editor && !isEmpty && !disabled && !busy
 
   const send = async () => {

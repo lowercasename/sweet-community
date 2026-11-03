@@ -2,7 +2,7 @@
 
 ## Stack
 
-Backend: Golang. Frontend: React with Tailwind, in old Sweet's clothes (Ubuntu, The Best Red, white cards on dotted paper). Database: SQLite (no ORM; sqlc for typed queries). The unit is a single Go binary with the React build and migrations embedded: small and portable, what a Debian package wraps, what a self-hoster who hates Docker can run on its own. The distribution artefact is a very simple Docker compose stack around it: the binary, Caddy (a custom build including the Cloudflare DNS module, see Domains), Litestream.
+Backend: Golang. Frontend: React with Tailwind and Lucide, in old Sweet's colours on its dotted paper. Database: SQLite (no ORM; sqlc for typed queries). The unit is a single Go binary with the React build and migrations embedded: small and portable, what a Debian package wraps, what a self-hoster who hates Docker can run on its own. The distribution artefact is a very simple Docker compose stack around it: the binary, Caddy (a custom build including the Cloudflare DNS module, see Domains), Litestream.
 
 Go was kept over TypeScript end to end (see record). Post bodies are TipTap's HTML, sanitised by bluemonday (see Posts and editor).
 

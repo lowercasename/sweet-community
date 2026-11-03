@@ -26,7 +26,9 @@ export function Post({ post, canEdit, disabled, onEdit }: PostProps) {
       <Stack gap={2}>
         <Row justify="between" align="baseline">
           <Row gap={2} align="baseline">
-            <Text as="span" variant="name">{post.author.username}</Text>
+            <Text as="span" variant="name">
+              {post.author.username}
+            </Text>
             <Text as="span" variant="small">
               <Time at={post.created_at} />
               {post.edited_at != null && (
@@ -38,7 +40,7 @@ export function Post({ post, canEdit, disabled, onEdit }: PostProps) {
             </Text>
           </Row>
           {canEdit && !editing && (
-            <Button variant="quiet" onClick={() => setEditing(true)}>
+            <Button variant="ghost" onClick={() => setEditing(true)}>
               Edit
             </Button>
           )}

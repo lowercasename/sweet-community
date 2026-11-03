@@ -4,12 +4,12 @@ import { useStreamEvents, useStreamStatus } from '../hooks/StreamContext'
 import { Button, Card, Measure, Pane, Row, ScrollArea, Stack, Text } from '../ui'
 import { Composer } from './Composer'
 import { ConnectionStatus } from './ConnectionStatus'
-import { PaneTitle } from './PaneTitle'
 import { PostList } from './PostList'
 
 interface PostsPaneProps {
   me: User | null
-  onClose?: () => void
+  /** Rails shell: fold this pane into its rail. */
+  onCollapse?: () => void
 }
 
 function isPost(data: unknown): data is Post {
@@ -27,7 +27,7 @@ function replace(posts: Post[], incoming: Post): Post[] {
   return posts.map((p) => (p.id === incoming.id ? incoming : p))
 }
 
-export function PostsPane({ me, onClose }: PostsPaneProps) {
+export function PostsPane({ me, onCollapse }: PostsPaneProps) {
   const status = useStreamStatus()
   const [posts, setPosts] = useState<Post[]>([])
   const [nextBefore, setNextBefore] = useState<number | null>(null)
@@ -94,7 +94,11 @@ export function PostsPane({ me, onClose }: PostsPaneProps) {
 
   return (
     <Pane>
-      <PaneTitle title="Posts" onClose={onClose} />
+      {onCollapse && (
+        <Row>
+          <Button variant="ghost" icon="panel-left-close" label="Hide posts" onClick={onCollapse} />
+        </Row>
+      )}
       <ScrollArea>
         <Measure>
           <Stack gap={3}>
@@ -113,7 +117,7 @@ export function PostsPane({ me, onClose }: PostsPaneProps) {
               {loadError && <Text variant="secondary">{loadError}</Text>}
               {nextBefore != null && (
                 <Row>
-                  <Button variant="quiet" disabled={loading} onClick={() => void loadMore()}>
+                  <Button variant="secondary" disabled={loading} onClick={() => void loadMore()}>
                     {loading ? 'Loading…' : 'Load more'}
                   </Button>
                 </Row>

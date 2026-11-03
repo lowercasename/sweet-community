@@ -25,7 +25,7 @@ const fixtures: Record<string, string> = {
   blockquote: '<blockquote><p>Quoted.</p></blockquote>',
   'hard break': '<p>Line one<br>Line two</p>',
   'nested marks': '<p><strong><em>both</em></strong> and <strong><s>struck bold</s></strong></p>',
-  'everything': [
+  everything: [
     '<h2>Title</h2>',
     '<p>Intro with <strong>bold</strong>, <em>italic</em>, <s>strike</s> and ',
     '<a target="_blank" rel="noopener noreferrer nofollow" href="https://example.com">a link</a>.</p>',

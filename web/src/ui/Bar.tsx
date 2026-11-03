@@ -8,7 +8,7 @@ interface BarProps {
 }
 
 const EDGES: Record<BarProps['edge'], string> = {
-  header: 'border-b-2 border-pink bg-card px-4 py-2 shadow-card',
+  header: 'border-b-2 border-pink bg-card px-4 py-2',
   footer: 'border-t border-line bg-card px-3 py-2',
 }
 
