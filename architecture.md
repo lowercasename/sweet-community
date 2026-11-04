@@ -34,6 +34,8 @@ SSE for the read side, plain POSTs to the API for sends. Plain HTTP, so cookie a
 
 Every event carries an `id:` line holding the event log's integer sequence, so the browser's own `Last-Event-ID` reconnect is served straight from SQLite; `?since=<seq>` is the same query on the manual path. No in-memory replay buffer: SQLite is the buffer.
 
+**Two event kinds per resource, no more.** `post`, `comment`, `message` and `user` each carry the whole resource and mean "this is its current state": create and edit are the same event. `post_delete`, `comment_delete`, `message_delete` carry the ids (the comment's includes its post's). Nothing else. The client cache therefore has exactly one upsert and one delete per resource, and a new feature adds a resource, not a kind. (Reversed from an earlier `post_edit` / `comment_edit`, which were accreting.)
+
 Reconnects are common on mobile (the test is a UK train), and iOS kills background SSE sockets silently: on iOS 18 the `error` event does not fire and `readyState` stays OPEN while the socket is dead, so the browser's auto-reconnect never triggers. Therefore:
 
 - the server sends a `:` heartbeat comment every 15 s; the client treats 30–45 s of silence as a dead connection. The heartbeat write also lets the server detect dead clients and free their goroutines, and keeps the stream alive through Cloudflare's 125 s read timeout if the domain is ever proxied;
@@ -49,7 +51,7 @@ TipTap, with a small schema (paragraph, heading, text, bold, italic, link, menti
 
 **HTML only, no JSON column (relitigated, confirmed).** What locks you in is the schema, not the format, and HTML degrades better: ProseMirror JSON is meaningless without the exact extension set and attribute names, while HTML renders in any browser and imports into any editor if TipTap is ever replaced. Sweet's own database had four body formats from three editor changes; the HTML column is the one that still renders. Storing JSON alongside would be a second, unvalidatable source of truth that drifts from the sanitised HTML. Reconsider only if collaborative editing (Yjs) is ever wanted. Guard against TipTap upgrades changing serialisation with a round-trip fixture test in the frontend (`setContent(html)` → `getHTML()` equals input, normalised); pin TipTap versions and upgrade deliberately.
 
-Edits: the client loads `body_html` into the editor with `setContent`, the user edits, and `getHTML()` goes back through the same sanitiser. The whole body is the unit of edit (`PUT /api/posts/{id}`, author only, sets `edited_at`); no diffs, no versions. Live clients get a `post_edit` event carrying the full post and replace it in place. The sanitiser accepts TipTap's link attributes (`target="_blank" rel="noopener noreferrer nofollow"`) verbatim, so stored HTML is byte-identical to editor output and an edit cycle is a fixed point; a Go test (`TestFixedPoint`) and the frontend round-trip test share their fixtures.
+Edits: the client loads `body_html` into the editor with `setContent`, the user edits, and `getHTML()` goes back through the same sanitiser. The whole body is the unit of edit (`PUT /api/posts/{id}`, author only, sets `edited_at`); no diffs, no versions. Live clients get a `post` event carrying the full post and replace it in place. The sanitiser accepts TipTap's link attributes (`target="_blank" rel="noopener noreferrer nofollow"`) verbatim, so stored HTML is byte-identical to editor output and an edit cycle is a fixed point; a Go test (`TestFixedPoint`) and the frontend round-trip test share their fixtures.
 
 **bluemonday is the gate.** Every body (post, comment, chat message) passes through one bluemonday policy before storage. The policy *is* the schema: the allowed tags and attributes, `href` limited to http/https/mailto, `rel="noopener noreferrer"` forced on links, no `class`/`style`/`target`/event attributes, `data-mention-id` on `span` matching a UUID pattern, `data-image-id` on `img` matching a UUID pattern, `src` on `img` limited to our own `/img/<id>` path, `data-embed-url` http(s) only. Nothing the client sends is trusted before the policy; everything after it is. Hard caps on body size.
 
@@ -69,7 +71,7 @@ Chat messages use a subset of the same TipTap schema (paragraph, text, link, men
 
 Replies: a `reply_to` column on messages, rendered as a quoted snippet above the reply, flat in the room (the WhatsApp/Telegram shape). No Slack-style threads; they would turn the room into a second feed.
 
-Layout: one page and no header. A collapsible nav column on the left (wordmark, Home, Search, Notifications, People, Settings, account, expand control), then posts and chat, each scrolling on its own, with a draggable divider between them (default 2:3, clamped 1:3 to 3:2). Dragging a pane past the edge folds it into a thin vertical rail that reopens it. Width and open panes persist per browser. Below 800px the nav column goes, one pane shows, and a bottom tab bar carries Posts, Chat, Search, Alerts and a Menu item (People, Settings, account) in that order. One SSE connection per page, fanned out to whichever panes are mounted; a pane that was closed refetches its first page when reopened rather than replaying events.
+Layout: one page and no header. A collapsible nav column on the left (wordmark, Home, Search, Notifications, People, Settings, account, expand control), then posts and chat, each scrolling on its own, with a draggable divider between them (default 2:3, clamped 1:3 to 3:2). Dragging a pane past the edge folds it into a thin vertical rail that reopens it. Width and open panes persist per browser. Below 800px the nav column goes, one pane shows, and a bottom tab bar carries Posts, Chat, Search, Alerts and a Menu item (People, Settings, account) in that order. One SSE connection per page. Both panes stay mounted whatever is showing: a closed pane is hidden, not unmounted, so a half-written post or message survives closing its pane or visiting Settings. (Reversed from "a closed pane refetches when reopened", which threw drafts away.)
 
 ### Embeds and link previews
 
@@ -79,7 +81,7 @@ SSRF: the fetcher uses a safe-by-default HTTP client library (e.g. `doyensec/saf
 
 ### Images
 
-Uploads go to S3-compatible storage (Cloudflare R2 for hosted instances) from day one; endpoint, bucket and credentials in config. Images are large and R2 space is cheap; local disk isn't. A local-filesystem driver can come later behind the same interface if self-hosters ask.
+Uploads go through one storage interface with two drivers: a local directory, the default, which is what development and a self-hoster without a bucket use; and S3-compatible storage (Cloudflare R2 for hosted instances), chosen when the endpoint and bucket are in config. Images are large and R2 space is cheap, so hosted instances always use R2. (Reversed from "S3 only, local later": a local default costs forty lines and removes a bucket from the first run.)
 
 Accepted input formats: JPEG, PNG, WebP, GIF, detected by magic bytes server-side, not by extension or declared type. Anything else is rejected with a clear message. Generated sizes are output as JPEG or PNG only (Go's `x/image/webp` decodes but does not encode); GIFs pass through untouched.
 
@@ -91,7 +93,7 @@ Images are protected per instance: served through the Go backend at `/img/<id>` 
 
 Images in the editor are cards: the picture small on the left, the alt text field taking the rest, a grip to drag the card between blocks, an X to remove it. No prompt on insert. Adjacent cards join into one block labelled "Gallery of N images", because the post renders a run of adjacent images as a grid: 2 across; 2 then 1; 2 and 2; 2, 2, 1; 4 then 2; 4, 2, 1; 4 and 4. Eight is the most in one gallery; a longer run splits. The gallery exists only at render time (`wrapGalleries` in the frontend): stored HTML is a plain run of `<img>`. Chat has no inline images: pictures attach above the text field as the same cards and are sent as a block of `<img>` before the text. Whether alt text is required is a feature flag.
 
-A post's three-dot menu (Floating UI) holds Edit for the author and Delete for the author or the owner. Delete asks first, in the browser's own dialog element. Deletion is soft (`deleted_at`): the post leaves every list, its comments go with it because they are only reachable through it, its images go with the next sweep, and a `post_delete` event carrying the id tells open pages to drop it.
+A post's three-dot menu (Floating UI) holds Edit and Delete as the post's `can` flags allow (see Permissions); comments carry the same menu. Delete asks first, in the browser's own dialog element. Deletion is soft (`deleted_at`): the post leaves every list, its comments go with it because they are only reachable through it, its images go with the next sweep, and a `post_delete` event carrying the id tells open pages to drop it.
 
 Per-image and per-post size caps; a per-instance storage quota enforced at upload (also a pricing lever).
 
@@ -205,7 +207,9 @@ One in-app notification table that every channel reads from.
 
 ## Admin tools at launch
 
-Roles: owner, moderator, member. Minimum shipped:
+Roles: owner, moderator, member. One owner: the person who runs this place. The owner sets anyone to member or moderator from the People page; a moderator can delete anything and edit nothing of others', exactly as the owner can, but cannot change roles. Transferring ownership is a separate, explicit action, later. A role change is a `user` event, so every open page's controls follow it.
+
+Minimum shipped:
 
 - Invite link creation and revocation
 - The approval queue
@@ -229,8 +233,20 @@ Read-only mode is also a switch on self-hosted instances, since "we're winding d
 
 One Go function, `CanSee(viewer, thing)`, that every query path goes through. A table-driven test file covers each viewer state (anonymous, member, moderator, author, removed) against each thing type (post, comment, chat message, image, topic). No feed query bypasses it for performance until a test proves the bypass gives the same answer. Non-negotiable: this is the promise the product makes.
 
+## Permissions
+
+The write side of the same promise, in the same shape. One package, `internal/perm`, holds every rule about who may do what to what (`EditPost`, `DeletePost`, `EditComment`, `DeleteComment`, and so on as actions arrive; `CanSee` lives there too when it is built). The rules are plain functions over an actor (id, role) and the thing's ownership facts, with one table-driven test, one row per (who, what) pair. Every write handler fetches the thing's owners, asks perm, and answers 403 if the answer is no; no query carries an author clause of its own.
+
+The frontend holds no permission logic. Every post, comment and message the API serves carries `can: {edit, delete}`, computed by perm for the requesting user on the way out, and `/api/me` carries the instance-level abilities (`invite`, `manage_roles`). Menus and buttons show what the flags say. There is nothing to keep aligned because there is only one implementation; a role change arrives as a `user` event and the client refetches what it holds. (Considered and rejected: mirroring the rules in TypeScript with a shared test table. Two implementations of a rule are a rule that will drift, which is how Sweet got four body formats.)
+
+## Client data
+
+One cache, TanStack Query, holds every piece of server data the client has: me, users, posts, comments, messages, invites. Components render from it and keep no server data in their own state. The event stream is the cache's write path: each event is one upsert or one delete into the cache, and a reconnect invalidates everything, which is the only refetch the app ever needs while the stream is up. People are normalised: posts, comments and messages render their author from the users query by id, not from the author snapshot they arrived with, so a changed picture, name or role shows everywhere at once. Pagination is cursor pages inside the cache (infinite queries), never component state.
+
 ## Testing and operations
 
+- The failing test comes first, for every behaviour change. Go tests for handlers, rules and sweeps; Vitest with happy-dom and Testing Library for pure functions and component state. No browser-driven or visual suite for now (Playwright and Storybook both declined, 2026-11-04). Bugs found after the fact are the thing this rule exists to prevent.
+- A change is verified on every surface it touches, not only the one it was made for: a layout change at phone width too; a data-shape change everywhere that data is shown. Tests live in the repo; nothing that only ran once on a laptop counts.
 - API-level tests against a temp-file SQLite per test (`t.TempDir()`) with the production pragmas (WAL, busy_timeout). Not `:memory:`: it is per-connection, so a pool sees N empty databases, and it cannot run WAL, so the write-contention paths are never exercised.
 - `/healthz`, structured logs, an optional error-reporting hook. Nothing more.
 
@@ -253,7 +269,6 @@ Kept so the reasoning isn't lost when one of these comes back up.
 | Native app / Capacitor | Wrapping the React build for the app stores, with native push | Its own account setup, store reviews, a "which Sweet?" screen, and a token auth mode; nothing in v1 depends on it. PWA with web push covers mobile | When store presence or iOS push for non-installed users matters |
 | Orchestrator web UI and self-serve instance creation | A superadmin web app, and a public form that creates an instance | A CLI does the same job while instances are few; v0 is "email Raph". The provision/setup/onboarding boundary is designed so the form is one automated step later | When there are more instances than fit in memory, or when payment arrives |
 | Bounce tracking | Marking addresses as bouncing after provider webhooks report failures | Needs provider webhooks and vendor coupling. A "didn't get it? resend or change address" screen gives the user what they need | If silent delivery failures show up in support |
-| Local-filesystem image driver | Storing uploads on the instance's disk | Images are large; S3/R2 space is cheap and local disk isn't. S3 from day one | If self-hosters ask; same interface |
 | Custom domains | `sweet.theirgroup.org` via on-demand TLS | One wildcard cert for `*.sweet.community` covers v0; on-demand TLS needs an `ask` endpoint from the orchestrator | When a group asks |
 | Presence / typing indicators | "Who's online" and "X is typing" in chat | Would push realtime towards WebSockets; SSE is simpler and sufficient without them | If chat feels dead without them |
 | Sub-group topics | Topics as places with their own membership | Sweet data: 81% of posts went to the main feed, 118 of 203 posters never posted in a community, 47 of 53 communities died. Topics stay as views on one feed | Probably never |
@@ -313,6 +328,10 @@ Kept so the reasoning isn't lost when one of these comes back up.
 
 | Decision | First call | Final call | Why |
 |---|---|---|---|
+| Image storage | S3 only from day one; local driver cut | Local directory is the default driver, S3/R2 when configured | Development and a bucket-less self-hoster need somewhere to put files; the interface was already there and the local driver is forty lines |
+| Closed panes | A closed pane unmounts and refetches when reopened | Both panes stay mounted; a closed one is hidden | Unmounting threw away whatever was being typed |
+| Event kinds | One kind per action (`post`, `post_edit`, `post_delete`, …) | Two per resource: the whole thing, or its deletion | Kinds were accreting; the cache code grew a case per kind |
+| Permissions on the client | Rules repeated in the frontend by hand | Server computes `can` flags; the client has no rules | Two copies of a rule drift; the server's answer is the only one that matters |
 | Backups | Nightly `VACUUM INTO` from inside the binary, no Litestream | Litestream for hosted instances; `VACUUM INTO` as the no-setup fallback for self-hosters | Small tooling cost, high payoff from near-continuous restore |
 | Body format | TipTap JSON canonical, server never touches HTML, Go walker validates and extracts | TipTap HTML canonical, bluemonday sanitises, `x/net/html` extracts | The JSON design rested on "Go has no good sanitiser", which was false. HTML + bluemonday is one policy instead of a walker, a fixture harness and two renderers |
 | Event cursor | Integer sequence → monotonic UUIDv7 → integer sequence | Integer sequence on the event log | Removing it was an invented simplification; commit order is what matters |
