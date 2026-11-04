@@ -249,6 +249,7 @@ One cache, TanStack Query, holds every piece of server data the client has: me, 
 
 - The failing test comes first, for every behaviour change. Go tests for handlers, rules and sweeps; Vitest with happy-dom and Testing Library for pure functions and component state. No browser-driven or visual suite for now (Playwright and Storybook both declined, 2026-11-04). Bugs found after the fact are the thing this rule exists to prevent.
 - A change is verified on every surface it touches, not only the one it was made for: a layout change at phone width too; a data-shape change everywhere that data is shown. Tests live in the repo; nothing that only ran once on a laptop counts.
+- The S3 image driver has a round-trip test (`TestS3RoundTrip`) that runs against the configured bucket when `.env` names one (`make test` exports it) and skips otherwise. It writes under its own prefix and cleans up. Verified against R2 on 2026-11-04.
 - API-level tests against a temp-file SQLite per test (`t.TempDir()`) with the production pragmas (WAL, busy_timeout). Not `:memory:`: it is per-connection, so a pool sees N empty databases, and it cannot run WAL, so the write-contention paths are never exercised.
 - `/healthz`, structured logs, an optional error-reporting hook. Nothing more.
 
