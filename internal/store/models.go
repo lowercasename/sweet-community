@@ -13,3 +13,8 @@ type Image struct {
 	Bytes       int64
 	CreatedAt   int64
 }
+
+type Setting struct {
+	Key   string
+	Value string
+}

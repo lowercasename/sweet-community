@@ -61,6 +61,10 @@ func (s *Server) createMessage(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusForbidden, "not allowed")
 		return
 	}
+	if g.Mode == perm.ModePosts {
+		writeErr(w, http.StatusForbidden, "this group has no chat")
+		return
+	}
 	clean, ok := readBody(w, r)
 	if !ok {
 		return

@@ -10,14 +10,26 @@ import (
 	"database/sql"
 )
 
+const countMembers = `-- name: CountMembers :one
+SELECT COUNT(*) FROM memberships WHERE group_id = ?1
+`
+
+func (q *Queries) CountMembers(ctx context.Context, groupID string) (int64, error) {
+	row := q.db.QueryRowContext(ctx, countMembers, groupID)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
 const createGroup = `-- name: CreateGroup :exec
-INSERT INTO groups (id, kind, name, created_at) VALUES (?1, ?2, ?3, ?4)
+INSERT INTO groups (id, kind, name, mode, created_at) VALUES (?1, ?2, ?3, ?4, ?5)
 `
 
 type CreateGroupParams struct {
 	ID        string
 	Kind      string
 	Name      string
+	Mode      string
 	CreatedAt int64
 }
 
@@ -26,6 +38,7 @@ func (q *Queries) CreateGroup(ctx context.Context, arg CreateGroupParams) error 
 		arg.ID,
 		arg.Kind,
 		arg.Name,
+		arg.Mode,
 		arg.CreatedAt,
 	)
 	return err
@@ -85,13 +98,14 @@ func (q *Queries) DeleteMembership(ctx context.Context, arg DeleteMembershipPara
 
 const getGroup = `-- name: GetGroup :one
 
-SELECT id, kind, name, created_at FROM groups WHERE id = ?1 AND deleted_at IS NULL
+SELECT id, kind, name, mode, created_at FROM groups WHERE id = ?1 AND deleted_at IS NULL
 `
 
 type GetGroupRow struct {
 	ID        string
 	Kind      string
 	Name      string
+	Mode      string
 	CreatedAt int64
 }
 
@@ -104,6 +118,7 @@ func (q *Queries) GetGroup(ctx context.Context, id string) (GetGroupRow, error) 
 		&i.ID,
 		&i.Kind,
 		&i.Name,
+		&i.Mode,
 		&i.CreatedAt,
 	)
 	return i, err
@@ -234,7 +249,7 @@ func (q *Queries) ListMyGroupIDs(ctx context.Context, userID string) ([]string, 
 }
 
 const listMyGroups = `-- name: ListMyGroups :many
-SELECT g.id, g.kind, g.name, g.created_at, m.role
+SELECT g.id, g.kind, g.name, g.mode, g.created_at, m.role
 FROM memberships m JOIN groups g ON g.id = m.group_id
 WHERE m.user_id = ?1 AND g.deleted_at IS NULL
 ORDER BY g.kind = 'root' DESC, g.created_at
@@ -244,6 +259,7 @@ type ListMyGroupsRow struct {
 	ID        string
 	Kind      string
 	Name      string
+	Mode      string
 	CreatedAt int64
 	Role      string
 }
@@ -261,6 +277,7 @@ func (q *Queries) ListMyGroups(ctx context.Context, userID string) ([]ListMyGrou
 			&i.ID,
 			&i.Kind,
 			&i.Name,
+			&i.Mode,
 			&i.CreatedAt,
 			&i.Role,
 		); err != nil {
@@ -277,20 +294,6 @@ func (q *Queries) ListMyGroups(ctx context.Context, userID string) ([]ListMyGrou
 	return items, nil
 }
 
-const renameGroup = `-- name: RenameGroup :exec
-UPDATE groups SET name = ?1 WHERE id = ?2 AND deleted_at IS NULL
-`
-
-type RenameGroupParams struct {
-	Name string
-	ID   string
-}
-
-func (q *Queries) RenameGroup(ctx context.Context, arg RenameGroupParams) error {
-	_, err := q.db.ExecContext(ctx, renameGroup, arg.Name, arg.ID)
-	return err
-}
-
 const setMembershipRole = `-- name: SetMembershipRole :exec
 UPDATE memberships SET role = ?1 WHERE group_id = ?2 AND user_id = ?3
 `
@@ -303,5 +306,20 @@ type SetMembershipRoleParams struct {
 
 func (q *Queries) SetMembershipRole(ctx context.Context, arg SetMembershipRoleParams) error {
 	_, err := q.db.ExecContext(ctx, setMembershipRole, arg.Role, arg.GroupID, arg.UserID)
+	return err
+}
+
+const updateGroup = `-- name: UpdateGroup :exec
+UPDATE groups SET name = ?1, mode = ?2 WHERE id = ?3 AND deleted_at IS NULL
+`
+
+type UpdateGroupParams struct {
+	Name string
+	Mode string
+	ID   string
+}
+
+func (q *Queries) UpdateGroup(ctx context.Context, arg UpdateGroupParams) error {
+	_, err := q.db.ExecContext(ctx, updateGroup, arg.Name, arg.Mode, arg.ID)
 	return err
 }

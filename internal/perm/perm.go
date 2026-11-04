@@ -71,8 +71,33 @@ func DeleteMessage(a Actor, m Message) bool { return a.member() && (a.ID == m.Au
 // Post and Send: any member writes in a group they are in.
 func Write(a Actor) bool { return a.member() }
 
-// CreateGroup: any member of the root group. (A per-instance flag restricting it to staff comes with instance settings.)
-func CreateGroup(root Actor) bool { return root.member() }
+// Group modes.
+const (
+	ModePosts = "posts"
+	ModeChat  = "chat"
+	ModeBoth  = "both"
+)
+
+// Instance setting group_creation: who may create groups.
+const (
+	CreationAnyone = "anyone"
+	CreationStaff  = "staff"
+)
+
+// CreateGroup: a member of the root group, or only its staff, as the
+// instance's group_creation setting says.
+func CreateGroup(root Actor, policy string) bool {
+	if policy == CreationStaff {
+		return root.staff()
+	}
+	return root.member()
+}
+
+// ManageInstance: the root group's owner edits instance settings.
+func ManageInstance(root Actor) bool { return root.Role == Owner }
+
+// Transfer: the owner hands ownership to another member of the group.
+func Transfer(a, target Actor) bool { return a.Role == Owner && target.member() && target.ID != a.ID }
 
 // AddMembers and RemoveMembers: the group's staff. In the root group, adding is an invite link.
 func AddMembers(a Actor) bool    { return a.staff() }
@@ -87,8 +112,10 @@ func SetRole(a, target Actor, role string) bool {
 	return role == Member || role == Moderator
 }
 
-// Rename and DeleteGroup: the owner; the root group is neither renamed nor deleted.
-func Rename(a Actor, g Group) bool      { return a.Role == Owner && g.Kind != KindRoot }
+// Rename and SetMode: the owner; the root group is not renamed, a DM is neither
+// renamed nor changed from chat. DeleteGroup: the owner; never the root.
+func Rename(a Actor, g Group) bool      { return a.Role == Owner && g.Kind == KindGroup }
+func SetMode(a Actor, g Group) bool     { return a.Role == Owner && g.Kind != KindDM }
 func DeleteGroup(a Actor, g Group) bool { return a.Role == Owner && g.Kind != KindRoot }
 
 // Leave: any member but the owner, of any group but the root.

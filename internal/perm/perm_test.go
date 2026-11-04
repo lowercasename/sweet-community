@@ -55,8 +55,23 @@ func TestRules(t *testing.T) {
 		{"owner deletes any message", DeleteMessage(owner, mosMessage), true},
 		{"moderator deletes any message", DeleteMessage(mod, mosMessage), true},
 
-		{"root member creates a group", CreateGroup(kit), true},
-		{"non-member creates nothing", CreateGroup(outsider), false},
+		{"root member creates a group", CreateGroup(kit, CreationAnyone), true},
+		{"non-member creates nothing", CreateGroup(outsider, CreationAnyone), false},
+		{"member creates when staff only", CreateGroup(kit, CreationStaff), false},
+		{"moderator creates when staff only", CreateGroup(mod, CreationStaff), true},
+		{"owner manages the instance", ManageInstance(owner), true},
+		{"moderator manages the instance", ManageInstance(mod), false},
+
+		{"owner hands over to a member", Transfer(owner, kit), true},
+		{"owner hands over to a moderator", Transfer(owner, mod), true},
+		{"owner hands over to self", Transfer(owner, owner), false},
+		{"owner hands over to an outsider", Transfer(owner, outsider), false},
+		{"moderator hands over", Transfer(mod, kit), false},
+
+		{"owner sets a group's mode", SetMode(owner, club), true},
+		{"owner sets the root's mode", SetMode(owner, root), true},
+		{"owner sets a dm's mode", SetMode(owner, Group{Kind: KindDM}), false},
+		{"owner renames a dm", Rename(owner, Group{Kind: KindDM}), false},
 
 		{"owner adds members", AddMembers(owner), true},
 		{"moderator adds members", AddMembers(mod), true},

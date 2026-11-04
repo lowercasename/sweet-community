@@ -1,11 +1,13 @@
 package api
 
 import (
+	"context"
 	"net/http/httptest"
 	"strings"
 	"testing"
 
 	"sweet/internal/perm"
+	"sweet/internal/store"
 )
 
 const rootPath = "/api/groups/" + perm.Root
@@ -42,7 +44,7 @@ func TestRootGroupAndRoles(t *testing.T) {
 
 	// Only the owner assigns roles, only member or moderator, never to the owner or to themselves.
 	kit.mustStatus(403, "PUT", rootPath+"/members/"+moID, map[string]string{"role": "moderator"})
-	owner.mustStatus(400, "PUT", rootPath+"/members/"+kitID, map[string]string{"role": "owner"})
+	owner.mustStatus(400, "PUT", rootPath+"/members/"+kitID, map[string]string{"role": "king"})
 	owner.mustStatus(403, "PUT", rootPath+"/members/"+ownerID, map[string]string{"role": "member"})
 	owner.mustStatus(404, "PUT", rootPath+"/members/nope", map[string]string{"role": "member"})
 	m := owner.mustStatus(200, "PUT", rootPath+"/members/"+kitID, map[string]string{"role": "moderator"})
@@ -236,3 +238,133 @@ func TestImagesFollowVisibility(t *testing.T) {
 }
 
 var _ = httptest.NewServer
+
+func TestGroupModeAndInstanceSetting(t *testing.T) {
+	ts, owner := newTestServer(t)
+	kit, _ := registerMember(t, ts, owner, "kit")
+	mo, moID := registerMember(t, ts, owner, "mo")
+
+	// A group's one setting is its mode; a chat-only group has no feed.
+	room := kit.mustStatus(201, "POST", "/api/groups", map[string]string{"name": "Room", "mode": "chat"})
+	rid := room["id"].(string)
+	if room["mode"] != "chat" {
+		t.Fatalf("mode: %v", room)
+	}
+	kit.mustStatus(403, "POST", "/api/groups/"+rid+"/posts", map[string]string{"body_html": "<p>x</p>"})
+	kit.mustStatus(201, "POST", "/api/groups/"+rid+"/messages", map[string]string{"body_html": "<p>hi</p>"})
+	both := kit.mustStatus(200, "PUT", "/api/groups/"+rid, map[string]string{"mode": "both"})
+	if both["mode"] != "both" || both["name"] != "Room" {
+		t.Fatalf("mode change: %v", both)
+	}
+	kit.mustStatus(201, "POST", "/api/groups/"+rid+"/posts", map[string]string{"body_html": "<p>now ok</p>"})
+	kit.mustStatus(400, "PUT", "/api/groups/"+rid, map[string]string{"mode": "video"})
+	if g := kit.mustStatus(201, "POST", "/api/groups", map[string]string{"name": "Default"}); g["mode"] != "both" {
+		t.Fatalf("default mode: %v", g)
+	}
+	// A DM is chat only, and stays so.
+	dm := kit.mustStatus(201, "POST", "/api/groups", map[string]any{"kind": "dm", "members": []string{moID}})
+	if dm["mode"] != "chat" {
+		t.Fatalf("dm mode: %v", dm)
+	}
+	kit.mustStatus(400, "PUT", "/api/groups/"+dm["id"].(string), map[string]string{"mode": "both"})
+	kit.mustStatus(403, "POST", "/api/groups/"+dm["id"].(string)+"/posts", map[string]string{"body_html": "<p>x</p>"})
+
+	// The instance's first setting: who may create groups. Owner-only to read and write.
+	kit.mustStatus(403, "GET", "/api/settings", nil)
+	kit.mustStatus(403, "PUT", "/api/settings", map[string]string{"group_creation": "staff"})
+	if s := owner.mustStatus(200, "GET", "/api/settings", nil); s["group_creation"] != "anyone" {
+		t.Fatalf("default setting: %v", s)
+	}
+	if !groupCan(myGroups(mo)[perm.Root], "create_groups") {
+		t.Fatal("member cannot create groups by default")
+	}
+	owner.mustStatus(400, "PUT", "/api/settings", map[string]string{"group_creation": "nobody"})
+	owner.mustStatus(200, "PUT", "/api/settings", map[string]string{"group_creation": "staff"})
+	if groupCan(myGroups(mo)[perm.Root], "create_groups") {
+		t.Fatal("member can still create groups after the setting changed")
+	}
+	mo.mustStatus(403, "POST", "/api/groups", map[string]string{"name": "Nope"})
+	owner.mustStatus(200, "PUT", rootPath+"/members/"+moID, map[string]string{"role": "moderator"})
+	mo.mustStatus(201, "POST", "/api/groups", map[string]string{"name": "Mods may"})
+	events := mo.readEvents(60)
+	found := false
+	for _, e := range events {
+		if e["kind"] == "settings" && e["payload"].(map[string]any)["group_creation"] == "staff" {
+			found = true
+		}
+	}
+	if !found {
+		t.Fatal("no settings event on the stream")
+	}
+}
+
+func TestOwnershipNeverLapses(t *testing.T) {
+	ts, owner, srv := newTestServerWith(t)
+	kit, kitID := registerMember(t, ts, owner, "kit")
+	mo, moID := registerMember(t, ts, owner, "mo")
+	jo, joID := registerMember(t, ts, owner, "jo")
+
+	g := kit.mustStatus(201, "POST", "/api/groups", map[string]string{"name": "Club"})
+	gid := g["id"].(string)
+	gp := "/api/groups/" + gid
+	kit.mustStatus(201, "POST", gp+"/members", map[string]string{"user_id": moID})
+	kit.mustStatus(201, "POST", gp+"/members", map[string]string{"user_id": joID})
+
+	// The owner cannot leave while owner, and only the owner hands ownership over.
+	kit.mustStatus(403, "DELETE", gp+"/members/"+kitID, nil)
+	mo.mustStatus(403, "PUT", gp+"/members/"+moID, map[string]string{"role": "owner"})
+	if !groupCan(myGroups(kit)[gid], "transfer") || groupCan(myGroups(mo)[gid], "transfer") {
+		t.Fatal("transfer flag")
+	}
+	m := kit.mustStatus(200, "PUT", gp+"/members/"+moID, map[string]string{"role": "owner"})
+	if m["role"] != "owner" {
+		t.Fatalf("handover: %v", m)
+	}
+	if got := myGroups(kit)[gid]; got["role"] != "moderator" || groupCan(got, "transfer") || !groupCan(got, "leave") {
+		t.Fatalf("former owner: %v", got)
+	}
+	if got := myGroups(mo)[gid]; got["role"] != "owner" || !groupCan(got, "rename") {
+		t.Fatalf("new owner: %v", got)
+	}
+	// Two owners never: the old one is a moderator now, and mo cannot make a second.
+	mo.mustStatus(400, "PUT", gp+"/members/"+joID, map[string]string{"role": "king"})
+
+	// Now kit may leave; mods leaving changes nothing for the group.
+	kit.mustStatus(204, "DELETE", gp+"/members/"+kitID, nil)
+	mo.mustStatus(200, "GET", gp, nil)
+	// The owner hands over to jo and leaves; jo, the last member, leaves and the group is gone.
+	mo.mustStatus(200, "PUT", gp+"/members/"+joID, map[string]string{"role": "owner"})
+	mo.mustStatus(204, "DELETE", gp+"/members/"+moID, nil)
+	jo.mustStatus(403, "DELETE", gp+"/members/"+joID, nil) // owner of a one-person group: hand over or delete
+	jo.mustStatus(200, "DELETE", gp, nil)
+	if _, ok := myGroups(jo)[gid]; ok {
+		t.Fatal("deleted group still listed")
+	}
+
+	// A DM has no owner: the last person leaving deletes it.
+	dm := kit.mustStatus(201, "POST", "/api/groups", map[string]any{"kind": "dm", "members": []string{moID}})
+	dp := "/api/groups/" + dm["id"].(string)
+	kit.mustStatus(204, "DELETE", dp+"/members/"+kitID, nil)
+	mo.mustStatus(200, "GET", dp, nil)
+	mo.mustStatus(204, "DELETE", dp+"/members/"+moID, nil)
+	mo.mustStatus(404, "GET", dp, nil)
+	// Nobody is left to receive it on the stream, so the log is the witness.
+	rows, err := srv.q().ListEventsSince(context.Background(), store.ListEventsSinceParams{After: 0, PageSize: 500})
+	if err != nil {
+		t.Fatal(err)
+	}
+	last := rows[len(rows)-1]
+	if last.Kind != "group_delete" || !strings.Contains(last.Payload, dm["id"].(string)) {
+		t.Fatalf("last event after the last member left: %s %s", last.Kind, last.Payload)
+	}
+
+	// The root group: its owner can hand over, but never leave.
+	owner.mustStatus(403, "DELETE", rootPath+"/members/"+owner.mustStatus(200, "GET", "/api/me", nil)["id"].(string), nil)
+	owner.mustStatus(200, "PUT", rootPath+"/members/"+kitID, map[string]string{"role": "owner"})
+	if got := myGroups(kit)[perm.Root]; got["role"] != "owner" || !groupCan(got, "set_roles") {
+		t.Fatalf("new instance owner: %v", got)
+	}
+	if got := myGroups(owner)[perm.Root]; got["role"] != "moderator" {
+		t.Fatalf("former instance owner: %v", got)
+	}
+}

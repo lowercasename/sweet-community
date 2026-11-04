@@ -20,22 +20,43 @@ import (
 // Group is the wire shape of a group as one viewer sees it: with their role
 // in it and what they may do to it (architecture.md, Groups).
 type Group struct {
-	ID        string   `json:"id"`
-	Kind      string   `json:"kind"`
-	Name      string   `json:"name"`
+	ID   string `json:"id"`
+	Kind string `json:"kind"`
+	Name string `json:"name"`
+	// Mode is the group's one setting: posts, chat or both. A DM is chat.
+	Mode      string   `json:"mode"`
 	CreatedAt int64    `json:"created_at"`
 	Role      string   `json:"role,omitempty"`
 	Can       GroupCan `json:"can"`
 }
 
-// GroupCan is what the viewer may do to a group.
+// GroupCan is what the viewer may do to a group. CreateGroups is meaningful
+// on the root group only: it carries the instance's group_creation setting.
 type GroupCan struct {
 	AddMembers    bool `json:"add_members"`
 	RemoveMembers bool `json:"remove_members"`
 	SetRoles      bool `json:"set_roles"`
+	Transfer      bool `json:"transfer"`
 	Rename        bool `json:"rename"`
+	SetMode       bool `json:"set_mode"`
 	Delete        bool `json:"delete"`
 	Leave         bool `json:"leave"`
+	CreateGroups  bool `json:"create_groups,omitempty"`
+}
+
+// Settings is the instance's settings on the wire (architecture.md, Feature flags).
+type Settings struct {
+	GroupCreation string `json:"group_creation"`
+}
+
+func (s *Server) settings(ctx context.Context) (Settings, error) {
+	v, err := s.q().GetSetting(ctx, "group_creation")
+	if errors.Is(err, sql.ErrNoRows) {
+		v = perm.CreationAnyone
+	} else if err != nil {
+		return Settings{}, err
+	}
+	return Settings{GroupCreation: v}, nil
 }
 
 // Membership is one person's place in a group.
@@ -46,16 +67,22 @@ type Membership struct {
 	JoinedAt int64  `json:"joined_at"`
 }
 
-func groupFor(a perm.Actor, g Group) Group {
+func groupFor(a perm.Actor, g Group, st Settings) Group {
 	pg := perm.Group{Kind: g.Kind}
 	g.Role = a.Role
 	g.Can = GroupCan{
-		AddMembers:    perm.AddMembers(a),
-		RemoveMembers: perm.RemoveMembers(a),
+		// In the root group adding is an invite link and nobody is removed (member removal comes with admin tools); a DM's membership is fixed.
+		AddMembers:    perm.AddMembers(a) && g.Kind != perm.KindDM,
+		RemoveMembers: perm.RemoveMembers(a) && g.Kind == perm.KindGroup,
 		SetRoles:      a.Role == perm.Owner,
+		Transfer:      a.Role == perm.Owner,
 		Rename:        perm.Rename(a, pg),
+		SetMode:       perm.SetMode(a, pg),
 		Delete:        perm.DeleteGroup(a, pg),
 		Leave:         perm.Leave(a, pg),
+	}
+	if g.Kind == perm.KindRoot {
+		g.Can.CreateGroups = perm.CreateGroup(a, st.GroupCreation)
 	}
 	return g
 }
@@ -98,8 +125,13 @@ func (s *Server) requireGroup(next http.HandlerFunc) http.HandlerFunc {
 			writeErr(w, http.StatusNotFound, "no such group")
 			return
 		}
-		g := Group{ID: row.ID, Kind: row.Kind, Name: row.Name, CreatedAt: row.CreatedAt}
-		next(w, r.WithContext(withGroup(r.Context(), groupFor(a, g), a)))
+		st, err := s.settings(r.Context())
+		if err != nil {
+			writeErr(w, http.StatusInternalServerError, err.Error())
+			return
+		}
+		g := Group{ID: row.ID, Kind: row.Kind, Name: row.Name, Mode: row.Mode, CreatedAt: row.CreatedAt}
+		next(w, r.WithContext(withGroup(r.Context(), groupFor(a, g, st), a)))
 	})
 }
 
@@ -110,10 +142,15 @@ func (s *Server) listGroups(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusInternalServerError, err.Error())
 		return
 	}
+	st, err := s.settings(r.Context())
+	if err != nil {
+		writeErr(w, http.StatusInternalServerError, err.Error())
+		return
+	}
 	out := make([]Group, 0, len(rows))
 	for _, row := range rows {
 		a := perm.Actor{ID: me.ID, Role: row.Role}
-		out = append(out, groupFor(a, Group{ID: row.ID, Kind: row.Kind, Name: row.Name, CreatedAt: row.CreatedAt}))
+		out = append(out, groupFor(a, Group{ID: row.ID, Kind: row.Kind, Name: row.Name, Mode: row.Mode, CreatedAt: row.CreatedAt}, st))
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"groups": out})
 }
@@ -130,6 +167,7 @@ func (s *Server) createGroup(w http.ResponseWriter, r *http.Request) {
 	var in struct {
 		Kind    string   `json:"kind"`
 		Name    string   `json:"name"`
+		Mode    string   `json:"mode"`
 		Members []string `json:"members"`
 	}
 	r.Body = http.MaxBytesReader(w, r.Body, 4096)
@@ -143,7 +181,12 @@ func (s *Server) createGroup(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusInternalServerError, err.Error())
 		return
 	}
-	if !perm.CreateGroup(root) {
+	st, err := s.settings(r.Context())
+	if err != nil {
+		writeErr(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	if !perm.CreateGroup(root, st.GroupCreation) {
 		writeErr(w, http.StatusForbidden, "not allowed")
 		return
 	}
@@ -155,7 +198,14 @@ func (s *Server) createGroup(w http.ResponseWriter, r *http.Request) {
 			writeErr(w, http.StatusBadRequest, "a group needs a name of up to 80 characters")
 			return
 		}
-		s.createGroupWith(w, r, perm.KindGroup, in.Name, now, map[string]string{me.ID: perm.Owner})
+		if in.Mode == "" {
+			in.Mode = perm.ModeBoth
+		}
+		if !validMode(in.Mode) {
+			writeErr(w, http.StatusBadRequest, "mode must be posts, chat or both")
+			return
+		}
+		s.createGroupWith(w, r, perm.KindGroup, in.Name, in.Mode, now, map[string]string{me.ID: perm.Owner})
 	case perm.KindDM:
 		people := map[string]string{me.ID: perm.Member}
 		for _, id := range in.Members {
@@ -174,10 +224,10 @@ func (s *Server) createGroup(w http.ResponseWriter, r *http.Request) {
 				writeErr(w, http.StatusInternalServerError, err.Error())
 				return
 			}
-			writeJSON(w, http.StatusOK, groupFor(perm.Actor{ID: me.ID, Role: perm.Member}, Group{ID: row.ID, Kind: row.Kind, Name: row.Name, CreatedAt: row.CreatedAt}))
+			writeJSON(w, http.StatusOK, groupFor(perm.Actor{ID: me.ID, Role: perm.Member}, Group{ID: row.ID, Kind: row.Kind, Name: row.Name, Mode: row.Mode, CreatedAt: row.CreatedAt}, st))
 			return
 		}
-		s.createGroupWith(w, r, perm.KindDM, "", now, people)
+		s.createGroupWith(w, r, perm.KindDM, "", perm.ModeChat, now, people)
 	default:
 		writeErr(w, http.StatusBadRequest, "kind must be group or dm")
 	}
@@ -207,16 +257,23 @@ func (s *Server) findDM(r *http.Request, viewerID string, people map[string]stri
 	return "", nil
 }
 
-func (s *Server) createGroupWith(w http.ResponseWriter, r *http.Request, kind, name string, now int64, people map[string]string) {
+func validMode(m string) bool { return m == perm.ModePosts || m == perm.ModeChat || m == perm.ModeBoth }
+
+func (s *Server) createGroupWith(w http.ResponseWriter, r *http.Request, kind, name, mode string, now int64, people map[string]string) {
 	me, _ := userFrom(r.Context())
 	id, err := uuid.NewV7()
 	if err != nil {
 		writeErr(w, http.StatusInternalServerError, err.Error())
 		return
 	}
-	g := Group{ID: id.String(), Kind: kind, Name: name, CreatedAt: now}
+	st, err := s.settings(r.Context())
+	if err != nil {
+		writeErr(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	g := Group{ID: id.String(), Kind: kind, Name: name, Mode: mode, CreatedAt: now}
 	s.loggedMany(w, r, now, func(qtx *store.Queries) ([]events.Entry, any, int, error) {
-		if err := qtx.CreateGroup(r.Context(), store.CreateGroupParams{ID: g.ID, Kind: g.Kind, Name: g.Name, CreatedAt: now}); err != nil {
+		if err := qtx.CreateGroup(r.Context(), store.CreateGroupParams{ID: g.ID, Kind: g.Kind, Name: g.Name, Mode: g.Mode, CreatedAt: now}); err != nil {
 			return nil, nil, http.StatusInternalServerError, err
 		}
 		entries := []events.Entry{{Kind: "group", Payload: g}}
@@ -234,33 +291,54 @@ func (s *Server) createGroupWith(w http.ResponseWriter, r *http.Request, kind, n
 			u := User{ID: row.ID, Username: row.Username, Picture: pictureURL(row.PictureID)}
 			entries = append(entries, events.Entry{Kind: "membership", Payload: Membership{GroupID: g.ID, User: u, Role: role, JoinedAt: now}})
 		}
-		return entries, groupFor(perm.Actor{ID: me.ID, Role: people[me.ID]}, g), http.StatusCreated, nil
+		return entries, groupFor(perm.Actor{ID: me.ID, Role: people[me.ID]}, g, st), http.StatusCreated, nil
 	})
 }
 
-func (s *Server) renameGroup(w http.ResponseWriter, r *http.Request) {
+// updateGroup sets a group's name and its mode (perm.Rename, perm.SetMode).
+func (s *Server) updateGroup(w http.ResponseWriter, r *http.Request) {
 	var in struct {
-		Name string `json:"name"`
+		Name *string `json:"name"`
+		Mode *string `json:"mode"`
 	}
 	r.Body = http.MaxBytesReader(w, r.Body, 4096)
 	if err := json.NewDecoder(r.Body).Decode(&in); err != nil {
 		writeErr(w, http.StatusBadRequest, "bad request body")
 		return
 	}
-	in.Name = strings.TrimSpace(in.Name)
-	if in.Name == "" || len(in.Name) > 80 {
-		writeErr(w, http.StatusBadRequest, "a group needs a name of up to 80 characters")
-		return
-	}
 	g, a := groupFrom(r.Context())
-	if !perm.Rename(a, perm.Group{Kind: g.Kind}) {
-		writeErr(w, http.StatusForbidden, "not allowed")
-		return
+	pg := perm.Group{Kind: g.Kind}
+	if in.Name != nil {
+		name := strings.TrimSpace(*in.Name)
+		if name == "" || len(name) > 80 {
+			writeErr(w, http.StatusBadRequest, "a group needs a name of up to 80 characters")
+			return
+		}
+		if !perm.Rename(a, pg) {
+			writeErr(w, http.StatusForbidden, "not allowed")
+			return
+		}
+		g.Name = name
 	}
-	g.Name = in.Name
+	if in.Mode != nil {
+		if !validMode(*in.Mode) {
+			writeErr(w, http.StatusBadRequest, "mode must be posts, chat or both")
+			return
+		}
+		if g.Kind == perm.KindDM {
+			writeErr(w, http.StatusBadRequest, "a DM is chat only")
+			return
+		}
+		if !perm.SetMode(a, pg) {
+			writeErr(w, http.StatusForbidden, "not allowed")
+			return
+		}
+		g.Mode = *in.Mode
+	}
+	logged := Group{ID: g.ID, Kind: g.Kind, Name: g.Name, Mode: g.Mode, CreatedAt: g.CreatedAt}
 	s.logged(w, r, "group", db.Now(), func(qtx *store.Queries) (any, int, error) {
-		err := qtx.RenameGroup(r.Context(), store.RenameGroupParams{Name: in.Name, ID: g.ID})
-		return &g, http.StatusOK, err
+		err := qtx.UpdateGroup(r.Context(), store.UpdateGroupParams{Name: g.Name, Mode: g.Mode, ID: g.ID})
+		return &logged, http.StatusOK, err
 	})
 }
 
@@ -335,35 +413,53 @@ func (s *Server) setMemberRole(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusBadRequest, "bad request body")
 		return
 	}
-	if in.Role != perm.Member && in.Role != perm.Moderator {
-		writeErr(w, http.StatusBadRequest, "role must be member or moderator")
+	if in.Role != perm.Member && in.Role != perm.Moderator && in.Role != perm.Owner {
+		writeErr(w, http.StatusBadRequest, "role must be member, moderator or owner")
 		return
 	}
 	g, a := groupFrom(r.Context())
+	me, _ := userFrom(r.Context())
 	uid := r.PathValue("uid")
-	s.logged(w, r, "membership", db.Now(), func(qtx *store.Queries) (any, int, error) {
+	now := db.Now()
+	s.loggedMany(w, r, now, func(qtx *store.Queries) ([]events.Entry, any, int, error) {
 		row, err := qtx.GetUser(r.Context(), uid)
 		if errors.Is(err, sql.ErrNoRows) {
-			return nil, http.StatusNotFound, errors.New("no such person")
+			return nil, nil, http.StatusNotFound, errors.New("no such person")
 		}
 		if err != nil {
-			return nil, http.StatusInternalServerError, err
+			return nil, nil, http.StatusInternalServerError, err
 		}
 		target, err := actorIn(r.Context(), qtx, User{ID: uid}, g.ID)
 		if err != nil {
-			return nil, http.StatusInternalServerError, err
+			return nil, nil, http.StatusInternalServerError, err
 		}
 		if !perm.CanSee(target) {
-			return nil, http.StatusNotFound, errors.New("not a member")
-		}
-		if !perm.SetRole(a, target, in.Role) {
-			return nil, http.StatusForbidden, errors.New("not allowed")
-		}
-		if err := qtx.SetMembershipRole(r.Context(), store.SetMembershipRoleParams{Role: in.Role, GroupID: g.ID, UserID: uid}); err != nil {
-			return nil, http.StatusInternalServerError, err
+			return nil, nil, http.StatusNotFound, errors.New("not a member")
 		}
 		u := User{ID: row.ID, Username: row.Username, Picture: pictureURL(row.PictureID)}
-		return Membership{GroupID: g.ID, User: u, Role: in.Role, JoinedAt: 0}, http.StatusOK, nil
+		if in.Role == perm.Owner {
+			// Handing over: the target becomes owner, the owner a moderator. Two memberships change.
+			if !perm.Transfer(a, target) {
+				return nil, nil, http.StatusForbidden, errors.New("not allowed")
+			}
+			if err := qtx.SetMembershipRole(r.Context(), store.SetMembershipRoleParams{Role: perm.Owner, GroupID: g.ID, UserID: uid}); err != nil {
+				return nil, nil, http.StatusInternalServerError, err
+			}
+			if err := qtx.SetMembershipRole(r.Context(), store.SetMembershipRoleParams{Role: perm.Moderator, GroupID: g.ID, UserID: me.ID}); err != nil {
+				return nil, nil, http.StatusInternalServerError, err
+			}
+			theirs := Membership{GroupID: g.ID, User: u, Role: perm.Owner}
+			mine := Membership{GroupID: g.ID, User: me, Role: perm.Moderator}
+			return []events.Entry{{Kind: "membership", Payload: theirs}, {Kind: "membership", Payload: mine}}, theirs, http.StatusOK, nil
+		}
+		if !perm.SetRole(a, target, in.Role) {
+			return nil, nil, http.StatusForbidden, errors.New("not allowed")
+		}
+		if err := qtx.SetMembershipRole(r.Context(), store.SetMembershipRoleParams{Role: in.Role, GroupID: g.ID, UserID: uid}); err != nil {
+			return nil, nil, http.StatusInternalServerError, err
+		}
+		m := Membership{GroupID: g.ID, User: u, Role: in.Role}
+		return []events.Entry{{Kind: "membership", Payload: m}}, m, http.StatusOK, nil
 	})
 }
 
@@ -395,7 +491,17 @@ func (s *Server) removeMember(w http.ResponseWriter, r *http.Request) {
 			return nil, nil, http.StatusInternalServerError, err
 		}
 		gone := map[string]string{"group_id": g.ID, "user_id": uid}
-		return []events.Entry{{Kind: "membership_delete", Payload: gone}}, nil, http.StatusNoContent, nil
+		entries := []events.Entry{{Kind: "membership_delete", Payload: gone}}
+		// The last one out turns off the lights: an empty group is deleted.
+		if n, err := qtx.CountMembers(r.Context(), g.ID); err != nil {
+			return nil, nil, http.StatusInternalServerError, err
+		} else if n == 0 {
+			if err := qtx.DeleteGroup(r.Context(), store.DeleteGroupParams{DeletedAt: sql.NullInt64{Int64: db.Now(), Valid: true}, ID: g.ID}); err != nil {
+				return nil, nil, http.StatusInternalServerError, err
+			}
+			entries = append(entries, events.Entry{Kind: "group_delete", Payload: map[string]string{"id": g.ID}})
+		}
+		return entries, nil, http.StatusNoContent, nil
 	})
 }
 
@@ -414,13 +520,45 @@ func (s *Server) events(w http.ResponseWriter, r *http.Request) {
 	for _, row := range rows {
 		roles[row.ID] = row.Role
 	}
+	st, err := s.settings(r.Context())
+	if err != nil {
+		writeErr(w, http.StatusInternalServerError, err.Error())
+		return
+	}
 	s.Hub.Serve(w, r, func(e events.Event) (events.Event, bool) {
-		return filterEvent(viewer, roles, e)
+		return filterEvent(viewer, roles, &st, e)
+	})
+}
+
+// getSettings and setSettings: the instance's settings, the root owner's.
+func (s *Server) getSettings(w http.ResponseWriter, r *http.Request) {
+	st, err := s.settings(r.Context())
+	if err != nil {
+		writeErr(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, st)
+}
+
+func (s *Server) setSettings(w http.ResponseWriter, r *http.Request) {
+	var in Settings
+	r.Body = http.MaxBytesReader(w, r.Body, 4096)
+	if err := json.NewDecoder(r.Body).Decode(&in); err != nil {
+		writeErr(w, http.StatusBadRequest, "bad request body")
+		return
+	}
+	if in.GroupCreation != perm.CreationAnyone && in.GroupCreation != perm.CreationStaff {
+		writeErr(w, http.StatusBadRequest, "group_creation must be anyone or staff")
+		return
+	}
+	s.logged(w, r, "settings", db.Now(), func(qtx *store.Queries) (any, int, error) {
+		err := qtx.SetSetting(r.Context(), store.SetSettingParams{Key: "group_creation", Value: in.GroupCreation})
+		return in, http.StatusOK, err
 	})
 }
 
 // filterEvent decides whether one viewer gets one event, and personalises it.
-func filterEvent(viewer User, roles map[string]string, e events.Event) (events.Event, bool) {
+func filterEvent(viewer User, roles map[string]string, st *Settings, e events.Event) (events.Event, bool) {
 	inGroup := func(gid string) (perm.Actor, bool) {
 		role, ok := roles[gid]
 		return perm.Actor{ID: viewer.ID, Role: role}, ok
@@ -473,7 +611,7 @@ func filterEvent(viewer User, roles map[string]string, e events.Event) (events.E
 		if !ok {
 			return e, false
 		}
-		return encode(groupFor(a, g))
+		return encode(groupFor(a, g, *st))
 	case "group_delete":
 		var d struct {
 			ID string `json:"id"`
@@ -512,6 +650,12 @@ func filterEvent(viewer User, roles map[string]string, e events.Event) (events.E
 		}
 		_, ok := roles[d.GroupID]
 		return e, ok
+	case "settings":
+		var next Settings
+		if json.Unmarshal(e.Payload, &next) == nil {
+			*st = next
+		}
+		return e, true
 	default:
 		// user, and anything instance-wide: everyone on the instance sees it.
 		return e, true

@@ -2,13 +2,13 @@
 -- on users. Who may do what is perm's call; the queries do not check.
 
 -- name: GetGroup :one
-SELECT id, kind, name, created_at FROM groups WHERE id = sqlc.arg(id) AND deleted_at IS NULL;
+SELECT id, kind, name, mode, created_at FROM groups WHERE id = sqlc.arg(id) AND deleted_at IS NULL;
 
 -- name: GetMembership :one
 SELECT role FROM memberships WHERE group_id = sqlc.arg(group_id) AND user_id = sqlc.arg(user_id);
 
 -- name: ListMyGroups :many
-SELECT g.id, g.kind, g.name, g.created_at, m.role
+SELECT g.id, g.kind, g.name, g.mode, g.created_at, m.role
 FROM memberships m JOIN groups g ON g.id = m.group_id
 WHERE m.user_id = sqlc.arg(user_id) AND g.deleted_at IS NULL
 ORDER BY g.kind = 'root' DESC, g.created_at;
@@ -24,10 +24,13 @@ WHERE m.group_id = sqlc.arg(group_id)
 ORDER BY m.role = 'owner' DESC, m.role = 'moderator' DESC, m.joined_at;
 
 -- name: CreateGroup :exec
-INSERT INTO groups (id, kind, name, created_at) VALUES (sqlc.arg(id), sqlc.arg(kind), sqlc.arg(name), sqlc.arg(created_at));
+INSERT INTO groups (id, kind, name, mode, created_at) VALUES (sqlc.arg(id), sqlc.arg(kind), sqlc.arg(name), sqlc.arg(mode), sqlc.arg(created_at));
 
--- name: RenameGroup :exec
-UPDATE groups SET name = sqlc.arg(name) WHERE id = sqlc.arg(id) AND deleted_at IS NULL;
+-- name: UpdateGroup :exec
+UPDATE groups SET name = sqlc.arg(name), mode = sqlc.arg(mode) WHERE id = sqlc.arg(id) AND deleted_at IS NULL;
+
+-- name: CountMembers :one
+SELECT COUNT(*) FROM memberships WHERE group_id = sqlc.arg(group_id);
 
 -- name: DeleteGroup :exec
 UPDATE groups SET deleted_at = sqlc.arg(deleted_at) WHERE id = sqlc.arg(id) AND deleted_at IS NULL;

@@ -172,7 +172,7 @@ func (s *Server) Routes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/groups", s.requireAuth(s.listGroups))
 	mux.HandleFunc("POST /api/groups", s.requireAuth(s.createGroup))
 	mux.HandleFunc("GET /api/groups/{gid}", s.requireGroup(s.getGroup))
-	mux.HandleFunc("PUT /api/groups/{gid}", s.requireGroup(s.renameGroup))
+	mux.HandleFunc("PUT /api/groups/{gid}", s.requireGroup(s.updateGroup))
 	mux.HandleFunc("DELETE /api/groups/{gid}", s.requireGroup(s.deleteGroup))
 	mux.HandleFunc("GET /api/groups/{gid}/members", s.requireGroup(s.listMembers))
 	mux.HandleFunc("POST /api/groups/{gid}/members", s.requireGroup(s.addMember))
@@ -190,6 +190,8 @@ func (s *Server) Routes(mux *http.ServeMux) {
 	mux.HandleFunc("DELETE /api/comments/{id}", s.requireAuth(s.deleteComment))
 	mux.HandleFunc("DELETE /api/messages/{id}", s.requireAuth(s.deleteMessage))
 	mux.HandleFunc("GET /api/events", s.requireAuth(s.events))
+	mux.HandleFunc("GET /api/settings", s.requireRoot(perm.ManageInstance, s.getSettings))
+	mux.HandleFunc("PUT /api/settings", s.requireRoot(perm.ManageInstance, s.setSettings))
 	mux.HandleFunc("POST /api/images", s.requireAuth(s.uploadImage))
 	mux.HandleFunc("GET /img/{id}", s.requireAuth(s.serveImage))
 	mux.HandleFunc("PUT /api/me/picture", s.requireAuth(s.setPicture))
@@ -346,6 +348,10 @@ func (s *Server) createPost(w http.ResponseWriter, r *http.Request) {
 	g, a := groupFrom(r.Context())
 	if !perm.Write(a) {
 		writeErr(w, http.StatusForbidden, "not allowed")
+		return
+	}
+	if g.Mode == perm.ModeChat {
+		writeErr(w, http.StatusForbidden, "this group has no posts")
 		return
 	}
 	clean, ok := readBody(w, r)
