@@ -1,10 +1,10 @@
 import { useEffect, useState } from 'react'
-import { getInvite, register, type User } from '../api'
+import { getInvite, register, type Me } from '../api'
 import { Button, Card, Centered, Field, Form, Input, Row, Stack, Text, Wordmark } from '../ui'
 
 interface JoinProps {
   code: string
-  onJoined: (me: User) => void
+  onJoined: (me: Me) => void
 }
 
 /** The page an invite link opens: who invited you, pick a name and a password, and you're in. */

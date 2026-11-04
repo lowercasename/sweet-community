@@ -18,12 +18,12 @@ interface ConfirmDialogProps {
 /** A modal question with one real action and Cancel. The browser's own dialog element: focus and Escape come free. */
 export function ConfirmDialog({ open, title, confirmLabel, busy, onConfirm, onClose, children }: ConfirmDialogProps) {
   const ref = useRef<HTMLDialogElement>(null)
+  // Mounted only while open: it opens modally on mount and leaves the DOM on close.
   useEffect(() => {
     const d = ref.current
-    if (!d) return
-    if (open && !d.open) d.showModal()
-    else if (!open && d.open) d.close()
+    if (d && !d.open) d.showModal()
   }, [open])
+  if (!open) return null
   return (
     <dialog
       ref={ref}

@@ -1,10 +1,11 @@
-import type { User } from '../api'
+import type { Me } from '../api'
+import { useAuthor } from '../data/hooks'
 import { NavAccount, NavBar, NavItem, Wordmark } from '../ui'
 
 export type Page = 'home' | 'people' | 'settings' | 'menu'
 
 interface SidebarProps {
-  me: User
+  me: Me
   page: Page
   expanded: boolean
   onNavigate: (page: Page) => void
@@ -16,13 +17,14 @@ interface SidebarProps {
  * will live; the rest is live.
  */
 export function Sidebar({ me, page, expanded, onNavigate, onToggle }: SidebarProps) {
+  const live = useAuthor(me)
   return (
     <NavBar
       expanded={expanded}
       head={<Wordmark expanded={expanded} />}
       foot={
         <>
-          <NavAccount username={me.username} picture={me.picture} expanded={expanded} />
+          <NavAccount username={live.username} picture={live.picture} expanded={expanded} />
           <NavItem
             icon={expanded ? 'collapse' : 'expand'}
             label={expanded ? 'Collapse' : 'Expand'}

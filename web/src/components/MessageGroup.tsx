@@ -1,30 +1,67 @@
+import { useState } from 'react'
 import type { Message } from '../api'
-import { Avatar, Box, HtmlContent, Row, Stack, Text, Time } from '../ui'
+import { useAuthor } from '../data/hooks'
+import { Avatar, Box, ConfirmDialog, HtmlContent, Menu, Row, Stack, Text, Time } from '../ui'
 
 interface MessageGroupProps {
   /** Consecutive messages from one person within a few minutes; at least one. */
   messages: Message[]
+  /** Resolves when the server has deleted the message; the cache drops it. */
+  onDelete: (id: string) => Promise<void>
 }
 
 /** One person's run of messages: avatar, name and time once, then the bodies close together. */
-export function MessageGroup({ messages }: MessageGroupProps) {
+export function MessageGroup({ messages, onDelete }: MessageGroupProps) {
   const first = messages[0]
+  const author = useAuthor(first.author)
+  const [confirming, setConfirming] = useState<string | null>(null)
+  const [deleting, setDeleting] = useState(false)
+
+  const remove = async () => {
+    if (!confirming) return
+    setDeleting(true)
+    try {
+      await onDelete(confirming)
+    } finally {
+      setDeleting(false)
+      setConfirming(null)
+    }
+  }
+
   return (
     <Box as="article">
       <Stack gap={1}>
         <Row gap={2} align="center">
-          <Avatar name={first.author.username} picture={first.author.picture} size="sm" />
+          <Avatar name={author.username} picture={author.picture} size="sm" />
           <Text as="span" variant="name">
-            {first.author.username}
+            {author.username}
           </Text>
           <Text as="span" variant="small">
             <Time at={first.created_at} />
           </Text>
         </Row>
         {messages.map((m) => (
-          <HtmlContent key={m.id} html={m.body_html} />
+          <Row key={m.id} justify="between" align="start">
+            <HtmlContent html={m.body_html} />
+            {m.can.delete && (
+              <Menu
+                label="Message options"
+                items={[{ label: 'Delete', icon: 'trash', onSelect: () => setConfirming(m.id) }]}
+              />
+            )}
+          </Row>
         ))}
       </Stack>
+      <ConfirmDialog
+        open={confirming !== null}
+        title="Delete this message?"
+        confirmLabel={deleting ? 'Deleting…' : 'Delete'}
+        busy={deleting}
+        onConfirm={() => void remove()}
+        onClose={() => setConfirming(null)}
+      >
+        <Text variant="secondary">This action cannot be undone.</Text>
+      </ConfirmDialog>
     </Box>
   )
 }

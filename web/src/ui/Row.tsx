@@ -12,7 +12,7 @@ const GAPS: Record<Gap, string> = {
 interface RowProps {
   gap?: Gap
   justify?: 'start' | 'between'
-  align?: 'baseline' | 'center'
+  align?: 'baseline' | 'center' | 'start'
   children?: ReactNode
 }
 
@@ -22,7 +22,7 @@ export function Row({ gap = 2, justify = 'start', align = 'baseline', children }
     'flex min-w-0 flex-row flex-wrap',
     GAPS[gap],
     justify === 'between' ? 'justify-between' : 'justify-start',
-    align === 'center' ? 'items-center' : 'items-baseline',
+    align === 'center' ? 'items-center' : align === 'start' ? 'items-start' : 'items-baseline',
   ]
   return <div className={cls.join(' ')}>{children}</div>
 }

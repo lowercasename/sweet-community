@@ -1,6 +1,7 @@
-import { useEffect, useLayoutEffect, useRef, useState } from 'react'
-import { createMessage, getMessages, type Message as MessageData } from '../api'
-import { useStreamEvents, useStreamStatus } from '../hooks/StreamContext'
+import { useEffect, useLayoutEffect, useRef } from 'react'
+import type { Message as MessageData } from '../api'
+import { useMessageActions, useMessages } from '../data/hooks'
+import { useStreamStatus } from '../hooks/StreamContext'
 import { Bar, Button, Card, Pane, Row, ScrollArea, Stack, Text } from '../ui'
 import { chatExtensions } from '../editor/extensions'
 import { BodyEditor } from './BodyEditor'
@@ -15,10 +16,6 @@ interface ChatPaneProps {
 const GROUP_WINDOW_MS = 5 * 60_000
 const STICK_THRESHOLD_PX = 80
 
-function isMessage(data: unknown): data is MessageData {
-  return typeof data === 'object' && data !== null && typeof (data as MessageData).id === 'string'
-}
-
 /** Runs of messages by one person within GROUP_WINDOW_MS of the previous one. */
 function group(list: MessageData[]): MessageData[][] {
   const groups: MessageData[][] = []
@@ -31,18 +28,10 @@ function group(list: MessageData[]): MessageData[][] {
   return groups
 }
 
-/** Oldest first; ignores duplicates by id. */
-function append(list: MessageData[], m: MessageData): MessageData[] {
-  if (list.some((x) => x.id === m.id)) return list
-  return [...list, m].sort((a, b) => a.created_at - b.created_at)
-}
-
 export function ChatPane({ side = 'full' }: ChatPaneProps) {
   const status = useStreamStatus()
-  const [messages, setMessages] = useState<MessageData[]>([])
-  const [nextBefore, setNextBefore] = useState<number | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [loadError, setLoadError] = useState<string | null>(null)
+  const { messages, loading, error, hasEarlier, loadEarlier } = useMessages()
+  const { send: sendMessage, remove } = useMessageActions()
 
   const scrollRef = useRef<HTMLDivElement>(null)
   // Follow new messages only while the viewer is already at the bottom.
@@ -51,29 +40,6 @@ export function ChatPane({ side = 'full' }: ChatPaneProps) {
   const prependRef = useRef<number | null>(null)
   // Last known scroll position, restored after the pane was hidden.
   const topRef = useRef(0)
-
-  useStreamEvents((kind, data) => {
-    if (kind === 'message' && isMessage(data)) setMessages((prev) => append(prev, data))
-  })
-
-  useEffect(() => {
-    let cancelled = false
-    getMessages()
-      .then((page) => {
-        if (cancelled) return
-        setMessages((prev) => page.messages.reduceRight((acc, m) => append(acc, m), prev))
-        setNextBefore(page.next_before)
-      })
-      .catch((e: unknown) => {
-        if (!cancelled) setLoadError(e instanceof Error ? e.message : 'Could not load')
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false)
-      })
-    return () => {
-      cancelled = true
-    }
-  }, [])
 
   useLayoutEffect(() => {
     const el = scrollRef.current
@@ -108,26 +74,14 @@ export function ChatPane({ side = 'full' }: ChatPaneProps) {
     return () => ro.disconnect()
   }, [])
 
-  const loadEarlier = async () => {
-    if (nextBefore == null || loading) return
-    setLoading(true)
-    setLoadError(null)
-    try {
-      const page = await getMessages(nextBefore)
-      prependRef.current = scrollRef.current?.scrollHeight ?? null
-      setMessages((prev) => page.messages.reduceRight((acc, m) => append(acc, m), prev))
-      setNextBefore(page.next_before)
-    } catch (e) {
-      setLoadError(e instanceof Error ? e.message : 'Could not load')
-    } finally {
-      setLoading(false)
-    }
+  const earlier = async () => {
+    prependRef.current = scrollRef.current?.scrollHeight ?? null
+    await loadEarlier()
   }
 
   const send = async (bodyHtml: string) => {
-    const m = await createMessage(bodyHtml)
     stickRef.current = true // your own message always scrolls into view
-    setMessages((prev) => append(prev, m))
+    await sendMessage(bodyHtml)
   }
 
   return (
@@ -135,19 +89,19 @@ export function ChatPane({ side = 'full' }: ChatPaneProps) {
       <Card fill flush>
         <ScrollArea ref={scrollRef} pad="inner" onScroll={onScroll}>
           <Stack gap={3}>
-            {nextBefore != null && (
+            {hasEarlier && (
               <Row>
-                <Button variant="secondary" disabled={loading} onClick={() => void loadEarlier()}>
+                <Button variant="secondary" disabled={loading} onClick={() => void earlier()}>
                   {loading ? 'Loading…' : 'Load earlier'}
                 </Button>
               </Row>
             )}
-            {loadError && <Text variant="secondary">{loadError}</Text>}
+            {error && <Text variant="secondary">{error.message}</Text>}
             {!loading && messages.length === 0 && (
               <Text variant="secondary">Nobody has said anything yet. Say hello.</Text>
             )}
             {group(messages).map((run) => (
-              <MessageGroup key={run[0].id} messages={run} />
+              <MessageGroup key={run[0].id} messages={run} onDelete={remove} />
             ))}
           </Stack>
         </ScrollArea>

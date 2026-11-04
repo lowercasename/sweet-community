@@ -1,10 +1,9 @@
-import { useEffect, useState } from 'react'
-import { getMe, type User } from './api'
+import { useState } from 'react'
+import type { Me } from './api'
+import { useMe, useSession } from './data/hooks'
 import { Home } from './pages/Home'
 import { Join } from './pages/Join'
 import { Login } from './pages/Login'
-
-type Auth = { kind: 'loading' } | { kind: 'anonymous' } | { kind: 'signed-in'; me: User }
 
 /** The join page's code, if this is an invite link. */
 function joinCode(): string | null {
@@ -14,29 +13,16 @@ function joinCode(): string | null {
 
 /** Root: who is this, and are they here on an invite link? */
 export function App() {
-  const [auth, setAuth] = useState<Auth>({ kind: 'loading' })
+  const { data: me, isPending } = useMe()
+  const { signIn, signOut } = useSession()
   const [code] = useState(joinCode)
 
-  useEffect(() => {
-    getMe()
-      .then((me) => setAuth({ kind: 'signed-in', me }))
-      .catch(() => setAuth({ kind: 'anonymous' }))
-  }, [])
-
-  const signedIn = (me: User) => {
+  const signedIn = (m: Me) => {
     if (code) window.history.replaceState(null, '', '/')
-    setAuth({ kind: 'signed-in', me })
+    signIn(m)
   }
 
-  if (auth.kind === 'loading') return null
-  if (auth.kind === 'anonymous') {
-    return code ? <Join code={code} onJoined={signedIn} /> : <Login onSignedIn={signedIn} />
-  }
-  return (
-    <Home
-      me={auth.me}
-      onMeChange={(me) => setAuth({ kind: 'signed-in', me })}
-      onSignOut={() => setAuth({ kind: 'anonymous' })}
-    />
-  )
+  if (isPending) return null
+  if (!me) return code ? <Join code={code} onJoined={signedIn} /> : <Login onSignedIn={signedIn} />
+  return <Home me={me} onSignOut={() => void signOut()} />
 }

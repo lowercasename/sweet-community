@@ -3,10 +3,27 @@
 export interface User {
   id: string
   username: string
-  /** "owner" runs the instance; everyone else is "member". */
-  role: 'owner' | 'member'
+  /** "owner" runs the instance; moderators help; everyone else is a member. */
+  role: 'owner' | 'moderator' | 'member'
   /** Avatar url, or null for the donut. */
   picture: string | null
+}
+
+/** What the signed-in person may do to one resource. The server's call (internal/perm); the client shows it. */
+export interface Can {
+  edit: boolean
+  delete: boolean
+}
+
+/** What the signed-in person may do on the instance. */
+export interface Abilities {
+  invite: boolean
+  manage_roles: boolean
+}
+
+/** The signed-in person as they see themselves. */
+export interface Me extends User {
+  can: Abilities
 }
 
 export interface UploadedImage {
@@ -30,7 +47,7 @@ export interface Invite {
 }
 
 export interface Session {
-  user: User
+  user: Me
   /** The session token, for clients that cannot hold the cookie. */
   token: string
 }
@@ -44,16 +61,20 @@ export interface Post {
   /** Unix ms of the last edit, or null if never edited. */
   edited_at: number | null
   comment_count: number
+  can: Can
 }
 
 export interface Comment {
   id: string
   post_id: string
+  /** The post's author may delete any comment on it; the server already folded that into `can`. */
+  post_author_id: string
   author: User
   body_html: string
   body_text: string
   created_at: number
   edited_at: number | null
+  can: Can
 }
 
 export interface Message {
@@ -62,6 +83,7 @@ export interface Message {
   body_html: string
   body_text: string
   created_at: number
+  can: Can
 }
 
 export interface MessagePage {
@@ -107,8 +129,8 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   return (await res.json()) as T
 }
 
-export function getMe(): Promise<User> {
-  return request<User>('/api/me')
+export function getMe(): Promise<Me> {
+  return request<Me>('/api/me')
 }
 
 export function getPosts(before?: number | null, limit = 20): Promise<PostPage> {
@@ -184,11 +206,24 @@ export function listInvites(): Promise<{ invites: Invite[] }> {
 }
 
 export async function deletePost(id: string): Promise<void> {
-  const res = await fetch(`/api/posts/${encodeURIComponent(id)}`, { method: 'DELETE' })
-  if (!res.ok) {
-    const body = (await res.json().catch(() => ({}))) as { error?: string }
-    throw new Error(body.error ?? `Could not delete (${res.status})`)
-  }
+  await request(`/api/posts/${encodeURIComponent(id)}`, { method: 'DELETE' })
+}
+
+export async function deleteComment(id: string): Promise<void> {
+  await request(`/api/comments/${encodeURIComponent(id)}`, { method: 'DELETE' })
+}
+
+export async function deleteMessage(id: string): Promise<void> {
+  await request(`/api/messages/${encodeURIComponent(id)}`, { method: 'DELETE' })
+}
+
+/** The owner makes someone a member or a moderator. Returns the user as they now are. */
+export function setRole(id: string, role: 'member' | 'moderator'): Promise<User> {
+  return request<User>(`/api/users/${encodeURIComponent(id)}/role`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ role }),
+  })
 }
 
 export async function revokeInvite(code: string): Promise<void> {
