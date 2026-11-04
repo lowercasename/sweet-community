@@ -1,10 +1,9 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { createComment, getComments, updateComment, type Comment as CommentData, type User } from '../api'
 import { commentExtensions } from '../editor/extensions'
-import { quoteHtml } from '../editor/quote'
 import { useStreamEvents } from '../hooks/StreamContext'
 import { Avatar, Box, Button, Hairline, HtmlContent, Icon, Row, Stack, Text, Time } from '../ui'
-import { BodyEditor, type BodyEditorHandle } from './BodyEditor'
+import { BodyEditor } from './BodyEditor'
 
 interface CommentThreadProps {
   postId: string
@@ -21,10 +20,9 @@ interface CommentItemProps {
   mine: boolean
   disabled: boolean
   onEdit: (bodyHtml: string) => Promise<void>
-  onQuote: () => void
 }
 
-function CommentItem({ comment, mine, disabled, onEdit, onQuote }: CommentItemProps) {
+function CommentItem({ comment, mine, disabled, onEdit }: CommentItemProps) {
   const [editing, setEditing] = useState(false)
   const save = async (bodyHtml: string) => {
     await onEdit(bodyHtml)
@@ -49,17 +47,10 @@ function CommentItem({ comment, mine, disabled, onEdit, onQuote }: CommentItemPr
               )}
             </Text>
           </Row>
-          {!editing && (
-            <Row gap={0} align="center">
-              <Button variant="ghost" label="Quote" onClick={onQuote}>
-                Quote
-              </Button>
-              {mine && (
-                <Button variant="ghost" label="Edit" onClick={() => setEditing(true)}>
-                  <Icon name="pencil" />
-                </Button>
-              )}
-            </Row>
+          {mine && !editing && (
+            <Button variant="ghost" label="Edit" onClick={() => setEditing(true)}>
+              <Icon name="pencil" />
+            </Button>
           )}
         </Row>
         {editing ? (
@@ -81,12 +72,11 @@ function CommentItem({ comment, mine, disabled, onEdit, onQuote }: CommentItemPr
   )
 }
 
-/** Flat comments under a post, oldest first, with a quote-reply editor at the end. */
+/** Flat comments under a post, oldest first, with the reply editor at the end. */
 export function CommentThread({ postId, me, disabled }: CommentThreadProps) {
   const [comments, setComments] = useState<CommentData[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const editorRef = useRef<BodyEditorHandle>(null)
 
   const upsert = (list: CommentData[], c: CommentData): CommentData[] => {
     if (list.some((x) => x.id === c.id)) return list.map((x) => (x.id === c.id ? c : x))
@@ -126,10 +116,6 @@ export function CommentThread({ postId, me, disabled }: CommentThreadProps) {
     setComments((prev) => upsert(prev, c))
   }
 
-  const quote = (c: CommentData) => {
-    editorRef.current?.appendHtml(quoteHtml(c.body_text))
-  }
-
   return (
     <Stack gap={3}>
       <Hairline />
@@ -142,11 +128,9 @@ export function CommentThread({ postId, me, disabled }: CommentThreadProps) {
           mine={c.author.id === me.id}
           disabled={disabled}
           onEdit={(html) => edit(c.id, html)}
-          onQuote={() => quote(c)}
         />
       ))}
       <BodyEditor
-        ref={editorRef}
         extensions={commentExtensions}
         size="line"
         submitLabel="Reply"

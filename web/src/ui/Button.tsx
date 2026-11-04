@@ -11,6 +11,8 @@ interface ButtonProps {
   /** Accessible name; required when the button has no text. */
   label?: string
   icon?: IconName
+  /** A small number after the icon, as old Sweet's post toolbar showed comment counts. Hidden when 0. */
+  count?: number
   onClick?: () => void
   children?: ReactNode
 }
@@ -37,10 +39,11 @@ export function Button({
   pressed,
   label,
   icon,
+  count,
   onClick,
   children,
 }: ButtonProps) {
-  const iconOnly = icon !== undefined && children === undefined
+  const iconOnly = icon !== undefined && children === undefined && !count
   const pad = iconOnly ? 'p-1.5' : 'px-3 py-1'
   return (
     <button
@@ -54,6 +57,7 @@ export function Button({
       onClick={onClick}
     >
       {icon && <Icon name={icon} />}
+      {count ? <span className="text-sm">{count}</span> : null}
       {children}
     </button>
   )

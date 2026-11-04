@@ -1,13 +1,7 @@
-import { forwardRef, useImperativeHandle, useRef, useState } from 'react'
+import { useRef, useState } from 'react'
 import { useEditor, useEditorState, type Extensions } from '@tiptap/react'
 import { Button, EditorSurface, Form, Row, Stack, Text } from '../ui'
 import { EditorToolbar, promptLink } from './EditorToolbar'
-
-export interface BodyEditorHandle {
-  /** Insert HTML at the end and focus; used for quote-replies. */
-  appendHtml: (html: string) => void
-  focus: () => void
-}
 
 interface BodyEditorProps {
   extensions: Extensions
@@ -31,10 +25,17 @@ interface BodyEditorProps {
 }
 
 /** The one editor: posts, chat and comments differ only in schema, size and submit key. */
-export const BodyEditor = forwardRef<BodyEditorHandle, BodyEditorProps>(function BodyEditor(
-  { extensions, size, enterSubmits = false, submitLabel, busyLabel, disabled, onSubmit, initialHtml, onCancel },
-  ref,
-) {
+export function BodyEditor({
+  extensions,
+  size,
+  enterSubmits = false,
+  submitLabel,
+  busyLabel,
+  disabled,
+  onSubmit,
+  initialHtml,
+  onCancel,
+}: BodyEditorProps) {
   const editing = initialHtml !== undefined
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -70,16 +71,6 @@ export const BodyEditor = forwardRef<BodyEditorHandle, BodyEditorProps>(function
       },
     },
   })
-
-  useImperativeHandle(ref, () => ({
-    appendHtml(html) {
-      if (!editor) return
-      editor.chain().focus('end').insertContent(html).focus('end').run()
-    },
-    focus() {
-      editor?.commands.focus('end')
-    },
-  }))
 
   const isEmpty = useEditorState({ editor, selector: ({ editor }) => (editor ? editor.isEmpty : true) })
   const canSubmit = !!editor && !isEmpty && !disabled && !busy
@@ -123,4 +114,4 @@ export const BodyEditor = forwardRef<BodyEditorHandle, BodyEditorProps>(function
       </Stack>
     </Form>
   )
-})
+}

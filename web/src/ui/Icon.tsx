@@ -8,6 +8,7 @@ import {
   Link,
   LogOut,
   Menu,
+  MessageCircle,
   MessagesSquare,
   Newspaper,
   Pencil,
@@ -33,6 +34,7 @@ export type IconName =
   | 'chat'
   | 'menu'
   | 'logout'
+  | 'comment'
   | 'pencil'
   | 'devices'
 
@@ -51,6 +53,7 @@ const ICONS: Record<IconName, LucideIcon> = {
   chat: MessagesSquare,
   menu: Menu,
   logout: LogOut,
+  comment: MessageCircle,
   pencil: Pencil,
   devices: TabletSmartphone,
 }

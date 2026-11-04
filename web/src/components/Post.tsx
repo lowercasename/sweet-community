@@ -14,11 +14,6 @@ interface PostProps {
   onEdit: (bodyHtml: string) => Promise<void>
 }
 
-function commentsLabel(n: number): string {
-  if (n === 0) return 'Comment'
-  return n === 1 ? '1 comment' : `${n} comments`
-}
-
 export function Post({ post, me, disabled, onEdit }: PostProps) {
   const [editing, setEditing] = useState(false)
   const [open, setOpen] = useState(false)
@@ -71,9 +66,14 @@ export function Post({ post, me, disabled, onEdit }: PostProps) {
           <HtmlContent html={post.body_html} />
         )}
         <Row>
-          <Button variant="ghost" pressed={open} onClick={() => setOpen((o) => !o)}>
-            {commentsLabel(post.comment_count)}
-          </Button>
+          <Button
+            variant="ghost"
+            icon="comment"
+            count={post.comment_count}
+            label={open ? 'Hide comments' : 'Show comments'}
+            pressed={open}
+            onClick={() => setOpen((o) => !o)}
+          />
         </Row>
         {open && <CommentThread postId={post.id} me={me} disabled={disabled} />}
       </Stack>
