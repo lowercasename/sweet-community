@@ -3,13 +3,14 @@ import { uploadImage } from '../api'
 
 export const IMAGE_ACCEPT = 'image/jpeg,image/png,image/webp,image/gif'
 
-/** Old Sweet's alt-text prompt, verbatim. Empty is allowed: not every picture needs words. */
-const ALT_PROMPT = 'Describe this image for people using screen readers.'
-
-/** Upload a file and insert it at the cursor as our image node. Throws on a refused upload. */
+/**
+ * Upload a file and insert it at the cursor as our image node. Throws on a
+ * refused upload. The alt text starts empty; the chip on the image in the
+ * editor (EditorImage) is where it gets written.
+ */
 export async function insertImage(editor: Editor, file: File): Promise<void> {
   const img = await uploadImage(file)
-  const alt = window.prompt(ALT_PROMPT, '') ?? ''
+  const alt = ''
   editor
     .chain()
     .focus()

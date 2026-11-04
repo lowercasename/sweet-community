@@ -89,7 +89,7 @@ Server-side on upload: apply EXIF orientation, strip metadata, generate sizes. D
 
 Images are protected per instance: served through the Go backend at `/img/<id>` with a session check. No images outside the web app (the digest carries no content), so no signed URLs.
 
-Alt text is prompted on every image; whether it's required is a feature flag.
+Alt text is written through a chip on the image in the editor (Bluesky, X and Mastodon all converged on this): "Add alt text" until a description exists, then a quiet ALT badge that reopens the field. No prompt on insert. Whether alt text is required is a feature flag.
 
 Per-image and per-post size caps; a per-instance storage quota enforced at upload (also a pricing lever).
 

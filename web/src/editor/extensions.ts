@@ -2,13 +2,17 @@ import StarterKit from '@tiptap/starter-kit'
 import Link from '@tiptap/extension-link'
 import { Placeholder } from '@tiptap/extensions'
 import Image from '@tiptap/extension-image'
+import { ReactNodeViewRenderer } from '@tiptap/react'
+import { EditorImage } from '../ui'
 
 const link = Link.configure({ openOnClick: false, autolink: true, defaultProtocol: 'https' })
 
 /**
  * An uploaded image. Only our own /img/<id> urls survive the server's
  * sanitiser; width and height (TipTap's own) let the page reserve space
- * before the bytes arrive, and data-image-id names the upload.
+ * before the bytes arrive, and data-image-id names the upload. In the editor
+ * the node is drawn by EditorImage, which carries the alt text chip; getHTML()
+ * still serialises the plain <img>, so stored HTML is unchanged.
  */
 export const SweetImage = Image.extend({
   addAttributes() {
@@ -16,6 +20,9 @@ export const SweetImage = Image.extend({
       ...this.parent?.(),
       'data-image-id': { default: null },
     }
+  },
+  addNodeView() {
+    return ReactNodeViewRenderer(EditorImage)
   },
 }).configure({ inline: false, allowBase64: false })
 

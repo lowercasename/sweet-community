@@ -104,12 +104,11 @@
     display: block;
     max-width: 100%;
     height: auto;
-    margin: 0 0 0.6em;
     border-radius: 4px;
   }
-  .editor .ProseMirror img.ProseMirror-selectednode {
-    outline: 2px solid var(--color-pink);
-    outline-offset: 2px;
+  /* In the editor the image sits inside EditorImage's wrapper, which carries the margin. */
+  .content img {
+    margin: 0 0 0.6em;
   }
 
   /* The editing surface: white, a hairline, pink when focused. */
