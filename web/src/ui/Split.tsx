@@ -83,12 +83,18 @@ export function Split({ ratio, onRatio, onCollapse, show, leftRail, rightRail, h
     e.preventDefault()
   }
 
+  // A hidden pane takes no column, and neither does an absent rail (phones),
+  // so the columns are exactly what is on screen.
   const columns =
     show === 'both'
       ? `minmax(0, ${ratio}fr) 16px minmax(0, ${1 - ratio}fr)`
       : show === 'left'
-        ? 'minmax(0, 1fr) auto'
-        : 'auto minmax(0, 1fr)'
+        ? rightRail
+          ? 'minmax(0, 1fr) auto'
+          : 'minmax(0, 1fr)'
+        : leftRail
+          ? 'auto minmax(0, 1fr)'
+          : 'minmax(0, 1fr)'
 
   return (
     <div

@@ -9,7 +9,7 @@ import { Split, type SplitShow } from './Split'
  * An uncontrolled input is the simplest stateful child: its value survives
  * only if the very same DOM node does.
  */
-function split(show: SplitShow, hidden = false) {
+function split(show: SplitShow, hidden = false, rails = true) {
   return (
     <Split
       show={show}
@@ -17,8 +17,8 @@ function split(show: SplitShow, hidden = false) {
       ratio={0.4}
       onRatio={() => {}}
       onCollapse={() => {}}
-      leftRail={<button>Show posts</button>}
-      rightRail={<button>Show chat</button>}
+      leftRail={rails ? <button>Show posts</button> : undefined}
+      rightRail={rails ? <button>Show chat</button> : undefined}
       left={<input aria-label="left draft" />}
       right={<input aria-label="right draft" />}
     />
@@ -68,5 +68,17 @@ describe('Split', () => {
     expect(screen.getByRole('separator')).toBeTruthy()
     expect(screen.queryByText('Show posts')).toBeNull()
     expect(screen.queryByText('Show chat')).toBeNull()
+  })
+
+  it('gives the open pane the whole width when there are no rails (phones)', () => {
+    const { container, rerender } = render(split('right', false, false))
+    const grid = () => (container.firstElementChild as HTMLElement).style.gridTemplateColumns
+    expect(grid()).toBe('minmax(0, 1fr)')
+    rerender(split('left', false, false))
+    expect(grid()).toBe('minmax(0, 1fr)')
+    rerender(split('left', false, true))
+    expect(grid()).toBe('minmax(0, 1fr) auto')
+    rerender(split('right', false, true))
+    expect(grid()).toBe('auto minmax(0, 1fr)')
   })
 })
