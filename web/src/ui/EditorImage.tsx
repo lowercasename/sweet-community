@@ -42,7 +42,11 @@ export function EditorImage({ editor, node, getPos, selected, updateAttributes, 
   // Enter in the field returns to writing, just after this image.
   const leave = () => {
     const pos = getPos()
-    if (pos !== undefined) editor.chain().focus(pos + node.nodeSize).run()
+    if (pos !== undefined)
+      editor
+        .chain()
+        .focus(pos + node.nodeSize)
+        .run()
   }
 
   return (

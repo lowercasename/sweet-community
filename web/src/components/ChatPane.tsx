@@ -9,6 +9,8 @@ import { ConnectionStatus } from './ConnectionStatus'
 import { MessageGroup } from './MessageGroup'
 
 interface ChatPaneProps {
+  /** The group whose room this is. */
+  groupId: string
   /** Which outer edge is padded; `left`/`right` inside a Split. */
   side?: 'left' | 'right' | 'full'
 }
@@ -28,10 +30,10 @@ function group(list: MessageData[]): MessageData[][] {
   return groups
 }
 
-export function ChatPane({ side = 'full' }: ChatPaneProps) {
+export function ChatPane({ groupId, side = 'full' }: ChatPaneProps) {
   const status = useStreamStatus()
-  const { messages, loading, error, hasEarlier, loadEarlier } = useMessages()
-  const { send: sendMessage, remove } = useMessageActions()
+  const { messages, loading, error, hasEarlier, loadEarlier } = useMessages(groupId)
+  const { send: sendMessage, remove } = useMessageActions(groupId)
 
   const scrollRef = useRef<HTMLDivElement>(null)
   // Follow new messages only while the viewer is already at the bottom.

@@ -1,5 +1,6 @@
 import { useState } from 'react'
-import type { Me } from '../api'
+import type { User } from '../api'
+import { useRootGroup } from '../data/hooks'
 import { StreamProvider } from '../hooks/StreamContext'
 import { useLayout } from '../hooks/useLayout'
 import { ChatPane } from '../components/ChatPane'
@@ -11,16 +12,16 @@ import { Sidebar, type Page } from '../components/Sidebar'
 import { Rail, Shell, Split, TabBar } from '../ui'
 
 interface HomeProps {
-  me: Me
+  me: User
   /** Ends the session (this one, or all of them) and returns to the sign-in page. */
   onSignOut: () => void
 }
 
 /**
- * The signed-in app: a nav column on the left, then the page. Home is posts
- * and chat either side of a draggable divider; drag a pane shut and it
- * folds into a Rail. On a narrow screen the nav column is replaced by a tab
- * bar at the bottom that also switches between the two panes.
+ * The signed-in app: a nav column on the left, then the page. Home is the
+ * root group's posts and chat either side of a draggable divider; drag a
+ * pane shut and it folds into a Rail. On a narrow screen the nav column is
+ * replaced by a tab bar at the bottom that also switches between the two panes.
  *
  * Posts and chat stay mounted whatever is showing, so a half-written post
  * or message survives closing its pane or visiting Settings.
@@ -28,6 +29,7 @@ interface HomeProps {
 export function Home({ me, onSignOut }: HomeProps) {
   const { layout, narrow, ratio, navExpanded, setLayout, setRatio, toggleNav } = useLayout()
   const [page, setPage] = useState<Page>('home')
+  const root = useRootGroup()
 
   const show = layout === 'both' ? 'both' : layout === 'posts' ? 'left' : 'right'
   const tabActive = page === 'home' ? (layout === 'posts' ? 'posts' : 'chat') : page === 'menu' ? 'menu' : undefined
@@ -41,20 +43,26 @@ export function Home({ me, onSignOut }: HomeProps) {
           )
         }
       >
-        {page === 'people' && <PeoplePage me={me} />}
+        {page === 'people' && root && <PeoplePage me={me} root={root} />}
         {page === 'settings' && <SettingsPage me={me} onSignOut={onSignOut} />}
         {page === 'menu' && <MenuPage me={me} onNavigate={setPage} onLogout={onSignOut} />}
-        <Split
-          hidden={page !== 'home'}
-          show={show}
-          ratio={ratio}
-          onRatio={setRatio}
-          onCollapse={(side) => setLayout(side === 'left' ? 'chat' : 'posts')}
-          leftRail={narrow ? undefined : <Rail side="left" icon="posts" label="Posts" onOpen={() => setLayout('both')} />}
-          rightRail={narrow ? undefined : <Rail side="right" icon="chat" label="Chat" onOpen={() => setLayout('both')} />}
-          left={<PostsPane side={show === 'both' ? 'left' : 'full'} />}
-          right={<ChatPane side={show === 'both' ? 'right' : 'full'} />}
-        />
+        {root && (
+          <Split
+            hidden={page !== 'home'}
+            show={show}
+            ratio={ratio}
+            onRatio={setRatio}
+            onCollapse={(side) => setLayout(side === 'left' ? 'chat' : 'posts')}
+            leftRail={
+              narrow ? undefined : <Rail side="left" icon="posts" label="Posts" onOpen={() => setLayout('both')} />
+            }
+            rightRail={
+              narrow ? undefined : <Rail side="right" icon="chat" label="Chat" onOpen={() => setLayout('both')} />
+            }
+            left={<PostsPane groupId={root.id} side={show === 'both' ? 'left' : 'full'} />}
+            right={<ChatPane groupId={root.id} side={show === 'both' ? 'right' : 'full'} />}
+          />
+        )}
         {narrow && (
           <TabBar
             tabs={[

@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import type { Invite, Me, Member } from '../api'
+import type { Group, Invite, Member, User } from '../api'
 import { useInviteActions, useInvites, useSetRole, useUsers } from '../data/hooks'
 import {
   Avatar,
@@ -19,7 +19,9 @@ import {
 } from '../ui'
 
 interface PeoplePageProps {
-  me: Me
+  me: User
+  /** The instance as a group: its can flags say whether I invite and set roles. */
+  root: Group
 }
 
 function InviteRow({ invite, onRevoke }: { invite: Invite; onRevoke: () => void }) {
@@ -59,14 +61,14 @@ const ROLE_WORD: Record<Member['role'], string> = {
 }
 
 /**
- * Everyone on the instance. Staff mint invite links here; the owner sets
- * roles. Both are the server's call, read from me.can.
+ * Everyone on the instance: the root group's members. Its staff mint invite
+ * links here; its owner sets roles. Both come from the root group's can flags.
  */
-export function PeoplePage({ me }: PeoplePageProps) {
+export function PeoplePage({ me, root }: PeoplePageProps) {
   const { data: users } = useUsers()
-  const { invites, error: inviteError } = useInvites(me.can.invite)
+  const { invites, error: inviteError } = useInvites(root.can.add_members)
   const { create, revoke } = useInviteActions()
-  const setRole = useSetRole()
+  const setRole = useSetRole(root.id)
   const [error, setError] = useState<string | null>(null)
 
   const invite = async () => {
@@ -89,7 +91,7 @@ export function PeoplePage({ me }: PeoplePageProps) {
       <ScrollArea>
         <Measure>
           <Stack gap={3}>
-            {me.can.invite && (
+            {root.can.add_members && (
               <Card>
                 <Stack gap={2}>
                   <Heading level={2}>Invite someone</Heading>
@@ -118,10 +120,10 @@ export function PeoplePage({ me }: PeoplePageProps) {
                             {u.username}
                           </Text>
                           <Text as="span" variant="small">
-                            {ROLE_WORD[u.role] && `${ROLE_WORD[u.role]} · `}joined <Time at={u.created_at} />
+                            {ROLE_WORD[u.role] && `${ROLE_WORD[u.role]} · `}joined <Time at={u.joined_at} />
                           </Text>
                         </Row>
-                        {me.can.manage_roles && u.role !== 'owner' && u.id !== me.id && (
+                        {root.can.set_roles && u.role !== 'owner' && u.id !== me.id && (
                           <Button variant="ghost" onClick={() => void change(u)}>
                             {u.role === 'moderator' ? 'Make member' : 'Make moderator'}
                           </Button>

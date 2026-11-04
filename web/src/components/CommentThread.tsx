@@ -2,23 +2,12 @@ import { useState } from 'react'
 import type { Comment as CommentData } from '../api'
 import { useAuthor, useCommentActions, useComments } from '../data/hooks'
 import { commentExtensions } from '../editor/extensions'
-import {
-  Avatar,
-  Box,
-  ConfirmDialog,
-  Hairline,
-  HtmlContent,
-  Menu,
-  Row,
-  Stack,
-  Text,
-  Time,
-  type MenuItem,
-} from '../ui'
+import { Avatar, Box, ConfirmDialog, Hairline, HtmlContent, Menu, Row, Stack, Text, Time, type MenuItem } from '../ui'
 import { BodyEditor } from './BodyEditor'
 
 interface CommentThreadProps {
   postId: string
+  groupId: string
   disabled: boolean
 }
 
@@ -109,9 +98,9 @@ function CommentItem({ comment, disabled, onEdit, onDelete }: CommentItemProps) 
 }
 
 /** Flat comments under a post, oldest first, with the reply editor at the end. */
-export function CommentThread({ postId, disabled }: CommentThreadProps) {
+export function CommentThread({ postId, groupId, disabled }: CommentThreadProps) {
   const { comments, loading, error } = useComments(postId)
-  const { create, edit, remove } = useCommentActions(postId)
+  const { create, edit, remove } = useCommentActions(postId, groupId)
 
   return (
     <Stack gap={2}>

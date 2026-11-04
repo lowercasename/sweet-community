@@ -1,9 +1,9 @@
 import { useState } from 'react'
-import { login, type Me } from '../api'
+import { login, type User } from '../api'
 import { Button, Card, Centered, Field, Form, Input, Row, Stack, Text, Wordmark } from '../ui'
 
 interface LoginProps {
-  onSignedIn: (me: Me) => void
+  onSignedIn: (me: User) => void
 }
 
 export function Login({ onSignedIn }: LoginProps) {

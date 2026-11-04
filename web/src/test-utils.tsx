@@ -2,7 +2,7 @@ import type { ReactNode } from 'react'
 import { QueryClientProvider } from '@tanstack/react-query'
 import { render } from '@testing-library/react'
 import { makeQueryClient } from './data/client'
-import type { Comment, Me, Message, Post, User } from './api'
+import type { Comment, Group, Member, Message, Post, User } from './api'
 
 /** Render inside a fresh query cache; returns the client so tests can seed or inspect it. */
 export function renderWithQuery(ui: ReactNode) {
@@ -14,20 +14,34 @@ export function renderWithQuery(ui: ReactNode) {
 export const nobody = { edit: false, delete: false }
 export const mine = { edit: true, delete: true }
 
-export const user = (id: string, role: User['role'] = 'member', picture: string | null = null): User => ({
-  id,
-  username: id,
-  role,
-  picture,
-})
+/** The root group's fixed id (perm.Root on the server). */
+export const ROOT = '00000000-0000-7000-8000-000000000000'
 
-export const me = (id: string, role: User['role'] = 'member'): Me => ({
-  ...user(id, role),
-  can: { invite: role !== 'member', manage_roles: role === 'owner' },
+export const user = (id: string, picture: string | null = null): User => ({ id, username: id, picture })
+
+export const member = (id: string, role: Member['role'] = 'member'): Member => ({ ...user(id), role, joined_at: 1 })
+
+/** A group as its viewer sees it: with their role and what they may do. */
+export const group = (id: string, role: Group['role'], extra: Partial<Group> = {}): Group => ({
+  id,
+  kind: id === ROOT ? 'root' : 'group',
+  name: id === ROOT ? '' : id,
+  created_at: 1,
+  role,
+  can: {
+    add_members: role !== 'member',
+    remove_members: role !== 'member',
+    set_roles: role === 'owner',
+    rename: role === 'owner' && id !== ROOT,
+    delete: role === 'owner' && id !== ROOT,
+    leave: role !== 'owner' && id !== ROOT,
+  },
+  ...extra,
 })
 
 export const post = (id: string, author: User, extra: Partial<Post> = {}): Post => ({
   id,
+  group_id: ROOT,
   author,
   body_html: `<p>${id}</p>`,
   body_text: id,
@@ -41,6 +55,7 @@ export const post = (id: string, author: User, extra: Partial<Post> = {}): Post 
 export const comment = (id: string, postId: string, author: User, extra: Partial<Comment> = {}): Comment => ({
   id,
   post_id: postId,
+  group_id: ROOT,
   post_author_id: 'kit',
   author,
   body_html: `<p>${id} says hi</p>`,
@@ -53,6 +68,7 @@ export const comment = (id: string, postId: string, author: User, extra: Partial
 
 export const message = (id: string, author: User, extra: Partial<Message> = {}): Message => ({
   id,
+  group_id: ROOT,
   author,
   body_html: `<p>${id}</p>`,
   body_text: id,

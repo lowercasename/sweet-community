@@ -95,7 +95,7 @@ export function Post({ post, disabled, onEdit, onDelete }: PostProps) {
             onClick={() => setOpen((o) => !o)}
           />
         </Row>
-        {open && <CommentThread postId={post.id} disabled={disabled} />}
+        {open && <CommentThread postId={post.id} groupId={post.group_id} disabled={disabled} />}
       </Stack>
       <ConfirmDialog
         open={confirming}

@@ -7,14 +7,16 @@ import { ConnectionStatus } from './ConnectionStatus'
 import { PostList } from './PostList'
 
 interface PostsPaneProps {
+  /** The group whose feed this is. */
+  groupId: string
   /** Which outer edge is padded; `left`/`right` inside a Split. */
   side?: 'left' | 'right' | 'full'
 }
 
-export function PostsPane({ side = 'full' }: PostsPaneProps) {
+export function PostsPane({ groupId, side = 'full' }: PostsPaneProps) {
   const status = useStreamStatus()
-  const { posts, loading, error, hasMore, loadMore } = usePosts()
-  const { create, edit, remove } = usePostActions()
+  const { posts, loading, error, hasMore, loadMore } = usePosts(groupId)
+  const { create, edit, remove } = usePostActions(groupId)
   const offline = status === 'offline'
 
   return (

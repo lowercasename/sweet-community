@@ -1,11 +1,11 @@
 import { useState } from 'react'
-import { logoutEverywhere, uploadImage, type Me } from '../api'
+import { logoutEverywhere, uploadImage, type User } from '../api'
 import { useAuthor, useSetPicture } from '../data/hooks'
 import { IMAGE_ACCEPT } from '../editor/images'
 import { Avatar, Button, Card, FilePicker, Heading, Measure, Pane, Row, ScrollArea, Stack, Text } from '../ui'
 
 interface SettingsPageProps {
-  me: Me
+  me: User
   /** Sign out: this session via the app's sign-out, or every session after logoutEverywhere. */
   onSignOut: () => void
 }

@@ -1,10 +1,10 @@
-import type { Me } from '../api'
+import type { User } from '../api'
 import { useAuthor } from '../data/hooks'
 import { Card, NavAccount, NavItem, Pane, Stack } from '../ui'
 import type { Page } from './Sidebar'
 
 interface MenuPageProps {
-  me: Me
+  me: User
   onNavigate: (page: Page) => void
   onLogout: () => void
 }

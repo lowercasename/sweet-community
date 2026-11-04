@@ -97,11 +97,7 @@ export function Split({ ratio, onRatio, onCollapse, show, leftRail, rightRail, h
           : 'minmax(0, 1fr)'
 
   return (
-    <div
-      ref={ref}
-      className={hidden ? 'hidden' : 'grid min-h-0 flex-1'}
-      style={{ gridTemplateColumns: columns }}
-    >
+    <div ref={ref} className={hidden ? 'hidden' : 'grid min-h-0 flex-1'} style={{ gridTemplateColumns: columns }}>
       {show === 'right' && leftRail}
       <div className={show === 'right' ? 'hidden' : 'contents'}>{left}</div>
       {show === 'both' && (

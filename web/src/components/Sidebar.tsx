@@ -1,11 +1,11 @@
-import type { Me } from '../api'
+import type { User } from '../api'
 import { useAuthor } from '../data/hooks'
 import { NavAccount, NavBar, NavItem, Wordmark } from '../ui'
 
 export type Page = 'home' | 'people' | 'settings' | 'menu'
 
 interface SidebarProps {
-  me: Me
+  me: User
   page: Page
   expanded: boolean
   onNavigate: (page: Page) => void

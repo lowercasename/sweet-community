@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import type { Me } from './api'
+import type { User } from './api'
 import { useMe, useSession } from './data/hooks'
 import { Home } from './pages/Home'
 import { Join } from './pages/Join'
@@ -17,7 +17,7 @@ export function App() {
   const { signIn, signOut } = useSession()
   const [code] = useState(joinCode)
 
-  const signedIn = (m: Me) => {
+  const signedIn = (m: User) => {
     if (code) window.history.replaceState(null, '', '/')
     signIn(m)
   }

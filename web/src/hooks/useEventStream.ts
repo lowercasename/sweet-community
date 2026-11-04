@@ -5,7 +5,19 @@ export type StreamStatus = 'connecting' | 'live' | 'reconnecting' | 'offline'
 export type EventHandler = (kind: string, data: unknown, seq: number) => void
 
 // Two per resource (architecture.md, Realtime): the whole thing, or its deletion.
-const EVENT_KINDS = ['post', 'post_delete', 'comment', 'comment_delete', 'message', 'message_delete', 'user'] as const
+const EVENT_KINDS = [
+  'post',
+  'post_delete',
+  'comment',
+  'comment_delete',
+  'message',
+  'message_delete',
+  'user',
+  'group',
+  'group_delete',
+  'membership',
+  'membership_delete',
+] as const
 const HEALTH_INTERVAL_MS = 30_000
 const HEALTH_TIMEOUT_MS = 10_000
 

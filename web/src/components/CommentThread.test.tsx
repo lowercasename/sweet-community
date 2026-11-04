@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, screen, within } from '@testing-library/react'
-import { comment, mine, nobody, renderWithQuery, user } from '../test-utils'
+import { ROOT, comment, mine, nobody, renderWithQuery, user } from '../test-utils'
 
 /**
  * The menu on a comment shows exactly what the server's can flags allow;
@@ -34,7 +34,7 @@ beforeEach(async () => {
 
 async function thread() {
   const { CommentThread } = await import('./CommentThread')
-  renderWithQuery(<CommentThread postId="p1" disabled={false} />)
+  renderWithQuery(<CommentThread postId="p1" groupId={ROOT} disabled={false} />)
   await screen.findByText('c-jo says hi')
 }
 

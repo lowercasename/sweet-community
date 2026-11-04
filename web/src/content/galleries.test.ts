@@ -3,8 +3,7 @@ import { describe, expect, it } from 'vitest'
 import { wrapGalleries } from './galleries'
 
 const img = (n: number) => `<img src="/img/${n}" alt="" width="10" height="10" data-image-id="${n}">`
-const imgs = (from: number, to: number) =>
-  Array.from({ length: to - from + 1 }, (_, i) => img(from + i)).join('')
+const imgs = (from: number, to: number) => Array.from({ length: to - from + 1 }, (_, i) => img(from + i)).join('')
 
 describe('wrapGalleries', () => {
   it('leaves text and lone images alone', () => {

@@ -16,7 +16,16 @@ interface FilePickerProps {
 }
 
 /** A button that opens the file chooser; the input itself stays hidden. */
-export function FilePicker({ accept, variant = 'ghost', icon, label, disabled, multiple, onPick, children }: FilePickerProps) {
+export function FilePicker({
+  accept,
+  variant = 'ghost',
+  icon,
+  label,
+  disabled,
+  multiple,
+  onPick,
+  children,
+}: FilePickerProps) {
   const input = useRef<HTMLInputElement>(null)
   return (
     <>
