@@ -2,7 +2,8 @@ import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { createMessage, getMessages, type Message as MessageData } from '../api'
 import { useStreamEvents, useStreamStatus } from '../hooks/StreamContext'
 import { Bar, Button, Card, Pane, Row, ScrollArea, Stack, Text } from '../ui'
-import { ChatInput } from './ChatInput'
+import { chatExtensions } from '../editor/extensions'
+import { BodyEditor } from './BodyEditor'
 import { ConnectionStatus } from './ConnectionStatus'
 import { MessageGroup } from './MessageGroup'
 
@@ -134,7 +135,15 @@ export function ChatPane({ side = 'full' }: ChatPaneProps) {
         <Bar as="footer" edge="footer">
           <Stack gap={1}>
             <ConnectionStatus status={status} />
-            <ChatInput disabled={status === 'offline'} onSend={send} />
+            <BodyEditor
+              extensions={chatExtensions}
+              size="line"
+              enterSubmits
+              submitLabel="Send"
+              busyLabel="Sending…"
+              disabled={status === 'offline'}
+              onSubmit={send}
+            />
           </Stack>
         </Bar>
       </Card>

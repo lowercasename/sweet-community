@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 import { describe, expect, it } from 'vitest'
 import { Editor } from '@tiptap/core'
-import { chatExtensions, postExtensions } from './extensions'
+import { chatExtensions, commentExtensions, postExtensions } from './extensions'
 
 /**
  * Round-trip guard: setContent(html) then getHTML() must return the same
@@ -79,5 +79,15 @@ describe('chat HTML round-trip', () => {
     expect(roundTrip('<h2>T</h2><ul><li><p>a</p></li></ul><blockquote><p>q</p></blockquote>', chatExtensions)).toBe(
       '<p>T</p><p>a</p><p>q</p>',
     )
+  })
+})
+
+describe('comment HTML round-trip', () => {
+  it('keeps a quote-reply', () => {
+    const html = '<blockquote><p>the question</p></blockquote><p>the answer</p>'
+    expect(roundTrip(html, commentExtensions)).toBe(html)
+  })
+  it('flattens headings and lists', () => {
+    expect(roundTrip('<h2>T</h2><ul><li><p>a</p></li></ul>', commentExtensions)).toBe('<p>T</p><p>a</p>')
   })
 })

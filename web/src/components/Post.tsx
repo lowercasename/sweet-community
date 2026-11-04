@@ -1,20 +1,28 @@
 import { useState } from 'react'
-import type { Post as PostData } from '../api'
+import type { Post as PostData, User } from '../api'
+import { postExtensions } from '../editor/extensions'
 import { Avatar, Button, Card, HtmlContent, Icon, Row, Stack, Text, Time } from '../ui'
-import { Composer } from './Composer'
+import { BodyEditor } from './BodyEditor'
+import { CommentThread } from './CommentThread'
 
 interface PostProps {
   post: PostData
-  /** True when the viewer is the author. */
-  canEdit: boolean
+  me: User
   /** True while offline; disables saving. */
   disabled: boolean
   /** Resolves when the server has stored the new body. */
   onEdit: (bodyHtml: string) => Promise<void>
 }
 
-export function Post({ post, canEdit, disabled, onEdit }: PostProps) {
+function commentsLabel(n: number): string {
+  if (n === 0) return 'Comment'
+  return n === 1 ? '1 comment' : `${n} comments`
+}
+
+export function Post({ post, me, disabled, onEdit }: PostProps) {
   const [editing, setEditing] = useState(false)
+  const [open, setOpen] = useState(false)
+  const mine = post.author.id === me.id
 
   const save = async (bodyHtml: string) => {
     await onEdit(bodyHtml)
@@ -40,16 +48,20 @@ export function Post({ post, canEdit, disabled, onEdit }: PostProps) {
               )}
             </Text>
           </Row>
-          {canEdit && !editing && (
-            <Button variant="ghost" onClick={() => setEditing(true)}>
+          {mine && !editing && (
+            <Button variant="ghost" label="Edit" onClick={() => setEditing(true)}>
               <Icon name="pencil" />
             </Button>
           )}
         </Row>
         {editing ? (
           // The stored HTML is the editor's input: no separate document format.
-          <Composer
+          <BodyEditor
             key={post.edited_at ?? 0}
+            extensions={postExtensions}
+            size="post"
+            submitLabel="Save"
+            busyLabel="Saving…"
             initialHtml={post.body_html}
             disabled={disabled}
             onSubmit={save}
@@ -58,6 +70,12 @@ export function Post({ post, canEdit, disabled, onEdit }: PostProps) {
         ) : (
           <HtmlContent html={post.body_html} />
         )}
+        <Row>
+          <Button variant="ghost" pressed={open} onClick={() => setOpen((o) => !o)}>
+            {commentsLabel(post.comment_count)}
+          </Button>
+        </Row>
+        {open && <CommentThread postId={post.id} me={me} disabled={disabled} />}
       </Stack>
     </Card>
   )

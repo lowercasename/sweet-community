@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react'
-import { createPost, getPosts, updatePost, type Post, type User } from '../api'
+import { createPost, getPosts, updatePost, type Comment, type Post, type User } from '../api'
 import { useStreamEvents, useStreamStatus } from '../hooks/StreamContext'
 import { Button, Card, Measure, Pane, Row, ScrollArea, Stack, Text } from '../ui'
-import { Composer } from './Composer'
+import { postExtensions } from '../editor/extensions'
+import { BodyEditor } from './BodyEditor'
 import { ConnectionStatus } from './ConnectionStatus'
 import { PostList } from './PostList'
 
@@ -14,6 +15,10 @@ interface PostsPaneProps {
 
 function isPost(data: unknown): data is Post {
   return typeof data === 'object' && data !== null && typeof (data as Post).id === 'string'
+}
+
+function isComment(data: unknown): data is Comment {
+  return typeof data === 'object' && data !== null && typeof (data as Comment).post_id === 'string'
 }
 
 /** Newest first; drops anything already present (by id). */
@@ -35,9 +40,12 @@ export function PostsPane({ me, side = 'full' }: PostsPaneProps) {
   const [loadError, setLoadError] = useState<string | null>(null)
 
   useStreamEvents((kind, data) => {
-    if (!isPost(data)) return
-    if (kind === 'post') setPosts((prev) => prepend(prev, data))
-    if (kind === 'post_edit') setPosts((prev) => replace(prev, data))
+    if (kind === 'post' && isPost(data)) setPosts((prev) => prepend(prev, data))
+    if (kind === 'post_edit' && isPost(data)) setPosts((prev) => replace(prev, data))
+    // Counts come only from the event, which everyone gets, the author included.
+    if (kind === 'comment' && isComment(data)) {
+      setPosts((prev) => prev.map((p) => (p.id === data.post_id ? { ...p, comment_count: p.comment_count + 1 } : p)))
+    }
   })
 
   useEffect(() => {
@@ -100,7 +108,14 @@ export function PostsPane({ me, side = 'full' }: PostsPaneProps) {
             <Card>
               <Stack gap={1}>
                 <ConnectionStatus status={status} />
-                <Composer disabled={status === 'offline'} onSubmit={submit} />
+                <BodyEditor
+                  extensions={postExtensions}
+                  size="post"
+                  submitLabel="Post"
+                  busyLabel="Posting…"
+                  disabled={status === 'offline'}
+                  onSubmit={submit}
+                />
               </Stack>
             </Card>
             <Stack gap={3}>

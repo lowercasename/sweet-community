@@ -32,7 +32,7 @@ export function Home({ me, onSignOut }: HomeProps) {
 
   let main
   if (page === 'people') main = <PeoplePage me={me} />
-  else if (page === 'settings') main = <SettingsPage onSignOut={onSignOut} />
+  else if (page === 'settings') main = <SettingsPage onSignOut={onSignOut} onLogout={() => void signOut()} />
   else if (page === 'menu') main = <MenuPage me={me} onNavigate={setPage} onLogout={() => void signOut()} />
   else if (narrow) main = <Panes layout="single">{layout === 'posts' ? <PostsPane me={me} /> : <ChatPane />}</Panes>
   else if (layout === 'both')
@@ -67,14 +67,7 @@ export function Home({ me, onSignOut }: HomeProps) {
       <Shell
         aside={
           narrow ? undefined : (
-            <Sidebar
-              me={me}
-              page={page}
-              expanded={navExpanded}
-              onNavigate={setPage}
-              onLogout={() => void signOut()}
-              onToggle={toggleNav}
-            />
+            <Sidebar me={me} page={page} expanded={navExpanded} onNavigate={setPage} onToggle={toggleNav} />
           )
         }
       >

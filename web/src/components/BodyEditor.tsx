@@ -1,10 +1,22 @@
-import { useRef, useState } from 'react'
-import { useEditor, useEditorState } from '@tiptap/react'
-import { postExtensions } from '../editor/extensions'
+import { forwardRef, useImperativeHandle, useRef, useState } from 'react'
+import { useEditor, useEditorState, type Extensions } from '@tiptap/react'
 import { Button, EditorSurface, Form, Row, Stack, Text } from '../ui'
 import { EditorToolbar, promptLink } from './EditorToolbar'
 
-interface ComposerProps {
+export interface BodyEditorHandle {
+  /** Insert HTML at the end and focus; used for quote-replies. */
+  appendHtml: (html: string) => void
+  focus: () => void
+}
+
+interface BodyEditorProps {
+  extensions: Extensions
+  /** `post` is a tall box; `line` starts one line high and grows. */
+  size: 'post' | 'line'
+  /** Enter submits (chat). Otherwise Enter is a newline and Mod+Enter submits. */
+  enterSubmits?: boolean
+  submitLabel: string
+  busyLabel: string
   /** True while offline; disables submit. */
   disabled: boolean
   /** Resolves on success; rejects with an Error whose message is shown under the editor. */
@@ -14,12 +26,15 @@ interface ComposerProps {
    * successful submit (the parent swaps the editor out). Create mode clears.
    */
   initialHtml?: string
-  submitLabel?: string
   /** Edit mode only: shown as a Cancel button and bound to Escape. */
   onCancel?: () => void
 }
 
-export function Composer({ disabled, onSubmit, initialHtml, submitLabel, onCancel }: ComposerProps) {
+/** The one editor: posts, chat and comments differ only in schema, size and submit key. */
+export const BodyEditor = forwardRef<BodyEditorHandle, BodyEditorProps>(function BodyEditor(
+  { extensions, size, enterSubmits = false, submitLabel, busyLabel, disabled, onSubmit, initialHtml, onCancel },
+  ref,
+) {
   const editing = initialHtml !== undefined
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -30,13 +45,13 @@ export function Composer({ disabled, onSubmit, initialHtml, submitLabel, onCance
   cancelRef.current = onCancel
 
   const editor = useEditor({
-    extensions: postExtensions,
+    extensions,
     content: initialHtml ?? '',
     autofocus: editing ? 'end' : false,
     editorProps: {
       handleKeyDown(_view, event) {
         const modKey = event.metaKey || event.ctrlKey
-        if (modKey && event.key === 'Enter') {
+        if (event.key === 'Enter' && (enterSubmits ? !event.shiftKey : modKey)) {
           event.preventDefault()
           submitRef.current()
           return true
@@ -56,11 +71,17 @@ export function Composer({ disabled, onSubmit, initialHtml, submitLabel, onCance
     },
   })
 
-  const isEmpty = useEditorState({
-    editor,
-    selector: ({ editor }) => (editor ? editor.isEmpty : true),
-  })
+  useImperativeHandle(ref, () => ({
+    appendHtml(html) {
+      if (!editor) return
+      editor.chain().focus('end').insertContent(html).focus('end').run()
+    },
+    focus() {
+      editor?.commands.focus('end')
+    },
+  }))
 
+  const isEmpty = useEditorState({ editor, selector: ({ editor }) => (editor ? editor.isEmpty : true) })
   const canSubmit = !!editor && !isEmpty && !disabled && !busy
 
   const submit = async () => {
@@ -69,22 +90,22 @@ export function Composer({ disabled, onSubmit, initialHtml, submitLabel, onCance
     setError(null)
     try {
       await onSubmit(editor.getHTML())
-      if (!editing) editor.commands.clearContent(true)
+      if (!editing) {
+        editor.commands.clearContent(true)
+        if (enterSubmits) editor.commands.focus()
+      }
     } catch (e) {
-      setError(e instanceof Error ? e.message : editing ? 'Could not save' : 'Could not post')
+      setError(e instanceof Error ? e.message : `Could not ${submitLabel.toLowerCase()}`)
     } finally {
       setBusy(false)
     }
   }
   submitRef.current = () => void submit()
 
-  const label = submitLabel ?? (editing ? 'Save' : 'Post')
-  const busyLabel = editing ? 'Saving…' : 'Posting…'
-
   return (
     <Form onSubmit={() => void submit()}>
-      <Stack gap={2}>
-        <EditorSurface editor={editor} />
+      <Stack gap={size === 'line' ? 1 : 2}>
+        <EditorSurface editor={editor} size={size} />
         <Row justify="between" align="center">
           <EditorToolbar editor={editor} />
           <Row gap={3} align="center">
@@ -94,7 +115,7 @@ export function Composer({ disabled, onSubmit, initialHtml, submitLabel, onCance
               </Button>
             )}
             <Button type="submit" disabled={!canSubmit}>
-              {busy ? busyLabel : label}
+              {busy ? busyLabel : submitLabel}
             </Button>
           </Row>
         </Row>
@@ -102,4 +123,4 @@ export function Composer({ disabled, onSubmit, initialHtml, submitLabel, onCance
       </Stack>
     </Form>
   )
-}
+})

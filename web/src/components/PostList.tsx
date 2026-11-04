@@ -4,8 +4,7 @@ import { Post } from './Post'
 
 interface PostListProps {
   posts: PostData[]
-  /** The viewer, once known; decides which posts show Edit. */
-  me: User | null
+  me: User
   /** True while offline. */
   disabled: boolean
   onEdit: (id: string, bodyHtml: string) => Promise<void>
@@ -16,13 +15,7 @@ export function PostList({ posts, me, disabled, onEdit }: PostListProps) {
   return (
     <Stack gap={3}>
       {posts.map((post) => (
-        <Post
-          key={post.id}
-          post={post}
-          canEdit={me != null && post.author.id === me.id}
-          disabled={disabled}
-          onEdit={(html) => onEdit(post.id, html)}
-        />
+        <Post key={post.id} post={post} me={me} disabled={disabled} onEdit={(html) => onEdit(post.id, html)} />
       ))}
     </Stack>
   )

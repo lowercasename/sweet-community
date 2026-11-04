@@ -34,6 +34,17 @@ export interface Post {
   created_at: number
   /** Unix ms of the last edit, or null if never edited. */
   edited_at: number | null
+  comment_count: number
+}
+
+export interface Comment {
+  id: string
+  post_id: string
+  author: User
+  body_html: string
+  body_text: string
+  created_at: number
+  edited_at: number | null
 }
 
 export interface Message {
@@ -169,4 +180,24 @@ export async function revokeInvite(code: string): Promise<void> {
 
 export function listUsers(): Promise<{ users: Member[] }> {
   return request('/api/users')
+}
+
+export function getComments(postId: string): Promise<{ comments: Comment[] }> {
+  return request(`/api/posts/${encodeURIComponent(postId)}/comments`)
+}
+
+export function createComment(postId: string, bodyHtml: string): Promise<Comment> {
+  return request<Comment>(`/api/posts/${encodeURIComponent(postId)}/comments`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ body_html: bodyHtml }),
+  })
+}
+
+export function updateComment(id: string, bodyHtml: string): Promise<Comment> {
+  return request<Comment>(`/api/comments/${encodeURIComponent(id)}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ body_html: bodyHtml }),
+  })
 }

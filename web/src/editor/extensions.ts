@@ -4,7 +4,7 @@ import Link from '@tiptap/extension-link'
 const link = Link.configure({ openOnClick: false, autolink: true, defaultProtocol: 'https' })
 
 /**
- * The post schema, shared by the Composer and the round-trip test.
+ * The post schema, used by BodyEditor for posts and by the round-trip test.
  * Paragraph, h2/h3, bold, italic, strike, link, bullet/ordered lists,
  * blockquote, hard break, undo/redo. Nothing else.
  */
@@ -33,6 +33,23 @@ export const chatExtensions = [
   StarterKit.configure({
     heading: false,
     blockquote: false,
+    bulletList: false,
+    orderedList: false,
+    listItem: false,
+    link: false,
+    underline: false,
+    code: false,
+    codeBlock: false,
+    horizontalRule: false,
+    trailingNode: false,
+  }),
+  link,
+]
+
+/** The comment schema: chat plus blockquote, which is what a quote-reply is. */
+export const commentExtensions = [
+  StarterKit.configure({
+    heading: false,
     bulletList: false,
     orderedList: false,
     listItem: false,
