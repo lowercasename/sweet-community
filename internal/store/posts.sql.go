@@ -47,27 +47,27 @@ func (q *Queries) DeletePost(ctx context.Context, arg DeletePostParams) error {
 	return err
 }
 
-const editOwnPost = `-- name: EditOwnPost :one
-UPDATE posts SET body_html = ?, body_text = ?, edited_at = ?
-WHERE id = ? AND author_id = ? AND deleted_at IS NULL
+const editPost = `-- name: EditPost :one
+UPDATE posts SET body_html = ?1, body_text = ?2, edited_at = ?3
+WHERE id = ?4 AND deleted_at IS NULL
 RETURNING created_at
 `
 
-type EditOwnPostParams struct {
+type EditPostParams struct {
 	BodyHtml string
 	BodyText string
 	EditedAt sql.NullInt64
 	ID       string
-	AuthorID string
 }
 
-func (q *Queries) EditOwnPost(ctx context.Context, arg EditOwnPostParams) (int64, error) {
-	row := q.db.QueryRowContext(ctx, editOwnPost,
+// Who may edit or delete is perm's call (internal/perm), made by the handler
+// after GetPostAuthor; the queries themselves do not check.
+func (q *Queries) EditPost(ctx context.Context, arg EditPostParams) (int64, error) {
+	row := q.db.QueryRowContext(ctx, editPost,
 		arg.BodyHtml,
 		arg.BodyText,
 		arg.EditedAt,
 		arg.ID,
-		arg.AuthorID,
 	)
 	var created_at int64
 	err := row.Scan(&created_at)

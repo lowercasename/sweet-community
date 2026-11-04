@@ -8,6 +8,7 @@ import (
 	"github.com/google/uuid"
 
 	"sweet/internal/db"
+	"sweet/internal/perm"
 	"sweet/internal/sanitize"
 	"sweet/internal/store"
 )
@@ -96,16 +97,47 @@ func (s *Server) editComment(w http.ResponseWriter, r *http.Request) {
 	author, _ := userFrom(r.Context())
 	c := Comment{ID: r.PathValue("id"), Author: author, BodyHTML: clean, BodyText: sanitize.Text(clean), EditedAt: &now}
 	s.logged(w, r, "comment_edit", now, func(qtx *store.Queries) (any, int, error) {
-		row, err := qtx.EditOwnComment(r.Context(), store.EditOwnCommentParams{
-			BodyHtml: c.BodyHTML, BodyText: c.BodyText, EditedAt: sql.NullInt64{Int64: now, Valid: true}, ID: c.ID, AuthorID: author.ID,
-		})
+		owners, err := qtx.GetCommentOwners(r.Context(), c.ID)
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, http.StatusNotFound, errors.New("no such comment")
 		}
 		if err != nil {
 			return nil, http.StatusInternalServerError, err
 		}
+		if !perm.EditComment(actor(author), perm.Comment{AuthorID: owners.AuthorID, PostAuthorID: owners.PostAuthorID}) {
+			return nil, http.StatusForbidden, errors.New("not your comment")
+		}
+		row, err := qtx.EditComment(r.Context(), store.EditCommentParams{
+			BodyHtml: c.BodyHTML, BodyText: c.BodyText, EditedAt: sql.NullInt64{Int64: now, Valid: true}, ID: c.ID,
+		})
+		if err != nil {
+			return nil, http.StatusInternalServerError, err
+		}
 		c.PostID, c.CreatedAt = row.PostID, row.CreatedAt
 		return &c, http.StatusOK, nil
+	})
+}
+
+// deleteComment soft-deletes a comment (perm.DeleteComment says who may).
+// The event carries both ids so pages can drop it and lower the post's count.
+func (s *Server) deleteComment(w http.ResponseWriter, r *http.Request) {
+	id := r.PathValue("id")
+	me, _ := userFrom(r.Context())
+	now := db.Now()
+	s.logged(w, r, "comment_delete", now, func(qtx *store.Queries) (any, int, error) {
+		owners, err := qtx.GetCommentOwners(r.Context(), id)
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, http.StatusNotFound, errors.New("no such comment")
+		}
+		if err != nil {
+			return nil, http.StatusInternalServerError, err
+		}
+		if !perm.DeleteComment(actor(me), perm.Comment{AuthorID: owners.AuthorID, PostAuthorID: owners.PostAuthorID}) {
+			return nil, http.StatusForbidden, errors.New("not your comment")
+		}
+		if err := qtx.DeleteComment(r.Context(), store.DeleteCommentParams{DeletedAt: sql.NullInt64{Int64: now, Valid: true}, ID: id}); err != nil {
+			return nil, http.StatusInternalServerError, err
+		}
+		return map[string]string{"id": id, "post_id": owners.PostID}, http.StatusOK, nil
 	})
 }

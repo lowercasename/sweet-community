@@ -46,35 +46,68 @@ func (q *Queries) CreateComment(ctx context.Context, arg CreateCommentParams) er
 	return err
 }
 
-const editOwnComment = `-- name: EditOwnComment :one
-UPDATE comments SET body_html = ?, body_text = ?, edited_at = ?
-WHERE id = ? AND author_id = ? AND deleted_at IS NULL
+const deleteComment = `-- name: DeleteComment :exec
+UPDATE comments SET deleted_at = ?1 WHERE id = ?2 AND deleted_at IS NULL
+`
+
+type DeleteCommentParams struct {
+	DeletedAt sql.NullInt64
+	ID        string
+}
+
+func (q *Queries) DeleteComment(ctx context.Context, arg DeleteCommentParams) error {
+	_, err := q.db.ExecContext(ctx, deleteComment, arg.DeletedAt, arg.ID)
+	return err
+}
+
+const editComment = `-- name: EditComment :one
+UPDATE comments SET body_html = ?1, body_text = ?2, edited_at = ?3
+WHERE id = ?4 AND deleted_at IS NULL
 RETURNING post_id, created_at
 `
 
-type EditOwnCommentParams struct {
+type EditCommentParams struct {
 	BodyHtml string
 	BodyText string
 	EditedAt sql.NullInt64
 	ID       string
-	AuthorID string
 }
 
-type EditOwnCommentRow struct {
+type EditCommentRow struct {
 	PostID    string
 	CreatedAt int64
 }
 
-func (q *Queries) EditOwnComment(ctx context.Context, arg EditOwnCommentParams) (EditOwnCommentRow, error) {
-	row := q.db.QueryRowContext(ctx, editOwnComment,
+func (q *Queries) EditComment(ctx context.Context, arg EditCommentParams) (EditCommentRow, error) {
+	row := q.db.QueryRowContext(ctx, editComment,
 		arg.BodyHtml,
 		arg.BodyText,
 		arg.EditedAt,
 		arg.ID,
-		arg.AuthorID,
 	)
-	var i EditOwnCommentRow
+	var i EditCommentRow
 	err := row.Scan(&i.PostID, &i.CreatedAt)
+	return i, err
+}
+
+const getCommentOwners = `-- name: GetCommentOwners :one
+SELECT c.post_id, c.author_id, p.author_id AS post_author_id
+FROM comments c JOIN posts p ON p.id = c.post_id
+WHERE c.id = ?1 AND c.deleted_at IS NULL AND p.deleted_at IS NULL
+`
+
+type GetCommentOwnersRow struct {
+	PostID       string
+	AuthorID     string
+	PostAuthorID string
+}
+
+// Who may edit or delete is perm's call (internal/perm), made by the handler
+// after GetCommentOwners; the queries themselves do not check.
+func (q *Queries) GetCommentOwners(ctx context.Context, id string) (GetCommentOwnersRow, error) {
+	row := q.db.QueryRowContext(ctx, getCommentOwners, id)
+	var i GetCommentOwnersRow
+	err := row.Scan(&i.PostID, &i.AuthorID, &i.PostAuthorID)
 	return i, err
 }
 

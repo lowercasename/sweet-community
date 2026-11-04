@@ -18,6 +18,7 @@ import (
 	"sweet/internal/db"
 	"sweet/internal/events"
 	"sweet/internal/images"
+	"sweet/internal/perm"
 	"sweet/internal/sanitize"
 	"sweet/internal/store"
 )
@@ -124,6 +125,7 @@ func (s *Server) Routes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/posts/{id}/comments", s.requireAuth(s.listComments))
 	mux.HandleFunc("POST /api/posts/{id}/comments", s.requireAuth(s.createComment))
 	mux.HandleFunc("PUT /api/comments/{id}", s.requireAuth(s.editComment))
+	mux.HandleFunc("DELETE /api/comments/{id}", s.requireAuth(s.deleteComment))
 	mux.HandleFunc("GET /api/messages", s.requireAuth(s.listMessages))
 	mux.HandleFunc("POST /api/messages", s.requireAuth(s.createMessage))
 	mux.HandleFunc("GET /api/events", s.requireAuth(s.Hub.ServeHTTP))
@@ -272,12 +274,19 @@ func (s *Server) editPost(w http.ResponseWriter, r *http.Request) {
 	author, _ := userFrom(r.Context())
 	p := Post{ID: r.PathValue("id"), Author: author, BodyHTML: clean, BodyText: sanitize.Text(clean), EditedAt: &now}
 	s.logged(w, r, "post_edit", now, func(qtx *store.Queries) (any, int, error) {
-		createdAt, err := qtx.EditOwnPost(r.Context(), store.EditOwnPostParams{
-			BodyHtml: p.BodyHTML, BodyText: p.BodyText, EditedAt: sql.NullInt64{Int64: now, Valid: true}, ID: p.ID, AuthorID: author.ID,
-		})
+		authorID, err := qtx.GetPostAuthor(r.Context(), p.ID)
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, http.StatusNotFound, errors.New("no such post")
 		}
+		if err != nil {
+			return nil, http.StatusInternalServerError, err
+		}
+		if !perm.EditPost(actor(author), perm.Post{AuthorID: authorID}) {
+			return nil, http.StatusForbidden, errors.New("not your post")
+		}
+		createdAt, err := qtx.EditPost(r.Context(), store.EditPostParams{
+			BodyHtml: p.BodyHTML, BodyText: p.BodyText, EditedAt: sql.NullInt64{Int64: now, Valid: true}, ID: p.ID,
+		})
 		if err != nil {
 			return nil, http.StatusInternalServerError, err
 		}
@@ -288,8 +297,10 @@ func (s *Server) editPost(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// deletePost soft-deletes a post: the author's own, or any post for the
-// owner. Its comments go with it (they are reached through the post) and
+// actor is the user as perm sees them.
+func actor(u User) perm.Actor { return perm.Actor{ID: u.ID, Role: u.Role} }
+
+// deletePost soft-deletes a post (perm.DeletePost says who may). Its comments go with it (they are reached through the post) and
 // its images are left to the sweep (images.Sweep), which frees anything no
 // live body references. The event carries only the id.
 func (s *Server) deletePost(w http.ResponseWriter, r *http.Request) {
@@ -304,7 +315,7 @@ func (s *Server) deletePost(w http.ResponseWriter, r *http.Request) {
 		if err != nil {
 			return nil, http.StatusInternalServerError, err
 		}
-		if authorID != me.ID && me.Role != "owner" {
+		if !perm.DeletePost(actor(me), perm.Post{AuthorID: authorID}) {
 			return nil, http.StatusForbidden, errors.New("not your post")
 		}
 		if err := qtx.DeletePost(r.Context(), store.DeletePostParams{DeletedAt: sql.NullInt64{Int64: now, Valid: true}, ID: id}); err != nil {

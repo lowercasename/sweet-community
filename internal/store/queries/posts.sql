@@ -10,9 +10,11 @@ LIMIT sqlc.arg(page_size);
 -- name: CreatePost :exec
 INSERT INTO posts (id, author_id, body_html, body_text, created_at) VALUES (?, ?, ?, ?, ?);
 
--- name: EditOwnPost :one
-UPDATE posts SET body_html = ?, body_text = ?, edited_at = ?
-WHERE id = ? AND author_id = ? AND deleted_at IS NULL
+-- Who may edit or delete is perm's call (internal/perm), made by the handler
+-- after GetPostAuthor; the queries themselves do not check.
+-- name: EditPost :one
+UPDATE posts SET body_html = sqlc.arg(body_html), body_text = sqlc.arg(body_text), edited_at = sqlc.arg(edited_at)
+WHERE id = sqlc.arg(id) AND deleted_at IS NULL
 RETURNING created_at;
 
 -- name: PostExists :one

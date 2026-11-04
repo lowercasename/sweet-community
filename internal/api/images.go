@@ -123,21 +123,22 @@ func (s *Server) setPicture(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	me, _ := userFrom(r.Context())
-	var pic sql.NullString
-	if in.ImageID != nil {
-		if _, err := s.q().GetImage(r.Context(), *in.ImageID); errors.Is(err, sql.ErrNoRows) {
-			writeErr(w, http.StatusNotFound, "no such image")
-			return
-		} else if err != nil {
-			writeErr(w, http.StatusInternalServerError, err.Error())
-			return
+	// A "user" event carries the whole user, so every open page can redraw
+	// their avatar wherever it appears.
+	s.logged(w, r, "user", db.Now(), func(qtx *store.Queries) (any, int, error) {
+		var pic sql.NullString
+		if in.ImageID != nil {
+			if _, err := qtx.GetImage(r.Context(), *in.ImageID); errors.Is(err, sql.ErrNoRows) {
+				return nil, http.StatusNotFound, errors.New("no such image")
+			} else if err != nil {
+				return nil, http.StatusInternalServerError, err
+			}
+			pic = sql.NullString{String: *in.ImageID, Valid: true}
 		}
-		pic = sql.NullString{String: *in.ImageID, Valid: true}
-	}
-	if err := s.q().SetUserPicture(r.Context(), store.SetUserPictureParams{PictureID: pic, ID: me.ID}); err != nil {
-		writeErr(w, http.StatusInternalServerError, err.Error())
-		return
-	}
-	me.Picture = pictureURL(pic)
-	writeJSON(w, http.StatusOK, me)
+		if err := qtx.SetUserPicture(r.Context(), store.SetUserPictureParams{PictureID: pic, ID: me.ID}); err != nil {
+			return nil, http.StatusInternalServerError, err
+		}
+		me.Picture = pictureURL(pic)
+		return me, http.StatusOK, nil
+	})
 }

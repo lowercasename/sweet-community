@@ -227,7 +227,7 @@ func TestPostsAreAuthoredBySessionAndEditedOnlyByAuthor(t *testing.T) {
 		t.Fatalf("author: %v", post)
 	}
 	id := post["id"].(string)
-	kit.mustStatus(404, "PUT", "/api/posts/"+id, map[string]string{"body_html": "<p>not yours</p>"})
+	kit.mustStatus(403, "PUT", "/api/posts/"+id, map[string]string{"body_html": "<p>not yours</p>"})
 	edited := owner.mustStatus(200, "PUT", "/api/posts/"+id, map[string]string{"body_html": "<p>still mine</p>"})
 	if edited["body_html"] != "<p>still mine</p>" {
 		t.Fatalf("edit: %v", edited)
@@ -342,8 +342,8 @@ func TestComments(t *testing.T) {
 		t.Fatalf("comment_count after two comments: %v", posts[0])
 	}
 
-	// Author-only edit, same 404 for someone else's.
-	owner.mustStatus(404, "PUT", "/api/comments/"+cid, map[string]string{"body_html": "<p>not yours</p>"})
+	// Author-only edit: 403 for someone else's, even the post's author.
+	owner.mustStatus(403, "PUT", "/api/comments/"+cid, map[string]string{"body_html": "<p>not yours</p>"})
 	edited := kit.mustStatus(200, "PUT", "/api/comments/"+cid, map[string]string{"body_html": "<p>an answer, edited</p>"})
 	if edited["post_id"] != id || edited["edited_at"] == nil || edited["body_html"] != "<p>an answer, edited</p>" {
 		t.Fatalf("edited comment: %v", edited)
@@ -535,5 +535,80 @@ func TestImageSweep(t *testing.T) {
 	// Idempotent.
 	if n, err = images.Sweep(context.Background(), srv.q(), srv.Images, db.Now()+1); err != nil || n != 0 {
 		t.Fatalf("second sweep: %d %v", n, err)
+	}
+}
+
+func TestDeleteComment(t *testing.T) {
+	ts, owner := newTestServer(t)
+	register := func(name string) *client {
+		inv := owner.mustStatus(201, "POST", "/api/invites", nil)
+		c := newClient(t, ts)
+		c.mustStatus(201, "POST", "/api/register", map[string]string{"code": inv["code"].(string), "username": name, "password": "longenough"})
+		return c
+	}
+	kit, mo := register("kit"), register("mo")
+
+	post := kit.mustStatus(201, "POST", "/api/posts", map[string]string{"body_html": "<p>kit's post</p>"})
+	pid := post["id"].(string)
+	comment := func(c *client) string {
+		return c.mustStatus(201, "POST", "/api/posts/"+pid+"/comments", map[string]string{"body_html": "<p>a comment</p>"})["id"].(string)
+	}
+
+	// Mo's comment: a bystander cannot delete it; Mo can, once.
+	byMo := comment(mo)
+	register("jo").mustStatus(403, "DELETE", "/api/comments/"+byMo, nil)
+	gone := mo.mustStatus(200, "DELETE", "/api/comments/"+byMo, nil)
+	if gone["id"] != byMo || gone["post_id"] != pid {
+		t.Fatalf("delete reply: %v", gone)
+	}
+	mo.mustStatus(404, "DELETE", "/api/comments/"+byMo, nil)
+	mo.mustStatus(404, "PUT", "/api/comments/"+byMo, map[string]string{"body_html": "<p>too late</p>"})
+
+	// The post's author may delete any comment on their post; the owner any comment at all.
+	kit.mustStatus(200, "DELETE", "/api/comments/"+comment(mo), nil)
+	owner.mustStatus(200, "DELETE", "/api/comments/"+comment(mo), nil)
+
+	// What is left is listed and counted.
+	keep := comment(mo)
+	list := kit.mustStatus(200, "GET", "/api/posts/"+pid+"/comments", nil)["comments"].([]any)
+	if len(list) != 1 || list[0].(map[string]any)["id"] != keep {
+		t.Fatalf("comments after deletions: %v", list)
+	}
+	posts := kit.mustStatus(200, "GET", "/api/posts", nil)["posts"].([]any)
+	if posts[0].(map[string]any)["comment_count"].(float64) != 1 {
+		t.Fatalf("comment_count: %v", posts[0])
+	}
+	// A comment on a deleted post is already gone.
+	kit.mustStatus(200, "DELETE", "/api/posts/"+pid, nil)
+	mo.mustStatus(404, "DELETE", "/api/comments/"+keep, nil)
+}
+
+func TestPictureChangeIsAnEvent(t *testing.T) {
+	_, owner, srv := newTestServerWith(t)
+	status, img := owner.upload(testPNG(40, 40))
+	if status != 201 {
+		t.Fatalf("upload: %d %v", status, img)
+	}
+	owner.mustStatus(200, "PUT", "/api/me/picture", map[string]string{"image_id": img["id"].(string)})
+	owner.mustStatus(200, "PUT", "/api/me/picture", map[string]any{"image_id": nil})
+
+	rows, err := srv.q().ListEventsSince(context.Background(), store.ListEventsSinceParams{After: 0, PageSize: 100})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var pictures []any
+	for _, e := range rows {
+		if e.Kind != "user" {
+			continue
+		}
+		var u map[string]any
+		json.Unmarshal([]byte(e.Payload), &u)
+		if u["username"] != "raphael" {
+			t.Fatalf("user event payload: %s", e.Payload)
+		}
+		pictures = append(pictures, u["picture"])
+	}
+	if len(pictures) != 2 || pictures[0] != img["url"] || pictures[1] != nil {
+		t.Fatalf("user events after two picture changes: %v", pictures)
 	}
 }
