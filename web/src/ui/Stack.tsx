@@ -13,11 +13,16 @@ const GAPS: Record<Gap, string> = {
 interface StackProps {
   gap?: Gap
   as?: 'div' | 'section' | 'main' | 'ul'
+  /** Take the parent's remaining height, for a column of panes. */
+  fill?: boolean
+  /** Out of sight but still mounted. */
+  hidden?: boolean
   children?: ReactNode
 }
 
 /** Vertical flex column with a fixed gap scale: 0, 4, 8, 16, 32px. */
-export function Stack({ gap = 2, as = 'div', children }: StackProps) {
+export function Stack({ gap = 2, as = 'div', fill = false, hidden = false, children }: StackProps) {
   const Tag = as
-  return <Tag className={`flex min-w-0 flex-col ${GAPS[gap]}`}>{children}</Tag>
+  const cls = hidden ? 'hidden' : `flex min-w-0 flex-col ${GAPS[gap]} ${fill ? 'min-h-0 flex-1' : ''}`
+  return <Tag className={cls}>{children}</Tag>
 }

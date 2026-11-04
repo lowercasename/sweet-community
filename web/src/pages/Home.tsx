@@ -1,15 +1,16 @@
 import { useState } from 'react'
 import type { User } from '../api'
-import { useRootGroup } from '../data/hooks'
+import { useGroups } from '../data/hooks'
 import { StreamProvider } from '../hooks/StreamContext'
 import { useLayout } from '../hooks/useLayout'
-import { ChatPane } from '../components/ChatPane'
+import { GroupView } from '../components/GroupView'
+import { MembersPage } from '../components/MembersPage'
 import { MenuPage } from '../components/MenuPage'
+import { NewGroupPage } from '../components/NewGroupPage'
 import { PeoplePage } from '../components/PeoplePage'
-import { PostsPane } from '../components/PostsPane'
 import { SettingsPage } from '../components/SettingsPage'
 import { Sidebar, type Page } from '../components/Sidebar'
-import { Rail, Shell, Split, TabBar } from '../ui'
+import { Shell, TabBar } from '../ui'
 
 interface HomeProps {
   me: User
@@ -18,20 +19,27 @@ interface HomeProps {
 }
 
 /**
- * The signed-in app: a nav column on the left, then the page. Home is the
- * root group's posts and chat either side of a draggable divider; drag a
- * pane shut and it folds into a Rail. On a narrow screen the nav column is
- * replaced by a tab bar at the bottom that also switches between the two panes.
+ * The signed-in app: a nav column on the left, then the page. The page is
+ * one group's view (the root group is Home), or People, Settings, a group's
+ * members, or the new-group form. On a narrow screen the nav column is
+ * replaced by a tab bar at the bottom.
  *
- * Posts and chat stay mounted whatever is showing, so a half-written post
- * or message survives closing its pane or visiting Settings.
+ * The current group's panes stay mounted whatever page is showing, so a
+ * half-written post or message survives a visit to Settings or Members.
+ * Switching to another group swaps them.
  */
 export function Home({ me, onSignOut }: HomeProps) {
-  const { layout, narrow, ratio, navExpanded, setLayout, setRatio, toggleNav } = useLayout()
+  const { layout, narrow, navExpanded, setLayout, toggleNav } = useLayout()
+  const { groups } = useGroups()
+  const root = groups.find((g) => g.kind === 'root')
   const [page, setPage] = useState<Page>('home')
-  const root = useRootGroup()
+  const [groupId, setGroupId] = useState<string | null>(null)
 
-  const show = layout === 'both' ? 'both' : layout === 'posts' ? 'left' : 'right'
+  const current = groups.find((g) => g.id === (groupId ?? root?.id)) ?? root
+  const openGroup = (id: string) => {
+    setGroupId(id)
+    setPage('home')
+  }
   const tabActive = page === 'home' ? (layout === 'posts' ? 'posts' : 'chat') : page === 'menu' ? 'menu' : undefined
 
   return (
@@ -39,28 +47,43 @@ export function Home({ me, onSignOut }: HomeProps) {
       <Shell
         aside={
           narrow ? undefined : (
-            <Sidebar me={me} page={page} expanded={navExpanded} onNavigate={setPage} onToggle={toggleNav} />
+            <Sidebar
+              me={me}
+              groups={groups}
+              currentGroupId={page === 'home' ? current?.id : undefined}
+              page={page}
+              expanded={navExpanded}
+              onNavigate={setPage}
+              onOpenGroup={openGroup}
+              onToggle={toggleNav}
+            />
           )
         }
       >
-        {page === 'people' && root && <PeoplePage me={me} root={root} />}
-        {page === 'settings' && <SettingsPage me={me} onSignOut={onSignOut} />}
-        {page === 'menu' && <MenuPage me={me} onNavigate={setPage} onLogout={onSignOut} />}
-        {root && (
-          <Split
+        {page === 'people' && root && <PeoplePage me={me} root={root} onOpenGroup={openGroup} />}
+        {page === 'settings' && root && <SettingsPage me={me} root={root} onSignOut={onSignOut} />}
+        {page === 'menu' && (
+          <MenuPage me={me} groups={groups} onNavigate={setPage} onOpenGroup={openGroup} onLogout={onSignOut} />
+        )}
+        {page === 'new-group' && <NewGroupPage onCreated={(g) => openGroup(g.id)} />}
+        {page === 'members' && current && (
+          <MembersPage
+            key={current.id}
+            group={current}
+            me={me}
+            onLeft={() => {
+              setGroupId(null)
+              setPage('home')
+            }}
+          />
+        )}
+        {current && (
+          <GroupView
+            key={current.id}
+            group={current}
+            me={me}
             hidden={page !== 'home'}
-            show={show}
-            ratio={ratio}
-            onRatio={setRatio}
-            onCollapse={(side) => setLayout(side === 'left' ? 'chat' : 'posts')}
-            leftRail={
-              narrow ? undefined : <Rail side="left" icon="posts" label="Posts" onOpen={() => setLayout('both')} />
-            }
-            rightRail={
-              narrow ? undefined : <Rail side="right" icon="chat" label="Chat" onOpen={() => setLayout('both')} />
-            }
-            left={<PostsPane groupId={root.id} side={show === 'both' ? 'left' : 'full'} />}
-            right={<ChatPane groupId={root.id} side={show === 'both' ? 'right' : 'full'} />}
+            onMembers={() => setPage('members')}
           />
         )}
         {narrow && (

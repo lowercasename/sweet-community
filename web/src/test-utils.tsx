@@ -26,17 +26,43 @@ export const group = (id: string, role: Group['role'], extra: Partial<Group> = {
   id,
   kind: id === ROOT ? 'root' : 'group',
   name: id === ROOT ? '' : id,
+  mode: 'both',
   created_at: 1,
   role,
   can: {
     add_members: role !== 'member',
-    remove_members: role !== 'member',
+    remove_members: role !== 'member' && id !== ROOT,
     set_roles: role === 'owner',
+    transfer: role === 'owner',
     rename: role === 'owner' && id !== ROOT,
+    set_mode: role === 'owner',
     delete: role === 'owner' && id !== ROOT,
     leave: role !== 'owner' && id !== ROOT,
+    create_groups: id === ROOT ? true : undefined,
+    manage_instance: id === ROOT ? role === 'owner' : undefined,
   },
   ...extra,
+})
+
+/** A DM as its viewer sees it: chat only, named by its people. */
+export const dm = (id: string, people: User[]): Group => ({
+  id,
+  kind: 'dm',
+  name: '',
+  mode: 'chat',
+  created_at: 1,
+  role: 'member',
+  can: {
+    add_members: false,
+    remove_members: false,
+    set_roles: false,
+    transfer: false,
+    rename: false,
+    set_mode: false,
+    delete: false,
+    leave: true,
+  },
+  members: people,
 })
 
 export const post = (id: string, author: User, extra: Partial<Post> = {}): Post => ({

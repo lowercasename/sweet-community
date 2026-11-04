@@ -26,9 +26,22 @@ export interface GroupCan {
   add_members: boolean
   remove_members: boolean
   set_roles: boolean
+  transfer: boolean
   rename: boolean
+  set_mode: boolean
   delete: boolean
   leave: boolean
+  /** Root group only: the instance's group_creation setting, applied to me. */
+  create_groups?: boolean
+  /** Root group only: I edit the instance's settings. */
+  manage_instance?: boolean
+}
+
+export type GroupMode = 'posts' | 'chat' | 'both'
+
+/** The instance's settings (architecture.md, Feature flags). */
+export interface Settings {
+  group_creation: 'anyone' | 'staff'
 }
 
 /** A group as its viewer sees it (architecture.md, Groups). The instance is the one of kind root. */
@@ -36,10 +49,14 @@ export interface Group {
   id: string
   kind: 'root' | 'group' | 'dm'
   name: string
+  /** The group's one setting: posts, chat or both. A DM is chat. */
+  mode: GroupMode
   created_at: number
   /** The viewer's own role in it. */
   role: Role
   can: GroupCan
+  /** DMs only: a DM is named by its people. */
+  members?: User[]
 }
 
 export interface Membership {
@@ -168,17 +185,25 @@ export function listGroups(): Promise<{ groups: Group[] }> {
   return request('/api/groups')
 }
 
-export function createGroup(name: string): Promise<Group> {
-  return request<Group>('/api/groups', json('POST', { name }))
+export function createGroup(name: string, mode: GroupMode): Promise<Group> {
+  return request<Group>('/api/groups', json('POST', { name, mode }))
+}
+
+export function updateGroup(groupId: string, patch: { name?: string; mode?: GroupMode }): Promise<Group> {
+  return request<Group>(g(groupId), json('PUT', patch))
+}
+
+export function getSettings(): Promise<Settings> {
+  return request<Settings>('/api/settings')
+}
+
+export function setSettings(s: Settings): Promise<Settings> {
+  return request<Settings>('/api/settings', json('PUT', s))
 }
 
 /** A DM with these people: the existing one if there is one, else a new one. */
 export function openDM(members: string[]): Promise<Group> {
   return request<Group>('/api/groups', json('POST', { kind: 'dm', members }))
-}
-
-export function renameGroup(groupId: string, name: string): Promise<Group> {
-  return request<Group>(g(groupId), json('PUT', { name }))
 }
 
 export async function deleteGroup(groupId: string): Promise<void> {
@@ -193,7 +218,8 @@ export function addMember(groupId: string, userId: string): Promise<Membership> 
   return request<Membership>(`${g(groupId)}/members`, json('POST', { user_id: userId }))
 }
 
-export function setMemberRole(groupId: string, userId: string, role: 'member' | 'moderator'): Promise<Membership> {
+/** The owner sets member or moderator; role owner hands the group over. */
+export function setMemberRole(groupId: string, userId: string, role: Role): Promise<Membership> {
   return request<Membership>(`${g(groupId)}/members/${encodeURIComponent(userId)}`, json('PUT', { role }))
 }
 

@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import type { Group, Invite, Member, User } from '../api'
-import { useInviteActions, useInvites, useSetRole, useUsers } from '../data/hooks'
+import { useGroupActions, useInviteActions, useInvites, useSetRole, useUsers } from '../data/hooks'
 import {
   Avatar,
   Button,
@@ -22,6 +22,8 @@ interface PeoplePageProps {
   me: User
   /** The instance as a group: its can flags say whether I invite and set roles. */
   root: Group
+  /** Show a group's view: after starting a DM with someone. */
+  onOpenGroup: (id: string) => void
 }
 
 function InviteRow({ invite, onRevoke }: { invite: Invite; onRevoke: () => void }) {
@@ -64,8 +66,9 @@ const ROLE_WORD: Record<Member['role'], string> = {
  * Everyone on the instance: the root group's members. Its staff mint invite
  * links here; its owner sets roles. Both come from the root group's can flags.
  */
-export function PeoplePage({ me, root }: PeoplePageProps) {
+export function PeoplePage({ me, root, onOpenGroup }: PeoplePageProps) {
   const { data: users } = useUsers()
+  const { openDM } = useGroupActions()
   const { invites, error: inviteError } = useInvites(root.can.add_members)
   const { create, revoke } = useInviteActions()
   const setRole = useSetRole(root.id)
@@ -83,6 +86,13 @@ export function PeoplePage({ me, root }: PeoplePageProps) {
       await setRole(u.id, u.role === 'moderator' ? 'member' : 'moderator')
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Could not change the role')
+    }
+  }
+  const message = async (u: Member) => {
+    try {
+      onOpenGroup((await openDM([u.id])).id)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Could not open a conversation')
     }
   }
 
@@ -123,11 +133,18 @@ export function PeoplePage({ me, root }: PeoplePageProps) {
                             {ROLE_WORD[u.role] && `${ROLE_WORD[u.role]} · `}joined <Time at={u.joined_at} />
                           </Text>
                         </Row>
-                        {root.can.set_roles && u.role !== 'owner' && u.id !== me.id && (
-                          <Button variant="ghost" onClick={() => void change(u)}>
-                            {u.role === 'moderator' ? 'Make member' : 'Make moderator'}
-                          </Button>
-                        )}
+                        <Row gap={1} align="center">
+                          {u.id !== me.id && (
+                            <Button variant="ghost" icon="chat" onClick={() => void message(u)}>
+                              Message
+                            </Button>
+                          )}
+                          {root.can.set_roles && u.role !== 'owner' && u.id !== me.id && (
+                            <Button variant="ghost" onClick={() => void change(u)}>
+                              {u.role === 'moderator' ? 'Make member' : 'Make moderator'}
+                            </Button>
+                          )}
+                        </Row>
                       </Row>
                     </ListItem>
                   ))}

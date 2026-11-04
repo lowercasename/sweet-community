@@ -35,10 +35,10 @@ func TestRootGroupAndRoles(t *testing.T) {
 
 	// Everyone is in the root group; the owner's root membership carries their abilities.
 	root := myGroups(owner)[perm.Root]
-	if root["kind"] != "root" || root["role"] != "owner" || !groupCan(root, "add_members") || !groupCan(root, "set_roles") || groupCan(root, "leave") || groupCan(root, "delete") {
+	if root["kind"] != "root" || root["role"] != "owner" || !groupCan(root, "add_members") || !groupCan(root, "set_roles") || !groupCan(root, "manage_instance") || groupCan(root, "leave") || groupCan(root, "delete") {
 		t.Fatalf("owner's root group: %v", root)
 	}
-	if r := myGroups(kit)[perm.Root]; r["role"] != "member" || groupCan(r, "add_members") || groupCan(r, "set_roles") || groupCan(r, "leave") {
+	if r := myGroups(kit)[perm.Root]; r["role"] != "member" || groupCan(r, "add_members") || groupCan(r, "set_roles") || groupCan(r, "manage_instance") || groupCan(r, "leave") {
 		t.Fatalf("member's root group: %v", r)
 	}
 
@@ -208,6 +208,17 @@ func TestDMFindOrCreate(t *testing.T) {
 	// In a DM both people are equals: nobody owns it, nobody renames it, anyone may leave.
 	if dm["role"] != "member" || groupCan(dm, "rename") || groupCan(dm, "set_roles") || !groupCan(dm, "leave") {
 		t.Fatalf("dm abilities: %v", dm)
+	}
+	// A DM is named by its people, so it carries them; a named group does not.
+	names := []string{}
+	for _, u := range myGroups(mo)[dm["id"].(string)]["members"].([]any) {
+		names = append(names, u.(map[string]any)["username"].(string))
+	}
+	if strings.Join(names, ",") != "kit,mo" {
+		t.Fatalf("dm members: %v", names)
+	}
+	if _, ok := myGroups(kit)[perm.Root]["members"]; ok {
+		t.Fatal("a non-dm group carries members")
 	}
 }
 

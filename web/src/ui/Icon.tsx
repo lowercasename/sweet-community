@@ -15,6 +15,7 @@ import {
   MessagesSquare,
   Newspaper,
   Pencil,
+  Plus,
   Search,
   Settings,
   TabletSmartphone,
@@ -47,6 +48,7 @@ export type IconName =
   | 'remove'
   | 'more'
   | 'trash'
+  | 'plus'
 
 const ICONS: Record<IconName, LucideIcon> = {
   bold: Bold,
@@ -71,6 +73,7 @@ const ICONS: Record<IconName, LucideIcon> = {
   remove: X,
   more: EllipsisVertical,
   trash: Trash2,
+  plus: Plus,
 }
 
 interface IconProps {

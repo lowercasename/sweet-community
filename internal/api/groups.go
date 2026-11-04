@@ -28,6 +28,25 @@ type Group struct {
 	CreatedAt int64    `json:"created_at"`
 	Role      string   `json:"role,omitempty"`
 	Can       GroupCan `json:"can"`
+	// Members is set for a DM only: a DM is named by its people.
+	Members []User `json:"members,omitempty"`
+}
+
+// withDMMembers fills in a DM's people, sorted by name; other groups are left alone.
+func (s *Server) withDMMembers(ctx context.Context, g Group) (Group, error) {
+	if g.Kind != perm.KindDM {
+		return g, nil
+	}
+	rows, err := s.q().ListMembers(ctx, g.ID)
+	if err != nil {
+		return g, err
+	}
+	g.Members = make([]User, 0, len(rows))
+	for _, row := range rows {
+		g.Members = append(g.Members, User{ID: row.ID, Username: row.Username, Picture: pictureURL(row.PictureID)})
+	}
+	sort.Slice(g.Members, func(i, j int) bool { return g.Members[i].Username < g.Members[j].Username })
+	return g, nil
 }
 
 // GroupCan is what the viewer may do to a group. CreateGroups is meaningful
@@ -42,6 +61,8 @@ type GroupCan struct {
 	Delete        bool `json:"delete"`
 	Leave         bool `json:"leave"`
 	CreateGroups  bool `json:"create_groups,omitempty"`
+	// ManageInstance is meaningful on the root group only: the owner edits instance settings.
+	ManageInstance bool `json:"manage_instance,omitempty"`
 }
 
 // Settings is the instance's settings on the wire (architecture.md, Feature flags).
@@ -83,6 +104,7 @@ func groupFor(a perm.Actor, g Group, st Settings) Group {
 	}
 	if g.Kind == perm.KindRoot {
 		g.Can.CreateGroups = perm.CreateGroup(a, st.GroupCreation)
+		g.Can.ManageInstance = perm.ManageInstance(a)
 	}
 	return g
 }
@@ -150,7 +172,12 @@ func (s *Server) listGroups(w http.ResponseWriter, r *http.Request) {
 	out := make([]Group, 0, len(rows))
 	for _, row := range rows {
 		a := perm.Actor{ID: me.ID, Role: row.Role}
-		out = append(out, groupFor(a, Group{ID: row.ID, Kind: row.Kind, Name: row.Name, Mode: row.Mode, CreatedAt: row.CreatedAt}, st))
+		g, err := s.withDMMembers(r.Context(), Group{ID: row.ID, Kind: row.Kind, Name: row.Name, Mode: row.Mode, CreatedAt: row.CreatedAt})
+		if err != nil {
+			writeErr(w, http.StatusInternalServerError, err.Error())
+			return
+		}
+		out = append(out, groupFor(a, g, st))
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"groups": out})
 }

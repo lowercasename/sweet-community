@@ -1,18 +1,43 @@
 import { useState } from 'react'
-import { logoutEverywhere, uploadImage, type User } from '../api'
-import { useAuthor, useSetPicture } from '../data/hooks'
+import { logoutEverywhere, uploadImage, type Group, type Settings, type User } from '../api'
+import { useAuthor, useSetPicture, useSetSettings, useSettings } from '../data/hooks'
 import { IMAGE_ACCEPT } from '../editor/images'
-import { Avatar, Button, Card, FilePicker, Heading, Measure, Pane, Row, ScrollArea, Stack, Text } from '../ui'
+import {
+  Avatar,
+  Button,
+  Card,
+  Field,
+  FilePicker,
+  Heading,
+  Measure,
+  Pane,
+  Row,
+  ScrollArea,
+  Select,
+  Stack,
+  Text,
+} from '../ui'
 
 interface SettingsPageProps {
   me: User
+  /** The instance as a group: its can flags say whether I edit the instance's settings. */
+  root: Group
   /** Sign out: this session via the app's sign-out, or every session after logoutEverywhere. */
   onSignOut: () => void
 }
 
-export function SettingsPage({ me, onSignOut }: SettingsPageProps) {
+const CREATION: { value: Settings['group_creation']; label: string }[] = [
+  { value: 'anyone', label: 'Anyone' },
+  { value: 'staff', label: 'Only the owner and moderators' },
+]
+
+export function SettingsPage({ me, root, onSignOut }: SettingsPageProps) {
   const live = useAuthor(me)
   const setPicture = useSetPicture()
+  const manages = root.can.manage_instance === true
+  const { settings, error: settingsError } = useSettings(manages)
+  const setSettings = useSetSettings()
+  const [settingsBusy, setSettingsBusy] = useState(false)
   const [busy, setBusy] = useState(false)
   const [pictureBusy, setPictureBusy] = useState(false)
   const [pictureError, setPictureError] = useState<string | null>(null)
@@ -43,11 +68,35 @@ export function SettingsPage({ me, onSignOut }: SettingsPageProps) {
     await logoutEverywhere()
     onSignOut()
   }
+  const changeCreation = async (value: Settings['group_creation']) => {
+    setSettingsBusy(true)
+    try {
+      await setSettings({ group_creation: value })
+    } finally {
+      setSettingsBusy(false)
+    }
+  }
   return (
     <Pane>
       <ScrollArea>
         <Measure>
           <Stack gap={3}>
+            {manages && (
+              <Card>
+                <Stack gap={2}>
+                  <Heading level={2}>This place</Heading>
+                  <Field label="Who can create groups">
+                    <Select
+                      value={settings?.group_creation ?? 'anyone'}
+                      options={CREATION}
+                      disabled={!settings || settingsBusy}
+                      onChange={(v) => void changeCreation(v)}
+                    />
+                  </Field>
+                  {settingsError && <Text variant="secondary">{settingsError.message}</Text>}
+                </Stack>
+              </Card>
+            )}
             <Card>
               <Stack gap={2}>
                 <Heading level={2}>Profile picture</Heading>

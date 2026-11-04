@@ -1,23 +1,39 @@
-import type { User } from '../api'
+import type { Group, User } from '../api'
 import { useAuthor } from '../data/hooks'
 import { NavAccount, NavBar, NavItem, Wordmark } from '../ui'
+import { groupLabel } from './GroupView'
 
-export type Page = 'home' | 'people' | 'settings' | 'menu'
+export type Page = 'home' | 'people' | 'settings' | 'menu' | 'members' | 'new-group'
 
 interface SidebarProps {
   me: User
+  groups: Group[]
+  /** The group whose view is showing, when the page is a group's view. */
+  currentGroupId?: string
   page: Page
   expanded: boolean
   onNavigate: (page: Page) => void
+  onOpenGroup: (id: string) => void
   onToggle: () => void
 }
 
 /**
- * The left navigation. Search and Notifications mark where those features
- * will live; the rest is live.
+ * The left navigation: Home is the root group; then the pages; then my
+ * groups and DMs, and New group when the root group says I may.
  */
-export function Sidebar({ me, page, expanded, onNavigate, onToggle }: SidebarProps) {
+export function Sidebar({
+  me,
+  groups,
+  currentGroupId,
+  page,
+  expanded,
+  onNavigate,
+  onOpenGroup,
+  onToggle,
+}: SidebarProps) {
   const live = useAuthor(me)
+  const root = groups.find((g) => g.kind === 'root')
+  const mine = groups.filter((g) => g.kind !== 'root')
   return (
     <NavBar
       expanded={expanded}
@@ -38,8 +54,8 @@ export function Sidebar({ me, page, expanded, onNavigate, onToggle }: SidebarPro
         icon="home"
         label="Home"
         expanded={expanded}
-        current={page === 'home'}
-        onClick={() => onNavigate('home')}
+        current={page === 'home' && currentGroupId === root?.id}
+        onClick={() => root && onOpenGroup(root.id)}
       />
       <NavItem icon="search" label="Search" expanded={expanded} />
       <NavItem icon="bell" label="Notifications" expanded={expanded} />
@@ -57,6 +73,25 @@ export function Sidebar({ me, page, expanded, onNavigate, onToggle }: SidebarPro
         current={page === 'settings'}
         onClick={() => onNavigate('settings')}
       />
+      {mine.map((g) => (
+        <NavItem
+          key={g.id}
+          icon={g.kind === 'dm' ? 'chat' : 'people'}
+          label={groupLabel(g, me)}
+          expanded={expanded}
+          current={page === 'home' && currentGroupId === g.id}
+          onClick={() => onOpenGroup(g.id)}
+        />
+      ))}
+      {root?.can.create_groups && (
+        <NavItem
+          icon="plus"
+          label="New group"
+          expanded={expanded}
+          current={page === 'new-group'}
+          onClick={() => onNavigate('new-group')}
+        />
+      )}
     </NavBar>
   )
 }

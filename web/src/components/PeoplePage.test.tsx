@@ -14,6 +14,7 @@ vi.mock('../api', () => ({
   createInvite: vi.fn(),
   revokeInvite: vi.fn(),
   setMemberRole: vi.fn(),
+  openDM: vi.fn(),
 }))
 
 afterEach(cleanup)
@@ -31,10 +32,24 @@ beforeEach(async () => {
 const rowOf = (name: string) => screen.getByText(name).closest('li')!
 
 describe('PeoplePage', () => {
+  it('starts a DM from a person, never from myself', async () => {
+    const { openDM } = await import('../api')
+    const { dm } = await import('../test-utils')
+    vi.mocked(openDM).mockResolvedValue(dm('d1', [user('kit'), user('raphael')]))
+    const { PeoplePage } = await import('./PeoplePage')
+    const onOpenGroup = vi.fn()
+    renderWithQuery(<PeoplePage me={user('raphael')} root={group(ROOT, 'owner')} onOpenGroup={onOpenGroup} />)
+    await screen.findByText('kit')
+    expect(within(rowOf('raphael')).queryByRole('button', { name: 'Message' })).toBeNull()
+    fireEvent.click(within(rowOf('kit')).getByRole('button', { name: 'Message' }))
+    expect(openDM).toHaveBeenCalledWith(['kit'])
+    await vi.waitFor(() => expect(onOpenGroup).toHaveBeenCalledWith('d1'))
+  })
+
   it('lets the owner promote and demote anyone but themselves', async () => {
     const { setMemberRole } = await import('../api')
     const { PeoplePage } = await import('./PeoplePage')
-    renderWithQuery(<PeoplePage me={user('raphael')} root={group(ROOT, 'owner')} />)
+    renderWithQuery(<PeoplePage me={user('raphael')} root={group(ROOT, 'owner')} onOpenGroup={() => {}} />)
     await screen.findByText('mo')
     expect(within(rowOf('raphael')).queryByRole('button')).toBeNull()
     fireEvent.click(within(rowOf('kit')).getByRole('button', { name: 'Make moderator' }))
@@ -46,7 +61,7 @@ describe('PeoplePage', () => {
 
   it('shows a moderator the invite tools but no role controls', async () => {
     const { PeoplePage } = await import('./PeoplePage')
-    renderWithQuery(<PeoplePage me={user('mo')} root={group(ROOT, 'moderator')} />)
+    renderWithQuery(<PeoplePage me={user('mo')} root={group(ROOT, 'moderator')} onOpenGroup={() => {}} />)
     await screen.findByText('kit')
     expect(screen.getByText('Invite someone')).toBeTruthy()
     expect(screen.queryByRole('button', { name: /Make / })).toBeNull()
@@ -54,7 +69,7 @@ describe('PeoplePage', () => {
 
   it('shows a member only the list', async () => {
     const { PeoplePage } = await import('./PeoplePage')
-    renderWithQuery(<PeoplePage me={user('kit')} root={group(ROOT, 'member')} />)
+    renderWithQuery(<PeoplePage me={user('kit')} root={group(ROOT, 'member')} onOpenGroup={() => {}} />)
     await screen.findByText('mo')
     expect(screen.queryByText('Invite someone')).toBeNull()
     expect(screen.queryByRole('button', { name: /Make / })).toBeNull()

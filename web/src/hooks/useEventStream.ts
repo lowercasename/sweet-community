@@ -17,6 +17,7 @@ const EVENT_KINDS = [
   'group_delete',
   'membership',
   'membership_delete',
+  'settings',
 ] as const
 const HEALTH_INTERVAL_MS = 30_000
 const HEALTH_TIMEOUT_MS = 10_000
