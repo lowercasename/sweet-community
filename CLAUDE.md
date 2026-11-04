@@ -10,6 +10,8 @@
 
 ## Claims about old Sweet
 
+Raphael, 2 November 2026: "Don't answer my questions or provide suggestions without at least trying to back yourself up with data, ever. The longer we talk, the more your context drifts and you start supplying thinking based on your own thinking."
+
 Every statement about what old Sweet had, did, or what happened on it is checked against the database dump before it is made, and quoted with the number. No statement from memory, ever: memory has already produced "there were no private groups" (there were 14) and "anyone could join" (10 were by approval). The dump is `json/*.json` (communities, posts, users, relationships, tags, votes, notifications, images); ask Raphael where it lives if it is not in the scratchpad. It contains emails and password hashes: read it with `python3 -I`, print aggregates and community names only, never a user record, and never commit any of it. If the data does not answer a question, say so and give the opinion as an opinion.
 
 ## How work is done
