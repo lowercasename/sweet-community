@@ -71,6 +71,8 @@ Chat messages use a subset of the same TipTap schema (paragraph, text, link, men
 
 Replies: a `reply_to` column on messages, rendered as a quoted snippet above the reply, flat in the room (the WhatsApp/Telegram shape). No Slack-style threads; they would turn the room into a second feed.
 
+A message is the same kind of content as a post or comment, with the same ownership: its author may delete it, and so may the owner or a moderator (`perm.DeleteMessage`); nobody edits a sent message. Deletion is soft and arrives as a `message_delete` event.
+
 Layout: one page and no header. A collapsible nav column on the left (wordmark, Home, Search, Notifications, People, Settings, account, expand control), then posts and chat, each scrolling on its own, with a draggable divider between them (default 2:3, clamped 1:3 to 3:2). Dragging a pane past the edge folds it into a thin vertical rail that reopens it. Width and open panes persist per browser. Below 800px the nav column goes, one pane shows, and a bottom tab bar carries Posts, Chat, Search, Alerts and a Menu item (People, Settings, account) in that order. One SSE connection per page. Both panes stay mounted whatever is showing: a closed pane is hidden, not unmounted, so a half-written post or message survives closing its pane or visiting Settings. (Reversed from "a closed pane refetches when reopened", which threw drafts away.)
 
 ### Embeds and link previews
@@ -207,7 +209,7 @@ One in-app notification table that every channel reads from.
 
 ## Admin tools at launch
 
-Roles: owner, moderator, member. One owner: the person who runs this place. The owner sets anyone to member or moderator from the People page; a moderator can delete anything and edit nothing of others', exactly as the owner can, but cannot change roles. Transferring ownership is a separate, explicit action, later. A role change is a `user` event, so every open page's controls follow it.
+Roles: owner, moderator, member. One owner: the person who runs this place. The owner sets anyone to member or moderator from the People page; a moderator can delete anything and edit nothing of others', exactly as the owner can, and can create and revoke invites, but cannot change roles. Transferring ownership is a separate, explicit action, later. A role change is a `user` event, so every open page's controls follow it.
 
 Minimum shipped:
 

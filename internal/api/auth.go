@@ -16,6 +16,7 @@ import (
 
 	"sweet/internal/auth"
 	"sweet/internal/db"
+	"sweet/internal/perm"
 	"sweet/internal/store"
 )
 
@@ -91,11 +92,11 @@ func (s *Server) requireAuth(next http.HandlerFunc) http.HandlerFunc {
 	}
 }
 
-// requireOwner is requireAuth plus the owner role.
-func (s *Server) requireOwner(next http.HandlerFunc) http.HandlerFunc {
+// requireCan is requireAuth plus one of perm's instance-level abilities.
+func (s *Server) requireCan(ok func(perm.Actor) bool, next http.HandlerFunc) http.HandlerFunc {
 	return s.requireAuth(func(w http.ResponseWriter, r *http.Request) {
-		if u, _ := userFrom(r.Context()); u.Role != "owner" {
-			writeErr(w, http.StatusForbidden, "owner only")
+		if u, _ := userFrom(r.Context()); !ok(actor(u)) {
+			writeErr(w, http.StatusForbidden, "not allowed")
 			return
 		}
 		next(w, r)
@@ -227,7 +228,7 @@ func (s *Server) login(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusInternalServerError, err.Error())
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"user": u, "token": token})
+	writeJSON(w, http.StatusOK, map[string]any{"user": meOf(u), "token": token})
 }
 
 func (s *Server) logout(w http.ResponseWriter, r *http.Request) {
@@ -246,5 +247,5 @@ func (s *Server) logoutAll(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) me(w http.ResponseWriter, r *http.Request) {
 	u, _ := userFrom(r.Context())
-	writeJSON(w, http.StatusOK, u)
+	writeJSON(w, http.StatusOK, meOf(u))
 }

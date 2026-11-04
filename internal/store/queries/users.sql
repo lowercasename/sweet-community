@@ -15,3 +15,6 @@ UPDATE users SET role = ? WHERE id = ?;
 
 -- name: SetUserPassword :exec
 UPDATE users SET password_hash = ? WHERE id = ?;
+
+-- name: GetUser :one
+SELECT id, username, role, picture_id FROM users WHERE id = ?;

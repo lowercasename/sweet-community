@@ -1,6 +1,7 @@
 package api
 
 import (
+	"bufio"
 	"bytes"
 	"context"
 	"encoding/json"
@@ -16,6 +17,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"sweet/internal/db"
 	"sweet/internal/events"
@@ -610,5 +612,210 @@ func TestPictureChangeIsAnEvent(t *testing.T) {
 	}
 	if len(pictures) != 2 || pictures[0] != img["url"] || pictures[1] != nil {
 		t.Fatalf("user events after two picture changes: %v", pictures)
+	}
+}
+
+// register makes a member and returns their client and id.
+func registerMember(t *testing.T, ts *httptest.Server, owner *client, name string) (*client, string) {
+	t.Helper()
+	inv := owner.mustStatus(201, "POST", "/api/invites", nil)
+	c := newClient(t, ts)
+	res := c.mustStatus(201, "POST", "/api/register", map[string]string{"code": inv["code"].(string), "username": name, "password": "longenough"})
+	return c, res["user"].(map[string]any)["id"].(string)
+}
+
+func can(v map[string]any) (edit, del bool) {
+	c, _ := v["can"].(map[string]any)
+	edit, _ = c["edit"].(bool)
+	del, _ = c["delete"].(bool)
+	return
+}
+
+func TestCanFlagsAndAbilities(t *testing.T) {
+	ts, owner := newTestServer(t)
+	kit, _ := registerMember(t, ts, owner, "kit")
+	mo, _ := registerMember(t, ts, owner, "mo")
+
+	// Instance-level abilities ride on /api/me and on the login reply.
+	me := owner.mustStatus(200, "GET", "/api/me", nil)
+	if c := me["can"].(map[string]any); c["invite"] != true || c["manage_roles"] != true {
+		t.Fatalf("owner abilities: %v", me["can"])
+	}
+	if c := kit.mustStatus(200, "GET", "/api/me", nil)["can"].(map[string]any); c["invite"] != false || c["manage_roles"] != false {
+		t.Fatalf("member abilities: %v", c)
+	}
+	login := kit.login("kit", "longenough")
+	if _, ok := login["user"].(map[string]any)["can"]; !ok {
+		t.Fatalf("login reply carries no abilities: %v", login)
+	}
+
+	// A post: its author edits and deletes; the owner deletes only; another member neither.
+	post := kit.mustStatus(201, "POST", "/api/posts", map[string]string{"body_html": "<p>kit's</p>"})
+	if e, d := can(post); !e || !d {
+		t.Fatalf("author's own post on create: edit %v delete %v", e, d)
+	}
+	first := func(c *client, key string) map[string]any {
+		return c.mustStatus(200, "GET", "/api/"+key, nil)[key].([]any)[0].(map[string]any)
+	}
+	if e, d := can(first(owner, "posts")); e || !d {
+		t.Fatalf("owner on kit's post: edit %v delete %v", e, d)
+	}
+	if e, d := can(first(mo, "posts")); e || d {
+		t.Fatalf("mo on kit's post: edit %v delete %v", e, d)
+	}
+	pid := post["id"].(string)
+
+	// A comment by mo on kit's post: mo edits and deletes, kit deletes, the owner deletes.
+	c := mo.mustStatus(201, "POST", "/api/posts/"+pid+"/comments", map[string]string{"body_html": "<p>mo</p>"})
+	if e, d := can(c); !e || !d {
+		t.Fatalf("mo's own comment: edit %v delete %v", e, d)
+	}
+	comments := func(c *client) map[string]any {
+		return c.mustStatus(200, "GET", "/api/posts/"+pid+"/comments", nil)["comments"].([]any)[0].(map[string]any)
+	}
+	if e, d := can(comments(kit)); e || !d {
+		t.Fatalf("post author on mo's comment: edit %v delete %v", e, d)
+	}
+	if e, d := can(comments(owner)); e || !d {
+		t.Fatalf("owner on mo's comment: edit %v delete %v", e, d)
+	}
+
+	// A message: its author deletes, the owner deletes, nobody edits.
+	m := mo.mustStatus(201, "POST", "/api/messages", map[string]string{"body_html": "<p>hi</p>"})
+	if e, d := can(m); e || !d {
+		t.Fatalf("own message: edit %v delete %v", e, d)
+	}
+	if e, d := can(first(kit, "messages")); e || d {
+		t.Fatalf("kit on mo's message: edit %v delete %v", e, d)
+	}
+	if _, d := can(first(owner, "messages")); !d {
+		t.Fatal("owner cannot delete a message")
+	}
+}
+
+// readEvents opens the stream from the start and returns the first n events.
+func (c *client) readEvents(n int) []map[string]any {
+	c.t.Helper()
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+	req, _ := http.NewRequestWithContext(ctx, "GET", c.base+"/api/events?since=0", nil)
+	res, err := c.http.Do(req)
+	if err != nil {
+		c.t.Fatal(err)
+	}
+	defer res.Body.Close()
+	var out []map[string]any
+	var kind string
+	sc := bufio.NewScanner(res.Body)
+	for sc.Scan() && len(out) < n {
+		line := sc.Text()
+		switch {
+		case strings.HasPrefix(line, "event: "):
+			kind = strings.TrimPrefix(line, "event: ")
+		case strings.HasPrefix(line, "data: "):
+			var payload map[string]any
+			json.Unmarshal([]byte(strings.TrimPrefix(line, "data: ")), &payload)
+			out = append(out, map[string]any{"kind": kind, "payload": payload})
+		}
+	}
+	return out
+}
+
+func TestEventsAreUniformAndPersonalised(t *testing.T) {
+	ts, owner := newTestServer(t)
+	kit, _ := registerMember(t, ts, owner, "kit")
+	post := kit.mustStatus(201, "POST", "/api/posts", map[string]string{"body_html": "<p>v1</p>"})
+	pid := post["id"].(string)
+	kit.mustStatus(200, "PUT", "/api/posts/"+pid, map[string]string{"body_html": "<p>v2</p>"})
+	c := kit.mustStatus(201, "POST", "/api/posts/"+pid+"/comments", map[string]string{"body_html": "<p>c1</p>"})
+	kit.mustStatus(200, "PUT", "/api/comments/"+c["id"].(string), map[string]string{"body_html": "<p>c2</p>"})
+
+	// Two kinds per resource: an edit is another "post" / "comment", not a kind of its own.
+	kinds := []string{}
+	for _, e := range kit.readEvents(4) {
+		kinds = append(kinds, e["kind"].(string))
+	}
+	if strings.Join(kinds, ",") != "post,post,comment,comment" {
+		t.Fatalf("event kinds: %v", kinds)
+	}
+
+	// The same event carries each viewer's own can flags.
+	kitsView := kit.readEvents(1)[0]["payload"].(map[string]any)
+	ownersView := owner.readEvents(1)[0]["payload"].(map[string]any)
+	if e, d := can(kitsView); !e || !d {
+		t.Fatalf("kit's view of own post over the stream: edit %v delete %v", e, d)
+	}
+	if e, d := can(ownersView); e || !d {
+		t.Fatalf("owner's view of kit's post over the stream: edit %v delete %v", e, d)
+	}
+	if ownersView["body_html"] != "<p>v1</p>" {
+		t.Fatalf("first post event body: %v", ownersView["body_html"])
+	}
+}
+
+func TestRoles(t *testing.T) {
+	ts, owner := newTestServer(t)
+	kit, kitID := registerMember(t, ts, owner, "kit")
+	mo, moID := registerMember(t, ts, owner, "mo")
+	ownerID := owner.mustStatus(200, "GET", "/api/me", nil)["id"].(string)
+
+	// Only the owner assigns roles, only member or moderator, never to the owner.
+	kit.mustStatus(403, "PUT", "/api/users/"+moID+"/role", map[string]string{"role": "moderator"})
+	owner.mustStatus(400, "PUT", "/api/users/"+kitID+"/role", map[string]string{"role": "owner"})
+	owner.mustStatus(400, "PUT", "/api/users/"+kitID+"/role", map[string]string{"role": "king"})
+	owner.mustStatus(403, "PUT", "/api/users/"+ownerID+"/role", map[string]string{"role": "member"})
+	owner.mustStatus(404, "PUT", "/api/users/nope/role", map[string]string{"role": "member"})
+	u := owner.mustStatus(200, "PUT", "/api/users/"+kitID+"/role", map[string]string{"role": "moderator"})
+	if u["role"] != "moderator" || u["username"] != "kit" {
+		t.Fatalf("promoted: %v", u)
+	}
+
+	// The change is a user event, and the list shows it.
+	last := kit.readEvents(20)
+	if e := last[len(last)-1]; e["kind"] != "user" || e["payload"].(map[string]any)["role"] != "moderator" {
+		t.Fatalf("last event after promotion: %v", e)
+	}
+	for _, m := range owner.mustStatus(200, "GET", "/api/users", nil)["users"].([]any) {
+		if m.(map[string]any)["username"] == "kit" && m.(map[string]any)["role"] != "moderator" {
+			t.Fatalf("users list: %v", m)
+		}
+	}
+
+	// A moderator can invite and delete anything, edit nothing of others', and not assign roles.
+	me := kit.mustStatus(200, "GET", "/api/me", nil)["can"].(map[string]any)
+	if me["invite"] != true || me["manage_roles"] != false {
+		t.Fatalf("moderator abilities: %v", me)
+	}
+	kit.mustStatus(201, "POST", "/api/invites", nil)
+	post := mo.mustStatus(201, "POST", "/api/posts", map[string]string{"body_html": "<p>mo's</p>"})
+	kit.mustStatus(403, "PUT", "/api/posts/"+post["id"].(string), map[string]string{"body_html": "<p>no</p>"})
+	kit.mustStatus(200, "DELETE", "/api/posts/"+post["id"].(string), nil)
+	kit.mustStatus(403, "PUT", "/api/users/"+moID+"/role", map[string]string{"role": "moderator"})
+
+	// Demotion.
+	owner.mustStatus(200, "PUT", "/api/users/"+kitID+"/role", map[string]string{"role": "member"})
+	kit.mustStatus(403, "POST", "/api/invites", nil)
+}
+
+func TestDeleteMessage(t *testing.T) {
+	ts, owner := newTestServer(t)
+	kit, _ := registerMember(t, ts, owner, "kit")
+	mo, _ := registerMember(t, ts, owner, "mo")
+	m := mo.mustStatus(201, "POST", "/api/messages", map[string]string{"body_html": "<p>oops</p>"})
+	id := m["id"].(string)
+	kit.mustStatus(403, "DELETE", "/api/messages/"+id, nil)
+	gone := mo.mustStatus(200, "DELETE", "/api/messages/"+id, nil)
+	if gone["id"] != id {
+		t.Fatalf("delete reply: %v", gone)
+	}
+	mo.mustStatus(404, "DELETE", "/api/messages/"+id, nil)
+	if n := len(kit.mustStatus(200, "GET", "/api/messages", nil)["messages"].([]any)); n != 0 {
+		t.Fatalf("deleted message still listed: %d", n)
+	}
+	theirs := kit.mustStatus(201, "POST", "/api/messages", map[string]string{"body_html": "<p>mine</p>"})
+	owner.mustStatus(200, "DELETE", "/api/messages/"+theirs["id"].(string), nil)
+	events := owner.readEvents(10)
+	if e := events[len(events)-1]; e["kind"] != "message_delete" || e["payload"].(map[string]any)["id"] != theirs["id"] {
+		t.Fatalf("last event: %v", e)
 	}
 }

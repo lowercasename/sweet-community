@@ -112,9 +112,9 @@ func (q *Queries) GetCommentOwners(ctx context.Context, id string) (GetCommentOw
 }
 
 const listComments = `-- name: ListComments :many
-SELECT c.id, c.post_id, c.body_html, c.body_text, c.created_at, c.edited_at,
+SELECT c.id, c.post_id, c.body_html, c.body_text, c.created_at, c.edited_at, p.author_id AS post_author_id,
        u.id AS author_id, u.username AS author_username, u.role AS author_role, u.picture_id AS author_picture_id
-FROM comments c JOIN users u ON u.id = c.author_id
+FROM comments c JOIN users u ON u.id = c.author_id JOIN posts p ON p.id = c.post_id
 WHERE c.post_id = ? AND c.deleted_at IS NULL
 ORDER BY c.created_at, c.id
 `
@@ -126,6 +126,7 @@ type ListCommentsRow struct {
 	BodyText        string
 	CreatedAt       int64
 	EditedAt        sql.NullInt64
+	PostAuthorID    string
 	AuthorID        string
 	AuthorUsername  string
 	AuthorRole      string
@@ -148,6 +149,7 @@ func (q *Queries) ListComments(ctx context.Context, postID string) ([]ListCommen
 			&i.BodyText,
 			&i.CreatedAt,
 			&i.EditedAt,
+			&i.PostAuthorID,
 			&i.AuthorID,
 			&i.AuthorUsername,
 			&i.AuthorRole,

@@ -95,19 +95,26 @@ func (h *Hub) Since(ctx context.Context, after int64, limit int) ([]Event, error
 // and dead-client detection on our side).
 const Heartbeat = 15 * time.Second
 
-// ServeHTTP is the SSE endpoint. It replays from Last-Event-ID or ?since=,
-// then goes live. Every event carries id: <seq>.
-func (h *Hub) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+// Serve is the SSE endpoint. It replays from Last-Event-ID or ?since=, then
+// goes live. Every event carries id: <seq>. decorate runs on each event
+// before it is written: the log holds the resource as it is, and the viewer's
+// own view of it (their can flags) is added here, per connection.
+func (h *Hub) Serve(w http.ResponseWriter, r *http.Request, decorate func(Event) Event) {
 	flusher, ok := w.(http.Flusher)
 	if !ok {
 		http.Error(w, "streaming unsupported", http.StatusInternalServerError)
 		return
 	}
-	after := int64(0)
+	// A client that names a sequence, even 0, wants everything after it; one
+	// that names none has just loaded the page from the API and wants only
+	// what happens next.
+	after, replay := int64(0), false
 	if v := r.Header.Get("Last-Event-ID"); v != "" {
 		after, _ = strconv.ParseInt(v, 10, 64)
+		replay = true
 	} else if v := r.URL.Query().Get("since"); v != "" {
 		after, _ = strconv.ParseInt(v, 10, 64)
+		replay = true
 	}
 
 	// Subscribe before replaying so nothing committed during the replay is
@@ -124,11 +131,12 @@ func (h *Hub) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	ctx := r.Context()
 	write := func(e Event) {
+		e = decorate(e)
 		fmt.Fprintf(w, "id: %d\nevent: %s\ndata: %s\n\n", e.Seq, e.Kind, e.Payload)
 	}
 
 	last := after
-	if after > 0 {
+	if replay {
 		backlog, err := h.Since(ctx, after, 1000)
 		if err == nil {
 			for _, e := range backlog {

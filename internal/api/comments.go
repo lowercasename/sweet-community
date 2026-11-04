@@ -16,13 +16,16 @@ import (
 // Comment is one flat reply under a post. A quote-reply is a blockquote in
 // the body; there is no tree.
 type Comment struct {
-	ID        string `json:"id"`
-	PostID    string `json:"post_id"`
-	Author    User   `json:"author"`
-	BodyHTML  string `json:"body_html"`
-	BodyText  string `json:"body_text"`
-	CreatedAt int64  `json:"created_at"`
-	EditedAt  *int64 `json:"edited_at"`
+	ID     string `json:"id"`
+	PostID string `json:"post_id"`
+	// PostAuthorID is an ownership fact perm needs: the post's author may delete any comment on it.
+	PostAuthorID string `json:"post_author_id"`
+	Author       User   `json:"author"`
+	BodyHTML     string `json:"body_html"`
+	BodyText     string `json:"body_text"`
+	CreatedAt    int64  `json:"created_at"`
+	EditedAt     *int64 `json:"edited_at"`
+	Can          Can    `json:"can"`
 }
 
 func (s *Server) postExists(r *http.Request, id string) (bool, error) {
@@ -46,17 +49,20 @@ func (s *Server) listComments(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusInternalServerError, err.Error())
 		return
 	}
+	viewer, _ := userFrom(r.Context())
 	out := make([]Comment, 0, len(rows))
 	for _, row := range rows {
-		out = append(out, Comment{
-			ID:        row.ID,
-			PostID:    row.PostID,
-			Author:    User{ID: row.AuthorID, Username: row.AuthorUsername, Role: row.AuthorRole, Picture: pictureURL(row.AuthorPictureID)},
-			BodyHTML:  row.BodyHtml,
-			BodyText:  row.BodyText,
-			CreatedAt: row.CreatedAt,
-			EditedAt:  nullInt(row.EditedAt),
-		})
+		c := Comment{
+			ID:           row.ID,
+			PostID:       row.PostID,
+			PostAuthorID: row.PostAuthorID,
+			Author:       User{ID: row.AuthorID, Username: row.AuthorUsername, Role: row.AuthorRole, Picture: pictureURL(row.AuthorPictureID)},
+			BodyHTML:     row.BodyHtml,
+			BodyText:     row.BodyText,
+			CreatedAt:    row.CreatedAt,
+			EditedAt:     nullInt(row.EditedAt),
+		}
+		out = append(out, *forViewer(viewer, &c).(*Comment))
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"comments": out})
 }
@@ -75,12 +81,15 @@ func (s *Server) createComment(w http.ResponseWriter, r *http.Request) {
 	author, _ := userFrom(r.Context())
 	c := Comment{ID: id.String(), PostID: postID, Author: author, BodyHTML: clean, BodyText: sanitize.Text(clean), CreatedAt: db.Now()}
 	s.logged(w, r, "comment", c.CreatedAt, func(qtx *store.Queries) (any, int, error) {
-		if n, err := qtx.PostExists(r.Context(), postID); err != nil {
-			return nil, http.StatusInternalServerError, err
-		} else if n == 0 {
+		postAuthorID, err := qtx.GetPostAuthor(r.Context(), postID)
+		if errors.Is(err, sql.ErrNoRows) {
 			return nil, http.StatusNotFound, errors.New("no such post")
 		}
-		err := qtx.CreateComment(r.Context(), store.CreateCommentParams{
+		if err != nil {
+			return nil, http.StatusInternalServerError, err
+		}
+		c.PostAuthorID = postAuthorID
+		err = qtx.CreateComment(r.Context(), store.CreateCommentParams{
 			ID: c.ID, PostID: postID, AuthorID: author.ID, BodyHtml: c.BodyHTML, BodyText: c.BodyText, CreatedAt: c.CreatedAt,
 		})
 		return &c, http.StatusCreated, err
@@ -96,7 +105,7 @@ func (s *Server) editComment(w http.ResponseWriter, r *http.Request) {
 	now := db.Now()
 	author, _ := userFrom(r.Context())
 	c := Comment{ID: r.PathValue("id"), Author: author, BodyHTML: clean, BodyText: sanitize.Text(clean), EditedAt: &now}
-	s.logged(w, r, "comment_edit", now, func(qtx *store.Queries) (any, int, error) {
+	s.logged(w, r, "comment", now, func(qtx *store.Queries) (any, int, error) {
 		owners, err := qtx.GetCommentOwners(r.Context(), c.ID)
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, http.StatusNotFound, errors.New("no such comment")
@@ -113,7 +122,7 @@ func (s *Server) editComment(w http.ResponseWriter, r *http.Request) {
 		if err != nil {
 			return nil, http.StatusInternalServerError, err
 		}
-		c.PostID, c.CreatedAt = row.PostID, row.CreatedAt
+		c.PostID, c.PostAuthorID, c.CreatedAt = row.PostID, owners.PostAuthorID, row.CreatedAt
 		return &c, http.StatusOK, nil
 	})
 }

@@ -39,3 +39,24 @@ func EditComment(a Actor, c Comment) bool { return a.ID == c.AuthorID }
 func DeleteComment(a Actor, c Comment) bool {
 	return a.ID == c.AuthorID || a.ID == c.PostAuthorID || a.staff()
 }
+
+// Message is what the rules need to know about a chat message.
+type Message struct{ AuthorID string }
+
+// DeleteMessage: the author, or staff. Nobody edits a sent message.
+func DeleteMessage(a Actor, m Message) bool { return a.ID == m.AuthorID || a.staff() }
+
+// Invite: staff create and revoke invite links.
+func Invite(a Actor) bool { return a.staff() }
+
+// ManageRoles: the owner alone assigns roles.
+func ManageRoles(a Actor) bool { return a.Role == Owner }
+
+// SetRole: the owner makes anyone else a member or a moderator. The owner's
+// own role never changes this way (transfer is a separate action, later).
+func SetRole(a, target Actor, role string) bool {
+	if !ManageRoles(a) || target.Role == Owner || target.ID == a.ID {
+		return false
+	}
+	return role == Member || role == Moderator
+}

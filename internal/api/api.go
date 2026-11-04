@@ -26,10 +26,34 @@ import (
 type User struct {
 	ID       string `json:"id"`
 	Username string `json:"username"`
-	// Role is "owner" (runs the instance) or "member".
+	// Role is "owner" (runs the instance), "moderator" or "member".
 	Role string `json:"role"`
 	// Picture is the avatar's url, or null for the donut.
 	Picture *string `json:"picture"`
+}
+
+// Can is what the requesting user may do to a resource, computed by perm on
+// the way out. The frontend shows controls from these and holds no rules.
+type Can struct {
+	Edit   bool `json:"edit"`
+	Delete bool `json:"delete"`
+}
+
+// Abilities are the instance-level things a user may do, on /api/me.
+type Abilities struct {
+	Invite      bool `json:"invite"`
+	ManageRoles bool `json:"manage_roles"`
+}
+
+// Me is the signed-in user as they see themselves: a User plus abilities.
+type Me struct {
+	User
+	Can Abilities `json:"can"`
+}
+
+func meOf(u User) Me {
+	a := actor(u)
+	return Me{User: u, Can: Abilities{Invite: perm.Invite(a), ManageRoles: perm.ManageRoles(a)}}
 }
 
 // Post is the wire shape. It carries no event sequence: the SSE "id:" line
@@ -42,6 +66,60 @@ type Post struct {
 	CreatedAt    int64  `json:"created_at"`
 	EditedAt     *int64 `json:"edited_at"`
 	CommentCount int64  `json:"comment_count"`
+	Can          Can    `json:"can"`
+}
+
+// forViewer fills in the viewer's can flags on a post, comment or message.
+// Anything else passes through. Used on every response and on the stream.
+func forViewer(viewer User, v any) any {
+	a := actor(viewer)
+	switch x := v.(type) {
+	case *Post:
+		p := *x
+		p.Can = Can{Edit: perm.EditPost(a, perm.Post{AuthorID: p.Author.ID}), Delete: perm.DeletePost(a, perm.Post{AuthorID: p.Author.ID})}
+		return &p
+	case *Comment:
+		c := *x
+		pc := perm.Comment{AuthorID: c.Author.ID, PostAuthorID: c.PostAuthorID}
+		c.Can = Can{Edit: perm.EditComment(a, pc), Delete: perm.DeleteComment(a, pc)}
+		return &c
+	case *Message:
+		m := *x
+		m.Can = Can{Delete: perm.DeleteMessage(a, perm.Message{AuthorID: m.Author.ID})}
+		return &m
+	}
+	return v
+}
+
+// decorateEvent is forViewer for a logged event: the payload is parsed into
+// its resource, flagged for the viewer, and re-encoded.
+func decorateEvent(viewer User, e events.Event) events.Event {
+	var v any
+	switch e.Kind {
+	case "post":
+		v = &Post{}
+	case "comment":
+		v = &Comment{}
+	case "message":
+		v = &Message{}
+	default:
+		return e
+	}
+	if json.Unmarshal(e.Payload, v) != nil {
+		return e
+	}
+	raw, err := json.Marshal(forViewer(viewer, v))
+	if err != nil {
+		return e
+	}
+	e.Payload = raw
+	return e
+}
+
+// events is the SSE endpoint, personalised for the signed-in viewer.
+func (s *Server) events(w http.ResponseWriter, r *http.Request) {
+	viewer, _ := userFrom(r.Context())
+	s.Hub.Serve(w, r, func(e events.Event) events.Event { return decorateEvent(viewer, e) })
 }
 
 type Server struct {
@@ -128,7 +206,9 @@ func (s *Server) Routes(mux *http.ServeMux) {
 	mux.HandleFunc("DELETE /api/comments/{id}", s.requireAuth(s.deleteComment))
 	mux.HandleFunc("GET /api/messages", s.requireAuth(s.listMessages))
 	mux.HandleFunc("POST /api/messages", s.requireAuth(s.createMessage))
-	mux.HandleFunc("GET /api/events", s.requireAuth(s.Hub.ServeHTTP))
+	mux.HandleFunc("DELETE /api/messages/{id}", s.requireAuth(s.deleteMessage))
+	mux.HandleFunc("PUT /api/users/{id}/role", s.requireAuth(s.setRole))
+	mux.HandleFunc("GET /api/events", s.requireAuth(s.events))
 	mux.HandleFunc("POST /api/images", s.requireAuth(s.uploadImage))
 	mux.HandleFunc("GET /img/{id}", s.requireAuth(s.serveImage))
 	mux.HandleFunc("PUT /api/me/picture", s.requireAuth(s.setPicture))
@@ -138,10 +218,10 @@ func (s *Server) Routes(mux *http.ServeMux) {
 		writeErr(w, http.StatusNotFound, "no such endpoint: "+r.Method+" "+r.URL.Path)
 	})
 
-	// Owner.
-	mux.HandleFunc("GET /api/invites", s.requireOwner(s.listInvites))
-	mux.HandleFunc("POST /api/invites", s.requireOwner(s.createInvite))
-	mux.HandleFunc("DELETE /api/invites/{code}", s.requireOwner(s.deleteInvite))
+	// Staff.
+	mux.HandleFunc("GET /api/invites", s.requireCan(perm.Invite, s.listInvites))
+	mux.HandleFunc("POST /api/invites", s.requireCan(perm.Invite, s.createInvite))
+	mux.HandleFunc("DELETE /api/invites/{code}", s.requireCan(perm.Invite, s.deleteInvite))
 }
 
 func writeJSON(w http.ResponseWriter, status int, v any) {
@@ -174,9 +254,10 @@ func (s *Server) listPosts(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusInternalServerError, err.Error())
 		return
 	}
+	viewer, _ := userFrom(r.Context())
 	posts := make([]Post, 0, len(rows))
 	for _, row := range rows {
-		posts = append(posts, Post{
+		p := Post{
 			ID:           row.ID,
 			Author:       User{ID: row.AuthorID, Username: row.AuthorUsername, Role: row.AuthorRole, Picture: pictureURL(row.AuthorPictureID)},
 			BodyHTML:     row.BodyHtml,
@@ -184,7 +265,8 @@ func (s *Server) listPosts(w http.ResponseWriter, r *http.Request) {
 			CreatedAt:    row.CreatedAt,
 			EditedAt:     nullInt(row.EditedAt),
 			CommentCount: row.CommentCount,
-		})
+		}
+		posts = append(posts, *forViewer(viewer, &p).(*Post))
 	}
 	var next *int64
 	if len(posts) > limit {
@@ -215,7 +297,9 @@ func readBody(w http.ResponseWriter, r *http.Request) (clean string, ok bool) {
 }
 
 // logged runs fn inside a write transaction, logs the event it returns, commits,
-// then broadcasts. fn should write with qtx and return the event payload.
+// then broadcasts. fn should write with qtx and return the event payload: the
+// resource as it is, without can flags. The log keeps it that way; the reply
+// to the actor and every stream get their viewer's flags added.
 func (s *Server) logged(w http.ResponseWriter, r *http.Request, kind string, now int64, fn func(qtx *store.Queries) (payload any, status int, err error)) {
 	ctx := r.Context()
 	tx, err := s.DB.BeginTx(ctx, nil) // BEGIN IMMEDIATE via _txlock
@@ -239,7 +323,8 @@ func (s *Server) logged(w http.ResponseWriter, r *http.Request, kind string, now
 		return
 	}
 	s.Hub.Broadcast(ev)
-	writeJSON(w, status, payload)
+	me, _ := userFrom(ctx)
+	writeJSON(w, status, forViewer(me, payload))
 }
 
 var errNotFound = errors.New("not found")
@@ -273,7 +358,7 @@ func (s *Server) editPost(w http.ResponseWriter, r *http.Request) {
 	now := db.Now()
 	author, _ := userFrom(r.Context())
 	p := Post{ID: r.PathValue("id"), Author: author, BodyHTML: clean, BodyText: sanitize.Text(clean), EditedAt: &now}
-	s.logged(w, r, "post_edit", now, func(qtx *store.Queries) (any, int, error) {
+	s.logged(w, r, "post", now, func(qtx *store.Queries) (any, int, error) {
 		authorID, err := qtx.GetPostAuthor(r.Context(), p.ID)
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, http.StatusNotFound, errors.New("no such post")

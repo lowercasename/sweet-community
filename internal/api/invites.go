@@ -159,5 +159,5 @@ func (s *Server) register(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusInternalServerError, err.Error())
 		return
 	}
-	writeJSON(w, http.StatusCreated, map[string]any{"user": u, "token": token})
+	writeJSON(w, http.StatusCreated, map[string]any{"user": meOf(u), "token": token})
 }

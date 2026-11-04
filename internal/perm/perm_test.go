@@ -37,6 +37,23 @@ func TestRules(t *testing.T) {
 		{"bystander deletes a comment", DeleteComment(jo, mosComment), false},
 		{"owner deletes any comment", DeleteComment(owner, mosComment), true},
 		{"moderator deletes any comment", DeleteComment(mod, mosComment), true},
+
+		{"author deletes own message", DeleteMessage(mo, Message{AuthorID: "mo"}), true},
+		{"member deletes another's message", DeleteMessage(jo, Message{AuthorID: "mo"}), false},
+		{"owner deletes any message", DeleteMessage(owner, Message{AuthorID: "mo"}), true},
+		{"moderator deletes any message", DeleteMessage(mod, Message{AuthorID: "mo"}), true},
+
+		{"owner invites", Invite(owner), true},
+		{"moderator invites", Invite(mod), true},
+		{"member invites", Invite(kit), false},
+
+		{"owner manages roles", ManageRoles(owner), true},
+		{"moderator manages roles", ManageRoles(mod), false},
+		{"owner makes a member moderator", SetRole(owner, kit, Moderator), true},
+		{"owner makes a moderator member", SetRole(owner, mod, Member), true},
+		{"owner makes someone owner", SetRole(owner, kit, Owner), false},
+		{"owner changes own role", SetRole(owner, owner, Member), false},
+		{"moderator sets a role", SetRole(mod, kit, Moderator), false},
 	}
 	for _, c := range cases {
 		if c.got != c.want {

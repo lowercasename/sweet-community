@@ -8,3 +8,9 @@ LIMIT sqlc.arg(page_size);
 
 -- name: CreateMessage :exec
 INSERT INTO messages (id, author_id, body_html, body_text, created_at) VALUES (?, ?, ?, ?, ?);
+
+-- name: GetMessageAuthor :one
+SELECT author_id FROM messages WHERE id = sqlc.arg(id) AND deleted_at IS NULL;
+
+-- name: DeleteMessage :exec
+UPDATE messages SET deleted_at = sqlc.arg(deleted_at) WHERE id = sqlc.arg(id) AND deleted_at IS NULL;

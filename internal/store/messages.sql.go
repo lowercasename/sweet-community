@@ -33,6 +33,31 @@ func (q *Queries) CreateMessage(ctx context.Context, arg CreateMessageParams) er
 	return err
 }
 
+const deleteMessage = `-- name: DeleteMessage :exec
+UPDATE messages SET deleted_at = ?1 WHERE id = ?2 AND deleted_at IS NULL
+`
+
+type DeleteMessageParams struct {
+	DeletedAt sql.NullInt64
+	ID        string
+}
+
+func (q *Queries) DeleteMessage(ctx context.Context, arg DeleteMessageParams) error {
+	_, err := q.db.ExecContext(ctx, deleteMessage, arg.DeletedAt, arg.ID)
+	return err
+}
+
+const getMessageAuthor = `-- name: GetMessageAuthor :one
+SELECT author_id FROM messages WHERE id = ?1 AND deleted_at IS NULL
+`
+
+func (q *Queries) GetMessageAuthor(ctx context.Context, id string) (string, error) {
+	row := q.db.QueryRowContext(ctx, getMessageAuthor, id)
+	var author_id string
+	err := row.Scan(&author_id)
+	return author_id, err
+}
+
 const listMessages = `-- name: ListMessages :many
 SELECT m.id, m.body_html, m.body_text, m.created_at,
        u.id AS author_id, u.username AS author_username, u.role AS author_role, u.picture_id AS author_picture_id
