@@ -11,11 +11,13 @@ import (
 )
 
 const createMessage = `-- name: CreateMessage :exec
-INSERT INTO messages (id, author_id, body_html, body_text, created_at) VALUES (?, ?, ?, ?, ?)
+INSERT INTO messages (id, group_id, author_id, body_html, body_text, created_at)
+VALUES (?1, ?2, ?3, ?4, ?5, ?6)
 `
 
 type CreateMessageParams struct {
 	ID        string
+	GroupID   string
 	AuthorID  string
 	BodyHtml  string
 	BodyText  string
@@ -25,6 +27,7 @@ type CreateMessageParams struct {
 func (q *Queries) CreateMessage(ctx context.Context, arg CreateMessageParams) error {
 	_, err := q.db.ExecContext(ctx, createMessage,
 		arg.ID,
+		arg.GroupID,
 		arg.AuthorID,
 		arg.BodyHtml,
 		arg.BodyText,
@@ -47,44 +50,53 @@ func (q *Queries) DeleteMessage(ctx context.Context, arg DeleteMessageParams) er
 	return err
 }
 
-const getMessageAuthor = `-- name: GetMessageAuthor :one
-SELECT author_id FROM messages WHERE id = ?1 AND deleted_at IS NULL
+const getMessageOwners = `-- name: GetMessageOwners :one
+SELECT m.author_id, m.group_id FROM messages m JOIN groups g ON g.id = m.group_id
+WHERE m.id = ?1 AND m.deleted_at IS NULL AND g.deleted_at IS NULL
 `
 
-func (q *Queries) GetMessageAuthor(ctx context.Context, id string) (string, error) {
-	row := q.db.QueryRowContext(ctx, getMessageAuthor, id)
-	var author_id string
-	err := row.Scan(&author_id)
-	return author_id, err
+type GetMessageOwnersRow struct {
+	AuthorID string
+	GroupID  string
+}
+
+func (q *Queries) GetMessageOwners(ctx context.Context, id string) (GetMessageOwnersRow, error) {
+	row := q.db.QueryRowContext(ctx, getMessageOwners, id)
+	var i GetMessageOwnersRow
+	err := row.Scan(&i.AuthorID, &i.GroupID)
+	return i, err
 }
 
 const listMessages = `-- name: ListMessages :many
-SELECT m.id, m.body_html, m.body_text, m.created_at,
-       u.id AS author_id, u.username AS author_username, u.role AS author_role, u.picture_id AS author_picture_id
+
+SELECT m.id, m.group_id, m.body_html, m.body_text, m.created_at,
+       u.id AS author_id, u.username AS author_username, u.picture_id AS author_picture_id
 FROM messages m JOIN users u ON u.id = m.author_id
-WHERE m.deleted_at IS NULL AND m.created_at < ?1
+WHERE m.group_id = ?1 AND m.deleted_at IS NULL AND m.created_at < ?2
 ORDER BY m.created_at DESC, m.id DESC
-LIMIT ?2
+LIMIT ?3
 `
 
 type ListMessagesParams struct {
+	GroupID  string
 	Before   int64
 	PageSize int64
 }
 
 type ListMessagesRow struct {
 	ID              string
+	GroupID         string
 	BodyHtml        string
 	BodyText        string
 	CreatedAt       int64
 	AuthorID        string
 	AuthorUsername  string
-	AuthorRole      string
 	AuthorPictureID sql.NullString
 }
 
+// Chat messages live in a group's room. Membership is the handler's check.
 func (q *Queries) ListMessages(ctx context.Context, arg ListMessagesParams) ([]ListMessagesRow, error) {
-	rows, err := q.db.QueryContext(ctx, listMessages, arg.Before, arg.PageSize)
+	rows, err := q.db.QueryContext(ctx, listMessages, arg.GroupID, arg.Before, arg.PageSize)
 	if err != nil {
 		return nil, err
 	}
@@ -94,12 +106,12 @@ func (q *Queries) ListMessages(ctx context.Context, arg ListMessagesParams) ([]L
 		var i ListMessagesRow
 		if err := rows.Scan(
 			&i.ID,
+			&i.GroupID,
 			&i.BodyHtml,
 			&i.BodyText,
 			&i.CreatedAt,
 			&i.AuthorID,
 			&i.AuthorUsername,
-			&i.AuthorRole,
 			&i.AuthorPictureID,
 		); err != nil {
 			return nil, err

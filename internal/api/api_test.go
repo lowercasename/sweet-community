@@ -119,10 +119,10 @@ func (c *client) mustStatus(want int, method, path string, body any) map[string]
 func TestUnauthenticatedIsRefused(t *testing.T) {
 	ts, _ := newTestServer(t)
 	anon := newClient(t, ts)
-	for _, p := range []string{"/api/me", "/api/posts", "/api/messages", "/api/users", "/api/invites"} {
+	for _, p := range []string{"/api/me", rootPath + "/posts", rootPath + "/messages", "/api/users", "/api/invites"} {
 		anon.mustStatus(401, "GET", p, nil)
 	}
-	anon.mustStatus(401, "POST", "/api/posts", map[string]string{"body_html": "<p>hi</p>"})
+	anon.mustStatus(401, "POST", rootPath+"/posts", map[string]string{"body_html": "<p>hi</p>"})
 	anon.mustStatus(401, "GET", "/api/events", nil)
 }
 
@@ -170,7 +170,7 @@ func TestInviteRegisterAndSessions(t *testing.T) {
 	// A good registration signs the new member in.
 	kit := newClient(t, ts)
 	reg := kit.mustStatus(201, "POST", "/api/register", map[string]string{"code": code, "username": "kit", "password": "longenough"})
-	if reg["user"].(map[string]any)["role"] != "member" || reg["token"] == "" {
+	if reg["user"].(map[string]any)["username"] != "kit" || reg["token"] == "" {
 		t.Fatalf("register: %v", reg)
 	}
 	me := kit.mustStatus(200, "GET", "/api/me", nil)
@@ -224,7 +224,7 @@ func TestPostsAreAuthoredBySessionAndEditedOnlyByAuthor(t *testing.T) {
 	kit := newClient(t, ts)
 	kit.mustStatus(201, "POST", "/api/register", map[string]string{"code": inv["code"].(string), "username": "kit", "password": "longenough"})
 
-	post := owner.mustStatus(201, "POST", "/api/posts", map[string]string{"body_html": "<p>mine</p>"})
+	post := owner.mustStatus(201, "POST", rootPath+"/posts", map[string]string{"body_html": "<p>mine</p>"})
 	if post["author"].(map[string]any)["username"] != "raphael" {
 		t.Fatalf("author: %v", post)
 	}
@@ -235,11 +235,11 @@ func TestPostsAreAuthoredBySessionAndEditedOnlyByAuthor(t *testing.T) {
 		t.Fatalf("edit: %v", edited)
 	}
 
-	msg := kit.mustStatus(201, "POST", "/api/messages", map[string]string{"body_html": "<p>hello</p>"})
+	msg := kit.mustStatus(201, "POST", rootPath+"/messages", map[string]string{"body_html": "<p>hello</p>"})
 	if msg["author"].(map[string]any)["username"] != "kit" {
 		t.Fatalf("message author: %v", msg)
 	}
-	posts := kit.mustStatus(200, "GET", "/api/posts", nil)
+	posts := kit.mustStatus(200, "GET", rootPath+"/posts", nil)
 	if n := len(posts["posts"].([]any)); n != 1 {
 		t.Fatalf("posts visible to a member: %d", n)
 	}
@@ -247,22 +247,22 @@ func TestPostsAreAuthoredBySessionAndEditedOnlyByAuthor(t *testing.T) {
 
 func TestCrossSiteWritesAreRefused(t *testing.T) {
 	_, owner := newTestServer(t)
-	status, _ := owner.do("POST", "/api/posts", map[string]string{"body_html": "<p>x</p>"}, "Origin", "https://evil.example")
+	status, _ := owner.do("POST", rootPath+"/posts", map[string]string{"body_html": "<p>x</p>"}, "Origin", "https://evil.example")
 	if status != 403 {
 		t.Fatalf("foreign Origin: want 403, got %d", status)
 	}
-	status, _ = owner.do("POST", "/api/posts", map[string]string{"body_html": "<p>x</p>"}, "Sec-Fetch-Site", "cross-site")
+	status, _ = owner.do("POST", rootPath+"/posts", map[string]string{"body_html": "<p>x</p>"}, "Sec-Fetch-Site", "cross-site")
 	if status != 403 {
 		t.Fatalf("Sec-Fetch-Site cross-site: want 403, got %d", status)
 	}
 	// Same-origin and no-Origin (curl, the app shell) are fine.
-	status, _ = owner.do("POST", "/api/posts", map[string]string{"body_html": "<p>x</p>"}, "Origin", owner.base)
+	status, _ = owner.do("POST", rootPath+"/posts", map[string]string{"body_html": "<p>x</p>"}, "Origin", owner.base)
 	if status != 201 {
 		t.Fatalf("same Origin: want 201, got %d", status)
 	}
-	owner.mustStatus(201, "POST", "/api/posts", map[string]string{"body_html": "<p>x</p>"})
+	owner.mustStatus(201, "POST", rootPath+"/posts", map[string]string{"body_html": "<p>x</p>"})
 	// Reads are never blocked.
-	status, _ = owner.do("GET", "/api/posts", nil, "Origin", "https://evil.example")
+	status, _ = owner.do("GET", rootPath+"/posts", nil, "Origin", "https://evil.example")
 	if status != 200 {
 		t.Fatalf("cross-origin GET: want 200, got %d", status)
 	}
@@ -312,7 +312,7 @@ func TestComments(t *testing.T) {
 	kit := newClient(t, ts)
 	kit.mustStatus(201, "POST", "/api/register", map[string]string{"code": inv["code"].(string), "username": "kit", "password": "longenough"})
 
-	post := owner.mustStatus(201, "POST", "/api/posts", map[string]string{"body_html": "<p>a question</p>"})
+	post := owner.mustStatus(201, "POST", rootPath+"/posts", map[string]string{"body_html": "<p>a question</p>"})
 	id := post["id"].(string)
 	if post["comment_count"].(float64) != 0 {
 		t.Fatalf("new post comment_count: %v", post["comment_count"])
@@ -339,7 +339,7 @@ func TestComments(t *testing.T) {
 	if len(list) != 2 || list[0].(map[string]any)["id"] != cid {
 		t.Fatalf("comment list: %v", list)
 	}
-	posts := kit.mustStatus(200, "GET", "/api/posts", nil)["posts"].([]any)
+	posts := kit.mustStatus(200, "GET", rootPath+"/posts", nil)["posts"].([]any)
 	if posts[0].(map[string]any)["comment_count"].(float64) != 2 {
 		t.Fatalf("comment_count after two comments: %v", posts[0])
 	}
@@ -424,7 +424,7 @@ func TestImagesUploadServeAndPicture(t *testing.T) {
 	owner.mustStatus(404, "GET", "/img/nope", nil)
 
 	// A body may reference it; the sanitiser keeps our own path.
-	post := owner.mustStatus(201, "POST", "/api/posts", map[string]string{
+	post := owner.mustStatus(201, "POST", rootPath+"/posts", map[string]string{
 		"body_html": `<p>look</p><img src="` + url + `" data-image-id="` + img["id"].(string) + `" alt="a test" width="2000" height="500">`,
 	})
 	if !strings.Contains(post["body_html"].(string), `src="`+url+`"`) {
@@ -456,7 +456,7 @@ func TestDeletePost(t *testing.T) {
 	kit := newClient(t, ts)
 	kit.mustStatus(201, "POST", "/api/register", map[string]string{"code": inv["code"].(string), "username": "kit", "password": "longenough"})
 
-	post := owner.mustStatus(201, "POST", "/api/posts", map[string]string{"body_html": "<p>going</p>"})
+	post := owner.mustStatus(201, "POST", rootPath+"/posts", map[string]string{"body_html": "<p>going</p>"})
 	id := post["id"].(string)
 	kit.mustStatus(201, "POST", "/api/posts/"+id+"/comments", map[string]string{"body_html": "<p>a comment</p>"})
 
@@ -468,7 +468,7 @@ func TestDeletePost(t *testing.T) {
 	}
 	owner.mustStatus(404, "DELETE", "/api/posts/"+id, nil)
 	owner.mustStatus(404, "PUT", "/api/posts/"+id, map[string]string{"body_html": "<p>too late</p>"})
-	if posts := owner.mustStatus(200, "GET", "/api/posts", nil); len(posts["posts"].([]any)) != 0 {
+	if posts := owner.mustStatus(200, "GET", rootPath+"/posts", nil); len(posts["posts"].([]any)) != 0 {
 		t.Fatalf("deleted post still listed: %v", posts)
 	}
 	// Its comments go with it.
@@ -476,7 +476,7 @@ func TestDeletePost(t *testing.T) {
 	kit.mustStatus(404, "POST", "/api/posts/"+id+"/comments", map[string]string{"body_html": "<p>late</p>"})
 
 	// The owner can delete anyone's post.
-	theirs := kit.mustStatus(201, "POST", "/api/posts", map[string]string{"body_html": "<p>kit's</p>"})
+	theirs := kit.mustStatus(201, "POST", rootPath+"/posts", map[string]string{"body_html": "<p>kit's</p>"})
 	owner.mustStatus(200, "DELETE", "/api/posts/"+theirs["id"].(string), nil)
 
 	// Both deletions are in the event log.
@@ -515,11 +515,11 @@ func TestImageSweep(t *testing.T) {
 	messageID, messageURL := upload() // in a chat message
 	pictureID, pictureURL := upload() // a profile picture
 
-	post := owner.mustStatus(201, "POST", "/api/posts", map[string]string{"body_html": imgTag(postID, postURL)})
+	post := owner.mustStatus(201, "POST", rootPath+"/posts", map[string]string{"body_html": imgTag(postID, postURL)})
 	owner.mustStatus(201, "POST", "/api/posts/"+post["id"].(string)+"/comments", map[string]string{"body_html": imgTag(commentID, commentURL)})
-	doomed := owner.mustStatus(201, "POST", "/api/posts", map[string]string{"body_html": imgTag(deletedID, deletedURL)})
+	doomed := owner.mustStatus(201, "POST", rootPath+"/posts", map[string]string{"body_html": imgTag(deletedID, deletedURL)})
 	owner.mustStatus(200, "DELETE", "/api/posts/"+doomed["id"].(string), nil)
-	owner.mustStatus(201, "POST", "/api/messages", map[string]string{"body_html": imgTag(messageID, messageURL)})
+	owner.mustStatus(201, "POST", rootPath+"/messages", map[string]string{"body_html": imgTag(messageID, messageURL)})
 	owner.mustStatus(200, "PUT", "/api/me/picture", map[string]string{"image_id": pictureID})
 
 	// Nothing younger than the grace period goes, however unreferenced.
@@ -550,7 +550,7 @@ func TestDeleteComment(t *testing.T) {
 	}
 	kit, mo := register("kit"), register("mo")
 
-	post := kit.mustStatus(201, "POST", "/api/posts", map[string]string{"body_html": "<p>kit's post</p>"})
+	post := kit.mustStatus(201, "POST", rootPath+"/posts", map[string]string{"body_html": "<p>kit's post</p>"})
 	pid := post["id"].(string)
 	comment := func(c *client) string {
 		return c.mustStatus(201, "POST", "/api/posts/"+pid+"/comments", map[string]string{"body_html": "<p>a comment</p>"})["id"].(string)
@@ -576,7 +576,7 @@ func TestDeleteComment(t *testing.T) {
 	if len(list) != 1 || list[0].(map[string]any)["id"] != keep {
 		t.Fatalf("comments after deletions: %v", list)
 	}
-	posts := kit.mustStatus(200, "GET", "/api/posts", nil)["posts"].([]any)
+	posts := kit.mustStatus(200, "GET", rootPath+"/posts", nil)["posts"].([]any)
 	if posts[0].(map[string]any)["comment_count"].(float64) != 1 {
 		t.Fatalf("comment_count: %v", posts[0])
 	}
@@ -631,31 +631,20 @@ func can(v map[string]any) (edit, del bool) {
 	return
 }
 
-func TestCanFlagsAndAbilities(t *testing.T) {
+func TestCanFlags(t *testing.T) {
 	ts, owner := newTestServer(t)
 	kit, _ := registerMember(t, ts, owner, "kit")
 	mo, _ := registerMember(t, ts, owner, "mo")
 
-	// Instance-level abilities ride on /api/me and on the login reply.
-	me := owner.mustStatus(200, "GET", "/api/me", nil)
-	if c := me["can"].(map[string]any); c["invite"] != true || c["manage_roles"] != true {
-		t.Fatalf("owner abilities: %v", me["can"])
-	}
-	if c := kit.mustStatus(200, "GET", "/api/me", nil)["can"].(map[string]any); c["invite"] != false || c["manage_roles"] != false {
-		t.Fatalf("member abilities: %v", c)
-	}
-	login := kit.login("kit", "longenough")
-	if _, ok := login["user"].(map[string]any)["can"]; !ok {
-		t.Fatalf("login reply carries no abilities: %v", login)
-	}
+	// Instance-level abilities are the root group's can flags (TestRootGroupAndRoles).
 
 	// A post: its author edits and deletes; the owner deletes only; another member neither.
-	post := kit.mustStatus(201, "POST", "/api/posts", map[string]string{"body_html": "<p>kit's</p>"})
+	post := kit.mustStatus(201, "POST", rootPath+"/posts", map[string]string{"body_html": "<p>kit's</p>"})
 	if e, d := can(post); !e || !d {
 		t.Fatalf("author's own post on create: edit %v delete %v", e, d)
 	}
 	first := func(c *client, key string) map[string]any {
-		return c.mustStatus(200, "GET", "/api/"+key, nil)[key].([]any)[0].(map[string]any)
+		return c.mustStatus(200, "GET", rootPath+"/"+key, nil)[key].([]any)[0].(map[string]any)
 	}
 	if e, d := can(first(owner, "posts")); e || !d {
 		t.Fatalf("owner on kit's post: edit %v delete %v", e, d)
@@ -681,7 +670,7 @@ func TestCanFlagsAndAbilities(t *testing.T) {
 	}
 
 	// A message: its author deletes, the owner deletes, nobody edits.
-	m := mo.mustStatus(201, "POST", "/api/messages", map[string]string{"body_html": "<p>hi</p>"})
+	m := mo.mustStatus(201, "POST", rootPath+"/messages", map[string]string{"body_html": "<p>hi</p>"})
 	if e, d := can(m); e || !d {
 		t.Fatalf("own message: edit %v delete %v", e, d)
 	}
@@ -724,7 +713,7 @@ func (c *client) readEvents(n int) []map[string]any {
 func TestEventsAreUniformAndPersonalised(t *testing.T) {
 	ts, owner := newTestServer(t)
 	kit, _ := registerMember(t, ts, owner, "kit")
-	post := kit.mustStatus(201, "POST", "/api/posts", map[string]string{"body_html": "<p>v1</p>"})
+	post := kit.mustStatus(201, "POST", rootPath+"/posts", map[string]string{"body_html": "<p>v1</p>"})
 	pid := post["id"].(string)
 	kit.mustStatus(200, "PUT", "/api/posts/"+pid, map[string]string{"body_html": "<p>v2</p>"})
 	c := kit.mustStatus(201, "POST", "/api/posts/"+pid+"/comments", map[string]string{"body_html": "<p>c1</p>"})
@@ -732,16 +721,27 @@ func TestEventsAreUniformAndPersonalised(t *testing.T) {
 
 	// Two kinds per resource: an edit is another "post" / "comment", not a kind of its own.
 	kinds := []string{}
-	for _, e := range kit.readEvents(4) {
-		kinds = append(kinds, e["kind"].(string))
+	for _, e := range kit.readEvents(6) {
+		if k := e["kind"].(string); k == "post" || k == "comment" {
+			kinds = append(kinds, k)
+		}
 	}
 	if strings.Join(kinds, ",") != "post,post,comment,comment" {
 		t.Fatalf("event kinds: %v", kinds)
 	}
 
 	// The same event carries each viewer's own can flags.
-	kitsView := kit.readEvents(1)[0]["payload"].(map[string]any)
-	ownersView := owner.readEvents(1)[0]["payload"].(map[string]any)
+	firstPost := func(c *client) map[string]any {
+		for _, e := range c.readEvents(6) {
+			if e["kind"] == "post" {
+				return e["payload"].(map[string]any)
+			}
+		}
+		t.Fatal("no post event")
+		return nil
+	}
+	kitsView := firstPost(kit)
+	ownersView := firstPost(owner)
 	if e, d := can(kitsView); !e || !d {
 		t.Fatalf("kit's view of own post over the stream: edit %v delete %v", e, d)
 	}
@@ -753,55 +753,11 @@ func TestEventsAreUniformAndPersonalised(t *testing.T) {
 	}
 }
 
-func TestRoles(t *testing.T) {
-	ts, owner := newTestServer(t)
-	kit, kitID := registerMember(t, ts, owner, "kit")
-	mo, moID := registerMember(t, ts, owner, "mo")
-	ownerID := owner.mustStatus(200, "GET", "/api/me", nil)["id"].(string)
-
-	// Only the owner assigns roles, only member or moderator, never to the owner.
-	kit.mustStatus(403, "PUT", "/api/users/"+moID+"/role", map[string]string{"role": "moderator"})
-	owner.mustStatus(400, "PUT", "/api/users/"+kitID+"/role", map[string]string{"role": "owner"})
-	owner.mustStatus(400, "PUT", "/api/users/"+kitID+"/role", map[string]string{"role": "king"})
-	owner.mustStatus(403, "PUT", "/api/users/"+ownerID+"/role", map[string]string{"role": "member"})
-	owner.mustStatus(404, "PUT", "/api/users/nope/role", map[string]string{"role": "member"})
-	u := owner.mustStatus(200, "PUT", "/api/users/"+kitID+"/role", map[string]string{"role": "moderator"})
-	if u["role"] != "moderator" || u["username"] != "kit" {
-		t.Fatalf("promoted: %v", u)
-	}
-
-	// The change is a user event, and the list shows it.
-	last := kit.readEvents(20)
-	if e := last[len(last)-1]; e["kind"] != "user" || e["payload"].(map[string]any)["role"] != "moderator" {
-		t.Fatalf("last event after promotion: %v", e)
-	}
-	for _, m := range owner.mustStatus(200, "GET", "/api/users", nil)["users"].([]any) {
-		if m.(map[string]any)["username"] == "kit" && m.(map[string]any)["role"] != "moderator" {
-			t.Fatalf("users list: %v", m)
-		}
-	}
-
-	// A moderator can invite and delete anything, edit nothing of others', and not assign roles.
-	me := kit.mustStatus(200, "GET", "/api/me", nil)["can"].(map[string]any)
-	if me["invite"] != true || me["manage_roles"] != false {
-		t.Fatalf("moderator abilities: %v", me)
-	}
-	kit.mustStatus(201, "POST", "/api/invites", nil)
-	post := mo.mustStatus(201, "POST", "/api/posts", map[string]string{"body_html": "<p>mo's</p>"})
-	kit.mustStatus(403, "PUT", "/api/posts/"+post["id"].(string), map[string]string{"body_html": "<p>no</p>"})
-	kit.mustStatus(200, "DELETE", "/api/posts/"+post["id"].(string), nil)
-	kit.mustStatus(403, "PUT", "/api/users/"+moID+"/role", map[string]string{"role": "moderator"})
-
-	// Demotion.
-	owner.mustStatus(200, "PUT", "/api/users/"+kitID+"/role", map[string]string{"role": "member"})
-	kit.mustStatus(403, "POST", "/api/invites", nil)
-}
-
 func TestDeleteMessage(t *testing.T) {
 	ts, owner := newTestServer(t)
 	kit, _ := registerMember(t, ts, owner, "kit")
 	mo, _ := registerMember(t, ts, owner, "mo")
-	m := mo.mustStatus(201, "POST", "/api/messages", map[string]string{"body_html": "<p>oops</p>"})
+	m := mo.mustStatus(201, "POST", rootPath+"/messages", map[string]string{"body_html": "<p>oops</p>"})
 	id := m["id"].(string)
 	kit.mustStatus(403, "DELETE", "/api/messages/"+id, nil)
 	gone := mo.mustStatus(200, "DELETE", "/api/messages/"+id, nil)
@@ -809,10 +765,10 @@ func TestDeleteMessage(t *testing.T) {
 		t.Fatalf("delete reply: %v", gone)
 	}
 	mo.mustStatus(404, "DELETE", "/api/messages/"+id, nil)
-	if n := len(kit.mustStatus(200, "GET", "/api/messages", nil)["messages"].([]any)); n != 0 {
+	if n := len(kit.mustStatus(200, "GET", rootPath+"/messages", nil)["messages"].([]any)); n != 0 {
 		t.Fatalf("deleted message still listed: %d", n)
 	}
-	theirs := kit.mustStatus(201, "POST", "/api/messages", map[string]string{"body_html": "<p>mine</p>"})
+	theirs := kit.mustStatus(201, "POST", rootPath+"/messages", map[string]string{"body_html": "<p>mine</p>"})
 	owner.mustStatus(200, "DELETE", "/api/messages/"+theirs["id"].(string), nil)
 	events := owner.readEvents(10)
 	if e := events[len(events)-1]; e["kind"] != "message_delete" || e["payload"].(map[string]any)["id"] != theirs["id"] {

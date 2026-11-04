@@ -3,7 +3,7 @@ INSERT INTO invites (code, created_by, created_at, expires_at) VALUES (?, ?, ?, 
 
 -- name: ListOpenInvites :many
 SELECT i.code, i.created_at, i.expires_at,
-       u.id AS creator_id, u.username AS creator_username, u.role AS creator_role, u.picture_id AS creator_picture_id
+       u.id AS creator_id, u.username AS creator_username, u.picture_id AS creator_picture_id
 FROM invites i JOIN users u ON u.id = i.created_by
 WHERE i.used_at IS NULL AND i.expires_at > sqlc.arg(now)
 ORDER BY i.created_at DESC;

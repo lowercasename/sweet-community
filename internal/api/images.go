@@ -94,6 +94,18 @@ func (s *Server) serveImage(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusInternalServerError, err.Error())
 		return
 	}
+	// CanSee for images (architecture.md, Images): the uploader, a profile
+	// picture, or a live body in one of the viewer's groups references it.
+	me, _ := userFrom(r.Context())
+	visible, err := s.q().ImageVisibleTo(r.Context(), store.ImageVisibleToParams{ImageID: id, ViewerID: me.ID})
+	if err != nil {
+		writeErr(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	if !(visible.Valid && visible.Bool) {
+		http.NotFound(w, r)
+		return
+	}
 	rc, err := s.Images.Get(r.Context(), id+"."+images.Ext(img.ContentType))
 	if errors.Is(err, images.ErrNotFound) {
 		http.NotFound(w, r)

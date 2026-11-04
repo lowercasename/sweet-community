@@ -95,11 +95,18 @@ func (h *Hub) Since(ctx context.Context, after int64, limit int) ([]Event, error
 // and dead-client detection on our side).
 const Heartbeat = 15 * time.Second
 
+// Entry is an event to log: a kind and its payload.
+type Entry struct {
+	Kind    string
+	Payload any
+}
+
 // Serve is the SSE endpoint. It replays from Last-Event-ID or ?since=, then
-// goes live. Every event carries id: <seq>. decorate runs on each event
-// before it is written: the log holds the resource as it is, and the viewer's
-// own view of it (their can flags) is added here, per connection.
-func (h *Hub) Serve(w http.ResponseWriter, r *http.Request, decorate func(Event) Event) {
+// goes live. Every event carries id: <seq>. filter runs on each event before
+// it is written: the log holds every event once, as it is; each connection
+// decides whether its viewer may have it and adds their own view (can
+// flags). A dropped event still advances the viewer's sequence.
+func (h *Hub) Serve(w http.ResponseWriter, r *http.Request, filter func(Event) (Event, bool)) {
 	flusher, ok := w.(http.Flusher)
 	if !ok {
 		http.Error(w, "streaming unsupported", http.StatusInternalServerError)
@@ -131,7 +138,12 @@ func (h *Hub) Serve(w http.ResponseWriter, r *http.Request, decorate func(Event)
 
 	ctx := r.Context()
 	write := func(e Event) {
-		e = decorate(e)
+		e, ok := filter(e)
+		if !ok {
+			// A comment line carrying the id keeps Last-Event-ID moving.
+			fmt.Fprintf(w, "id: %d\n: skipped\n\n", e.Seq)
+			return
+		}
 		fmt.Fprintf(w, "id: %d\nevent: %s\ndata: %s\n\n", e.Seq, e.Kind, e.Payload)
 	}
 

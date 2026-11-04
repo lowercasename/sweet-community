@@ -11,6 +11,8 @@ import (
 
 	"sweet/internal/auth"
 	"sweet/internal/db"
+	"sweet/internal/events"
+	"sweet/internal/perm"
 	"sweet/internal/store"
 )
 
@@ -53,7 +55,7 @@ func (s *Server) listInvites(w http.ResponseWriter, r *http.Request) {
 	for _, row := range rows {
 		out = append(out, Invite{
 			Code: row.Code, URL: "/join/" + row.Code, CreatedAt: row.CreatedAt, ExpiresAt: row.ExpiresAt,
-			CreatedBy: User{ID: row.CreatorID, Username: row.CreatorUsername, Role: row.CreatorRole, Picture: pictureURL(row.CreatorPictureID)},
+			CreatedBy: User{ID: row.CreatorID, Username: row.CreatorUsername, Picture: pictureURL(row.CreatorPictureID)},
 		})
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"invites": out})
@@ -116,7 +118,7 @@ func (s *Server) register(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusInternalServerError, err.Error())
 		return
 	}
-	u := User{ID: id.String(), Username: in.Username, Role: "member"}
+	u := User{ID: id.String(), Username: in.Username}
 	now := db.Now()
 
 	ctx := r.Context()
@@ -132,7 +134,7 @@ func (s *Server) register(w http.ResponseWriter, r *http.Request) {
 	// used_at set, rolls back, and the user it inserted goes with it.
 	qtx := store.New(tx)
 	if err := qtx.CreateUser(ctx, store.CreateUserParams{
-		ID: u.ID, Username: u.Username, PasswordHash: sql.NullString{String: hash, Valid: true}, Role: "member", CreatedAt: now,
+		ID: u.ID, Username: u.Username, PasswordHash: sql.NullString{String: hash, Valid: true}, CreatedAt: now,
 	}); err != nil {
 		if db.IsUniqueViolation(err) {
 			writeErr(w, http.StatusConflict, "that username is taken")
@@ -150,14 +152,26 @@ func (s *Server) register(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusNotFound, "this invite link has been used or has expired")
 		return
 	}
+	// A new account is a membership of the root group, and that is an event:
+	// everyone's People page learns of them.
+	if err := qtx.CreateMembership(ctx, store.CreateMembershipParams{GroupID: perm.Root, UserID: u.ID, Role: perm.Member, JoinedAt: now}); err != nil {
+		writeErr(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	ev, err := events.Log(ctx, tx, "membership", Membership{GroupID: perm.Root, User: u, Role: perm.Member, JoinedAt: now}, now)
+	if err != nil {
+		writeErr(w, http.StatusInternalServerError, err.Error())
+		return
+	}
 	if err := tx.Commit(); err != nil {
 		writeErr(w, http.StatusInternalServerError, err.Error())
 		return
 	}
+	s.Hub.Broadcast(ev)
 	token, err := s.issueSession(w, r, u.ID)
 	if err != nil {
 		writeErr(w, http.StatusInternalServerError, err.Error())
 		return
 	}
-	writeJSON(w, http.StatusCreated, map[string]any{"user": meOf(u), "token": token})
+	writeJSON(w, http.StatusCreated, map[string]any{"user": u, "token": token})
 }

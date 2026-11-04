@@ -11,11 +11,13 @@ import (
 )
 
 const createPost = `-- name: CreatePost :exec
-INSERT INTO posts (id, author_id, body_html, body_text, created_at) VALUES (?, ?, ?, ?, ?)
+INSERT INTO posts (id, group_id, author_id, body_html, body_text, created_at)
+VALUES (?1, ?2, ?3, ?4, ?5, ?6)
 `
 
 type CreatePostParams struct {
 	ID        string
+	GroupID   string
 	AuthorID  string
 	BodyHtml  string
 	BodyText  string
@@ -25,6 +27,7 @@ type CreatePostParams struct {
 func (q *Queries) CreatePost(ctx context.Context, arg CreatePostParams) error {
 	_, err := q.db.ExecContext(ctx, createPost,
 		arg.ID,
+		arg.GroupID,
 		arg.AuthorID,
 		arg.BodyHtml,
 		arg.BodyText,
@@ -60,8 +63,6 @@ type EditPostParams struct {
 	ID       string
 }
 
-// Who may edit or delete is perm's call (internal/perm), made by the handler
-// after GetPostAuthor; the queries themselves do not check.
 func (q *Queries) EditPost(ctx context.Context, arg EditPostParams) (int64, error) {
 	row := q.db.QueryRowContext(ctx, editPost,
 		arg.BodyHtml,
@@ -74,47 +75,58 @@ func (q *Queries) EditPost(ctx context.Context, arg EditPostParams) (int64, erro
 	return created_at, err
 }
 
-const getPostAuthor = `-- name: GetPostAuthor :one
-SELECT author_id FROM posts WHERE id = ?1 AND deleted_at IS NULL
+const getPostOwners = `-- name: GetPostOwners :one
+SELECT p.author_id, p.group_id FROM posts p JOIN groups g ON g.id = p.group_id
+WHERE p.id = ?1 AND p.deleted_at IS NULL AND g.deleted_at IS NULL
 `
 
-func (q *Queries) GetPostAuthor(ctx context.Context, id string) (string, error) {
-	row := q.db.QueryRowContext(ctx, getPostAuthor, id)
-	var author_id string
-	err := row.Scan(&author_id)
-	return author_id, err
+type GetPostOwnersRow struct {
+	AuthorID string
+	GroupID  string
+}
+
+func (q *Queries) GetPostOwners(ctx context.Context, id string) (GetPostOwnersRow, error) {
+	row := q.db.QueryRowContext(ctx, getPostOwners, id)
+	var i GetPostOwnersRow
+	err := row.Scan(&i.AuthorID, &i.GroupID)
+	return i, err
 }
 
 const listPosts = `-- name: ListPosts :many
-SELECT p.id, p.body_html, p.body_text, p.created_at, p.edited_at,
-       u.id AS author_id, u.username AS author_username, u.role AS author_role, u.picture_id AS author_picture_id,
+
+SELECT p.id, p.group_id, p.body_html, p.body_text, p.created_at, p.edited_at,
+       u.id AS author_id, u.username AS author_username, u.picture_id AS author_picture_id,
        (SELECT COUNT(*) FROM comments c WHERE c.post_id = p.id AND c.deleted_at IS NULL) AS comment_count
 FROM posts p JOIN users u ON u.id = p.author_id
-WHERE p.deleted_at IS NULL AND p.created_at < ?1
+WHERE p.group_id = ?1 AND p.deleted_at IS NULL AND p.created_at < ?2
 ORDER BY p.created_at DESC, p.id DESC
-LIMIT ?2
+LIMIT ?3
 `
 
 type ListPostsParams struct {
+	GroupID  string
 	Before   int64
 	PageSize int64
 }
 
 type ListPostsRow struct {
 	ID              string
+	GroupID         string
 	BodyHtml        string
 	BodyText        string
 	CreatedAt       int64
 	EditedAt        sql.NullInt64
 	AuthorID        string
 	AuthorUsername  string
-	AuthorRole      string
 	AuthorPictureID sql.NullString
 	CommentCount    int64
 }
 
+// Posts live in a group. The handler has already checked the viewer's
+// membership of the group it lists; who may edit or delete is perm's call,
+// made after GetPostOwners. The queries themselves do not check.
 func (q *Queries) ListPosts(ctx context.Context, arg ListPostsParams) ([]ListPostsRow, error) {
-	rows, err := q.db.QueryContext(ctx, listPosts, arg.Before, arg.PageSize)
+	rows, err := q.db.QueryContext(ctx, listPosts, arg.GroupID, arg.Before, arg.PageSize)
 	if err != nil {
 		return nil, err
 	}
@@ -124,13 +136,13 @@ func (q *Queries) ListPosts(ctx context.Context, arg ListPostsParams) ([]ListPos
 		var i ListPostsRow
 		if err := rows.Scan(
 			&i.ID,
+			&i.GroupID,
 			&i.BodyHtml,
 			&i.BodyText,
 			&i.CreatedAt,
 			&i.EditedAt,
 			&i.AuthorID,
 			&i.AuthorUsername,
-			&i.AuthorRole,
 			&i.AuthorPictureID,
 			&i.CommentCount,
 		); err != nil {
@@ -145,15 +157,4 @@ func (q *Queries) ListPosts(ctx context.Context, arg ListPostsParams) ([]ListPos
 		return nil, err
 	}
 	return items, nil
-}
-
-const postExists = `-- name: PostExists :one
-SELECT COUNT(*) FROM posts WHERE id = ? AND deleted_at IS NULL
-`
-
-func (q *Queries) PostExists(ctx context.Context, id string) (int64, error) {
-	row := q.db.QueryRowContext(ctx, postExists, id)
-	var count int64
-	err := row.Scan(&count)
-	return count, err
 }

@@ -5,6 +5,7 @@ package db
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"io/fs"
 	"net/url"
@@ -47,8 +48,21 @@ func Open(path string) (*sql.DB, error) {
 }
 
 // Migrate applies every *.sql file in migrations, in name order, that has
-// not been applied yet. Forward-only. Each file runs in one transaction.
-func Migrate(ctx context.Context, d *sql.DB, migrations fs.FS) error {
+// not been applied yet. Forward-only. Each file runs in one transaction on
+// one connection with foreign keys off, which is SQLite's documented way to
+// rebuild a table that others reference; foreign_key_check runs after each
+// file, so a migration that leaves a dangling reference fails.
+func Migrate(ctx context.Context, db *sql.DB, migrations fs.FS) error {
+	conn, err := db.Conn(ctx)
+	if err != nil {
+		return err
+	}
+	defer conn.Close()
+	d := conn
+	if _, err := d.ExecContext(ctx, `PRAGMA foreign_keys = OFF`); err != nil {
+		return err
+	}
+	defer d.ExecContext(context.Background(), `PRAGMA foreign_keys = ON`)
 	if _, err := d.ExecContext(ctx, `CREATE TABLE IF NOT EXISTS schema_migrations (
 		name TEXT PRIMARY KEY, applied_at INTEGER NOT NULL)`); err != nil {
 		return err
@@ -80,6 +94,14 @@ func Migrate(ctx context.Context, d *sql.DB, migrations fs.FS) error {
 		}
 		if _, err := tx.ExecContext(ctx, `INSERT INTO schema_migrations (name, applied_at) VALUES (?, ?)`,
 			name, time.Now().UnixMilli()); err != nil {
+			tx.Rollback()
+			return err
+		}
+		var table, rowid, parent, index any
+		if err := tx.QueryRowContext(ctx, `PRAGMA foreign_key_check`).Scan(&table, &rowid, &parent, &index); err == nil {
+			tx.Rollback()
+			return fmt.Errorf("migration %s: foreign key violation in %v (row %v) -> %v", name, table, rowid, parent)
+		} else if !errors.Is(err, sql.ErrNoRows) {
 			tx.Rollback()
 			return err
 		}

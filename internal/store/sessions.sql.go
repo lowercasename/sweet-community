@@ -52,7 +52,7 @@ func (q *Queries) DeleteUserSessions(ctx context.Context, userID string) error {
 }
 
 const getSessionUser = `-- name: GetSessionUser :one
-SELECT u.id, u.username, u.role, u.picture_id, s.last_seen_at
+SELECT u.id, u.username, u.picture_id, s.last_seen_at
 FROM sessions s JOIN users u ON u.id = s.user_id
 WHERE s.id = ?1 AND s.expires_at > ?2
 `
@@ -65,7 +65,6 @@ type GetSessionUserParams struct {
 type GetSessionUserRow struct {
 	ID         string
 	Username   string
-	Role       string
 	PictureID  sql.NullString
 	LastSeenAt int64
 }
@@ -76,7 +75,6 @@ func (q *Queries) GetSessionUser(ctx context.Context, arg GetSessionUserParams) 
 	err := row.Scan(
 		&i.ID,
 		&i.Username,
-		&i.Role,
 		&i.PictureID,
 		&i.LastSeenAt,
 	)

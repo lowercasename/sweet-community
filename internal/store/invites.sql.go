@@ -89,7 +89,7 @@ func (q *Queries) GetOpenInviteCreator(ctx context.Context, arg GetOpenInviteCre
 
 const listOpenInvites = `-- name: ListOpenInvites :many
 SELECT i.code, i.created_at, i.expires_at,
-       u.id AS creator_id, u.username AS creator_username, u.role AS creator_role, u.picture_id AS creator_picture_id
+       u.id AS creator_id, u.username AS creator_username, u.picture_id AS creator_picture_id
 FROM invites i JOIN users u ON u.id = i.created_by
 WHERE i.used_at IS NULL AND i.expires_at > ?1
 ORDER BY i.created_at DESC
@@ -101,7 +101,6 @@ type ListOpenInvitesRow struct {
 	ExpiresAt        int64
 	CreatorID        string
 	CreatorUsername  string
-	CreatorRole      string
 	CreatorPictureID sql.NullString
 }
 
@@ -120,7 +119,6 @@ func (q *Queries) ListOpenInvites(ctx context.Context, now int64) ([]ListOpenInv
 			&i.ExpiresAt,
 			&i.CreatorID,
 			&i.CreatorUsername,
-			&i.CreatorRole,
 			&i.CreatorPictureID,
 		); err != nil {
 			return nil, err

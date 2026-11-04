@@ -65,14 +65,45 @@ func (q *Queries) GetImage(ctx context.Context, id string) (Image, error) {
 	return i, err
 }
 
+const imageVisibleTo = `-- name: ImageVisibleTo :one
+SELECT EXISTS (SELECT 1 FROM images i WHERE i.id = ?1 AND i.uploader_id = ?2)
+    OR EXISTS (SELECT 1 FROM users u WHERE u.picture_id = ?1)
+    OR EXISTS (SELECT 1 FROM posts p JOIN memberships m ON m.group_id = p.group_id AND m.user_id = ?2
+               WHERE p.deleted_at IS NULL AND instr(p.body_html, ?1) > 0)
+    OR EXISTS (SELECT 1 FROM comments c JOIN posts p ON p.id = c.post_id AND p.deleted_at IS NULL
+               JOIN memberships m ON m.group_id = p.group_id AND m.user_id = ?2
+               WHERE c.deleted_at IS NULL AND instr(c.body_html, ?1) > 0)
+    OR EXISTS (SELECT 1 FROM messages x JOIN memberships m ON m.group_id = x.group_id AND m.user_id = ?2
+               WHERE x.deleted_at IS NULL AND instr(x.body_html, ?1) > 0) AS visible
+`
+
+type ImageVisibleToParams struct {
+	ImageID  string
+	ViewerID string
+}
+
+// Can this viewer see this image (architecture.md, Images)? Yes if they
+// uploaded it, if it is anyone's profile picture, or if it sits in a live
+// post, comment or message of a group they belong to. instr() on the id is
+// enough because bodies reference images as /img/<id> and data-image-id="<id>".
+func (q *Queries) ImageVisibleTo(ctx context.Context, arg ImageVisibleToParams) (sql.NullBool, error) {
+	row := q.db.QueryRowContext(ctx, imageVisibleTo, arg.ImageID, arg.ViewerID)
+	var visible sql.NullBool
+	err := row.Scan(&visible)
+	return visible, err
+}
+
 const listUnreferencedImages = `-- name: ListUnreferencedImages :many
 SELECT i.id, i.content_type FROM images i
 WHERE i.created_at < ?1
   AND NOT EXISTS (SELECT 1 FROM users u WHERE u.picture_id = i.id)
-  AND NOT EXISTS (SELECT 1 FROM posts p WHERE p.deleted_at IS NULL AND instr(p.body_html, i.id) > 0)
+  AND NOT EXISTS (SELECT 1 FROM posts p JOIN groups g ON g.id = p.group_id AND g.deleted_at IS NULL
+                  WHERE p.deleted_at IS NULL AND instr(p.body_html, i.id) > 0)
   AND NOT EXISTS (SELECT 1 FROM comments c JOIN posts p ON p.id = c.post_id AND p.deleted_at IS NULL
+                  JOIN groups g ON g.id = p.group_id AND g.deleted_at IS NULL
                   WHERE c.deleted_at IS NULL AND instr(c.body_html, i.id) > 0)
-  AND NOT EXISTS (SELECT 1 FROM messages m WHERE m.deleted_at IS NULL AND instr(m.body_html, i.id) > 0)
+  AND NOT EXISTS (SELECT 1 FROM messages x JOIN groups g ON g.id = x.group_id AND g.deleted_at IS NULL
+                  WHERE x.deleted_at IS NULL AND instr(x.body_html, i.id) > 0)
 `
 
 type ListUnreferencedImagesRow struct {
@@ -81,8 +112,7 @@ type ListUnreferencedImagesRow struct {
 }
 
 // Images nothing points at: not a profile picture, not in a live post,
-// comment (of a live post) or message. instr() on the id is enough because
-// bodies reference images as /img/<id> and data-image-id="<id>".
+// comment (of a live post) or message of a live group.
 func (q *Queries) ListUnreferencedImages(ctx context.Context, before int64) ([]ListUnreferencedImagesRow, error) {
 	rows, err := q.db.QueryContext(ctx, listUnreferencedImages, before)
 	if err != nil {

@@ -11,7 +11,7 @@ import (
 )
 
 const countComments = `-- name: CountComments :one
-SELECT COUNT(*) FROM comments WHERE post_id = ? AND deleted_at IS NULL
+SELECT COUNT(*) FROM comments WHERE post_id = ?1 AND deleted_at IS NULL
 `
 
 func (q *Queries) CountComments(ctx context.Context, postID string) (int64, error) {
@@ -22,7 +22,8 @@ func (q *Queries) CountComments(ctx context.Context, postID string) (int64, erro
 }
 
 const createComment = `-- name: CreateComment :exec
-INSERT INTO comments (id, post_id, author_id, body_html, body_text, created_at) VALUES (?, ?, ?, ?, ?, ?)
+INSERT INTO comments (id, post_id, author_id, body_html, body_text, created_at)
+VALUES (?1, ?2, ?3, ?4, ?5, ?6)
 `
 
 type CreateCommentParams struct {
@@ -91,31 +92,36 @@ func (q *Queries) EditComment(ctx context.Context, arg EditCommentParams) (EditC
 }
 
 const getCommentOwners = `-- name: GetCommentOwners :one
-SELECT c.post_id, c.author_id, p.author_id AS post_author_id
-FROM comments c JOIN posts p ON p.id = c.post_id
-WHERE c.id = ?1 AND c.deleted_at IS NULL AND p.deleted_at IS NULL
+SELECT c.post_id, c.author_id, p.author_id AS post_author_id, p.group_id
+FROM comments c JOIN posts p ON p.id = c.post_id JOIN groups g ON g.id = p.group_id
+WHERE c.id = ?1 AND c.deleted_at IS NULL AND p.deleted_at IS NULL AND g.deleted_at IS NULL
 `
 
 type GetCommentOwnersRow struct {
 	PostID       string
 	AuthorID     string
 	PostAuthorID string
+	GroupID      string
 }
 
-// Who may edit or delete is perm's call (internal/perm), made by the handler
-// after GetCommentOwners; the queries themselves do not check.
 func (q *Queries) GetCommentOwners(ctx context.Context, id string) (GetCommentOwnersRow, error) {
 	row := q.db.QueryRowContext(ctx, getCommentOwners, id)
 	var i GetCommentOwnersRow
-	err := row.Scan(&i.PostID, &i.AuthorID, &i.PostAuthorID)
+	err := row.Scan(
+		&i.PostID,
+		&i.AuthorID,
+		&i.PostAuthorID,
+		&i.GroupID,
+	)
 	return i, err
 }
 
 const listComments = `-- name: ListComments :many
-SELECT c.id, c.post_id, c.body_html, c.body_text, c.created_at, c.edited_at, p.author_id AS post_author_id,
-       u.id AS author_id, u.username AS author_username, u.role AS author_role, u.picture_id AS author_picture_id
+
+SELECT c.id, c.post_id, c.body_html, c.body_text, c.created_at, c.edited_at, p.author_id AS post_author_id, p.group_id,
+       u.id AS author_id, u.username AS author_username, u.picture_id AS author_picture_id
 FROM comments c JOIN users u ON u.id = c.author_id JOIN posts p ON p.id = c.post_id
-WHERE c.post_id = ? AND c.deleted_at IS NULL
+WHERE c.post_id = ?1 AND c.deleted_at IS NULL
 ORDER BY c.created_at, c.id
 `
 
@@ -127,12 +133,14 @@ type ListCommentsRow struct {
 	CreatedAt       int64
 	EditedAt        sql.NullInt64
 	PostAuthorID    string
+	GroupID         string
 	AuthorID        string
 	AuthorUsername  string
-	AuthorRole      string
 	AuthorPictureID sql.NullString
 }
 
+// Comments reach their group through their post. Membership is the
+// handler's check; who may edit or delete is perm's call after GetCommentOwners.
 func (q *Queries) ListComments(ctx context.Context, postID string) ([]ListCommentsRow, error) {
 	rows, err := q.db.QueryContext(ctx, listComments, postID)
 	if err != nil {
@@ -150,9 +158,9 @@ func (q *Queries) ListComments(ctx context.Context, postID string) ([]ListCommen
 			&i.CreatedAt,
 			&i.EditedAt,
 			&i.PostAuthorID,
+			&i.GroupID,
 			&i.AuthorID,
 			&i.AuthorUsername,
-			&i.AuthorRole,
 			&i.AuthorPictureID,
 		); err != nil {
 			return nil, err

@@ -34,6 +34,7 @@ type ctxKey int
 const (
 	userKey ctxKey = iota
 	sessionKey
+	groupKey
 )
 
 // userFrom returns the authenticated user, if the handler is behind requireAuth.
@@ -45,6 +46,21 @@ func userFrom(ctx context.Context) (User, bool) {
 func sessionFrom(ctx context.Context) string {
 	s, _ := ctx.Value(sessionKey).(string)
 	return s
+}
+
+type groupCtx struct {
+	group Group
+	actor perm.Actor
+}
+
+func withGroup(ctx context.Context, g Group, a perm.Actor) context.Context {
+	return context.WithValue(ctx, groupKey, groupCtx{g, a})
+}
+
+// groupFrom is the group named in the path and the user as perm sees them in it (set by requireGroup).
+func groupFrom(ctx context.Context) (Group, perm.Actor) {
+	g, _ := ctx.Value(groupKey).(groupCtx)
+	return g.group, g.actor
 }
 
 // tokenFrom reads the session token from the cookie or, for the app shell,
@@ -75,7 +91,7 @@ func (s *Server) authenticate(r *http.Request) (User, string, bool) {
 	if now-row.LastSeenAt > touchAfter.Milliseconds() {
 		s.q().TouchSession(r.Context(), store.TouchSessionParams{LastSeenAt: now, ExpiresAt: now + SessionTTL.Milliseconds(), ID: id})
 	}
-	return User{ID: row.ID, Username: row.Username, Role: row.Role, Picture: pictureURL(row.PictureID)}, id, true
+	return User{ID: row.ID, Username: row.Username, Picture: pictureURL(row.PictureID)}, id, true
 }
 
 // requireAuth rejects unauthenticated requests with 401 and puts the user in the context.
@@ -92,10 +108,17 @@ func (s *Server) requireAuth(next http.HandlerFunc) http.HandlerFunc {
 	}
 }
 
-// requireCan is requireAuth plus one of perm's instance-level abilities.
-func (s *Server) requireCan(ok func(perm.Actor) bool, next http.HandlerFunc) http.HandlerFunc {
+// requireRoot is requireAuth plus a rule about the user's role in the root
+// group: the instance's staff are the root group's staff.
+func (s *Server) requireRoot(ok func(perm.Actor) bool, next http.HandlerFunc) http.HandlerFunc {
 	return s.requireAuth(func(w http.ResponseWriter, r *http.Request) {
-		if u, _ := userFrom(r.Context()); !ok(actor(u)) {
+		u, _ := userFrom(r.Context())
+		a, err := actorIn(r.Context(), s.q(), u, perm.Root)
+		if err != nil {
+			writeErr(w, http.StatusInternalServerError, err.Error())
+			return
+		}
+		if !ok(a) {
 			writeErr(w, http.StatusForbidden, "not allowed")
 			return
 		}
@@ -206,7 +229,7 @@ func (s *Server) login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	row, err := s.q().GetUserByUsername(r.Context(), in.Username)
-	u := User{ID: row.ID, Username: row.Username, Role: row.Role, Picture: pictureURL(row.PictureID)}
+	u := User{ID: row.ID, Username: row.Username, Picture: pictureURL(row.PictureID)}
 	hash := row.PasswordHash
 	// Same answer for unknown user and wrong password; bcrypt runs either way
 	// so timing does not reveal which.
@@ -228,7 +251,7 @@ func (s *Server) login(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusInternalServerError, err.Error())
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"user": meOf(u), "token": token})
+	writeJSON(w, http.StatusOK, map[string]any{"user": u, "token": token})
 }
 
 func (s *Server) logout(w http.ResponseWriter, r *http.Request) {
@@ -247,5 +270,5 @@ func (s *Server) logoutAll(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) me(w http.ResponseWriter, r *http.Request) {
 	u, _ := userFrom(r.Context())
-	writeJSON(w, http.StatusOK, meOf(u))
+	writeJSON(w, http.StatusOK, u)
 }

@@ -26,8 +26,6 @@ import (
 type User struct {
 	ID       string `json:"id"`
 	Username string `json:"username"`
-	// Role is "owner" (runs the instance), "moderator" or "member".
-	Role string `json:"role"`
 	// Picture is the avatar's url, or null for the donut.
 	Picture *string `json:"picture"`
 }
@@ -39,27 +37,11 @@ type Can struct {
 	Delete bool `json:"delete"`
 }
 
-// Abilities are the instance-level things a user may do, on /api/me.
-type Abilities struct {
-	Invite      bool `json:"invite"`
-	ManageRoles bool `json:"manage_roles"`
-}
-
-// Me is the signed-in user as they see themselves: a User plus abilities.
-type Me struct {
-	User
-	Can Abilities `json:"can"`
-}
-
-func meOf(u User) Me {
-	a := actor(u)
-	return Me{User: u, Can: Abilities{Invite: perm.Invite(a), ManageRoles: perm.ManageRoles(a)}}
-}
-
 // Post is the wire shape. It carries no event sequence: the SSE "id:" line
 // is the sequence, and the feed paginates by created_at.
 type Post struct {
 	ID           string `json:"id"`
+	GroupID      string `json:"group_id"`
 	Author       User   `json:"author"`
 	BodyHTML     string `json:"body_html"`
 	BodyText     string `json:"body_text"`
@@ -69,10 +51,10 @@ type Post struct {
 	Can          Can    `json:"can"`
 }
 
-// forViewer fills in the viewer's can flags on a post, comment or message.
-// Anything else passes through. Used on every response and on the stream.
-func forViewer(viewer User, v any) any {
-	a := actor(viewer)
+// forViewer fills in the viewer's can flags on a post, comment or message,
+// given the viewer as perm sees them in that thing's group. Anything else
+// passes through. Used on every response and on the stream.
+func forViewer(a perm.Actor, v any) any {
 	switch x := v.(type) {
 	case *Post:
 		p := *x
@@ -91,35 +73,18 @@ func forViewer(viewer User, v any) any {
 	return v
 }
 
-// decorateEvent is forViewer for a logged event: the payload is parsed into
-// its resource, flagged for the viewer, and re-encoded.
-func decorateEvent(viewer User, e events.Event) events.Event {
-	var v any
-	switch e.Kind {
-	case "post":
-		v = &Post{}
-	case "comment":
-		v = &Comment{}
-	case "message":
-		v = &Message{}
-	default:
-		return e
+// groupIDOf is the group a logged resource belongs to, for personalising a
+// reply to the actor; "" for things that are not in a group.
+func groupIDOf(v any) string {
+	switch x := v.(type) {
+	case *Post:
+		return x.GroupID
+	case *Comment:
+		return x.GroupID
+	case *Message:
+		return x.GroupID
 	}
-	if json.Unmarshal(e.Payload, v) != nil {
-		return e
-	}
-	raw, err := json.Marshal(forViewer(viewer, v))
-	if err != nil {
-		return e
-	}
-	e.Payload = raw
-	return e
-}
-
-// events is the SSE endpoint, personalised for the signed-in viewer.
-func (s *Server) events(w http.ResponseWriter, r *http.Request) {
-	viewer, _ := userFrom(r.Context())
-	s.Hub.Serve(w, r, func(e events.Event) events.Event { return decorateEvent(viewer, e) })
+	return ""
 }
 
 type Server struct {
@@ -145,7 +110,8 @@ func nullInt(v sql.NullInt64) *int64 {
 // it sets it. A password given later is ignored: change it in the app.
 func EnsureOwner(ctx context.Context, d *sql.DB, username, password string) (User, error) {
 	q := store.New(d)
-	u := User{Username: username, Role: "owner"}
+	u := User{Username: username}
+	now := db.Now()
 	row, err := q.GetUserByUsername(ctx, username)
 	switch {
 	case errors.Is(err, sql.ErrNoRows):
@@ -154,16 +120,23 @@ func EnsureOwner(ctx context.Context, d *sql.DB, username, password string) (Use
 			return u, err
 		}
 		u.ID = id.String()
-		if err := q.CreateUser(ctx, store.CreateUserParams{ID: u.ID, Username: u.Username, Role: "owner", CreatedAt: db.Now()}); err != nil {
+		if err := q.CreateUser(ctx, store.CreateUserParams{ID: u.ID, Username: u.Username, CreatedAt: now}); err != nil {
 			return u, err
 		}
 	case err != nil:
 		return u, err
 	default:
 		u.ID = row.ID
-		if err := q.SetUserRole(ctx, store.SetUserRoleParams{Role: "owner", ID: u.ID}); err != nil {
+	}
+	// The owner is the root group's owner (architecture.md, Groups).
+	if _, err := q.GetMembership(ctx, store.GetMembershipParams{GroupID: perm.Root, UserID: u.ID}); errors.Is(err, sql.ErrNoRows) {
+		if err := q.CreateMembership(ctx, store.CreateMembershipParams{GroupID: perm.Root, UserID: u.ID, Role: perm.Owner, JoinedAt: now}); err != nil {
 			return u, err
 		}
+	} else if err != nil {
+		return u, err
+	} else if err := q.SetMembershipRole(ctx, store.SetMembershipRoleParams{Role: perm.Owner, GroupID: perm.Root, UserID: u.ID}); err != nil {
+		return u, err
 	}
 	if !row.PasswordHash.Valid && password != "" {
 		h, err := auth.HashPassword(password)
@@ -196,18 +169,26 @@ func (s *Server) Routes(mux *http.ServeMux) {
 	mux.HandleFunc("POST /api/logout", s.requireAuth(s.logout))
 	mux.HandleFunc("POST /api/logout-all", s.requireAuth(s.logoutAll))
 	mux.HandleFunc("GET /api/users", s.requireAuth(s.listUsers))
-	mux.HandleFunc("GET /api/posts", s.requireAuth(s.listPosts))
-	mux.HandleFunc("POST /api/posts", s.requireAuth(s.createPost))
+	mux.HandleFunc("GET /api/groups", s.requireAuth(s.listGroups))
+	mux.HandleFunc("POST /api/groups", s.requireAuth(s.createGroup))
+	mux.HandleFunc("GET /api/groups/{gid}", s.requireGroup(s.getGroup))
+	mux.HandleFunc("PUT /api/groups/{gid}", s.requireGroup(s.renameGroup))
+	mux.HandleFunc("DELETE /api/groups/{gid}", s.requireGroup(s.deleteGroup))
+	mux.HandleFunc("GET /api/groups/{gid}/members", s.requireGroup(s.listMembers))
+	mux.HandleFunc("POST /api/groups/{gid}/members", s.requireGroup(s.addMember))
+	mux.HandleFunc("PUT /api/groups/{gid}/members/{uid}", s.requireGroup(s.setMemberRole))
+	mux.HandleFunc("DELETE /api/groups/{gid}/members/{uid}", s.requireGroup(s.removeMember))
+	mux.HandleFunc("GET /api/groups/{gid}/posts", s.requireGroup(s.listPosts))
+	mux.HandleFunc("POST /api/groups/{gid}/posts", s.requireGroup(s.createPost))
+	mux.HandleFunc("GET /api/groups/{gid}/messages", s.requireGroup(s.listMessages))
+	mux.HandleFunc("POST /api/groups/{gid}/messages", s.requireGroup(s.createMessage))
 	mux.HandleFunc("PUT /api/posts/{id}", s.requireAuth(s.editPost))
 	mux.HandleFunc("DELETE /api/posts/{id}", s.requireAuth(s.deletePost))
 	mux.HandleFunc("GET /api/posts/{id}/comments", s.requireAuth(s.listComments))
 	mux.HandleFunc("POST /api/posts/{id}/comments", s.requireAuth(s.createComment))
 	mux.HandleFunc("PUT /api/comments/{id}", s.requireAuth(s.editComment))
 	mux.HandleFunc("DELETE /api/comments/{id}", s.requireAuth(s.deleteComment))
-	mux.HandleFunc("GET /api/messages", s.requireAuth(s.listMessages))
-	mux.HandleFunc("POST /api/messages", s.requireAuth(s.createMessage))
 	mux.HandleFunc("DELETE /api/messages/{id}", s.requireAuth(s.deleteMessage))
-	mux.HandleFunc("PUT /api/users/{id}/role", s.requireAuth(s.setRole))
 	mux.HandleFunc("GET /api/events", s.requireAuth(s.events))
 	mux.HandleFunc("POST /api/images", s.requireAuth(s.uploadImage))
 	mux.HandleFunc("GET /img/{id}", s.requireAuth(s.serveImage))
@@ -218,10 +199,10 @@ func (s *Server) Routes(mux *http.ServeMux) {
 		writeErr(w, http.StatusNotFound, "no such endpoint: "+r.Method+" "+r.URL.Path)
 	})
 
-	// Staff.
-	mux.HandleFunc("GET /api/invites", s.requireCan(perm.Invite, s.listInvites))
-	mux.HandleFunc("POST /api/invites", s.requireCan(perm.Invite, s.createInvite))
-	mux.HandleFunc("DELETE /api/invites/{code}", s.requireCan(perm.Invite, s.deleteInvite))
+	// The root group's staff: an invite link adds someone to the root group.
+	mux.HandleFunc("GET /api/invites", s.requireRoot(perm.AddMembers, s.listInvites))
+	mux.HandleFunc("POST /api/invites", s.requireRoot(perm.AddMembers, s.createInvite))
+	mux.HandleFunc("DELETE /api/invites/{code}", s.requireRoot(perm.AddMembers, s.deleteInvite))
 }
 
 func writeJSON(w http.ResponseWriter, status int, v any) {
@@ -248,25 +229,26 @@ func pageParams(r *http.Request, defaultLimit, maxLimit int) (before int64, limi
 }
 
 func (s *Server) listPosts(w http.ResponseWriter, r *http.Request) {
+	g, a := groupFrom(r.Context())
 	before, limit := pageParams(r, 20, 100)
-	rows, err := s.q().ListPosts(r.Context(), store.ListPostsParams{Before: before, PageSize: int64(limit + 1)})
+	rows, err := s.q().ListPosts(r.Context(), store.ListPostsParams{GroupID: g.ID, Before: before, PageSize: int64(limit + 1)})
 	if err != nil {
 		writeErr(w, http.StatusInternalServerError, err.Error())
 		return
 	}
-	viewer, _ := userFrom(r.Context())
 	posts := make([]Post, 0, len(rows))
 	for _, row := range rows {
 		p := Post{
 			ID:           row.ID,
-			Author:       User{ID: row.AuthorID, Username: row.AuthorUsername, Role: row.AuthorRole, Picture: pictureURL(row.AuthorPictureID)},
+			GroupID:      row.GroupID,
+			Author:       User{ID: row.AuthorID, Username: row.AuthorUsername, Picture: pictureURL(row.AuthorPictureID)},
 			BodyHTML:     row.BodyHtml,
 			BodyText:     row.BodyText,
 			CreatedAt:    row.CreatedAt,
 			EditedAt:     nullInt(row.EditedAt),
 			CommentCount: row.CommentCount,
 		}
-		posts = append(posts, *forViewer(viewer, &p).(*Post))
+		posts = append(posts, *forViewer(a, &p).(*Post))
 	}
 	var next *int64
 	if len(posts) > limit {
@@ -296,11 +278,23 @@ func readBody(w http.ResponseWriter, r *http.Request) (clean string, ok bool) {
 	return clean, true
 }
 
-// logged runs fn inside a write transaction, logs the event it returns, commits,
-// then broadcasts. fn should write with qtx and return the event payload: the
-// resource as it is, without can flags. The log keeps it that way; the reply
-// to the actor and every stream get their viewer's flags added.
+// logged runs fn inside a write transaction, logs the one event it returns,
+// commits, broadcasts, and replies with the payload personalised for the
+// actor. fn returns the resource as it is, without can flags; the log keeps
+// it that way and every reader adds their own view.
 func (s *Server) logged(w http.ResponseWriter, r *http.Request, kind string, now int64, fn func(qtx *store.Queries) (payload any, status int, err error)) {
+	s.loggedMany(w, r, now, func(qtx *store.Queries) ([]events.Entry, any, int, error) {
+		payload, status, err := fn(qtx)
+		if err != nil {
+			return nil, nil, status, err
+		}
+		return []events.Entry{{Kind: kind, Payload: payload}}, payload, status, nil
+	})
+}
+
+// loggedMany is logged for a write that is several events (a new group and
+// its memberships). The reply is the given response, personalised.
+func (s *Server) loggedMany(w http.ResponseWriter, r *http.Request, now int64, fn func(qtx *store.Queries) (entries []events.Entry, response any, status int, err error)) {
 	ctx := r.Context()
 	tx, err := s.DB.BeginTx(ctx, nil) // BEGIN IMMEDIATE via _txlock
 	if err != nil {
@@ -308,28 +302,52 @@ func (s *Server) logged(w http.ResponseWriter, r *http.Request, kind string, now
 		return
 	}
 	defer tx.Rollback()
-	payload, status, err := fn(store.New(tx))
+	qtx := store.New(tx)
+	entries, response, status, err := fn(qtx)
 	if err != nil {
 		writeErr(w, status, err.Error())
 		return
 	}
-	ev, err := events.Log(ctx, tx, kind, payload, now)
-	if err != nil {
-		writeErr(w, http.StatusInternalServerError, err.Error())
-		return
+	logged := make([]events.Event, 0, len(entries))
+	for _, en := range entries {
+		ev, err := events.Log(ctx, tx, en.Kind, en.Payload, now)
+		if err != nil {
+			writeErr(w, http.StatusInternalServerError, err.Error())
+			return
+		}
+		logged = append(logged, ev)
+	}
+	me, _ := userFrom(ctx)
+	// The actor's own view of what they wrote, looked up while the tx is open.
+	a := perm.Actor{ID: me.ID}
+	if gid := groupIDOf(response); gid != "" {
+		if a, err = actorIn(ctx, qtx, me, gid); err != nil {
+			writeErr(w, http.StatusInternalServerError, err.Error())
+			return
+		}
 	}
 	if err := tx.Commit(); err != nil {
 		writeErr(w, http.StatusInternalServerError, err.Error())
 		return
 	}
-	s.Hub.Broadcast(ev)
-	me, _ := userFrom(ctx)
-	writeJSON(w, status, forViewer(me, payload))
+	for _, ev := range logged {
+		s.Hub.Broadcast(ev)
+	}
+	if status == http.StatusNoContent {
+		w.WriteHeader(status)
+		return
+	}
+	writeJSON(w, status, forViewer(a, response))
 }
 
 var errNotFound = errors.New("not found")
 
 func (s *Server) createPost(w http.ResponseWriter, r *http.Request) {
+	g, a := groupFrom(r.Context())
+	if !perm.Write(a) {
+		writeErr(w, http.StatusForbidden, "not allowed")
+		return
+	}
 	clean, ok := readBody(w, r)
 	if !ok {
 		return
@@ -340,16 +358,13 @@ func (s *Server) createPost(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	author, _ := userFrom(r.Context())
-	p := Post{ID: id.String(), Author: author, BodyHTML: clean, BodyText: sanitize.Text(clean), CreatedAt: db.Now()}
+	p := Post{ID: id.String(), GroupID: g.ID, Author: author, BodyHTML: clean, BodyText: sanitize.Text(clean), CreatedAt: db.Now()}
 	s.logged(w, r, "post", p.CreatedAt, func(qtx *store.Queries) (any, int, error) {
-		err := qtx.CreatePost(r.Context(), store.CreatePostParams{ID: p.ID, AuthorID: author.ID, BodyHtml: p.BodyHTML, BodyText: p.BodyText, CreatedAt: p.CreatedAt})
+		err := qtx.CreatePost(r.Context(), store.CreatePostParams{ID: p.ID, GroupID: g.ID, AuthorID: author.ID, BodyHtml: p.BodyHTML, BodyText: p.BodyText, CreatedAt: p.CreatedAt})
 		return &p, http.StatusCreated, err
 	})
 }
 
-// editPost replaces a post's body. The whole sanitised HTML is the unit of
-// edit: no diffs, no versions. Only the author may edit; anyone else gets the
-// same 404 as a missing post.
 func (s *Server) editPost(w http.ResponseWriter, r *http.Request) {
 	clean, ok := readBody(w, r)
 	if !ok {
@@ -359,14 +374,21 @@ func (s *Server) editPost(w http.ResponseWriter, r *http.Request) {
 	author, _ := userFrom(r.Context())
 	p := Post{ID: r.PathValue("id"), Author: author, BodyHTML: clean, BodyText: sanitize.Text(clean), EditedAt: &now}
 	s.logged(w, r, "post", now, func(qtx *store.Queries) (any, int, error) {
-		authorID, err := qtx.GetPostAuthor(r.Context(), p.ID)
+		owners, err := qtx.GetPostOwners(r.Context(), p.ID)
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, http.StatusNotFound, errors.New("no such post")
 		}
 		if err != nil {
 			return nil, http.StatusInternalServerError, err
 		}
-		if !perm.EditPost(actor(author), perm.Post{AuthorID: authorID}) {
+		a, err := actorIn(r.Context(), qtx, author, owners.GroupID)
+		if err != nil {
+			return nil, http.StatusInternalServerError, err
+		}
+		if !perm.CanSee(a) {
+			return nil, http.StatusNotFound, errors.New("no such post")
+		}
+		if !perm.EditPost(a, perm.Post{AuthorID: owners.AuthorID}) {
 			return nil, http.StatusForbidden, errors.New("not your post")
 		}
 		createdAt, err := qtx.EditPost(r.Context(), store.EditPostParams{
@@ -375,37 +397,41 @@ func (s *Server) editPost(w http.ResponseWriter, r *http.Request) {
 		if err != nil {
 			return nil, http.StatusInternalServerError, err
 		}
-		p.CreatedAt = createdAt
+		p.GroupID, p.CreatedAt = owners.GroupID, createdAt
 		n, err := qtx.CountComments(r.Context(), p.ID)
 		p.CommentCount = n
 		return &p, http.StatusOK, err
 	})
 }
 
-// actor is the user as perm sees them.
-func actor(u User) perm.Actor { return perm.Actor{ID: u.ID, Role: u.Role} }
-
-// deletePost soft-deletes a post (perm.DeletePost says who may). Its comments go with it (they are reached through the post) and
-// its images are left to the sweep (images.Sweep), which frees anything no
-// live body references. The event carries only the id.
+// deletePost soft-deletes a post (perm.DeletePost says who may). Its comments
+// go with it (they are reached through the post) and its images are left to
+// the sweep (images.Sweep). The event carries the id and the group.
 func (s *Server) deletePost(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
 	me, _ := userFrom(r.Context())
 	now := db.Now()
 	s.logged(w, r, "post_delete", now, func(qtx *store.Queries) (any, int, error) {
-		authorID, err := qtx.GetPostAuthor(r.Context(), id)
+		owners, err := qtx.GetPostOwners(r.Context(), id)
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, http.StatusNotFound, errors.New("no such post")
 		}
 		if err != nil {
 			return nil, http.StatusInternalServerError, err
 		}
-		if !perm.DeletePost(actor(me), perm.Post{AuthorID: authorID}) {
+		a, err := actorIn(r.Context(), qtx, me, owners.GroupID)
+		if err != nil {
+			return nil, http.StatusInternalServerError, err
+		}
+		if !perm.CanSee(a) {
+			return nil, http.StatusNotFound, errors.New("no such post")
+		}
+		if !perm.DeletePost(a, perm.Post{AuthorID: owners.AuthorID}) {
 			return nil, http.StatusForbidden, errors.New("not your post")
 		}
 		if err := qtx.DeletePost(r.Context(), store.DeletePostParams{DeletedAt: sql.NullInt64{Int64: now, Valid: true}, ID: id}); err != nil {
 			return nil, http.StatusInternalServerError, err
 		}
-		return map[string]string{"id": id}, http.StatusOK, nil
+		return map[string]string{"id": id, "group_id": owners.GroupID}, http.StatusOK, nil
 	})
 }
