@@ -12,6 +12,8 @@ import (
 	"strconv"
 	"sync"
 	"time"
+
+	"sweet/internal/store"
 )
 
 // Event is one row of the event log.
@@ -40,11 +42,7 @@ func Log(ctx context.Context, tx *sql.Tx, kind string, payload any, now int64) (
 	if err != nil {
 		return Event{}, err
 	}
-	res, err := tx.ExecContext(ctx, `INSERT INTO events (kind, payload, created_at) VALUES (?, ?, ?)`, kind, string(raw), now)
-	if err != nil {
-		return Event{}, err
-	}
-	seq, err := res.LastInsertId()
+	seq, err := store.New(tx).InsertEvent(ctx, store.InsertEventParams{Kind: kind, Payload: string(raw), CreatedAt: now})
 	if err != nil {
 		return Event{}, err
 	}
@@ -81,22 +79,15 @@ func (h *Hub) unsubscribe(ch chan Event) {
 
 // Since returns events with seq > after, oldest first.
 func (h *Hub) Since(ctx context.Context, after int64, limit int) ([]Event, error) {
-	rows, err := h.db.QueryContext(ctx, `SELECT seq, kind, payload FROM events WHERE seq > ? ORDER BY seq LIMIT ?`, after, limit)
+	rows, err := store.New(h.db).ListEventsSince(ctx, store.ListEventsSinceParams{After: after, PageSize: int64(limit)})
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
-	var out []Event
-	for rows.Next() {
-		var e Event
-		var payload string
-		if err := rows.Scan(&e.Seq, &e.Kind, &payload); err != nil {
-			return nil, err
-		}
-		e.Payload = json.RawMessage(payload)
-		out = append(out, e)
+	out := make([]Event, 0, len(rows))
+	for _, row := range rows {
+		out = append(out, Event{Seq: row.Seq, Kind: row.Kind, Payload: json.RawMessage(row.Payload)})
 	}
-	return out, rows.Err()
+	return out, nil
 }
 
 // Heartbeat is how often the server writes a comment line to keep the

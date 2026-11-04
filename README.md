@@ -21,7 +21,7 @@ make dev-backend               # go run on :8080 (serves a placeholder page with
 cd web && pnpm install && pnpm dev   # Vite on :5173, proxies /api and /healthz to :8080
 ```
 
-Backend: `go test ./...`. Frontend, in `web/`: `pnpm typecheck`, `pnpm test` (TipTap round-trip), `pnpm check:atomic` (no raw HTML outside `src/ui/`).
+Backend: `go test ./...`; after changing a query or migration, `make generate` (sqlc runs via `go tool`, nothing to install). Frontend, in `web/`: `pnpm typecheck`, `pnpm test` (TipTap round-trip), `pnpm check:atomic` (no raw HTML outside `src/ui/`).
 
 ## Layout
 
@@ -29,6 +29,7 @@ Backend: `go test ./...`. Frontend, in `web/`: `pnpm typecheck`, `pnpm test` (Ti
 cmd/sweet/          main; migrations/ is copied here by make (go:embed can't reach ../)
 internal/auth       password hashing, tokens, username rules
 internal/db         SQLite open (WAL, busy_timeout, BEGIN IMMEDIATE), migrations
+internal/store      sqlc: queries/*.sql in, typed Go out (make generate; never edit the .go files)
 internal/sanitize   the one bluemonday policy every body passes through
 internal/events     event log, in-process pub/sub, SSE handler
 internal/api        handlers: sessions and invites (auth.go, invites.go), posts, messages, users; tests in api_test.go

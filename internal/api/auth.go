@@ -16,6 +16,7 @@ import (
 
 	"sweet/internal/auth"
 	"sweet/internal/db"
+	"sweet/internal/store"
 )
 
 const (
@@ -66,20 +67,14 @@ func (s *Server) authenticate(r *http.Request) (User, string, bool) {
 	}
 	id := auth.HashToken(token)
 	now := db.Now()
-	var u User
-	var lastSeen int64
-	err := s.DB.QueryRowContext(r.Context(), `
-		SELECT u.id, u.username, u.role, s.last_seen_at
-		FROM sessions s JOIN users u ON u.id = s.user_id
-		WHERE s.id = ? AND s.expires_at > ?`, id, now).Scan(&u.ID, &u.Username, &u.Role, &lastSeen)
+	row, err := s.q().GetSessionUser(r.Context(), store.GetSessionUserParams{ID: id, Now: now})
 	if err != nil {
 		return User{}, "", false
 	}
-	if now-lastSeen > touchAfter.Milliseconds() {
-		s.DB.ExecContext(r.Context(), `UPDATE sessions SET last_seen_at = ?, expires_at = ? WHERE id = ?`,
-			now, now+SessionTTL.Milliseconds(), id)
+	if now-row.LastSeenAt > touchAfter.Milliseconds() {
+		s.q().TouchSession(r.Context(), store.TouchSessionParams{LastSeenAt: now, ExpiresAt: now + SessionTTL.Milliseconds(), ID: id})
 	}
-	return u, id, true
+	return User{ID: row.ID, Username: row.Username, Role: row.Role}, id, true
 }
 
 // requireAuth rejects unauthenticated requests with 401 and puts the user in the context.
@@ -140,9 +135,9 @@ func (s *Server) issueSession(w http.ResponseWriter, r *http.Request, userID str
 		return "", err
 	}
 	now := db.Now()
-	if _, err := s.DB.ExecContext(r.Context(), `
-		INSERT INTO sessions (id, user_id, created_at, last_seen_at, expires_at) VALUES (?, ?, ?, ?, ?)`,
-		hash, userID, now, now, now+SessionTTL.Milliseconds()); err != nil {
+	if err := s.q().CreateSession(r.Context(), store.CreateSessionParams{
+		ID: hash, UserID: userID, CreatedAt: now, LastSeenAt: now, ExpiresAt: now + SessionTTL.Milliseconds(),
+	}); err != nil {
 		return "", err
 	}
 	http.SetCookie(w, &http.Cookie{
@@ -209,10 +204,9 @@ func (s *Server) login(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusBadRequest, "bad request body")
 		return
 	}
-	var u User
-	var hash sql.NullString
-	err := s.DB.QueryRowContext(r.Context(), `SELECT id, username, role, password_hash FROM users WHERE username = ?`, in.Username).
-		Scan(&u.ID, &u.Username, &u.Role, &hash)
+	row, err := s.q().GetUserByUsername(r.Context(), in.Username)
+	u := User{ID: row.ID, Username: row.Username, Role: row.Role}
+	hash := row.PasswordHash
 	// Same answer for unknown user and wrong password; bcrypt runs either way
 	// so timing does not reveal which.
 	if errors.Is(err, sql.ErrNoRows) || !hash.Valid {
@@ -237,7 +231,7 @@ func (s *Server) login(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) logout(w http.ResponseWriter, r *http.Request) {
-	s.DB.ExecContext(r.Context(), `DELETE FROM sessions WHERE id = ?`, sessionFrom(r.Context()))
+	s.q().DeleteSession(r.Context(), sessionFrom(r.Context()))
 	clearCookie(w, r)
 	w.WriteHeader(http.StatusNoContent)
 }
@@ -245,7 +239,7 @@ func (s *Server) logout(w http.ResponseWriter, r *http.Request) {
 // logoutAll ends every session of the user, this one included.
 func (s *Server) logoutAll(w http.ResponseWriter, r *http.Request) {
 	u, _ := userFrom(r.Context())
-	s.DB.ExecContext(r.Context(), `DELETE FROM sessions WHERE user_id = ?`, u.ID)
+	s.q().DeleteUserSessions(r.Context(), u.ID)
 	clearCookie(w, r)
 	w.WriteHeader(http.StatusNoContent)
 }

@@ -1,6 +1,6 @@
-// Package api holds the HTTP handlers: sessions and invites, posts, chat
-// messages, the event stream. Everything but sign-in, join and healthz
-// requires a session (see auth.go).
+// Package api holds the HTTP handlers: sessions and invites, posts, comments,
+// chat messages, the event stream. Everything but sign-in, join and healthz
+// requires a session (see auth.go). SQL lives in internal/store (sqlc).
 package api
 
 import (
@@ -18,6 +18,7 @@ import (
 	"sweet/internal/db"
 	"sweet/internal/events"
 	"sweet/internal/sanitize"
+	"sweet/internal/store"
 )
 
 type User struct {
@@ -30,12 +31,13 @@ type User struct {
 // Post is the wire shape. It carries no event sequence: the SSE "id:" line
 // is the sequence, and the feed paginates by created_at.
 type Post struct {
-	ID        string `json:"id"`
-	Author    User   `json:"author"`
-	BodyHTML  string `json:"body_html"`
-	BodyText  string `json:"body_text"`
-	CreatedAt int64  `json:"created_at"`
-	EditedAt  *int64 `json:"edited_at"`
+	ID           string `json:"id"`
+	Author       User   `json:"author"`
+	BodyHTML     string `json:"body_html"`
+	BodyText     string `json:"body_text"`
+	CreatedAt    int64  `json:"created_at"`
+	EditedAt     *int64 `json:"edited_at"`
+	CommentCount int64  `json:"comment_count"`
 }
 
 type Server struct {
@@ -45,13 +47,22 @@ type Server struct {
 	limiter loginLimiter
 }
 
+func (s *Server) q() *store.Queries { return store.New(s.DB) }
+
+func nullInt(v sql.NullInt64) *int64 {
+	if !v.Valid {
+		return nil
+	}
+	return &v.Int64
+}
+
 // EnsureOwner makes sure the instance has its owner account. On first run it
 // creates the user; whenever the owner has no password yet and one is given,
 // it sets it. A password given later is ignored: change it in the app.
 func EnsureOwner(ctx context.Context, d *sql.DB, username, password string) (User, error) {
+	q := store.New(d)
 	u := User{Username: username, Role: "owner"}
-	var hash sql.NullString
-	err := d.QueryRowContext(ctx, `SELECT id, password_hash FROM users WHERE username = ?`, username).Scan(&u.ID, &hash)
+	row, err := q.GetUserByUsername(ctx, username)
 	switch {
 	case errors.Is(err, sql.ErrNoRows):
 		id, err := uuid.NewV7()
@@ -59,22 +70,23 @@ func EnsureOwner(ctx context.Context, d *sql.DB, username, password string) (Use
 			return u, err
 		}
 		u.ID = id.String()
-		if _, err := d.ExecContext(ctx, `INSERT INTO users (id, username, role, created_at) VALUES (?, ?, 'owner', ?)`, u.ID, u.Username, db.Now()); err != nil {
+		if err := q.CreateUser(ctx, store.CreateUserParams{ID: u.ID, Username: u.Username, Role: "owner", CreatedAt: db.Now()}); err != nil {
 			return u, err
 		}
 	case err != nil:
 		return u, err
 	default:
-		if _, err := d.ExecContext(ctx, `UPDATE users SET role = 'owner' WHERE id = ?`, u.ID); err != nil {
+		u.ID = row.ID
+		if err := q.SetUserRole(ctx, store.SetUserRoleParams{Role: "owner", ID: u.ID}); err != nil {
 			return u, err
 		}
 	}
-	if !hash.Valid && password != "" {
+	if !row.PasswordHash.Valid && password != "" {
 		h, err := auth.HashPassword(password)
 		if err != nil {
 			return u, err
 		}
-		if _, err := d.ExecContext(ctx, `UPDATE users SET password_hash = ? WHERE id = ?`, h, u.ID); err != nil {
+		if err := q.SetUserPassword(ctx, store.SetUserPasswordParams{PasswordHash: sql.NullString{String: h, Valid: true}, ID: u.ID}); err != nil {
 			return u, err
 		}
 	}
@@ -83,11 +95,8 @@ func EnsureOwner(ctx context.Context, d *sql.DB, username, password string) (Use
 
 // OwnerHasPassword reports whether the owner can sign in at all.
 func OwnerHasPassword(ctx context.Context, d *sql.DB, username string) bool {
-	var hash sql.NullString
-	if err := d.QueryRowContext(ctx, `SELECT password_hash FROM users WHERE username = ?`, username).Scan(&hash); err != nil {
-		return false
-	}
-	return hash.Valid
+	row, err := store.New(d).GetUserPasswordHash(ctx, username)
+	return err == nil && row.PasswordHash.Valid
 }
 
 func (s *Server) Routes(mux *http.ServeMux) {
@@ -106,6 +115,9 @@ func (s *Server) Routes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/posts", s.requireAuth(s.listPosts))
 	mux.HandleFunc("POST /api/posts", s.requireAuth(s.createPost))
 	mux.HandleFunc("PUT /api/posts/{id}", s.requireAuth(s.editPost))
+	mux.HandleFunc("GET /api/posts/{id}/comments", s.requireAuth(s.listComments))
+	mux.HandleFunc("POST /api/posts/{id}/comments", s.requireAuth(s.createComment))
+	mux.HandleFunc("PUT /api/comments/{id}", s.requireAuth(s.editComment))
 	mux.HandleFunc("GET /api/messages", s.requireAuth(s.listMessages))
 	mux.HandleFunc("POST /api/messages", s.requireAuth(s.createMessage))
 	mux.HandleFunc("GET /api/events", s.requireAuth(s.Hub.ServeHTTP))
@@ -131,34 +143,37 @@ func writeErr(w http.ResponseWriter, status int, msg string) {
 	writeJSON(w, status, map[string]string{"error": msg})
 }
 
-func (s *Server) listPosts(w http.ResponseWriter, r *http.Request) {
-	limit := 20
-	if v, err := strconv.Atoi(r.URL.Query().Get("limit")); err == nil && v > 0 && v <= 100 {
+// pageParams reads ?before= and ?limit= for the newest-first feeds.
+func pageParams(r *http.Request, defaultLimit, maxLimit int) (before int64, limit int) {
+	limit = defaultLimit
+	if v, err := strconv.Atoi(r.URL.Query().Get("limit")); err == nil && v > 0 && v <= maxLimit {
 		limit = v
 	}
-	before := int64(1 << 62)
+	before = int64(1 << 62)
 	if v, err := strconv.ParseInt(r.URL.Query().Get("before"), 10, 64); err == nil && v > 0 {
 		before = v
 	}
-	rows, err := s.DB.QueryContext(r.Context(), `
-		SELECT p.id, p.body_html, p.body_text, p.created_at, p.edited_at, u.id, u.username, u.role
-		FROM posts p JOIN users u ON u.id = p.author_id
-		WHERE p.deleted_at IS NULL AND p.created_at < ?
-		ORDER BY p.created_at DESC, p.id DESC
-		LIMIT ?`, before, limit+1)
+	return before, limit
+}
+
+func (s *Server) listPosts(w http.ResponseWriter, r *http.Request) {
+	before, limit := pageParams(r, 20, 100)
+	rows, err := s.q().ListPosts(r.Context(), store.ListPostsParams{Before: before, PageSize: int64(limit + 1)})
 	if err != nil {
 		writeErr(w, http.StatusInternalServerError, err.Error())
 		return
 	}
-	defer rows.Close()
-	posts := []Post{}
-	for rows.Next() {
-		var p Post
-		if err := rows.Scan(&p.ID, &p.BodyHTML, &p.BodyText, &p.CreatedAt, &p.EditedAt, &p.Author.ID, &p.Author.Username, &p.Author.Role); err != nil {
-			writeErr(w, http.StatusInternalServerError, err.Error())
-			return
-		}
-		posts = append(posts, p)
+	posts := make([]Post, 0, len(rows))
+	for _, row := range rows {
+		posts = append(posts, Post{
+			ID:           row.ID,
+			Author:       User{ID: row.AuthorID, Username: row.AuthorUsername, Role: row.AuthorRole},
+			BodyHTML:     row.BodyHtml,
+			BodyText:     row.BodyText,
+			CreatedAt:    row.CreatedAt,
+			EditedAt:     nullInt(row.EditedAt),
+			CommentCount: row.CommentCount,
+		})
 	}
 	var next *int64
 	if len(posts) > limit {
@@ -188,6 +203,36 @@ func readBody(w http.ResponseWriter, r *http.Request) (clean string, ok bool) {
 	return clean, true
 }
 
+// logged runs fn inside a write transaction, logs the event it returns, commits,
+// then broadcasts. fn should write with qtx and return the event payload.
+func (s *Server) logged(w http.ResponseWriter, r *http.Request, kind string, now int64, fn func(qtx *store.Queries) (payload any, status int, err error)) {
+	ctx := r.Context()
+	tx, err := s.DB.BeginTx(ctx, nil) // BEGIN IMMEDIATE via _txlock
+	if err != nil {
+		writeErr(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	defer tx.Rollback()
+	payload, status, err := fn(store.New(tx))
+	if err != nil {
+		writeErr(w, status, err.Error())
+		return
+	}
+	ev, err := events.Log(ctx, tx, kind, payload, now)
+	if err != nil {
+		writeErr(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	if err := tx.Commit(); err != nil {
+		writeErr(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	s.Hub.Broadcast(ev)
+	writeJSON(w, status, payload)
+}
+
+var errNotFound = errors.New("not found")
+
 func (s *Server) createPost(w http.ResponseWriter, r *http.Request) {
 	clean, ok := readBody(w, r)
 	if !ok {
@@ -200,77 +245,36 @@ func (s *Server) createPost(w http.ResponseWriter, r *http.Request) {
 	}
 	author, _ := userFrom(r.Context())
 	p := Post{ID: id.String(), Author: author, BodyHTML: clean, BodyText: sanitize.Text(clean), CreatedAt: db.Now()}
-
-	ctx := r.Context()
-	tx, err := s.DB.BeginTx(ctx, nil) // BEGIN IMMEDIATE via _txlock
-	if err != nil {
-		writeErr(w, http.StatusInternalServerError, err.Error())
-		return
-	}
-	if _, err := tx.ExecContext(ctx, `INSERT INTO posts (id, author_id, body_html, body_text, created_at) VALUES (?, ?, ?, ?, ?)`,
-		p.ID, p.Author.ID, p.BodyHTML, p.BodyText, p.CreatedAt); err != nil {
-		tx.Rollback()
-		writeErr(w, http.StatusInternalServerError, err.Error())
-		return
-	}
-	ev, err := events.Log(ctx, tx, "post", &p, p.CreatedAt)
-	if err != nil {
-		tx.Rollback()
-		writeErr(w, http.StatusInternalServerError, err.Error())
-		return
-	}
-	if err := tx.Commit(); err != nil {
-		writeErr(w, http.StatusInternalServerError, err.Error())
-		return
-	}
-	s.Hub.Broadcast(ev)
-	writeJSON(w, http.StatusCreated, p)
+	s.logged(w, r, "post", p.CreatedAt, func(qtx *store.Queries) (any, int, error) {
+		err := qtx.CreatePost(r.Context(), store.CreatePostParams{ID: p.ID, AuthorID: author.ID, BodyHtml: p.BodyHTML, BodyText: p.BodyText, CreatedAt: p.CreatedAt})
+		return &p, http.StatusCreated, err
+	})
 }
 
 // editPost replaces a post's body. The whole sanitised HTML is the unit of
-// edit: no diffs, no versions. The new body is logged as a "post_edit" event
-// carrying the full post, so live clients replace it in place.
+// edit: no diffs, no versions. Only the author may edit; anyone else gets the
+// same 404 as a missing post.
 func (s *Server) editPost(w http.ResponseWriter, r *http.Request) {
 	clean, ok := readBody(w, r)
 	if !ok {
 		return
 	}
-	id := r.PathValue("id")
 	now := db.Now()
 	author, _ := userFrom(r.Context())
-	p := Post{ID: id, Author: author, BodyHTML: clean, BodyText: sanitize.Text(clean), EditedAt: &now}
-
-	ctx := r.Context()
-	tx, err := s.DB.BeginTx(ctx, nil)
-	if err != nil {
-		writeErr(w, http.StatusInternalServerError, err.Error())
-		return
-	}
-	// Only the author may edit; anyone else gets the same 404 as a missing post.
-	err = tx.QueryRowContext(ctx, `
-		UPDATE posts SET body_html = ?, body_text = ?, edited_at = ?
-		WHERE id = ? AND author_id = ? AND deleted_at IS NULL
-		RETURNING created_at`, p.BodyHTML, p.BodyText, now, id, author.ID).Scan(&p.CreatedAt)
-	if errors.Is(err, sql.ErrNoRows) {
-		tx.Rollback()
-		writeErr(w, http.StatusNotFound, "no such post")
-		return
-	}
-	if err != nil {
-		tx.Rollback()
-		writeErr(w, http.StatusInternalServerError, err.Error())
-		return
-	}
-	ev, err := events.Log(ctx, tx, "post_edit", &p, now)
-	if err != nil {
-		tx.Rollback()
-		writeErr(w, http.StatusInternalServerError, err.Error())
-		return
-	}
-	if err := tx.Commit(); err != nil {
-		writeErr(w, http.StatusInternalServerError, err.Error())
-		return
-	}
-	s.Hub.Broadcast(ev)
-	writeJSON(w, http.StatusOK, p)
+	p := Post{ID: r.PathValue("id"), Author: author, BodyHTML: clean, BodyText: sanitize.Text(clean), EditedAt: &now}
+	s.logged(w, r, "post_edit", now, func(qtx *store.Queries) (any, int, error) {
+		createdAt, err := qtx.EditOwnPost(r.Context(), store.EditOwnPostParams{
+			BodyHtml: p.BodyHTML, BodyText: p.BodyText, EditedAt: sql.NullInt64{Int64: now, Valid: true}, ID: p.ID, AuthorID: author.ID,
+		})
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, http.StatusNotFound, errors.New("no such post")
+		}
+		if err != nil {
+			return nil, http.StatusInternalServerError, err
+		}
+		p.CreatedAt = createdAt
+		n, err := qtx.CountComments(r.Context(), p.ID)
+		p.CommentCount = n
+		return &p, http.StatusOK, err
+	})
 }

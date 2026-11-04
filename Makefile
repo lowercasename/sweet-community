@@ -19,6 +19,9 @@ dev-backend: cmd/sweet/migrations
 run: build
 	./bin/sweet -db data/sweet.db -owner raphael
 
+generate:
+	go tool sqlc generate
+
 test: cmd/sweet/migrations
 	go test ./...
 

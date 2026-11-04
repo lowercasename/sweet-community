@@ -2,13 +2,12 @@ package api
 
 import (
 	"net/http"
-	"strconv"
 
 	"github.com/google/uuid"
 
 	"sweet/internal/db"
-	"sweet/internal/events"
 	"sweet/internal/sanitize"
+	"sweet/internal/store"
 )
 
 // Message is one chat message in the instance's single room.
@@ -23,33 +22,21 @@ type Message struct {
 // listMessages returns the newest page first, like posts; the client reverses
 // it for display. ?before= pages backwards through history.
 func (s *Server) listMessages(w http.ResponseWriter, r *http.Request) {
-	limit := 50
-	if v, err := strconv.Atoi(r.URL.Query().Get("limit")); err == nil && v > 0 && v <= 200 {
-		limit = v
-	}
-	before := int64(1 << 62)
-	if v, err := strconv.ParseInt(r.URL.Query().Get("before"), 10, 64); err == nil && v > 0 {
-		before = v
-	}
-	rows, err := s.DB.QueryContext(r.Context(), `
-		SELECT m.id, m.body_html, m.body_text, m.created_at, u.id, u.username, u.role
-		FROM messages m JOIN users u ON u.id = m.author_id
-		WHERE m.deleted_at IS NULL AND m.created_at < ?
-		ORDER BY m.created_at DESC, m.id DESC
-		LIMIT ?`, before, limit+1)
+	before, limit := pageParams(r, 50, 200)
+	rows, err := s.q().ListMessages(r.Context(), store.ListMessagesParams{Before: before, PageSize: int64(limit + 1)})
 	if err != nil {
 		writeErr(w, http.StatusInternalServerError, err.Error())
 		return
 	}
-	defer rows.Close()
-	msgs := []Message{}
-	for rows.Next() {
-		var m Message
-		if err := rows.Scan(&m.ID, &m.BodyHTML, &m.BodyText, &m.CreatedAt, &m.Author.ID, &m.Author.Username, &m.Author.Role); err != nil {
-			writeErr(w, http.StatusInternalServerError, err.Error())
-			return
-		}
-		msgs = append(msgs, m)
+	msgs := make([]Message, 0, len(rows))
+	for _, row := range rows {
+		msgs = append(msgs, Message{
+			ID:        row.ID,
+			Author:    User{ID: row.AuthorID, Username: row.AuthorUsername, Role: row.AuthorRole},
+			BodyHTML:  row.BodyHtml,
+			BodyText:  row.BodyText,
+			CreatedAt: row.CreatedAt,
+		})
 	}
 	var next *int64
 	if len(msgs) > limit {
@@ -72,29 +59,8 @@ func (s *Server) createMessage(w http.ResponseWriter, r *http.Request) {
 	}
 	author, _ := userFrom(r.Context())
 	m := Message{ID: id.String(), Author: author, BodyHTML: clean, BodyText: sanitize.Text(clean), CreatedAt: db.Now()}
-
-	ctx := r.Context()
-	tx, err := s.DB.BeginTx(ctx, nil)
-	if err != nil {
-		writeErr(w, http.StatusInternalServerError, err.Error())
-		return
-	}
-	if _, err := tx.ExecContext(ctx, `INSERT INTO messages (id, author_id, body_html, body_text, created_at) VALUES (?, ?, ?, ?, ?)`,
-		m.ID, m.Author.ID, m.BodyHTML, m.BodyText, m.CreatedAt); err != nil {
-		tx.Rollback()
-		writeErr(w, http.StatusInternalServerError, err.Error())
-		return
-	}
-	ev, err := events.Log(ctx, tx, "message", &m, m.CreatedAt)
-	if err != nil {
-		tx.Rollback()
-		writeErr(w, http.StatusInternalServerError, err.Error())
-		return
-	}
-	if err := tx.Commit(); err != nil {
-		writeErr(w, http.StatusInternalServerError, err.Error())
-		return
-	}
-	s.Hub.Broadcast(ev)
-	writeJSON(w, http.StatusCreated, m)
+	s.logged(w, r, "message", m.CreatedAt, func(qtx *store.Queries) (any, int, error) {
+		err := qtx.CreateMessage(r.Context(), store.CreateMessageParams{ID: m.ID, AuthorID: author.ID, BodyHtml: m.BodyHTML, BodyText: m.BodyText, CreatedAt: m.CreatedAt})
+		return &m, http.StatusCreated, err
+	})
 }

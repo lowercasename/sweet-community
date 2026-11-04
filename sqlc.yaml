@@ -1,0 +1,12 @@
+# go tool sqlc generate   (see Makefile: make generate)
+version: "2"
+sql:
+  - engine: "sqlite"
+    schema: "migrations"
+    queries: "internal/store/queries"
+    gen:
+      go:
+        package: "store"
+        out: "internal/store"
+        emit_empty_slices: true
+        omit_unused_structs: true

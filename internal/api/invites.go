@@ -11,6 +11,7 @@ import (
 
 	"sweet/internal/auth"
 	"sweet/internal/db"
+	"sweet/internal/store"
 )
 
 // InviteTTL is how long an invite link works.
@@ -34,8 +35,7 @@ func (s *Server) createInvite(w http.ResponseWriter, r *http.Request) {
 	}
 	now := db.Now()
 	inv := Invite{Code: code, URL: "/join/" + code, CreatedBy: u, CreatedAt: now, ExpiresAt: now + InviteTTL.Milliseconds()}
-	if _, err := s.DB.ExecContext(r.Context(), `INSERT INTO invites (code, created_by, created_at, expires_at) VALUES (?, ?, ?, ?)`,
-		inv.Code, u.ID, inv.CreatedAt, inv.ExpiresAt); err != nil {
+	if err := s.q().CreateInvite(r.Context(), store.CreateInviteParams{Code: inv.Code, CreatedBy: u.ID, CreatedAt: inv.CreatedAt, ExpiresAt: inv.ExpiresAt}); err != nil {
 		writeErr(w, http.StatusInternalServerError, err.Error())
 		return
 	}
@@ -44,37 +44,29 @@ func (s *Server) createInvite(w http.ResponseWriter, r *http.Request) {
 
 // listInvites (owner) returns the links that are still open.
 func (s *Server) listInvites(w http.ResponseWriter, r *http.Request) {
-	rows, err := s.DB.QueryContext(r.Context(), `
-		SELECT i.code, i.created_at, i.expires_at, u.id, u.username, u.role
-		FROM invites i JOIN users u ON u.id = i.created_by
-		WHERE i.used_at IS NULL AND i.expires_at > ?
-		ORDER BY i.created_at DESC`, db.Now())
+	rows, err := s.q().ListOpenInvites(r.Context(), db.Now())
 	if err != nil {
 		writeErr(w, http.StatusInternalServerError, err.Error())
 		return
 	}
-	defer rows.Close()
-	out := []Invite{}
-	for rows.Next() {
-		var inv Invite
-		if err := rows.Scan(&inv.Code, &inv.CreatedAt, &inv.ExpiresAt, &inv.CreatedBy.ID, &inv.CreatedBy.Username, &inv.CreatedBy.Role); err != nil {
-			writeErr(w, http.StatusInternalServerError, err.Error())
-			return
-		}
-		inv.URL = "/join/" + inv.Code
-		out = append(out, inv)
+	out := make([]Invite, 0, len(rows))
+	for _, row := range rows {
+		out = append(out, Invite{
+			Code: row.Code, URL: "/join/" + row.Code, CreatedAt: row.CreatedAt, ExpiresAt: row.ExpiresAt,
+			CreatedBy: User{ID: row.CreatorID, Username: row.CreatorUsername, Role: row.CreatorRole},
+		})
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"invites": out})
 }
 
 // deleteInvite (owner) revokes an open link.
 func (s *Server) deleteInvite(w http.ResponseWriter, r *http.Request) {
-	res, err := s.DB.ExecContext(r.Context(), `DELETE FROM invites WHERE code = ? AND used_at IS NULL`, r.PathValue("code"))
+	n, err := s.q().DeleteOpenInvite(r.Context(), r.PathValue("code"))
 	if err != nil {
 		writeErr(w, http.StatusInternalServerError, err.Error())
 		return
 	}
-	if n, _ := res.RowsAffected(); n == 0 {
+	if n == 0 {
 		writeErr(w, http.StatusNotFound, "no such invite")
 		return
 	}
@@ -83,10 +75,7 @@ func (s *Server) deleteInvite(w http.ResponseWriter, r *http.Request) {
 
 // getInvite (public) tells the join page whether a link is good and who sent it.
 func (s *Server) getInvite(w http.ResponseWriter, r *http.Request) {
-	var by string
-	err := s.DB.QueryRowContext(r.Context(), `
-		SELECT u.username FROM invites i JOIN users u ON u.id = i.created_by
-		WHERE i.code = ? AND i.used_at IS NULL AND i.expires_at > ?`, r.PathValue("code"), db.Now()).Scan(&by)
+	by, err := s.q().GetOpenInviteCreator(r.Context(), store.GetOpenInviteCreatorParams{Code: r.PathValue("code"), Now: db.Now()})
 	if errors.Is(err, sql.ErrNoRows) {
 		writeErr(w, http.StatusNotFound, "this invite link has been used or has expired")
 		return
@@ -141,8 +130,10 @@ func (s *Server) register(w http.ResponseWriter, r *http.Request) {
 	// UPDATE's WHERE makes a link single-use even under two simultaneous
 	// registrations: BEGIN IMMEDIATE serialises them and the second sees
 	// used_at set, rolls back, and the user it inserted goes with it.
-	if _, err := tx.ExecContext(ctx, `INSERT INTO users (id, username, password_hash, role, created_at) VALUES (?, ?, ?, 'member', ?)`,
-		u.ID, u.Username, hash, now); err != nil {
+	qtx := store.New(tx)
+	if err := qtx.CreateUser(ctx, store.CreateUserParams{
+		ID: u.ID, Username: u.Username, PasswordHash: sql.NullString{String: hash, Valid: true}, Role: "member", CreatedAt: now,
+	}); err != nil {
 		if db.IsUniqueViolation(err) {
 			writeErr(w, http.StatusConflict, "that username is taken")
 			return
@@ -150,13 +141,12 @@ func (s *Server) register(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusInternalServerError, err.Error())
 		return
 	}
-	res, err := tx.ExecContext(ctx, `UPDATE invites SET used_by = ?, used_at = ? WHERE code = ? AND used_at IS NULL AND expires_at > ?`,
-		u.ID, now, in.Code, now)
+	n, err := qtx.ClaimInvite(ctx, store.ClaimInviteParams{UsedBy: sql.NullString{String: u.ID, Valid: true}, UsedAt: sql.NullInt64{Int64: now, Valid: true}, Code: in.Code, Now: now})
 	if err != nil {
 		writeErr(w, http.StatusInternalServerError, err.Error())
 		return
 	}
-	if n, _ := res.RowsAffected(); n == 0 {
+	if n == 0 {
 		writeErr(w, http.StatusNotFound, "this invite link has been used or has expired")
 		return
 	}

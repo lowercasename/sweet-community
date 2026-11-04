@@ -286,3 +286,56 @@ func TestUnknownAPIPathIsJSON404(t *testing.T) {
 		t.Fatalf("unknown /api path: want JSON 404, got %d %v", status, body)
 	}
 }
+
+func TestComments(t *testing.T) {
+	ts, owner := newTestServer(t)
+	inv := owner.mustStatus(201, "POST", "/api/invites", nil)
+	kit := newClient(t, ts)
+	kit.mustStatus(201, "POST", "/api/register", map[string]string{"code": inv["code"].(string), "username": "kit", "password": "longenough"})
+
+	post := owner.mustStatus(201, "POST", "/api/posts", map[string]string{"body_html": "<p>a question</p>"})
+	id := post["id"].(string)
+	if post["comment_count"].(float64) != 0 {
+		t.Fatalf("new post comment_count: %v", post["comment_count"])
+	}
+
+	// Nothing yet; unknown post is a 404 either way.
+	if n := len(owner.mustStatus(200, "GET", "/api/posts/"+id+"/comments", nil)["comments"].([]any)); n != 0 {
+		t.Fatalf("comments on a new post: %d", n)
+	}
+	owner.mustStatus(404, "GET", "/api/posts/nope/comments", nil)
+	owner.mustStatus(404, "POST", "/api/posts/nope/comments", map[string]string{"body_html": "<p>x</p>"})
+	owner.mustStatus(400, "POST", "/api/posts/"+id+"/comments", map[string]string{"body_html": "<p> </p>"})
+
+	// Kit answers; the quote is just a blockquote in the body.
+	c := kit.mustStatus(201, "POST", "/api/posts/"+id+"/comments", map[string]string{"body_html": "<blockquote><p>a question</p></blockquote><p>an answer</p>"})
+	if c["post_id"] != id || c["author"].(map[string]any)["username"] != "kit" || c["edited_at"] != nil {
+		t.Fatalf("comment: %v", c)
+	}
+	cid := c["id"].(string)
+	owner.mustStatus(201, "POST", "/api/posts/"+id+"/comments", map[string]string{"body_html": "<p>thanks</p>"})
+
+	// Listed oldest first; the post now counts them.
+	list := owner.mustStatus(200, "GET", "/api/posts/"+id+"/comments", nil)["comments"].([]any)
+	if len(list) != 2 || list[0].(map[string]any)["id"] != cid {
+		t.Fatalf("comment list: %v", list)
+	}
+	posts := kit.mustStatus(200, "GET", "/api/posts", nil)["posts"].([]any)
+	if posts[0].(map[string]any)["comment_count"].(float64) != 2 {
+		t.Fatalf("comment_count after two comments: %v", posts[0])
+	}
+
+	// Author-only edit, same 404 for someone else's.
+	owner.mustStatus(404, "PUT", "/api/comments/"+cid, map[string]string{"body_html": "<p>not yours</p>"})
+	edited := kit.mustStatus(200, "PUT", "/api/comments/"+cid, map[string]string{"body_html": "<p>an answer, edited</p>"})
+	if edited["post_id"] != id || edited["edited_at"] == nil || edited["body_html"] != "<p>an answer, edited</p>" {
+		t.Fatalf("edited comment: %v", edited)
+	}
+	kit.mustStatus(404, "PUT", "/api/comments/nope", map[string]string{"body_html": "<p>x</p>"})
+
+	// Editing the post keeps its count.
+	p2 := owner.mustStatus(200, "PUT", "/api/posts/"+id, map[string]string{"body_html": "<p>a question, clarified</p>"})
+	if p2["comment_count"].(float64) != 2 {
+		t.Fatalf("comment_count after post edit: %v", p2)
+	}
+}
