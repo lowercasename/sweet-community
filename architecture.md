@@ -24,6 +24,22 @@ Comments on posts are a flat list, not threaded. Replies to a specific comment a
 
 Both live chat and long-form blog-like posts, with inline image uploads and embeds.
 
+### Groups
+
+A group is a membership-scoped space with the same shape as the instance: a feed and a chat room, drawn with the same panes and editors. **The instance itself is the root group**, which everyone joins on registration and nobody leaves, so "everyone sees everything by default" is root membership and no query special-cases it. Every post and chat message belongs to exactly one group; comments belong to their post's.
+
+Groups are **private and invisible**: a group, its name, its members and its content exist only for its members. There is no listing and no "ask to join"; people get in by being added. The owner and moderators see only the groups they are members of. A private space is private from the owner too; moderation of one happens when a member reports something, which brings staff in explicitly. This is said on the rules page.
+
+**Groups are fractal, one level deep.** A role is a property of a membership, not of a person: every group has one owner and any number of moderators, and the rest are members. The instance's owner and moderators are the root group's owner and moderators; there is no other kind of role. In any group, the owner and moderators delete anything in it and edit nothing of others', the owner and moderators add and remove members, the owner alone sets roles and transfers ownership (later), the owner alone renames or deletes the group. A person's role in one group says nothing about another: the instance owner is a plain member of a clubhouse they were added to. Every rule in `perm` takes the actor's role in the thing's group.
+
+Anyone may create a group (a per-instance feature flag can restrict creation to the root group's staff); the creator is its owner. Members may leave any group but the root. No pending-invite state, no requests.
+
+A **DM** is a group of kind `dm`: no name, two or more members, shown by its members' names, created from a person's name ("Message") and reused if one with exactly those members already exists. Same tables, same rules, same panes, with the posts pane closed by default.
+
+Three needs drove this, and none of them is "a sub-community of the feed": a moderation room where staff talk and share screenshots; a small invite-only clubhouse inside a larger house for a subject its members want to keep among themselves; and a private word with one person. None of that content can live on the main feed at all, so nobody is choosing between the feed and a group; they are choosing between the group and silence. That is why this does not reverse the finding behind cutting sub-group topics (47 of 53 public communities died): there are no public sub-groups, and topics remain views on the root feed.
+
+The instance's feature flags (posts, chat, images) apply inside groups too.
+
 ### Feature flags (per instance)
 
 An instance settings table. Each feature is on or off, set by the owner during onboarding and changeable later: long-form posts, chat, images, embeds, topics, alt text (off / optional / required). The API refuses disabled features; the frontend reads settings at boot and hides them. This is how one product covers a friend group, an interest community and a chat-first group.
@@ -34,7 +50,9 @@ SSE for the read side, plain POSTs to the API for sends. Plain HTTP, so cookie a
 
 Every event carries an `id:` line holding the event log's integer sequence, so the browser's own `Last-Event-ID` reconnect is served straight from SQLite; `?since=<seq>` is the same query on the manual path, and an explicit `since=0` replays from the start; a client that names no sequence has just loaded the page from the API and gets only what happens next. No in-memory replay buffer: SQLite is the buffer.
 
-**Two event kinds per resource, no more.** `post`, `comment`, `message` and `user` each carry the whole resource and mean "this is its current state": create and edit are the same event. `post_delete`, `comment_delete`, `message_delete` carry the ids (the comment's includes its post's). Nothing else. The client cache therefore has exactly one upsert and one delete per resource, and a new feature adds a resource, not a kind. (Reversed from an earlier `post_edit` / `comment_edit`, which were accreting.)
+**Two event kinds per resource, no more.** `post`, `comment`, `message`, `user`, `group` and `membership` each carry the whole resource and mean "this is its current state": create and edit are the same event. `post_delete`, `comment_delete`, `message_delete`, `group_delete`, `membership_delete` carry the ids (the comment's includes its post's; a membership's are the group and the user). Nothing else. The client cache therefore has exactly one upsert and one delete per resource, and a new feature adds a resource, not a kind. (Reversed from an earlier `post_edit` / `comment_edit`, which were accreting.)
+
+**The stream is per viewer.** The log holds every event once. Each connection runs each event through `CanSee` for its viewer before writing it, and adds the viewer's `can` flags; an event for a group the viewer is not in is never sent. Being added to a group arrives as a `membership` event, on which the client fetches that group; being removed arrives as `membership_delete`, on which the client drops it.
 
 Reconnects are common on mobile (the test is a UK train), and iOS kills background SSE sockets silently: on iOS 18 the `error` event does not fire and `readyState` stays OPEN while the socket is dead, so the browser's auto-reconnect never triggers. Therefore:
 
@@ -85,13 +103,15 @@ SSRF: the fetcher uses a safe-by-default HTTP client library (e.g. `doyensec/saf
 
 Uploads go through one storage interface with two drivers: a local directory, the default, which is what development and a self-hoster without a bucket use; and S3-compatible storage (Cloudflare R2 for hosted instances), chosen when the endpoint and bucket are in config. Images are large and R2 space is cheap, so hosted instances always use R2. (Reversed from "S3 only, local later": a local default costs forty lines and removes a bucket from the first run.)
 
+Open: isolation between hosted instances in R2. Today the guard is each instance's own `images` table (the only way to an object is `/img/<id>` looked up there, and the sweep deletes only its own keys); the bucket credential itself can read every prefix. R2 scopes tokens to buckets, not prefixes, so a shared bucket cannot be enforced by the credential; one bucket and one token per instance can, and the Operations section already assumes a bucket per instance for Litestream. Decide before the second hosted instance.
+
 Accepted input formats: JPEG, PNG, WebP, GIF, detected by magic bytes server-side, not by extension or declared type. Anything else is rejected with a clear message. Generated sizes are output as JPEG or PNG only (Go's `x/image/webp` decodes but does not encode); GIFs pass through untouched.
 
 No HEIC decoding. The file input uses `accept="image/jpeg,image/png,image/webp,image/gif"` with JPEG first and never `image/*`: WebKit transcodes a chosen HEIC to the *first* listed type, and `image/*` anywhere in the list hands us HEIC. Android does not transcode; the magic-byte check catches it with the clear message.
 
 Server-side on upload: apply EXIF orientation, strip metadata, generate sizes. Display pictures use the same pipeline with fixed square sizes.
 
-Images are protected per instance: served through the Go backend at `/img/<id>` with a session check. No images outside the web app (the digest carries no content), so no signed URLs.
+Images are protected per instance: served through the Go backend at `/img/<id>` with a session check and `CanSee`: the viewer uploaded it, or can see a live post, comment or message that references it. A screenshot in a private group is served only to that group's members. No images outside the web app (the digest carries no content), so no signed URLs.
 
 Images in the editor are cards: the picture small on the left, the alt text field taking the rest, a grip to drag the card between blocks, an X to remove it. No prompt on insert. Adjacent cards join into one block labelled "Gallery of N images", because the post renders a run of adjacent images as a grid: 2 across; 2 then 1; 2 and 2; 2, 2, 1; 4 then 2; 4, 2, 1; 4 and 4. Eight is the most in one gallery; a longer run splits. The gallery exists only at render time (`wrapGalleries` in the frontend): stored HTML is a plain run of `<img>`. Chat has no inline images: pictures attach above the text field as the same cards and are sent as a block of `<img>` before the text. Whether alt text is required is a feature flag.
 
@@ -105,7 +125,8 @@ Per-image and per-post size caps; a per-instance storage quota enforced at uploa
 - Event ordering: the event log has an integer sequence column assigned inside the write transaction, which is therefore commit-ordered. SSE `id:` and `?since=` use it. UUIDs are not used as cursors (generation order is not commit order with a connection pool).
 - Every write transaction starts `BEGIN IMMEDIATE`. A deferred transaction that reads then writes can fail with `SQLITE_BUSY_SNAPSHOT`, which `busy_timeout` cannot help with. Consider one connection for writes and a separate read pool.
 - Pagination by cursor, never offset, for feed, chat and search.
-- Soft delete: `deleted_at` on posts, comments and messages. Deleting a post takes its comments with it: no tombstone, no orphaned thread (see Simplified).
+- Groups: `groups(id, kind, name, created_at, deleted_at)` and `memberships(group_id, user_id, role, joined_at)` with role owner, moderator or member. `posts.group_id` and `messages.group_id` are NOT NULL and reference `groups`; the migration that adds groups creates the root group, backfills every post and message onto it, turns each user's old `users.role` into their root membership, and drops `users.role`. Comments reach their group through their post. A user has no role of their own, only memberships.
+- Soft delete: `deleted_at` on posts, comments, messages and groups. Deleting a post takes its comments with it: no tombstone, no orphaned thread (see Simplified). Deleting a group hides everything in it.
 - Edit tracking: `edited_at` flag only; no version history.
 - Unread markers: a table of `(user_id, stream, last_read_event_seq)`, one row per user per stream (chat, feed, notifications), updated from the client with a debounce. Lives in the DB so it follows people across devices and feeds the digest and the unanswered-posts view.
 - Chat history kept forever, paginated.
@@ -209,7 +230,7 @@ One in-app notification table that every channel reads from.
 
 ## Admin tools at launch
 
-Roles: owner, moderator, member. One owner: the person who runs this place. The owner sets anyone to member or moderator from the People page; a moderator can delete anything and edit nothing of others', exactly as the owner can, and can create and revoke invites, but cannot change roles. Transferring ownership is a separate, explicit action, later. A role change is a `user` event, so every open page's controls follow it.
+Roles: owner, moderator, member, as memberships of the root group (see Groups: the same three roles exist in every group). One owner: the person who runs this place. The owner sets anyone to member or moderator from the People page; a moderator can delete anything and edit nothing of others', exactly as the owner can, and can create and revoke invites (invites add people to the root group), but cannot change roles. Transferring ownership is a separate, explicit action, later. A role change is a `membership` event, so every open page's controls follow it.
 
 Minimum shipped:
 
@@ -233,13 +254,15 @@ Read-only mode is also a switch on self-hosted instances, since "we're winding d
 
 ## Visibility rules
 
-One Go function, `CanSee(viewer, thing)`, that every query path goes through. A table-driven test file covers each viewer state (anonymous, member, moderator, author, removed) against each thing type (post, comment, chat message, image, topic). No feed query bypasses it for performance until a test proves the bypass gives the same answer. Non-negotiable: this is the promise the product makes.
+One Go function, `CanSee(viewer, thing)`, that every query path goes through. A table-driven test file covers each viewer state (anonymous, member, moderator, author, removed) against each thing type (post, comment, chat message, image, group, topic). No feed query bypasses it for performance until a test proves the bypass gives the same answer. Non-negotiable: this is the promise the product makes.
+
+The rule itself is membership, nothing else: a signed-in, not-removed viewer sees a thing if they are a member of the group it is in. Staff have no extra sight. Lists are scoped in SQL by a join on `memberships` for the viewer, and single-thing reads go through `CanSee` in `internal/perm`, with a test that the two agree.
 
 ## Permissions
 
-The write side of the same promise, in the same shape. One package, `internal/perm`, holds every rule about who may do what to what (`EditPost`, `DeletePost`, `EditComment`, `DeleteComment`, and so on as actions arrive; `CanSee` lives there too when it is built). The rules are plain functions over an actor (id, role) and the thing's ownership facts, with one table-driven test, one row per (who, what) pair. Every write handler fetches the thing's owners, asks perm, and answers 403 if the answer is no; no query carries an author clause of its own.
+The write side of the same promise, in the same shape. One package, `internal/perm`, holds every rule about who may do what to what (`EditPost`, `DeletePost`, `EditComment`, `DeleteComment`, `DeleteMessage`, the group and membership actions, and `CanSee`). The rules are plain functions over an actor (id, and their role in the thing's group) and the thing's ownership facts, with one table-driven test, one row per (who, what) pair. Every write handler fetches the thing's owners and the actor's membership, asks perm, and answers 403 if the answer is no; no query carries an author clause of its own. Because roles live on memberships, the same functions serve the root group and every other group.
 
-The frontend holds no permission logic. Every post, comment and message the API serves carries `can: {edit, delete}`, computed by perm for the requesting user on the way out, and `/api/me` carries the instance-level abilities (`invite`, `manage_roles`). Menus and buttons show what the flags say. There is nothing to keep aligned because there is only one implementation; a role change arrives as a `user` event and the client refetches what it holds. (Considered and rejected: mirroring the rules in TypeScript with a shared test table. Two implementations of a rule are a rule that will drift, which is how Sweet got four body formats.)
+The frontend holds no permission logic. Every post, comment and message the API serves carries `can: {edit, delete}`, and every group carries `can: {add_members, remove_members, set_roles, rename, delete, leave}`, computed by perm for the requesting user on the way out. Menus and buttons show what the flags say. There is nothing to keep aligned because there is only one implementation; a membership change arrives as a `membership` event and the client refetches what it holds for that group. (Considered and rejected: mirroring the rules in TypeScript with a shared test table. Two implementations of a rule are a rule that will drift, which is how Sweet got four body formats.)
 
 ## Client data
 
@@ -268,13 +291,12 @@ Kept so the reasoning isn't lost when one of these comes back up.
 | Cut | What it was | Why | When to revisit |
 |---|---|---|---|
 | Open registration + Turnstile | A third registration mode, open to anyone, with Cloudflare bot protection | Approval is open in practice; removes a Cloudflare dependency from self-hosted installs and the only bot-protection code in the product | If an instance needs frictionless signup and the approval queue is a bottleneck |
-| DMs | Private one-to-one messages | The chat room covers it; Sweet had three mentions of wanting DMs in two and a half years and people used Twitter instead | If members ask, or if an instance has no shared outside channel |
 | Native app / Capacitor | Wrapping the React build for the app stores, with native push | Its own account setup, store reviews, a "which Sweet?" screen, and a token auth mode; nothing in v1 depends on it. PWA with web push covers mobile | When store presence or iOS push for non-installed users matters |
 | Orchestrator web UI and self-serve instance creation | A superadmin web app, and a public form that creates an instance | A CLI does the same job while instances are few; v0 is "email Raph". The provision/setup/onboarding boundary is designed so the form is one automated step later | When there are more instances than fit in memory, or when payment arrives |
 | Bounce tracking | Marking addresses as bouncing after provider webhooks report failures | Needs provider webhooks and vendor coupling. A "didn't get it? resend or change address" screen gives the user what they need | If silent delivery failures show up in support |
 | Custom domains | `sweet.theirgroup.org` via on-demand TLS | One wildcard cert for `*.sweet.community` covers v0; on-demand TLS needs an `ask` endpoint from the orchestrator | When a group asks |
 | Presence / typing indicators | "Who's online" and "X is typing" in chat | Would push realtime towards WebSockets; SSE is simpler and sufficient without them | If chat feels dead without them |
-| Sub-group topics | Topics as places with their own membership | Sweet data: 81% of posts went to the main feed, 118 of 203 posters never posted in a community, 47 of 53 communities died. Topics stay as views on one feed | Probably never |
+| Public sub-communities | Topics as public places with their own membership, competing with the feed | Sweet data: 81% of posts went to the main feed, 118 of 203 posters never posted in a community, 47 of 53 communities died. Topics stay as views on one feed. Private groups (see Groups) are a different object: content that cannot be on the feed at all | Probably never |
 | Post version history | Keeping every edit | An `edited_at` flag is enough | If moderation needs it |
 | Server-side drafts | Drafts saved to the instance | Browser local storage does the job with no API; Safari's 7-day storage wipe for non-installed sites is accepted | If people lose drafts and mind |
 | Server-side rendering of ProseMirror JSON | Go renders ProseMirror JSON to HTML | A Go renderer drifts from the TipTap schema (a published account of trying it ended with a Node sidecar). Superseded: the body is HTML, so nothing is rendered server-side | Never |
@@ -335,6 +357,8 @@ Kept so the reasoning isn't lost when one of these comes back up.
 | Closed panes | A closed pane unmounts and refetches when reopened | Both panes stay mounted; a closed one is hidden | Unmounting threw away whatever was being typed |
 | Event kinds | One kind per action (`post`, `post_edit`, `post_delete`, …) | Two per resource: the whole thing, or its deletion | Kinds were accreting; the cache code grew a case per kind |
 | Permissions on the client | Rules repeated in the frontend by hand | Server computes `can` flags; the client has no rules | Two copies of a rule drift; the server's answer is the only one that matters |
+| DMs | Cut: the room covers it, three requests in two and a half years | A DM is a private group of kind `dm` | Once private groups exist for the moderation room and clubhouses, a DM is the same object with two members and no name; cutting it would be a special case, not a saving |
+| Private spaces inside an instance | None: everyone sees everything | Private, invisible groups with a feed and a chat, the instance as the root group | A moderation room, a sensitive-topic clubhouse and a private word with one person all need content that cannot be on the feed. The data against sub-communities was about public ones competing with the feed |
 | Backups | Nightly `VACUUM INTO` from inside the binary, no Litestream | Litestream for hosted instances; `VACUUM INTO` as the no-setup fallback for self-hosters | Small tooling cost, high payoff from near-continuous restore |
 | Body format | TipTap JSON canonical, server never touches HTML, Go walker validates and extracts | TipTap HTML canonical, bluemonday sanitises, `x/net/html` extracts | The JSON design rested on "Go has no good sanitiser", which was false. HTML + bluemonday is one policy instead of a walker, a fixture harness and two renderers |
 | Event cursor | Integer sequence → monotonic UUIDv7 → integer sequence | Integer sequence on the event log | Removing it was an invented simplification; commit order is what matters |
