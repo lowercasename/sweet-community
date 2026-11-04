@@ -1,74 +1,65 @@
-import { useState } from 'react'
-import { NodeViewWrapper, type NodeViewProps } from '@tiptap/react'
-import { Button } from './Button'
-import { Textarea } from './Textarea'
+import { NodeViewWrapper, useEditorState, type Editor, type NodeViewProps } from '@tiptap/react'
+import { ImageCard } from './ImageCard'
+import { GALLERY_MAX } from '../content/galleries'
 
-/** Mastodon allows 1500, Bluesky 2000, X 1000. */
-export const ALT_MAX = 1500
+interface Run {
+  /** Images in this gallery, counting this one. 1 means a lone image. */
+  count: number
+  first: boolean
+  last: boolean
+}
 
-const PLACEHOLDER = 'Describe this image for people using screen readers.'
-
-const CHIP =
-  'absolute bottom-2 left-2 cursor-pointer appearance-none rounded-[4px] border-0 px-1.5 py-0.5 ' +
-  'text-xs font-medium leading-5 text-white transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-pink'
+const ALONE: Run = { count: 1, first: true, last: true }
 
 /**
- * An image inside the editor. The chip in the corner follows the convention
- * Bluesky, X and Mastodon settled on: it says what is missing until a
- * description exists, then shows a quiet ALT badge that reopens the field.
+ * Where this image sits in its run of adjacent images, as the post will
+ * render them: runs longer than GALLERY_MAX split into several galleries.
  */
-export function EditorImage({ node, selected, updateAttributes }: NodeViewProps) {
-  const alt = (node.attrs.alt as string | null) ?? ''
-  const [draft, setDraft] = useState<string | null>(null)
-  const open = draft !== null
+function runAt(doc: Editor['state']['doc'], pos: number | undefined): Run {
+  if (pos === undefined) return ALONE
+  const $pos = doc.resolve(pos)
+  const parent = $pos.parent
+  const index = $pos.index()
+  let start = index
+  while (start > 0 && parent.child(start - 1).type.name === 'image') start--
+  let end = index
+  while (end + 1 < parent.childCount && parent.child(end + 1).type.name === 'image') end++
+  const offset = index - start
+  const chunkStart = start + offset - (offset % GALLERY_MAX)
+  const chunkEnd = Math.min(end, chunkStart + GALLERY_MAX - 1)
+  return { count: chunkEnd - chunkStart + 1, first: index === chunkStart, last: index === chunkEnd }
+}
 
-  const save = () => {
-    if (draft === null) return
-    updateAttributes({ alt: draft.trim() })
-    setDraft(null)
+/**
+ * An image node in the editor, drawn as an ImageCard. Adjacent cards join
+ * into one block because the post will render them as a gallery. The grip
+ * drags the card anywhere between blocks, in or out of a gallery.
+ */
+export function EditorImage({ editor, node, getPos, selected, updateAttributes, deleteNode }: NodeViewProps) {
+  const run = useEditorState({ editor, selector: ({ editor }) => runAt(editor.state.doc, getPos()) }) ?? ALONE
+  const corners = run.first && run.last ? 'all' : run.first ? 'top' : run.last ? 'bottom' : 'none'
+
+  // Enter in the field returns to writing, just after this image.
+  const leave = () => {
+    const pos = getPos()
+    if (pos !== undefined) editor.chain().focus(pos + node.nodeSize).run()
   }
 
   return (
-    <NodeViewWrapper className="my-0 mb-[0.6em]">
-      <span className="relative inline-block max-w-full align-top">
-        <img
-          className={`m-0 ${selected ? 'outline-2 outline-offset-2 outline-pink' : ''}`}
-          src={node.attrs.src as string}
-          alt={alt}
-          width={(node.attrs.width as number | null) ?? undefined}
-          height={(node.attrs.height as number | null) ?? undefined}
-          data-drag-handle
-        />
-        {!open && (
-          <button
-            type="button"
-            className={`${CHIP} ${alt ? 'bg-ink/70 hover:bg-ink' : 'bg-pink hover:bg-sweet'}`}
-            title={alt ? 'Edit the description' : 'Describe this image for people using screen readers'}
-            onClick={() => setDraft(alt)}
-          >
-            {alt ? 'ALT' : 'Add alt text'}
-          </button>
-        )}
-      </span>
-      {open && (
-        <span className="mt-2 flex flex-col gap-2">
-          <Textarea
-            value={draft}
-            onChange={setDraft}
-            placeholder={PLACEHOLDER}
-            autoFocus
-            maxLength={ALT_MAX}
-            onSubmit={save}
-            onCancel={() => setDraft(null)}
-          />
-          <span className="flex items-center gap-3">
-            <Button onClick={save}>Save</Button>
-            <Button variant="ghost" onClick={() => setDraft(null)}>
-              Cancel
-            </Button>
-          </span>
-        </span>
+    <NodeViewWrapper className={`${run.first ? '' : '-mt-px'} ${run.last ? 'mb-[0.6em]' : ''}`}>
+      {run.first && run.count > 1 && (
+        <span className="mb-1 block text-sm text-mute">Gallery of {run.count} images</span>
       )}
+      <ImageCard
+        src={node.attrs.src as string}
+        alt={(node.attrs.alt as string | null) ?? ''}
+        onAltChange={(alt) => updateAttributes({ alt })}
+        onAltEnter={leave}
+        onRemove={deleteNode}
+        grip
+        corners={corners}
+        selected={selected}
+      />
     </NodeViewWrapper>
   )
 }

@@ -82,6 +82,11 @@ describe('chat HTML round-trip', () => {
       '<p>T</p><p>a</p><p>q</p>',
     )
   })
+  it('has no inline images (chat attaches them above the text instead)', () => {
+    expect(roundTrip('<img src="/img/1" alt="" width="1" height="1" data-image-id="1"><p>hi</p>', chatExtensions)).toBe(
+      '<p>hi</p>',
+    )
+  })
 })
 
 describe('comment HTML round-trip', () => {

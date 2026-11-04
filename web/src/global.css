@@ -100,15 +100,49 @@
     list-style: decimal;
     padding-left: 1.4em;
   }
-  :is(.content, .editor .ProseMirror) img {
+  /* In the editor, images are EditorImage cards and style themselves. */
+  .content img {
     display: block;
     max-width: 100%;
     height: auto;
+    margin: 0 0 0.6em;
     border-radius: 4px;
   }
-  /* In the editor the image sits inside EditorImage's wrapper, which carries the margin. */
-  .content img {
+
+  /*
+   * Galleries: HtmlContent wraps each run of adjacent images in
+   * <div class="gallery" data-count="N">. Fixed row heights and object-fit
+   * keep the grid tidy whatever the pictures' shapes.
+   * 2: two across. 3: two across, one below. 4: two rows of two.
+   * 5: two, two, one. 6: four across, two below. 7: four, two, one. 8: four, four.
+   */
+  .content .gallery {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    grid-auto-rows: 200px;
+    gap: 4px;
     margin: 0 0 0.6em;
+  }
+  .content .gallery img {
+    width: 100%;
+    height: 100%;
+    margin: 0;
+    object-fit: cover;
+  }
+  .content .gallery:is([data-count='6'], [data-count='7'], [data-count='8']) {
+    grid-template-columns: repeat(4, 1fr);
+    grid-auto-rows: 140px;
+  }
+  .content .gallery:is([data-count='3'], [data-count='5']) img:last-child {
+    grid-column: span 2;
+    grid-row: span 2;
+  }
+  .content .gallery:is([data-count='6'], [data-count='7']) img:nth-child(n + 5) {
+    grid-column: span 2;
+  }
+  .content .gallery[data-count='7'] img:last-child {
+    grid-column: span 4;
+    grid-row: span 2;
   }
 
   /* The editing surface: white, a hairline, pink when focused. */

@@ -9,12 +9,14 @@ interface FilePickerProps {
   icon?: IconName
   label: string
   disabled?: boolean
-  onPick: (file: File) => void
+  /** Allow choosing several files at once. */
+  multiple?: boolean
+  onPick: (files: File[]) => void
   children?: ReactNode
 }
 
 /** A button that opens the file chooser; the input itself stays hidden. */
-export function FilePicker({ accept, variant = 'ghost', icon, label, disabled, onPick, children }: FilePickerProps) {
+export function FilePicker({ accept, variant = 'ghost', icon, label, disabled, multiple, onPick, children }: FilePickerProps) {
   const input = useRef<HTMLInputElement>(null)
   return (
     <>
@@ -22,13 +24,14 @@ export function FilePicker({ accept, variant = 'ghost', icon, label, disabled, o
         ref={input}
         type="file"
         accept={accept}
+        multiple={multiple}
         className="hidden"
         tabIndex={-1}
         aria-hidden="true"
         onChange={(e) => {
-          const f = e.target.files?.[0]
+          const files = Array.from(e.target.files ?? [])
           e.target.value = ''
-          if (f) onPick(f)
+          if (files.length > 0) onPick(files)
         }}
       />
       <Button variant={variant} icon={icon} label={label} disabled={disabled} onClick={() => input.current?.click()}>

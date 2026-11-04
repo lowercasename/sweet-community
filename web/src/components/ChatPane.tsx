@@ -139,6 +139,7 @@ export function ChatPane({ side = 'full' }: ChatPaneProps) {
               extensions={chatExtensions}
               size="line"
               enterSubmits
+              images="attached"
               submitLabel="Send"
               busyLabel="Sending…"
               disabled={status === 'offline'}

@@ -2,6 +2,7 @@ import {
   Bell,
   Bold,
   ChevronsLeft,
+  GripVertical,
   ChevronsRight,
   House,
   Image as ImageIcon,
@@ -17,6 +18,7 @@ import {
   Settings,
   TabletSmartphone,
   Users,
+  X,
   type LucideIcon,
 } from 'lucide-react'
 
@@ -39,6 +41,8 @@ export type IconName =
   | 'image'
   | 'pencil'
   | 'devices'
+  | 'grip'
+  | 'remove'
 
 const ICONS: Record<IconName, LucideIcon> = {
   bold: Bold,
@@ -59,6 +63,8 @@ const ICONS: Record<IconName, LucideIcon> = {
   image: ImageIcon,
   pencil: Pencil,
   devices: TabletSmartphone,
+  grip: GripVertical,
+  remove: X,
 }
 
 interface IconProps {

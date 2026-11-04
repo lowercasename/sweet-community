@@ -1,7 +1,7 @@
 import { useRef, useState } from 'react'
 import { useEditor, useEditorState, type Extensions } from '@tiptap/react'
-import { Button, EditorSurface, Form, Row, Stack, Text } from '../ui'
-import { imageFiles, insertImage } from '../editor/images'
+import { Button, EditorSurface, Form, ImageCard, Row, Stack, Text } from '../ui'
+import { imageFiles, imagesHtml, insertImages, uploadImages, type AttachedImage } from '../editor/images'
 import { EditorToolbar, promptLink } from './EditorToolbar'
 
 interface BodyEditorProps {
@@ -10,6 +10,12 @@ interface BodyEditorProps {
   size: 'post' | 'line'
   /** Enter submits (chat). Otherwise Enter is a newline and Mod+Enter submits. */
   enterSubmits?: boolean
+  /**
+   * `inline`: images are nodes in the text, placed where the cursor is
+   * (posts, comments). `attached`: images stack above the text field and
+   * are sent as a block before it (chat).
+   */
+  images?: 'inline' | 'attached'
   submitLabel: string
   busyLabel: string
   /** True while offline; disables submit. */
@@ -25,11 +31,12 @@ interface BodyEditorProps {
   onCancel?: () => void
 }
 
-/** The one editor: posts, chat and comments differ only in schema, size and submit key. */
+/** The one editor: posts, chat and comments differ only in schema, size, submit key and where images go. */
 export function BodyEditor({
   extensions,
   size,
   enterSubmits = false,
+  images = 'inline',
   submitLabel,
   busyLabel,
   disabled,
@@ -40,6 +47,7 @@ export function BodyEditor({
   const editing = initialHtml !== undefined
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [attached, setAttached] = useState<AttachedImage[]>([])
 
   // The keydown handler is created once by TipTap; read the latest callbacks via refs.
   const submitRef = useRef<() => void>(() => {})
@@ -75,39 +83,48 @@ export function BodyEditor({
         const files = imageFiles(event.clipboardData)
         if (files.length === 0) return false
         event.preventDefault()
-        for (const f of files) addImageRef.current(f)
+        addImagesRef.current(files)
         return true
       },
       handleDrop(_view, event) {
         const files = imageFiles(event.dataTransfer)
         if (files.length === 0) return false
         event.preventDefault()
-        for (const f of files) addImageRef.current(f)
+        addImagesRef.current(files)
         return true
       },
     },
   })
 
-  const addImageRef = useRef<(file: File) => void>(() => {})
-  addImageRef.current = (file: File) => {
+  const addImagesRef = useRef<(files: File[]) => void>(() => {})
+  addImagesRef.current = (files: File[]) => {
     if (!editor) return
     setError(null)
-    insertImage(editor, file).catch((e: unknown) =>
-      setError(e instanceof Error ? e.message : 'Could not add the image'),
-    )
+    const done =
+      images === 'inline'
+        ? insertImages(editor, files)
+        : uploadImages(files).then(({ images, error }) => {
+            setAttached((prev) => [...prev, ...images])
+            if (error) throw new Error(error)
+          })
+    done.catch((e: unknown) => setError(e instanceof Error ? e.message : 'Could not add the images'))
   }
 
+  const setAlt = (id: string, alt: string) => setAttached((prev) => prev.map((i) => (i.id === id ? { ...i, alt } : i)))
+  const remove = (id: string) => setAttached((prev) => prev.filter((i) => i.id !== id))
+
   const isEmpty = useEditorState({ editor, selector: ({ editor }) => (editor ? editor.isEmpty : true) })
-  const canSubmit = !!editor && !isEmpty && !disabled && !busy
+  const canSubmit = !!editor && (!isEmpty || attached.length > 0) && !disabled && !busy
 
   const submit = async () => {
     if (!editor || !canSubmit) return
     setBusy(true)
     setError(null)
     try {
-      await onSubmit(editor.getHTML())
+      await onSubmit(imagesHtml(attached) + (isEmpty ? '' : editor.getHTML()))
       if (!editing) {
         editor.commands.clearContent(true)
+        setAttached([])
         if (enterSubmits) editor.commands.focus()
       }
     } catch (e) {
@@ -121,9 +138,26 @@ export function BodyEditor({
   return (
     <Form onSubmit={() => void submit()}>
       <Stack gap={size === 'line' ? 1 : 2}>
+        {attached.length > 0 && (
+          <Stack gap={0}>
+            {attached.map((img, i) => (
+              <ImageCard
+                key={img.id}
+                src={img.url}
+                alt={img.alt}
+                onAltChange={(alt) => setAlt(img.id, alt)}
+                onAltEnter={() => editor?.commands.focus()}
+                onRemove={() => remove(img.id)}
+                corners={
+                  attached.length === 1 ? 'all' : i === 0 ? 'top' : i === attached.length - 1 ? 'bottom' : 'none'
+                }
+              />
+            ))}
+          </Stack>
+        )}
         <EditorSurface editor={editor} size={size} />
         <Row justify="between" align="center">
-          <EditorToolbar editor={editor} onImage={(f) => addImageRef.current(f)} />
+          <EditorToolbar editor={editor} onImage={(files) => addImagesRef.current(files)} />
           <Row gap={3} align="center">
             {onCancel && (
               <Button variant="ghost" disabled={busy} onClick={onCancel}>

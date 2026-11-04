@@ -89,7 +89,7 @@ Server-side on upload: apply EXIF orientation, strip metadata, generate sizes. D
 
 Images are protected per instance: served through the Go backend at `/img/<id>` with a session check. No images outside the web app (the digest carries no content), so no signed URLs.
 
-Alt text is written through a chip on the image in the editor (Bluesky, X and Mastodon all converged on this): "Add alt text" until a description exists, then a quiet ALT badge that reopens the field. No prompt on insert. Whether alt text is required is a feature flag.
+Images in the editor are cards: the picture small on the left, the alt text field taking the rest, a grip to drag the card between blocks, an X to remove it. No prompt on insert. Adjacent cards join into one block labelled "Gallery of N images", because the post renders a run of adjacent images as a grid: 2 across; 2 then 1; 2 and 2; 2, 2, 1; 4 then 2; 4, 2, 1; 4 and 4. Eight is the most in one gallery; a longer run splits. The gallery exists only at render time (`wrapGalleries` in the frontend): stored HTML is a plain run of `<img>`. Chat has no inline images: pictures attach above the text field as the same cards and are sent as a block of `<img>` before the text. Whether alt text is required is a feature flag.
 
 Per-image and per-post size caps; a per-instance storage quota enforced at upload (also a pricing lever).
 

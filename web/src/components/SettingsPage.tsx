@@ -60,7 +60,7 @@ export function SettingsPage({ me, onMeChange, onSignOut, onLogout }: SettingsPa
                     icon="image"
                     label="Choose a picture"
                     disabled={pictureBusy}
-                    onPick={(f) => void choosePicture(f)}
+                    onPick={(files) => void choosePicture(files[0])}
                   >
                     {pictureBusy ? 'Uploading…' : 'Choose a picture'}
                   </FilePicker>
