@@ -111,8 +111,8 @@ export function ChatPane({ side = 'full' }: ChatPaneProps) {
   }
 
   return (
-    <Pane side={side}>
-      <Card fill>
+    <Pane side={side} flush>
+      <Card fill flush>
         <ScrollArea ref={scrollRef} pad="inner" onScroll={onScroll}>
           <Stack gap={3}>
             {nextBefore != null && (
