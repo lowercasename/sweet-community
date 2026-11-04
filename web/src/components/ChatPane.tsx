@@ -49,6 +49,8 @@ export function ChatPane({ side = 'full' }: ChatPaneProps) {
   const stickRef = useRef(true)
   // Height before an older page was prepended, so the view doesn't jump.
   const prependRef = useRef<number | null>(null)
+  // Last known scroll position, restored after the pane was hidden.
+  const topRef = useRef(0)
 
   useStreamEvents((kind, data) => {
     if (kind === 'message' && isMessage(data)) setMessages((prev) => append(prev, data))
@@ -86,8 +88,25 @@ export function ChatPane({ side = 'full' }: ChatPaneProps) {
 
   const onScroll = () => {
     const el = scrollRef.current
-    if (el) stickRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < STICK_THRESHOLD_PX
+    if (!el || el.clientHeight === 0) return // hidden: nothing to measure
+    stickRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < STICK_THRESHOLD_PX
+    topRef.current = el.scrollTop
   }
+
+  // The pane is hidden (display: none) while closed or behind another page,
+  // which loses the browser's scroll position. When it gets a size again,
+  // or the divider changes its width, put the view back: at the bottom if it
+  // was following, else where it was.
+  useEffect(() => {
+    const el = scrollRef.current
+    if (!el) return
+    const ro = new ResizeObserver(() => {
+      if (el.clientHeight === 0) return
+      el.scrollTop = stickRef.current ? el.scrollHeight : topRef.current
+    })
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [])
 
   const loadEarlier = async () => {
     if (nextBefore == null || loading) return

@@ -8,7 +8,7 @@ import { PeoplePage } from '../components/PeoplePage'
 import { PostsPane } from '../components/PostsPane'
 import { SettingsPage } from '../components/SettingsPage'
 import { Sidebar, type Page } from '../components/Sidebar'
-import { Panes, Rail, Shell, Split, TabBar } from '../ui'
+import { Rail, Shell, Split, TabBar } from '../ui'
 
 interface HomeProps {
   me: User
@@ -21,6 +21,9 @@ interface HomeProps {
  * and chat either side of a draggable divider; drag a pane shut and it
  * folds into a Rail. On a narrow screen the nav column is replaced by a tab
  * bar at the bottom that also switches between the two panes.
+ *
+ * Posts and chat stay mounted whatever is showing, so a half-written post
+ * or message survives closing its pane or visiting Settings.
  */
 export function Home({ me, onMeChange, onSignOut }: HomeProps) {
   const { layout, narrow, ratio, navExpanded, setLayout, setRatio, toggleNav } = useLayout()
@@ -31,37 +34,7 @@ export function Home({ me, onMeChange, onSignOut }: HomeProps) {
     onSignOut()
   }
 
-  let main
-  if (page === 'people') main = <PeoplePage me={me} />
-  else if (page === 'settings')
-    main = <SettingsPage me={me} onMeChange={onMeChange} onSignOut={onSignOut} onLogout={() => void signOut()} />
-  else if (page === 'menu') main = <MenuPage me={me} onNavigate={setPage} onLogout={() => void signOut()} />
-  else if (narrow) main = <Panes layout="single">{layout === 'posts' ? <PostsPane me={me} /> : <ChatPane />}</Panes>
-  else if (layout === 'both')
-    main = (
-      <Split
-        ratio={ratio}
-        onRatio={setRatio}
-        onCollapse={(side) => setLayout(side === 'left' ? 'chat' : 'posts')}
-        left={<PostsPane me={me} side="left" />}
-        right={<ChatPane side="right" />}
-      />
-    )
-  else if (layout === 'posts')
-    main = (
-      <Panes layout="right-rail">
-        <PostsPane me={me} />
-        <Rail side="right" icon="chat" label="Chat" onOpen={() => setLayout('both')} />
-      </Panes>
-    )
-  else
-    main = (
-      <Panes layout="left-rail">
-        <Rail side="left" icon="posts" label="Posts" onOpen={() => setLayout('both')} />
-        <ChatPane />
-      </Panes>
-    )
-
+  const show = layout === 'both' ? 'both' : layout === 'posts' ? 'left' : 'right'
   const tabActive = page === 'home' ? (layout === 'posts' ? 'posts' : 'chat') : page === 'menu' ? 'menu' : undefined
 
   return (
@@ -73,7 +46,22 @@ export function Home({ me, onMeChange, onSignOut }: HomeProps) {
           )
         }
       >
-        {main}
+        {page === 'people' && <PeoplePage me={me} />}
+        {page === 'settings' && (
+          <SettingsPage me={me} onMeChange={onMeChange} onSignOut={onSignOut} onLogout={() => void signOut()} />
+        )}
+        {page === 'menu' && <MenuPage me={me} onNavigate={setPage} onLogout={() => void signOut()} />}
+        <Split
+          hidden={page !== 'home'}
+          show={show}
+          ratio={ratio}
+          onRatio={setRatio}
+          onCollapse={(side) => setLayout(side === 'left' ? 'chat' : 'posts')}
+          leftRail={narrow ? undefined : <Rail side="left" icon="posts" label="Posts" onOpen={() => setLayout('both')} />}
+          rightRail={narrow ? undefined : <Rail side="right" icon="chat" label="Chat" onOpen={() => setLayout('both')} />}
+          left={<PostsPane me={me} side={show === 'both' ? 'left' : 'full'} />}
+          right={<ChatPane side={show === 'both' ? 'right' : 'full'} />}
+        />
         {narrow && (
           <TabBar
             tabs={[
