@@ -32,7 +32,7 @@ An instance settings table. Each feature is on or off, set by the owner during o
 
 SSE for the read side, plain POSTs to the API for sends. Plain HTTP, so cookie auth and proxies just work (Caddy detects `text/event-stream` and flushes immediately; no config). One stream per client, carrying every event type (chat, posts, replies, notifications, version). Not Socket.io; reconsider WebSockets only if we want presence or typing indicators.
 
-Every event carries an `id:` line holding the event log's integer sequence, so the browser's own `Last-Event-ID` reconnect is served straight from SQLite; `?since=<seq>` is the same query on the manual path. No in-memory replay buffer: SQLite is the buffer.
+Every event carries an `id:` line holding the event log's integer sequence, so the browser's own `Last-Event-ID` reconnect is served straight from SQLite; `?since=<seq>` is the same query on the manual path, and an explicit `since=0` replays from the start; a client that names no sequence has just loaded the page from the API and gets only what happens next. No in-memory replay buffer: SQLite is the buffer.
 
 **Two event kinds per resource, no more.** `post`, `comment`, `message` and `user` each carry the whole resource and mean "this is its current state": create and edit are the same event. `post_delete`, `comment_delete`, `message_delete` carry the ids (the comment's includes its post's). Nothing else. The client cache therefore has exactly one upsert and one delete per resource, and a new feature adds a resource, not a kind. (Reversed from an earlier `post_edit` / `comment_edit`, which were accreting.)
 
