@@ -25,6 +25,8 @@ export default defineConfig({
       },
       '/api': { target: backend, changeOrigin: false },
       '/healthz': { target: backend, changeOrigin: false },
+      // Uploaded images are served by the Go side, behind the session cookie.
+      '/img': { target: backend, changeOrigin: false },
     },
   },
 })
