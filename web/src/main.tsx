@@ -6,10 +6,10 @@ import '@fontsource/ubuntu/400-italic.css'
 import '@fontsource/ubuntu/500.css'
 import '@fontsource/ubuntu/700.css'
 import './global.css'
-import { Home } from './pages/Home'
+import { App } from './App'
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
-    <Home />
+    <App />
   </React.StrictMode>,
 )

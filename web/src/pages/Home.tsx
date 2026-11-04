@@ -1,51 +1,42 @@
-import { useEffect, useState } from 'react'
-import { getMe, type User } from '../api'
+import { useState } from 'react'
+import { logout, type User } from '../api'
 import { StreamProvider } from '../hooks/StreamContext'
 import { useLayout } from '../hooks/useLayout'
 import { ChatPane } from '../components/ChatPane'
+import { MenuPage } from '../components/MenuPage'
+import { PeoplePage } from '../components/PeoplePage'
 import { PostsPane } from '../components/PostsPane'
-import { Sidebar } from '../components/Sidebar'
+import { SettingsPage } from '../components/SettingsPage'
+import { Sidebar, type Page } from '../components/Sidebar'
 import { Panes, Rail, Shell, Split, TabBar } from '../ui'
 
+interface HomeProps {
+  me: User
+  onSignOut: () => void
+}
+
 /**
- * The one page: a nav column on the left, then posts and chat either side of
- * a draggable divider. Drag a pane shut and it folds into a Rail; click the
- * rail to bring it back. On a narrow screen one pane shows and a tab bar at
- * the bottom switches.
+ * The signed-in app: a nav column on the left, then the page. Home is posts
+ * and chat either side of a draggable divider; drag a pane shut and it
+ * folds into a Rail. On a narrow screen the nav column is replaced by a tab
+ * bar at the bottom that also switches between the two panes.
  */
-export function Home() {
-  const [me, setMe] = useState<User | null>(null)
+export function Home({ me, onSignOut }: HomeProps) {
   const { layout, narrow, ratio, navExpanded, setLayout, setRatio, toggleNav } = useLayout()
+  const [page, setPage] = useState<Page>('home')
 
-  useEffect(() => {
-    getMe()
-      .then(setMe)
-      .catch(() => setMe(null))
-  }, [])
+  const signOut = async () => {
+    await logout()
+    onSignOut()
+  }
 
-  let body
-  if (narrow) {
-    body = (
-      <>
-        <Panes layout="single">{layout === 'posts' ? <PostsPane me={me} /> : <ChatPane />}</Panes>
-        <TabBar
-          tabs={[
-            { key: 'posts', icon: 'posts', label: 'Posts' },
-            { key: 'chat', icon: 'chat', label: 'Chat' },
-            { key: 'search', icon: 'search', label: 'Search' },
-            { key: 'bell', icon: 'bell', label: 'Alerts' },
-            { key: 'menu', icon: 'menu', label: 'Menu' },
-          ]}
-          active={layout === 'posts' ? 'posts' : 'chat'}
-          onSelect={(key) => {
-            // Only the panes do anything yet; search, alerts and the menu sheet come with their features.
-            if (key === 'posts' || key === 'chat') setLayout(key)
-          }}
-        />
-      </>
-    )
-  } else if (layout === 'both') {
-    body = (
+  let main
+  if (page === 'people') main = <PeoplePage me={me} />
+  else if (page === 'settings') main = <SettingsPage onSignOut={onSignOut} />
+  else if (page === 'menu') main = <MenuPage me={me} onNavigate={setPage} onLogout={() => void signOut()} />
+  else if (narrow) main = <Panes layout="single">{layout === 'posts' ? <PostsPane me={me} /> : <ChatPane />}</Panes>
+  else if (layout === 'both')
+    main = (
       <Split
         ratio={ratio}
         onRatio={setRatio}
@@ -54,25 +45,60 @@ export function Home() {
         right={<ChatPane side="right" />}
       />
     )
-  } else if (layout === 'posts') {
-    body = (
+  else if (layout === 'posts')
+    main = (
       <Panes layout="right-rail">
         <PostsPane me={me} />
         <Rail side="right" icon="chat" label="Chat" onOpen={() => setLayout('both')} />
       </Panes>
     )
-  } else {
-    body = (
+  else
+    main = (
       <Panes layout="left-rail">
         <Rail side="left" icon="posts" label="Posts" onOpen={() => setLayout('both')} />
         <ChatPane />
       </Panes>
     )
-  }
+
+  const tabActive = page === 'home' ? (layout === 'posts' ? 'posts' : 'chat') : page === 'menu' ? 'menu' : undefined
 
   return (
     <StreamProvider>
-      <Shell aside={narrow ? undefined : <Sidebar me={me} expanded={navExpanded} onToggle={toggleNav} />}>{body}</Shell>
+      <Shell
+        aside={
+          narrow ? undefined : (
+            <Sidebar
+              me={me}
+              page={page}
+              expanded={navExpanded}
+              onNavigate={setPage}
+              onLogout={() => void signOut()}
+              onToggle={toggleNav}
+            />
+          )
+        }
+      >
+        {main}
+        {narrow && (
+          <TabBar
+            tabs={[
+              { key: 'posts', icon: 'posts', label: 'Posts' },
+              { key: 'chat', icon: 'chat', label: 'Chat' },
+              { key: 'search', icon: 'search', label: 'Search' },
+              { key: 'bell', icon: 'bell', label: 'Alerts' },
+              { key: 'menu', icon: 'menu', label: 'Menu' },
+            ]}
+            active={tabActive}
+            onSelect={(key) => {
+              if (key === 'posts' || key === 'chat') {
+                setPage('home')
+                setLayout(key)
+              } else if (key === 'menu') setPage('menu')
+              // Search and alerts come with their features.
+            }}
+          />
+        )}
+      </Shell>
     </StreamProvider>
   )
 }

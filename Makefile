@@ -14,7 +14,7 @@ build: cmd/sweet/migrations frontend
 # Backend only, serving whatever is in internal/web/dist (placeholder until
 # the frontend is built). Pair with `cd web && pnpm dev` for live reload.
 dev-backend: cmd/sweet/migrations
-	go run ./cmd/sweet -db data/sweet.db -owner raphael
+	go run ./cmd/sweet -db data/sweet.db -owner raphael -owner-password "$${SWEET_OWNER_PASSWORD}"
 
 run: build
 	./bin/sweet -db data/sweet.db -owner raphael

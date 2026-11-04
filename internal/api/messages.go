@@ -32,7 +32,7 @@ func (s *Server) listMessages(w http.ResponseWriter, r *http.Request) {
 		before = v
 	}
 	rows, err := s.DB.QueryContext(r.Context(), `
-		SELECT m.id, m.body_html, m.body_text, m.created_at, u.id, u.username
+		SELECT m.id, m.body_html, m.body_text, m.created_at, u.id, u.username, u.role
 		FROM messages m JOIN users u ON u.id = m.author_id
 		WHERE m.deleted_at IS NULL AND m.created_at < ?
 		ORDER BY m.created_at DESC, m.id DESC
@@ -45,7 +45,7 @@ func (s *Server) listMessages(w http.ResponseWriter, r *http.Request) {
 	msgs := []Message{}
 	for rows.Next() {
 		var m Message
-		if err := rows.Scan(&m.ID, &m.BodyHTML, &m.BodyText, &m.CreatedAt, &m.Author.ID, &m.Author.Username); err != nil {
+		if err := rows.Scan(&m.ID, &m.BodyHTML, &m.BodyText, &m.CreatedAt, &m.Author.ID, &m.Author.Username, &m.Author.Role); err != nil {
 			writeErr(w, http.StatusInternalServerError, err.Error())
 			return
 		}
@@ -70,7 +70,8 @@ func (s *Server) createMessage(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusInternalServerError, err.Error())
 		return
 	}
-	m := Message{ID: id.String(), Author: s.Owner, BodyHTML: clean, BodyText: sanitize.Text(clean), CreatedAt: db.Now()}
+	author, _ := userFrom(r.Context())
+	m := Message{ID: id.String(), Author: author, BodyHTML: clean, BodyText: sanitize.Text(clean), CreatedAt: db.Now()}
 
 	ctx := r.Context()
 	tx, err := s.DB.BeginTx(ctx, nil)

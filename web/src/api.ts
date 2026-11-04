@@ -3,6 +3,27 @@
 export interface User {
   id: string
   username: string
+  /** "owner" runs the instance; everyone else is "member". */
+  role: 'owner' | 'member'
+}
+
+export interface Member extends User {
+  created_at: number
+}
+
+export interface Invite {
+  code: string
+  /** Path of the join page, e.g. /join/abc. */
+  url: string
+  created_by: User
+  created_at: number
+  expires_at: number
+}
+
+export interface Session {
+  user: User
+  /** The session token, for clients that cannot hold the cookie. */
+  token: string
 }
 
 export interface Post {
@@ -97,4 +118,48 @@ export function createMessage(bodyHtml: string): Promise<Message> {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ body_html: bodyHtml }),
   })
+}
+
+export function login(username: string, password: string): Promise<Session> {
+  return request<Session>('/api/login', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ username, password }),
+  })
+}
+
+export function register(code: string, username: string, password: string): Promise<Session> {
+  return request<Session>('/api/register', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ code, username, password }),
+  })
+}
+
+export async function logout(): Promise<void> {
+  await fetch('/api/logout', { method: 'POST' })
+}
+
+export async function logoutEverywhere(): Promise<void> {
+  await fetch('/api/logout-all', { method: 'POST' })
+}
+
+export function getInvite(code: string): Promise<{ invited_by: string }> {
+  return request(`/api/invites/${encodeURIComponent(code)}`)
+}
+
+export function createInvite(): Promise<Invite> {
+  return request<Invite>('/api/invites', { method: 'POST' })
+}
+
+export function listInvites(): Promise<{ invites: Invite[] }> {
+  return request('/api/invites')
+}
+
+export async function revokeInvite(code: string): Promise<void> {
+  await fetch(`/api/invites/${encodeURIComponent(code)}`, { method: 'DELETE' })
+}
+
+export function listUsers(): Promise<{ users: Member[] }> {
+  return request('/api/users')
 }

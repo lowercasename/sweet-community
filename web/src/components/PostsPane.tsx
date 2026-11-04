@@ -7,7 +7,7 @@ import { ConnectionStatus } from './ConnectionStatus'
 import { PostList } from './PostList'
 
 interface PostsPaneProps {
-  me: User | null
+  me: User
   /** Which outer edge is padded; `left`/`right` inside a Split. */
   side?: 'left' | 'right' | 'full'
 }

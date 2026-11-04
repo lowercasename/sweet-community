@@ -26,7 +26,9 @@ var migrationsFS embed.FS
 func main() {
 	addr := flag.String("addr", ":8080", "listen address")
 	dbPath := flag.String("db", "data/sweet.db", "SQLite database path")
-	owner := flag.String("owner", "owner", "username of the single PoC user")
+	owner := flag.String("owner", "owner", "username of the instance owner")
+	ownerPassword := flag.String("owner-password", os.Getenv("SWEET_OWNER_PASSWORD"),
+		"owner's initial password (or SWEET_OWNER_PASSWORD); used only until the owner has one")
 	flag.Parse()
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
@@ -48,13 +50,16 @@ func main() {
 		log.Fatalf("migrate: %v", err)
 	}
 
-	me, err := api.EnsureOwner(ctx, d, *owner)
+	me, err := api.EnsureOwner(ctx, d, *owner, *ownerPassword)
 	if err != nil {
 		log.Fatalf("owner: %v", err)
 	}
+	if !api.OwnerHasPassword(ctx, d, *owner) {
+		log.Printf("WARNING: owner %q has no password and cannot sign in; restart with -owner-password or SWEET_OWNER_PASSWORD", *owner)
+	}
 
 	hub := events.NewHub(d)
-	srv := &api.Server{DB: d, Hub: hub, Owner: me}
+	srv := &api.Server{DB: d, Hub: hub}
 
 	mux := http.NewServeMux()
 	srv.Routes(mux)
@@ -62,7 +67,7 @@ func main() {
 
 	httpSrv := &http.Server{
 		Addr:              *addr,
-		Handler:           mux,
+		Handler:           api.Protect(mux),
 		ReadHeaderTimeout: 10 * time.Second,
 		// No WriteTimeout: SSE connections are long-lived by design.
 	}

@@ -6,6 +6,7 @@ import {
   House,
   Italic,
   Link,
+  LogOut,
   Menu,
   MessagesSquare,
   Newspaper,
@@ -30,6 +31,7 @@ export type IconName =
   | 'posts'
   | 'chat'
   | 'menu'
+  | 'logout'
   | 'pencil'
 
 const ICONS: Record<IconName, LucideIcon> = {
@@ -46,6 +48,7 @@ const ICONS: Record<IconName, LucideIcon> = {
   posts: Newspaper,
   chat: MessagesSquare,
   menu: Menu,
+  logout: LogOut,
   pencil: Pencil,
 }
 

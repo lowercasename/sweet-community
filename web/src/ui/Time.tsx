@@ -6,19 +6,17 @@ interface TimeProps {
 }
 
 function relative(at: number, now: number): string {
-  const s = Math.round((now - at) / 1000)
-  if (s < 45) return 'just now'
+  const future = at > now
+  const s = Math.round(Math.abs(now - at) / 1000)
+  const wrap = (v: string) => (future ? `in ${v}` : `${v} ago`)
+  if (s < 45) return future ? 'any moment' : 'just now'
   const m = Math.round(s / 60)
-  if (m < 60) return `${m}m ago`
+  if (m < 60) return wrap(`${m}m`)
   const h = Math.round(m / 60)
-  if (h < 24) return `${h}h ago`
+  if (h < 24) return wrap(`${h}h`)
   const d = Math.round(h / 24)
-  if (d < 30) return `${d}d ago`
-  return new Date(at).toLocaleDateString(undefined, {
-    day: 'numeric',
-    month: 'short',
-    year: 'numeric',
-  })
+  if (d < 30) return wrap(`${d}d`)
+  return new Date(at).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' })
 }
 
 /** Re-renders once a minute so "3m ago" keeps up. */

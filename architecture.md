@@ -122,7 +122,7 @@ Uniqueness is per instance (each has its own database): username and email uniqu
 
 If the verification email doesn't arrive, the user gets a "didn't get it? resend, or change the address" screen. No bounce tracking.
 
-Sessions, not JWTs: server-side sessions stored in the instance's SQLite, 180 days with rolling expiry. On the web, an httpOnly `SameSite=Lax` cookie set by HTTP (Safari's 7-day cap applies only to script-set cookies). CSRF: SameSite plus an Origin check on every state-changing request. The same session id can be presented as a bearer token (see Mobile).
+Sessions, not JWTs: server-side sessions stored in the instance's SQLite, 180 days with rolling expiry (refreshed at most once a day; the stored id is the SHA-256 of the token the client holds). On the web, an httpOnly `SameSite=Lax` cookie set by HTTP (Safari's 7-day cap applies only to script-set cookies). CSRF: SameSite plus an Origin check on every state-changing request. The same session id can be presented as a bearer token (see Mobile).
 
 Revocation is a "log out everywhere" button: users have it for themselves, moderators have it for any user, and the orchestrator can call it through the instance admin API.
 

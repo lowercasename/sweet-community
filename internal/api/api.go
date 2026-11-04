@@ -1,5 +1,6 @@
-// Package api holds the HTTP handlers for the PoC: me, posts, events.
-// No auth yet: a single owner user, created at startup, authors everything.
+// Package api holds the HTTP handlers: sessions and invites, posts, chat
+// messages, the event stream. Everything but sign-in, join and healthz
+// requires a session (see auth.go).
 package api
 
 import (
@@ -13,6 +14,7 @@ import (
 
 	"github.com/google/uuid"
 
+	"sweet/internal/auth"
 	"sweet/internal/db"
 	"sweet/internal/events"
 	"sweet/internal/sanitize"
@@ -21,6 +23,8 @@ import (
 type User struct {
 	ID       string `json:"id"`
 	Username string `json:"username"`
+	// Role is "owner" (runs the instance) or "member".
+	Role string `json:"role"`
 }
 
 // Post is the wire shape. It carries no event sequence: the SSE "id:" line
@@ -35,39 +39,81 @@ type Post struct {
 }
 
 type Server struct {
-	DB    *sql.DB
-	Hub   *events.Hub
-	Owner User
+	DB  *sql.DB
+	Hub *events.Hub
+
+	limiter loginLimiter
 }
 
-// EnsureOwner creates the single PoC user if it doesn't exist.
-func EnsureOwner(ctx context.Context, d *sql.DB, username string) (User, error) {
-	var u User
-	err := d.QueryRowContext(ctx, `SELECT id, username FROM users WHERE username = ?`, username).Scan(&u.ID, &u.Username)
-	if err == nil {
-		return u, nil
-	}
-	if !errors.Is(err, sql.ErrNoRows) {
+// EnsureOwner makes sure the instance has its owner account. On first run it
+// creates the user; whenever the owner has no password yet and one is given,
+// it sets it. A password given later is ignored: change it in the app.
+func EnsureOwner(ctx context.Context, d *sql.DB, username, password string) (User, error) {
+	u := User{Username: username, Role: "owner"}
+	var hash sql.NullString
+	err := d.QueryRowContext(ctx, `SELECT id, password_hash FROM users WHERE username = ?`, username).Scan(&u.ID, &hash)
+	switch {
+	case errors.Is(err, sql.ErrNoRows):
+		id, err := uuid.NewV7()
+		if err != nil {
+			return u, err
+		}
+		u.ID = id.String()
+		if _, err := d.ExecContext(ctx, `INSERT INTO users (id, username, role, created_at) VALUES (?, ?, 'owner', ?)`, u.ID, u.Username, db.Now()); err != nil {
+			return u, err
+		}
+	case err != nil:
 		return u, err
+	default:
+		if _, err := d.ExecContext(ctx, `UPDATE users SET role = 'owner' WHERE id = ?`, u.ID); err != nil {
+			return u, err
+		}
 	}
-	id, err := uuid.NewV7()
-	if err != nil {
-		return u, err
+	if !hash.Valid && password != "" {
+		h, err := auth.HashPassword(password)
+		if err != nil {
+			return u, err
+		}
+		if _, err := d.ExecContext(ctx, `UPDATE users SET password_hash = ? WHERE id = ?`, h, u.ID); err != nil {
+			return u, err
+		}
 	}
-	u = User{ID: id.String(), Username: username}
-	_, err = d.ExecContext(ctx, `INSERT INTO users (id, username, created_at) VALUES (?, ?, ?)`, u.ID, u.Username, db.Now())
-	return u, err
+	return u, nil
+}
+
+// OwnerHasPassword reports whether the owner can sign in at all.
+func OwnerHasPassword(ctx context.Context, d *sql.DB, username string) bool {
+	var hash sql.NullString
+	if err := d.QueryRowContext(ctx, `SELECT password_hash FROM users WHERE username = ?`, username).Scan(&hash); err != nil {
+		return false
+	}
+	return hash.Valid
 }
 
 func (s *Server) Routes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, r *http.Request) { io.WriteString(w, "ok") })
-	mux.HandleFunc("GET /api/me", s.me)
-	mux.HandleFunc("GET /api/posts", s.listPosts)
-	mux.HandleFunc("POST /api/posts", s.createPost)
-	mux.HandleFunc("PUT /api/posts/{id}", s.editPost)
-	mux.HandleFunc("GET /api/messages", s.listMessages)
-	mux.HandleFunc("POST /api/messages", s.createMessage)
-	mux.Handle("GET /api/events", s.Hub)
+
+	// Public: the way in.
+	mux.HandleFunc("POST /api/login", s.login)
+	mux.HandleFunc("GET /api/invites/{code}", s.getInvite)
+	mux.HandleFunc("POST /api/register", s.register)
+
+	// Members.
+	mux.HandleFunc("GET /api/me", s.requireAuth(s.me))
+	mux.HandleFunc("POST /api/logout", s.requireAuth(s.logout))
+	mux.HandleFunc("POST /api/logout-all", s.requireAuth(s.logoutAll))
+	mux.HandleFunc("GET /api/users", s.requireAuth(s.listUsers))
+	mux.HandleFunc("GET /api/posts", s.requireAuth(s.listPosts))
+	mux.HandleFunc("POST /api/posts", s.requireAuth(s.createPost))
+	mux.HandleFunc("PUT /api/posts/{id}", s.requireAuth(s.editPost))
+	mux.HandleFunc("GET /api/messages", s.requireAuth(s.listMessages))
+	mux.HandleFunc("POST /api/messages", s.requireAuth(s.createMessage))
+	mux.HandleFunc("GET /api/events", s.requireAuth(s.Hub.ServeHTTP))
+
+	// Owner.
+	mux.HandleFunc("GET /api/invites", s.requireOwner(s.listInvites))
+	mux.HandleFunc("POST /api/invites", s.requireOwner(s.createInvite))
+	mux.HandleFunc("DELETE /api/invites/{code}", s.requireOwner(s.deleteInvite))
 }
 
 func writeJSON(w http.ResponseWriter, status int, v any) {
@@ -80,10 +126,6 @@ func writeErr(w http.ResponseWriter, status int, msg string) {
 	writeJSON(w, status, map[string]string{"error": msg})
 }
 
-func (s *Server) me(w http.ResponseWriter, r *http.Request) {
-	writeJSON(w, http.StatusOK, s.Owner)
-}
-
 func (s *Server) listPosts(w http.ResponseWriter, r *http.Request) {
 	limit := 20
 	if v, err := strconv.Atoi(r.URL.Query().Get("limit")); err == nil && v > 0 && v <= 100 {
@@ -94,7 +136,7 @@ func (s *Server) listPosts(w http.ResponseWriter, r *http.Request) {
 		before = v
 	}
 	rows, err := s.DB.QueryContext(r.Context(), `
-		SELECT p.id, p.body_html, p.body_text, p.created_at, p.edited_at, u.id, u.username
+		SELECT p.id, p.body_html, p.body_text, p.created_at, p.edited_at, u.id, u.username, u.role
 		FROM posts p JOIN users u ON u.id = p.author_id
 		WHERE p.deleted_at IS NULL AND p.created_at < ?
 		ORDER BY p.created_at DESC, p.id DESC
@@ -107,7 +149,7 @@ func (s *Server) listPosts(w http.ResponseWriter, r *http.Request) {
 	posts := []Post{}
 	for rows.Next() {
 		var p Post
-		if err := rows.Scan(&p.ID, &p.BodyHTML, &p.BodyText, &p.CreatedAt, &p.EditedAt, &p.Author.ID, &p.Author.Username); err != nil {
+		if err := rows.Scan(&p.ID, &p.BodyHTML, &p.BodyText, &p.CreatedAt, &p.EditedAt, &p.Author.ID, &p.Author.Username, &p.Author.Role); err != nil {
 			writeErr(w, http.StatusInternalServerError, err.Error())
 			return
 		}
@@ -151,7 +193,8 @@ func (s *Server) createPost(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusInternalServerError, err.Error())
 		return
 	}
-	p := Post{ID: id.String(), Author: s.Owner, BodyHTML: clean, BodyText: sanitize.Text(clean), CreatedAt: db.Now()}
+	author, _ := userFrom(r.Context())
+	p := Post{ID: id.String(), Author: author, BodyHTML: clean, BodyText: sanitize.Text(clean), CreatedAt: db.Now()}
 
 	ctx := r.Context()
 	tx, err := s.DB.BeginTx(ctx, nil) // BEGIN IMMEDIATE via _txlock
@@ -189,7 +232,8 @@ func (s *Server) editPost(w http.ResponseWriter, r *http.Request) {
 	}
 	id := r.PathValue("id")
 	now := db.Now()
-	p := Post{ID: id, Author: s.Owner, BodyHTML: clean, BodyText: sanitize.Text(clean), EditedAt: &now}
+	author, _ := userFrom(r.Context())
+	p := Post{ID: id, Author: author, BodyHTML: clean, BodyText: sanitize.Text(clean), EditedAt: &now}
 
 	ctx := r.Context()
 	tx, err := s.DB.BeginTx(ctx, nil)
@@ -197,11 +241,11 @@ func (s *Server) editPost(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusInternalServerError, err.Error())
 		return
 	}
-	// Only the author may edit (the owner is the only user for now).
+	// Only the author may edit; anyone else gets the same 404 as a missing post.
 	err = tx.QueryRowContext(ctx, `
 		UPDATE posts SET body_html = ?, body_text = ?, edited_at = ?
 		WHERE id = ? AND author_id = ? AND deleted_at IS NULL
-		RETURNING created_at`, p.BodyHTML, p.BodyText, now, id, s.Owner.ID).Scan(&p.CreatedAt)
+		RETURNING created_at`, p.BodyHTML, p.BodyText, now, id, author.ID).Scan(&p.CreatedAt)
 	if errors.Is(err, sql.ErrNoRows) {
 		tx.Rollback()
 		writeErr(w, http.StatusNotFound, "no such post")
