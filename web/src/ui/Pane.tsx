@@ -14,5 +14,5 @@ const PADS: Record<NonNullable<PaneProps['side']>, string> = {
 
 /** One column of the layout, padded on the paper; its ScrollArea or Card child scrolls. */
 export function Pane({ side = 'full', children }: PaneProps) {
-  return <section className={`flex min-h-0 min-w-0 flex-col gap-2 overflow-hidden ${PADS[side]}`}>{children}</section>
+  return <section className={`flex min-h-0 min-w-0 flex-1 flex-col gap-2 overflow-hidden ${PADS[side]}`}>{children}</section>
 }
