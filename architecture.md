@@ -101,7 +101,7 @@ Per-image and per-post size caps; a per-instance storage quota enforced at uploa
 - Event ordering: the event log has an integer sequence column assigned inside the write transaction, which is therefore commit-ordered. SSE `id:` and `?since=` use it. UUIDs are not used as cursors (generation order is not commit order with a connection pool).
 - Every write transaction starts `BEGIN IMMEDIATE`. A deferred transaction that reads then writes can fail with `SQLITE_BUSY_SNAPSHOT`, which `busy_timeout` cannot help with. Consider one connection for writes and a separate read pool.
 - Pagination by cursor, never offset, for feed, chat and search.
-- Soft delete: `deleted_at` on posts, comments and messages. Deleting a post with replies keeps the thread with a "deleted" stub.
+- Soft delete: `deleted_at` on posts, comments and messages. Deleting a post takes its comments with it: no tombstone, no orphaned thread (see Simplified).
 - Edit tracking: `edited_at` flag only; no version history.
 - Unread markers: a table of `(user_id, stream, last_read_event_seq)`, one row per user per stream (chat, feed, notifications), updated from the client with a debounce. Lives in the DB so it follows people across devices and feeds the digest and the unanswered-posts view.
 - Chat history kept forever, paginated.
@@ -274,6 +274,7 @@ Kept so the reasoning isn't lost when one of these comes back up.
 | Server-side HEIC decoding | Accept JPEG/PNG/WebP/GIF by magic bytes, reject the rest with a clear message | HEIC in Go needs cgo and libheif; WebKit transcodes to the first `accept` type when JPEG is listed first and `image/*` is absent |
 | In-memory SSE replay buffer | Browser `Last-Event-ID` and `?since=<seq>` both served from SQLite, plus heartbeat and forced reconnect on visibility/online | SQLite already holds everything; a buffer duplicates it. iOS kills sockets silently, so the client can't trust `readyState` |
 | Member removal with a keep / anonymise / delete choice | Anonymise, always | Fewer branches in the code and in the moderator's head |
+| Deleted post leaves a tombstone so its comments survive | The post and its comments go together | The author asked for it gone, and a stub that says "deleted" with other people's replies under it is the awkward middle. The cost, commenters losing their words, is small in a group of people who know each other, and the rows stay (soft delete) if a case ever needs them |
 | Session list UI, revoke one at a time | "Log out everywhere" button | Covers the real use (lost phone, suspected compromise) with one control |
 | JWTs | Server-side sessions in SQLite, 180 days rolling, presented as a cookie on the web or a bearer token elsewhere | Simpler, revocable, no refresh-token dance |
 | WebSockets / Socket.io | SSE + plain POSTs | Plain HTTP, proxies and cookies just work, browser reconnects by itself. Socket.io is a Node-centric protocol layer solving a 2012 problem |
