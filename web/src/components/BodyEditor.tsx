@@ -1,6 +1,7 @@
 import { useRef, useState } from 'react'
 import { useEditor, useEditorState, type Extensions } from '@tiptap/react'
 import { Button, EditorSurface, Form, Row, Stack, Text } from '../ui'
+import { imageFiles, insertImage } from '../editor/images'
 import { EditorToolbar, promptLink } from './EditorToolbar'
 
 interface BodyEditorProps {
@@ -69,8 +70,32 @@ export function BodyEditor({
         }
         return false
       },
+      // Pasted or dropped image files are uploaded, not inlined as data: urls.
+      handlePaste(_view, event) {
+        const files = imageFiles(event.clipboardData)
+        if (files.length === 0) return false
+        event.preventDefault()
+        for (const f of files) addImageRef.current(f)
+        return true
+      },
+      handleDrop(_view, event) {
+        const files = imageFiles(event.dataTransfer)
+        if (files.length === 0) return false
+        event.preventDefault()
+        for (const f of files) addImageRef.current(f)
+        return true
+      },
     },
   })
+
+  const addImageRef = useRef<(file: File) => void>(() => {})
+  addImageRef.current = (file: File) => {
+    if (!editor) return
+    setError(null)
+    insertImage(editor, file).catch((e: unknown) =>
+      setError(e instanceof Error ? e.message : 'Could not add the image'),
+    )
+  }
 
   const isEmpty = useEditorState({ editor, selector: ({ editor }) => (editor ? editor.isEmpty : true) })
   const canSubmit = !!editor && !isEmpty && !disabled && !busy
@@ -98,7 +123,7 @@ export function BodyEditor({
       <Stack gap={size === 'line' ? 1 : 2}>
         <EditorSurface editor={editor} size={size} />
         <Row justify="between" align="center">
-          <EditorToolbar editor={editor} />
+          <EditorToolbar editor={editor} onImage={(f) => addImageRef.current(f)} />
           <Row gap={3} align="center">
             {onCancel && (
               <Button variant="ghost" disabled={busy} onClick={onCancel}>

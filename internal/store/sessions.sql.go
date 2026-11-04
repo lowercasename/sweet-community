@@ -7,6 +7,7 @@ package store
 
 import (
 	"context"
+	"database/sql"
 )
 
 const createSession = `-- name: CreateSession :exec
@@ -51,7 +52,7 @@ func (q *Queries) DeleteUserSessions(ctx context.Context, userID string) error {
 }
 
 const getSessionUser = `-- name: GetSessionUser :one
-SELECT u.id, u.username, u.role, s.last_seen_at
+SELECT u.id, u.username, u.role, u.picture_id, s.last_seen_at
 FROM sessions s JOIN users u ON u.id = s.user_id
 WHERE s.id = ?1 AND s.expires_at > ?2
 `
@@ -65,6 +66,7 @@ type GetSessionUserRow struct {
 	ID         string
 	Username   string
 	Role       string
+	PictureID  sql.NullString
 	LastSeenAt int64
 }
 
@@ -75,6 +77,7 @@ func (q *Queries) GetSessionUser(ctx context.Context, arg GetSessionUserParams) 
 		&i.ID,
 		&i.Username,
 		&i.Role,
+		&i.PictureID,
 		&i.LastSeenAt,
 	)
 	return i, err

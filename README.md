@@ -11,7 +11,7 @@ make build                     # builds web/ into internal/web/dist, then bin/sw
 ./bin/sweet -db data/sweet.db -owner raphael -owner-password 'something long'
 ```
 
-Open http://localhost:8080 and sign in as the owner. Flags: `-addr` (default `:8080`), `-db`, `-owner`, `-owner-password` (or `SWEET_OWNER_PASSWORD`; used only until the owner has a password). Everyone else joins through an invite link the owner makes on the People page.
+Open http://localhost:8080 and sign in as the owner. Images go to `-images-dir` (default `data/images`) unless `SWEET_S3_ENDPOINT` and `SWEET_S3_BUCKET` are set, with `SWEET_S3_ACCESS_KEY`, `SWEET_S3_SECRET_KEY`, optional `SWEET_S3_REGION` (default `auto`, right for R2), `SWEET_S3_PREFIX` and `SWEET_S3_INSECURE=1` for a plain-http stand-in. Flags: `-addr` (default `:8080`), `-db`, `-owner`, `-owner-password` (or `SWEET_OWNER_PASSWORD`; used only until the owner has a password). Everyone else joins through an invite link the owner makes on the People page.
 
 ## Develop
 
@@ -32,6 +32,7 @@ internal/db         SQLite open (WAL, busy_timeout, BEGIN IMMEDIATE), migrations
 internal/store      sqlc: queries/*.sql in, typed Go out (make generate; never edit the .go files)
 internal/sanitize   the one bluemonday policy every body passes through
 internal/events     event log, in-process pub/sub, SSE handler
+internal/images     upload processing (magic bytes in, bounded JPEG/PNG out) and storage drivers (local dir, S3/R2)
 internal/api        handlers: sessions and invites (auth.go, invites.go), posts, messages, users; tests in api_test.go
 internal/web        embeds the frontend build
 migrations/         *.sql, forward-only

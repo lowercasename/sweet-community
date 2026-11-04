@@ -13,7 +13,7 @@ export function MessageGroup({ messages }: MessageGroupProps) {
     <Box as="article">
       <Stack gap={1}>
         <Row gap={2} align="center">
-          <Avatar name={first.author.username} size="sm" />
+          <Avatar name={first.author.username} picture={first.author.picture} size="sm" />
           <Text as="span" variant="name">
             {first.author.username}
           </Text>

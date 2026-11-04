@@ -7,6 +7,7 @@ package store
 
 import (
 	"context"
+	"database/sql"
 )
 
 const createMessage = `-- name: CreateMessage :exec
@@ -34,7 +35,7 @@ func (q *Queries) CreateMessage(ctx context.Context, arg CreateMessageParams) er
 
 const listMessages = `-- name: ListMessages :many
 SELECT m.id, m.body_html, m.body_text, m.created_at,
-       u.id AS author_id, u.username AS author_username, u.role AS author_role
+       u.id AS author_id, u.username AS author_username, u.role AS author_role, u.picture_id AS author_picture_id
 FROM messages m JOIN users u ON u.id = m.author_id
 WHERE m.deleted_at IS NULL AND m.created_at < ?1
 ORDER BY m.created_at DESC, m.id DESC
@@ -47,13 +48,14 @@ type ListMessagesParams struct {
 }
 
 type ListMessagesRow struct {
-	ID             string
-	BodyHtml       string
-	BodyText       string
-	CreatedAt      int64
-	AuthorID       string
-	AuthorUsername string
-	AuthorRole     string
+	ID              string
+	BodyHtml        string
+	BodyText        string
+	CreatedAt       int64
+	AuthorID        string
+	AuthorUsername  string
+	AuthorRole      string
+	AuthorPictureID sql.NullString
 }
 
 func (q *Queries) ListMessages(ctx context.Context, arg ListMessagesParams) ([]ListMessagesRow, error) {
@@ -73,6 +75,7 @@ func (q *Queries) ListMessages(ctx context.Context, arg ListMessagesParams) ([]L
 			&i.AuthorID,
 			&i.AuthorUsername,
 			&i.AuthorRole,
+			&i.AuthorPictureID,
 		); err != nil {
 			return nil, err
 		}

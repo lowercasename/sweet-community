@@ -15,7 +15,7 @@ func (s *Server) listUsers(w http.ResponseWriter, r *http.Request) {
 	}
 	out := make([]member, 0, len(rows))
 	for _, row := range rows {
-		out = append(out, member{User: User{ID: row.ID, Username: row.Username, Role: row.Role}, CreatedAt: row.CreatedAt})
+		out = append(out, member{User: User{ID: row.ID, Username: row.Username, Role: row.Role, Picture: pictureURL(row.PictureID)}, CreatedAt: row.CreatedAt})
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"users": out})
 }

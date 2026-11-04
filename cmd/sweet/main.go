@@ -17,8 +17,26 @@ import (
 	"sweet/internal/api"
 	"sweet/internal/db"
 	"sweet/internal/events"
+	"sweet/internal/images"
 	"sweet/internal/web"
 )
+
+// imageStore picks S3 when SWEET_S3_ENDPOINT and SWEET_S3_BUCKET are set
+// (R2: <account>.r2.cloudflarestorage.com, region auto), else a directory.
+func imageStore(dir string) (images.Store, error) {
+	if ep, bucket := os.Getenv("SWEET_S3_ENDPOINT"), os.Getenv("SWEET_S3_BUCKET"); ep != "" && bucket != "" {
+		return images.NewS3(images.S3Config{
+			Endpoint:  ep,
+			Bucket:    bucket,
+			AccessKey: os.Getenv("SWEET_S3_ACCESS_KEY"),
+			SecretKey: os.Getenv("SWEET_S3_SECRET_KEY"),
+			Region:    os.Getenv("SWEET_S3_REGION"),
+			Prefix:    os.Getenv("SWEET_S3_PREFIX"),
+			Insecure:  os.Getenv("SWEET_S3_INSECURE") == "1",
+		})
+	}
+	return images.NewLocal(dir)
+}
 
 //go:embed migrations
 var migrationsFS embed.FS
@@ -29,6 +47,7 @@ func main() {
 	owner := flag.String("owner", "owner", "username of the instance owner")
 	ownerPassword := flag.String("owner-password", os.Getenv("SWEET_OWNER_PASSWORD"),
 		"owner's initial password (or SWEET_OWNER_PASSWORD); used only until the owner has one")
+	imagesDir := flag.String("images-dir", "data/images", "directory for uploaded images when SWEET_S3_* is not set")
 	flag.Parse()
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
@@ -58,8 +77,13 @@ func main() {
 		log.Printf("WARNING: owner %q has no password and cannot sign in; restart with -owner-password or SWEET_OWNER_PASSWORD", *owner)
 	}
 
+	imgStore, err := imageStore(*imagesDir)
+	if err != nil {
+		log.Fatalf("images: %v", err)
+	}
+
 	hub := events.NewHub(d)
-	srv := &api.Server{DB: d, Hub: hub}
+	srv := &api.Server{DB: d, Hub: hub, Images: imgStore}
 
 	mux := http.NewServeMux()
 	srv.Routes(mux)

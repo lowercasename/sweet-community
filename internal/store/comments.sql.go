@@ -80,22 +80,23 @@ func (q *Queries) EditOwnComment(ctx context.Context, arg EditOwnCommentParams) 
 
 const listComments = `-- name: ListComments :many
 SELECT c.id, c.post_id, c.body_html, c.body_text, c.created_at, c.edited_at,
-       u.id AS author_id, u.username AS author_username, u.role AS author_role
+       u.id AS author_id, u.username AS author_username, u.role AS author_role, u.picture_id AS author_picture_id
 FROM comments c JOIN users u ON u.id = c.author_id
 WHERE c.post_id = ? AND c.deleted_at IS NULL
 ORDER BY c.created_at, c.id
 `
 
 type ListCommentsRow struct {
-	ID             string
-	PostID         string
-	BodyHtml       string
-	BodyText       string
-	CreatedAt      int64
-	EditedAt       sql.NullInt64
-	AuthorID       string
-	AuthorUsername string
-	AuthorRole     string
+	ID              string
+	PostID          string
+	BodyHtml        string
+	BodyText        string
+	CreatedAt       int64
+	EditedAt        sql.NullInt64
+	AuthorID        string
+	AuthorUsername  string
+	AuthorRole      string
+	AuthorPictureID sql.NullString
 }
 
 func (q *Queries) ListComments(ctx context.Context, postID string) ([]ListCommentsRow, error) {
@@ -117,6 +118,7 @@ func (q *Queries) ListComments(ctx context.Context, postID string) ([]ListCommen
 			&i.AuthorID,
 			&i.AuthorUsername,
 			&i.AuthorRole,
+			&i.AuthorPictureID,
 		); err != nil {
 			return nil, err
 		}

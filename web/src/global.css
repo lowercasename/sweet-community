@@ -100,6 +100,17 @@
     list-style: decimal;
     padding-left: 1.4em;
   }
+  :is(.content, .editor .ProseMirror) img {
+    display: block;
+    max-width: 100%;
+    height: auto;
+    margin: 0 0 0.6em;
+    border-radius: 4px;
+  }
+  .editor .ProseMirror img.ProseMirror-selectednode {
+    outline: 2px solid var(--color-pink);
+    outline-offset: 2px;
+  }
 
   /* The editing surface: white, a hairline, pink when focused. */
   .editor .ProseMirror {

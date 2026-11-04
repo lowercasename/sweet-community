@@ -32,5 +32,11 @@ export function App() {
   if (auth.kind === 'anonymous') {
     return code ? <Join code={code} onJoined={signedIn} /> : <Login onSignedIn={signedIn} />
   }
-  return <Home me={auth.me} onSignOut={() => setAuth({ kind: 'anonymous' })} />
+  return (
+    <Home
+      me={auth.me}
+      onMeChange={(me) => setAuth({ kind: 'signed-in', me })}
+      onSignOut={() => setAuth({ kind: 'anonymous' })}
+    />
+  )
 }

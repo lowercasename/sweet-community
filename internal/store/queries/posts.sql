@@ -1,6 +1,6 @@
 -- name: ListPosts :many
 SELECT p.id, p.body_html, p.body_text, p.created_at, p.edited_at,
-       u.id AS author_id, u.username AS author_username, u.role AS author_role,
+       u.id AS author_id, u.username AS author_username, u.role AS author_role, u.picture_id AS author_picture_id,
        (SELECT COUNT(*) FROM comments c WHERE c.post_id = p.id AND c.deleted_at IS NULL) AS comment_count
 FROM posts p JOIN users u ON u.id = p.author_id
 WHERE p.deleted_at IS NULL AND p.created_at < sqlc.arg(before)

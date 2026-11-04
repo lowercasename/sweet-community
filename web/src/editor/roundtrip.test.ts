@@ -24,6 +24,8 @@ const fixtures: Record<string, string> = {
   'ordered list': '<ol><li><p>First</p></li><li><p>Second</p></li></ol>',
   blockquote: '<blockquote><p>Quoted.</p></blockquote>',
   'hard break': '<p>Line one<br>Line two</p>',
+  image:
+    '<p>look</p><img src="/img/019a4c5e-0000-7000-8000-000000000002" alt="a cat" width="800" height="600" data-image-id="019a4c5e-0000-7000-8000-000000000002">',
   'nested marks': '<p><strong><em>both</em></strong> and <strong><s>struck bold</s></strong></p>',
   everything: [
     '<h2>Title</h2>',

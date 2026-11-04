@@ -22,7 +22,7 @@ export function Sidebar({ me, page, expanded, onNavigate, onToggle }: SidebarPro
       head={<Wordmark expanded={expanded} />}
       foot={
         <>
-          <NavAccount username={me.username} expanded={expanded} />
+          <NavAccount username={me.username} picture={me.picture} expanded={expanded} />
           <NavItem
             icon={expanded ? 'collapse' : 'expand'}
             label={expanded ? 'Collapse' : 'Expand'}

@@ -94,7 +94,7 @@ export function PeoplePage({ me }: PeoplePageProps) {
                 {error && <Text variant="secondary">{error}</Text>}
                 {users.map((u) => (
                   <Row key={u.id} gap={2} align="center">
-                    <Avatar name={u.username} />
+                    <Avatar name={u.username} picture={u.picture} />
                     <Text as="span" variant="name">
                       {u.username}
                     </Text>

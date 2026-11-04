@@ -74,7 +74,7 @@ func (s *Server) authenticate(r *http.Request) (User, string, bool) {
 	if now-row.LastSeenAt > touchAfter.Milliseconds() {
 		s.q().TouchSession(r.Context(), store.TouchSessionParams{LastSeenAt: now, ExpiresAt: now + SessionTTL.Milliseconds(), ID: id})
 	}
-	return User{ID: row.ID, Username: row.Username, Role: row.Role}, id, true
+	return User{ID: row.ID, Username: row.Username, Role: row.Role, Picture: pictureURL(row.PictureID)}, id, true
 }
 
 // requireAuth rejects unauthenticated requests with 401 and puts the user in the context.
@@ -205,7 +205,7 @@ func (s *Server) login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	row, err := s.q().GetUserByUsername(r.Context(), in.Username)
-	u := User{ID: row.ID, Username: row.Username, Role: row.Role}
+	u := User{ID: row.ID, Username: row.Username, Role: row.Role, Picture: pictureURL(row.PictureID)}
 	hash := row.PasswordHash
 	// Same answer for unknown user and wrong password; bcrypt runs either way
 	// so timing does not reveal which.

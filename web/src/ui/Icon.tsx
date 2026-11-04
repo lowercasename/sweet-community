@@ -4,6 +4,7 @@ import {
   ChevronsLeft,
   ChevronsRight,
   House,
+  Image as ImageIcon,
   Italic,
   Link,
   LogOut,
@@ -35,6 +36,7 @@ export type IconName =
   | 'menu'
   | 'logout'
   | 'comment'
+  | 'image'
   | 'pencil'
   | 'devices'
 
@@ -54,6 +56,7 @@ const ICONS: Record<IconName, LucideIcon> = {
   menu: Menu,
   logout: LogOut,
   comment: MessageCircle,
+  image: ImageIcon,
   pencil: Pencil,
   devices: TabletSmartphone,
 }

@@ -3,3 +3,13 @@
 //   sqlc v1.31.1
 
 package store
+
+type Image struct {
+	ID          string
+	UploaderID  string
+	ContentType string
+	Width       int64
+	Height      int64
+	Bytes       int64
+	CreatedAt   int64
+}

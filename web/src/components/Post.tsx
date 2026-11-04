@@ -29,7 +29,7 @@ export function Post({ post, me, disabled, onEdit }: PostProps) {
       <Stack gap={2}>
         <Row justify="between" align="center">
           <Row gap={2} align="center">
-            <Avatar name={post.author.username} />
+            <Avatar name={post.author.username} picture={post.author.picture} />
             <Text as="span" variant="name">
               {post.author.username}
             </Text>

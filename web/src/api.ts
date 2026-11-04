@@ -5,6 +5,15 @@ export interface User {
   username: string
   /** "owner" runs the instance; everyone else is "member". */
   role: 'owner' | 'member'
+  /** Avatar url, or null for the donut. */
+  picture: string | null
+}
+
+export interface UploadedImage {
+  id: string
+  url: string
+  width: number
+  height: number
 }
 
 export interface Member extends User {
@@ -199,5 +208,19 @@ export function updateComment(id: string, bodyHtml: string): Promise<Comment> {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ body_html: bodyHtml }),
+  })
+}
+
+export async function uploadImage(file: File): Promise<UploadedImage> {
+  const form = new FormData()
+  form.append('file', file)
+  return request<UploadedImage>('/api/images', { method: 'POST', body: form })
+}
+
+export function setPicture(imageId: string | null): Promise<User> {
+  return request<User>('/api/me/picture', {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ image_id: imageId }),
   })
 }

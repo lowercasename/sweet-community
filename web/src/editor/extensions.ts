@@ -1,8 +1,23 @@
 import StarterKit from '@tiptap/starter-kit'
 import Link from '@tiptap/extension-link'
 import { Placeholder } from '@tiptap/extensions'
+import Image from '@tiptap/extension-image'
 
 const link = Link.configure({ openOnClick: false, autolink: true, defaultProtocol: 'https' })
+
+/**
+ * An uploaded image. Only our own /img/<id> urls survive the server's
+ * sanitiser; width and height (TipTap's own) let the page reserve space
+ * before the bytes arrive, and data-image-id names the upload.
+ */
+export const SweetImage = Image.extend({
+  addAttributes() {
+    return {
+      ...this.parent?.(),
+      'data-image-id': { default: null },
+    }
+  },
+}).configure({ inline: false, allowBase64: false })
 
 // Old Sweet's one placeholder, for posts and comments alike.
 const placeholder = Placeholder.configure({ placeholder: 'What would you like to say?' })
@@ -28,6 +43,7 @@ export const postExtensions = [
   }),
   link,
   placeholder,
+  SweetImage,
 ]
 
 /**
@@ -50,6 +66,7 @@ export const chatExtensions = [
   }),
   link,
   placeholder,
+  SweetImage,
 ]
 
 /** The comment schema: chat plus blockquote, which is what a quote-reply is. */
@@ -68,4 +85,5 @@ export const commentExtensions = [
   }),
   link,
   placeholder,
+  SweetImage,
 ]

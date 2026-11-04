@@ -1,8 +1,11 @@
 import { useEditorState, type Editor } from '@tiptap/react'
-import { Button, Row } from '../ui'
+import { Button, FilePicker, Row } from '../ui'
+import { IMAGE_ACCEPT } from '../editor/images'
 
 interface EditorToolbarProps {
   editor: Editor | null
+  /** When set, an image button appears and hands the chosen file here. */
+  onImage?: (file: File) => void
 }
 
 /** Mod+K or the Link button: prompt for a URL and set/unset the link mark on the selection. */
@@ -16,7 +19,7 @@ export function promptLink(editor: Editor) {
 }
 
 /** Bold, italic, link. Phones have no ⌘ key, so these are not optional. */
-export function EditorToolbar({ editor }: EditorToolbarProps) {
+export function EditorToolbar({ editor, onImage }: EditorToolbarProps) {
   const active = useEditorState({
     editor,
     selector: ({ editor }) => ({
@@ -43,6 +46,7 @@ export function EditorToolbar({ editor }: EditorToolbarProps) {
         onClick={() => editor.chain().focus().toggleItalic().run()}
       />
       <Button variant="ghost" icon="link" label="Link" pressed={!!active?.link} onClick={() => promptLink(editor)} />
+      {onImage && <FilePicker accept={IMAGE_ACCEPT} icon="image" label="Add an image" onPick={onImage} />}
     </Row>
   )
 }

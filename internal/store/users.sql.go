@@ -34,7 +34,7 @@ func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) error {
 }
 
 const getUserByUsername = `-- name: GetUserByUsername :one
-SELECT id, username, role, password_hash FROM users WHERE username = ?
+SELECT id, username, role, password_hash, picture_id FROM users WHERE username = ?
 `
 
 type GetUserByUsernameRow struct {
@@ -42,6 +42,7 @@ type GetUserByUsernameRow struct {
 	Username     string
 	Role         string
 	PasswordHash sql.NullString
+	PictureID    sql.NullString
 }
 
 func (q *Queries) GetUserByUsername(ctx context.Context, username string) (GetUserByUsernameRow, error) {
@@ -52,6 +53,7 @@ func (q *Queries) GetUserByUsername(ctx context.Context, username string) (GetUs
 		&i.Username,
 		&i.Role,
 		&i.PasswordHash,
+		&i.PictureID,
 	)
 	return i, err
 }
@@ -73,13 +75,14 @@ func (q *Queries) GetUserPasswordHash(ctx context.Context, username string) (Get
 }
 
 const listUsers = `-- name: ListUsers :many
-SELECT id, username, role, created_at FROM users ORDER BY created_at
+SELECT id, username, role, picture_id, created_at FROM users ORDER BY created_at
 `
 
 type ListUsersRow struct {
 	ID        string
 	Username  string
 	Role      string
+	PictureID sql.NullString
 	CreatedAt int64
 }
 
@@ -96,6 +99,7 @@ func (q *Queries) ListUsers(ctx context.Context) ([]ListUsersRow, error) {
 			&i.ID,
 			&i.Username,
 			&i.Role,
+			&i.PictureID,
 			&i.CreatedAt,
 		); err != nil {
 			return nil, err

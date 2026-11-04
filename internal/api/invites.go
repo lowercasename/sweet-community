@@ -53,7 +53,7 @@ func (s *Server) listInvites(w http.ResponseWriter, r *http.Request) {
 	for _, row := range rows {
 		out = append(out, Invite{
 			Code: row.Code, URL: "/join/" + row.Code, CreatedAt: row.CreatedAt, ExpiresAt: row.ExpiresAt,
-			CreatedBy: User{ID: row.CreatorID, Username: row.CreatorUsername, Role: row.CreatorRole},
+			CreatedBy: User{ID: row.CreatorID, Username: row.CreatorUsername, Role: row.CreatorRole, Picture: pictureURL(row.CreatorPictureID)},
 		})
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"invites": out})

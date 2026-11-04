@@ -84,6 +84,8 @@ func TestFixedPoint(t *testing.T) {
 		`<p><strong><em>both</em></strong> and <strong><s>struck bold</s></strong></p>`,
 		// What TipTap emits after loading an API-authored link (see roundtrip.test.ts).
 		`<p><a target="_blank" rel="noreferrer noopener" href="https://sweet.sh">ok</a></p>`,
+		// An uploaded image as TipTap's Image node serialises it (see editor/extensions.ts).
+		`<p>look</p><img src="/img/019a4c5e-0000-7000-8000-000000000002" alt="a cat" width="800" height="600" data-image-id="019a4c5e-0000-7000-8000-000000000002">`,
 	}
 	for _, f := range fixtures {
 		if got := Body(f); got != f {

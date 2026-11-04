@@ -25,7 +25,7 @@ Run the backend from the repo root (`make dev-backend`) alongside `pnpm dev`. Th
 
 Everything is a component, down to the smallest bit of HTML.
 
-- `src/components/BodyEditor.tsx` is the one editor: posts, chat and comments differ only in schema (`src/editor/extensions.ts`), size and submit key. A quote-reply is `editor/quote.ts` appending a blockquote.
+- `src/components/BodyEditor.tsx` is the one editor: posts, chat and comments differ only in schema (`src/editor/extensions.ts`), size and submit key. Images are TipTap's Image node restricted to our `/img/<id>` urls (`editor/images.ts` uploads a file and inserts it; paste and drop go the same way).
 - `src/ui/` — primitives. Each wraps one HTML element or one layout concern and is the **only** place that element appears: `Box`, `Stack`, `Row`, `Text`, `Heading`, `Link`, `Button`, `Time`, `Hairline`, `Form`, `HtmlContent`, `EditorSurface`, `Icon`, `Shell`, `NavBar`, `NavItem`, `NavAccount`, `Wordmark`, `Avatar`, `Split`, `Panes`, `Pane`, `Rail`, `TabBar`, `Card`, `Bar`, `ScrollArea`, `Measure`. Tailwind classes appear only here; `pnpm check:atomic` fails on a `className` or `style` prop anywhere in `components/` or `pages/`. The two non-utility rule sets (`.content` for rendered bodies, `.editor` for TipTap) are in `src/global.css`.
 - `src/components/` — composites built only from `src/ui/` primitives and other components: `Header`, `ConnectionStatus`, `Post`, `PostList`, `Composer`.
 - `src/pages/` — `Feed`.

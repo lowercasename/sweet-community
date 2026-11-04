@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { createComment, getComments, updateComment, type Comment as CommentData, type User } from '../api'
 import { commentExtensions } from '../editor/extensions'
 import { useStreamEvents } from '../hooks/StreamContext'
-import { Avatar, Box, Button, Card, Hairline, HtmlContent, Icon, Row, Stack, Text, Time } from '../ui'
+import { Avatar, Box, Button, Hairline, HtmlContent, Icon, Row, Stack, Text, Time } from '../ui'
 import { BodyEditor } from './BodyEditor'
 
 interface CommentThreadProps {
@@ -33,7 +33,7 @@ function CommentItem({ comment, mine, disabled, onEdit }: CommentItemProps) {
       <Stack gap={1}>
         <Row justify="between" align="center">
           <Row gap={2} align="center">
-            <Avatar name={comment.author.username} size="sm" />
+            <Avatar name={comment.author.username} picture={comment.author.picture} size="sm" />
             <Text as="span" variant="name">
               {comment.author.username}
             </Text>
@@ -65,9 +65,7 @@ function CommentItem({ comment, mine, disabled, onEdit }: CommentItemProps) {
             onCancel={() => setEditing(false)}
           />
         ) : (
-          <Card tone="field">
-            <HtmlContent html={comment.body_html} />
-          </Card>
+          <HtmlContent html={comment.body_html} />
         )}
       </Stack>
     </Box>

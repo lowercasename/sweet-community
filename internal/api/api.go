@@ -17,6 +17,7 @@ import (
 	"sweet/internal/auth"
 	"sweet/internal/db"
 	"sweet/internal/events"
+	"sweet/internal/images"
 	"sweet/internal/sanitize"
 	"sweet/internal/store"
 )
@@ -26,6 +27,8 @@ type User struct {
 	Username string `json:"username"`
 	// Role is "owner" (runs the instance) or "member".
 	Role string `json:"role"`
+	// Picture is the avatar's url, or null for the donut.
+	Picture *string `json:"picture"`
 }
 
 // Post is the wire shape. It carries no event sequence: the SSE "id:" line
@@ -43,6 +46,8 @@ type Post struct {
 type Server struct {
 	DB  *sql.DB
 	Hub *events.Hub
+	// Images is nil when no storage is configured; uploads then 501.
+	Images images.Store
 
 	limiter loginLimiter
 }
@@ -121,6 +126,9 @@ func (s *Server) Routes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/messages", s.requireAuth(s.listMessages))
 	mux.HandleFunc("POST /api/messages", s.requireAuth(s.createMessage))
 	mux.HandleFunc("GET /api/events", s.requireAuth(s.Hub.ServeHTTP))
+	mux.HandleFunc("POST /api/images", s.requireAuth(s.uploadImage))
+	mux.HandleFunc("GET /img/{id}", s.requireAuth(s.serveImage))
+	mux.HandleFunc("PUT /api/me/picture", s.requireAuth(s.setPicture))
 
 	// Anything else under /api/ is a 404 in JSON, never the SPA page.
 	mux.HandleFunc("/api/", func(w http.ResponseWriter, r *http.Request) {
@@ -167,7 +175,7 @@ func (s *Server) listPosts(w http.ResponseWriter, r *http.Request) {
 	for _, row := range rows {
 		posts = append(posts, Post{
 			ID:           row.ID,
-			Author:       User{ID: row.AuthorID, Username: row.AuthorUsername, Role: row.AuthorRole},
+			Author:       User{ID: row.AuthorID, Username: row.AuthorUsername, Role: row.AuthorRole, Picture: pictureURL(row.AuthorPictureID)},
 			BodyHTML:     row.BodyHtml,
 			BodyText:     row.BodyText,
 			CreatedAt:    row.CreatedAt,

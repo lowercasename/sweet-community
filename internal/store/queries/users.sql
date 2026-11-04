@@ -1,11 +1,11 @@
 -- name: GetUserByUsername :one
-SELECT id, username, role, password_hash FROM users WHERE username = ?;
+SELECT id, username, role, password_hash, picture_id FROM users WHERE username = ?;
 
 -- name: GetUserPasswordHash :one
 SELECT id, password_hash FROM users WHERE username = ?;
 
 -- name: ListUsers :many
-SELECT id, username, role, created_at FROM users ORDER BY created_at;
+SELECT id, username, role, picture_id, created_at FROM users ORDER BY created_at;
 
 -- name: CreateUser :exec
 INSERT INTO users (id, username, password_hash, role, created_at) VALUES (?, ?, ?, ?, ?);

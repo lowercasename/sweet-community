@@ -12,6 +12,7 @@ import { Panes, Rail, Shell, Split, TabBar } from '../ui'
 
 interface HomeProps {
   me: User
+  onMeChange: (me: User) => void
   onSignOut: () => void
 }
 
@@ -21,7 +22,7 @@ interface HomeProps {
  * folds into a Rail. On a narrow screen the nav column is replaced by a tab
  * bar at the bottom that also switches between the two panes.
  */
-export function Home({ me, onSignOut }: HomeProps) {
+export function Home({ me, onMeChange, onSignOut }: HomeProps) {
   const { layout, narrow, ratio, navExpanded, setLayout, setRatio, toggleNav } = useLayout()
   const [page, setPage] = useState<Page>('home')
 
@@ -32,7 +33,8 @@ export function Home({ me, onSignOut }: HomeProps) {
 
   let main
   if (page === 'people') main = <PeoplePage me={me} />
-  else if (page === 'settings') main = <SettingsPage onSignOut={onSignOut} onLogout={() => void signOut()} />
+  else if (page === 'settings')
+    main = <SettingsPage me={me} onMeChange={onMeChange} onSignOut={onSignOut} onLogout={() => void signOut()} />
   else if (page === 'menu') main = <MenuPage me={me} onNavigate={setPage} onLogout={() => void signOut()} />
   else if (narrow) main = <Panes layout="single">{layout === 'posts' ? <PostsPane me={me} /> : <ChatPane />}</Panes>
   else if (layout === 'both')

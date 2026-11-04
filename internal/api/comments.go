@@ -50,7 +50,7 @@ func (s *Server) listComments(w http.ResponseWriter, r *http.Request) {
 		out = append(out, Comment{
 			ID:        row.ID,
 			PostID:    row.PostID,
-			Author:    User{ID: row.AuthorID, Username: row.AuthorUsername, Role: row.AuthorRole},
+			Author:    User{ID: row.AuthorID, Username: row.AuthorUsername, Role: row.AuthorRole, Picture: pictureURL(row.AuthorPictureID)},
 			BodyHTML:  row.BodyHtml,
 			BodyText:  row.BodyText,
 			CreatedAt: row.CreatedAt,

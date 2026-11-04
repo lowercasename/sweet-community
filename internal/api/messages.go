@@ -32,7 +32,7 @@ func (s *Server) listMessages(w http.ResponseWriter, r *http.Request) {
 	for _, row := range rows {
 		msgs = append(msgs, Message{
 			ID:        row.ID,
-			Author:    User{ID: row.AuthorID, Username: row.AuthorUsername, Role: row.AuthorRole},
+			Author:    User{ID: row.AuthorID, Username: row.AuthorUsername, Role: row.AuthorRole, Picture: pictureURL(row.AuthorPictureID)},
 			BodyHTML:  row.BodyHtml,
 			BodyText:  row.BodyText,
 			CreatedAt: row.CreatedAt,

@@ -4,7 +4,11 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"image"
+	"image/color"
+	"image/png"
 	"io"
+	"mime/multipart"
 	"net/http"
 	"net/http/cookiejar"
 	"net/http/httptest"
@@ -15,6 +19,7 @@ import (
 
 	"sweet/internal/db"
 	"sweet/internal/events"
+	"sweet/internal/images"
 )
 
 // newTestServer boots a real server on a temp-file database with the owner
@@ -33,7 +38,11 @@ func newTestServer(t *testing.T) (*httptest.Server, *client) {
 	if _, err := EnsureOwner(context.Background(), d, "raphael", "correct horse"); err != nil {
 		t.Fatal(err)
 	}
-	srv := &Server{DB: d, Hub: events.NewHub(d)}
+	imgs, err := images.NewLocal(filepath.Join(t.TempDir(), "images"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	srv := &Server{DB: d, Hub: events.NewHub(d), Images: imgs}
 	mux := http.NewServeMux()
 	srv.Routes(mux)
 	ts := httptest.NewServer(Protect(mux))
@@ -337,5 +346,96 @@ func TestComments(t *testing.T) {
 	p2 := owner.mustStatus(200, "PUT", "/api/posts/"+id, map[string]string{"body_html": "<p>a question, clarified</p>"})
 	if p2["comment_count"].(float64) != 2 {
 		t.Fatalf("comment_count after post edit: %v", p2)
+	}
+}
+
+// upload posts bytes as multipart field "file" and returns status and body.
+func (c *client) upload(data []byte) (int, map[string]any) {
+	c.t.Helper()
+	var buf bytes.Buffer
+	mw := multipart.NewWriter(&buf)
+	fw, _ := mw.CreateFormFile("file", "x.bin")
+	fw.Write(data)
+	mw.Close()
+	req, _ := http.NewRequest("POST", c.base+"/api/images", &buf)
+	req.Header.Set("Content-Type", mw.FormDataContentType())
+	res, err := c.http.Do(req)
+	if err != nil {
+		c.t.Fatal(err)
+	}
+	defer res.Body.Close()
+	raw, _ := io.ReadAll(res.Body)
+	out := map[string]any{}
+	json.Unmarshal(raw, &out)
+	return res.StatusCode, out
+}
+
+func testPNG(w, h int) []byte {
+	img := image.NewNRGBA(image.Rect(0, 0, w, h))
+	for y := 0; y < h; y++ {
+		for x := 0; x < w; x++ {
+			img.Set(x, y, color.NRGBA{uint8(x), uint8(y), 90, 255})
+		}
+	}
+	var buf bytes.Buffer
+	png.Encode(&buf, img)
+	return buf.Bytes()
+}
+
+func TestImagesUploadServeAndPicture(t *testing.T) {
+	ts, owner := newTestServer(t)
+
+	// Not an image: refused by content, whatever the name.
+	if status, body := owner.upload([]byte("<script>alert(1)</script>")); status != 422 {
+		t.Fatalf("non-image upload: %d %v", status, body)
+	}
+
+	status, img := owner.upload(testPNG(2400, 600))
+	if status != 201 || img["width"].(float64) != 2000 || img["height"].(float64) != 500 {
+		t.Fatalf("upload: %d %v", status, img)
+	}
+	url := img["url"].(string)
+
+	// Served to members with a long private cache life; not to strangers.
+	res, err := owner.http.Get(owner.base + url)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer res.Body.Close()
+	if res.StatusCode != 200 || res.Header.Get("Content-Type") != "image/jpeg" || !strings.Contains(res.Header.Get("Cache-Control"), "immutable") {
+		t.Fatalf("serve: %d %v", res.StatusCode, res.Header)
+	}
+	if _, _, err := image.Decode(res.Body); err != nil {
+		t.Fatalf("served bytes do not decode: %v", err)
+	}
+	if status, _ := newClient(t, ts).do("GET", url, nil); status != 401 {
+		t.Fatalf("anonymous image fetch: want 401, got %d", status)
+	}
+	owner.mustStatus(404, "GET", "/img/nope", nil)
+
+	// A body may reference it; the sanitiser keeps our own path.
+	post := owner.mustStatus(201, "POST", "/api/posts", map[string]string{
+		"body_html": `<p>look</p><img src="` + url + `" data-image-id="` + img["id"].(string) + `" alt="a test" width="2000" height="500">`,
+	})
+	if !strings.Contains(post["body_html"].(string), `src="`+url+`"`) {
+		t.Fatalf("image stripped from body: %v", post["body_html"])
+	}
+
+	// Profile picture on, then off.
+	me := owner.mustStatus(200, "PUT", "/api/me/picture", map[string]any{"image_id": img["id"]})
+	if me["picture"] != url {
+		t.Fatalf("picture set: %v", me)
+	}
+	if owner.mustStatus(200, "GET", "/api/me", nil)["picture"] != url {
+		t.Fatal("picture not persisted on /api/me")
+	}
+	users := owner.mustStatus(200, "GET", "/api/users", nil)["users"].([]any)
+	if users[0].(map[string]any)["picture"] != url {
+		t.Fatalf("picture missing from people list: %v", users[0])
+	}
+	owner.mustStatus(404, "PUT", "/api/me/picture", map[string]any{"image_id": "nope"})
+	me = owner.mustStatus(200, "PUT", "/api/me/picture", map[string]any{"image_id": nil})
+	if me["picture"] != nil {
+		t.Fatalf("picture cleared: %v", me)
 	}
 }

@@ -14,7 +14,7 @@ export function MenuPage({ me, onNavigate, onLogout }: MenuPageProps) {
     <Pane>
       <Card>
         <Stack gap={1}>
-          <NavAccount username={me.username} expanded />
+          <NavAccount username={me.username} picture={me.picture} expanded />
           <NavItem icon="people" label="People" expanded onClick={() => onNavigate('people')} />
           <NavItem icon="settings" label="Settings" expanded onClick={() => onNavigate('settings')} />
           <NavItem icon="logout" label="Sign out" expanded onClick={onLogout} />

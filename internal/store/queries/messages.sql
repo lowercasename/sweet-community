@@ -1,6 +1,6 @@
 -- name: ListMessages :many
 SELECT m.id, m.body_html, m.body_text, m.created_at,
-       u.id AS author_id, u.username AS author_username, u.role AS author_role
+       u.id AS author_id, u.username AS author_username, u.role AS author_role, u.picture_id AS author_picture_id
 FROM messages m JOIN users u ON u.id = m.author_id
 WHERE m.deleted_at IS NULL AND m.created_at < sqlc.arg(before)
 ORDER BY m.created_at DESC, m.id DESC
