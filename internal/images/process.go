@@ -5,12 +5,11 @@ import (
 	"errors"
 	"image"
 	"image/draw"
+	"image/gif"
 	"image/jpeg"
 	"image/png"
 	"io"
 	"net/http"
-
-	_ "image/gif" // decode only
 
 	xdraw "golang.org/x/image/draw"
 	_ "golang.org/x/image/webp" // decode only; Go cannot encode WebP
@@ -34,15 +33,28 @@ var (
 // Processed is a stored image: bytes, their type, and the size they were stored at.
 type Processed struct {
 	Data        []byte
-	ContentType string // image/jpeg or image/png
-	Ext         string // jpg or png
+	ContentType string // image/jpeg, image/png or image/gif
+	Ext         string // jpg, png or gif
 	Width       int
 	Height      int
 }
 
+// Ext is the stored file extension for a content type.
+func Ext(contentType string) string {
+	switch contentType {
+	case "image/png":
+		return "png"
+	case "image/gif":
+		return "gif"
+	default:
+		return "jpg"
+	}
+}
+
 // Process validates by content (not by name), caps the dimensions, strips
 // metadata by re-encoding, and returns JPEG for opaque images and PNG for
-// ones with transparency. Animated GIFs keep their first frame only.
+// ones with transparency. An animated GIF is the exception: it is stored as
+// it came, because re-encoding would lose the animation.
 func Process(r io.Reader) (Processed, error) {
 	data, err := io.ReadAll(io.LimitReader(r, MaxUpload+1))
 	if err != nil {
@@ -62,6 +74,11 @@ func Process(r io.Reader) (Processed, error) {
 	}
 	if cfg.Width <= 0 || cfg.Height <= 0 || cfg.Width*cfg.Height > maxPixels {
 		return Processed{}, ErrTooLarge
+	}
+	if http.DetectContentType(data) == "image/gif" {
+		if g, err := gif.DecodeAll(bytes.NewReader(data)); err == nil && len(g.Image) > 1 {
+			return Processed{Data: data, ContentType: "image/gif", Ext: "gif", Width: cfg.Width, Height: cfg.Height}, nil
+		}
 	}
 	src, _, err := image.Decode(bytes.NewReader(data))
 	if err != nil {

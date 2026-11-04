@@ -94,11 +94,7 @@ func (s *Server) serveImage(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusInternalServerError, err.Error())
 		return
 	}
-	ext := "jpg"
-	if img.ContentType == "image/png" {
-		ext = "png"
-	}
-	rc, err := s.Images.Get(r.Context(), id+"."+ext)
+	rc, err := s.Images.Get(r.Context(), id+"."+images.Ext(img.ContentType))
 	if errors.Is(err, images.ErrNotFound) {
 		http.NotFound(w, r)
 		return

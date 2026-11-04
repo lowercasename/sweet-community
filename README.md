@@ -11,7 +11,9 @@ make build                     # builds web/ into internal/web/dist, then bin/sw
 ./bin/sweet -db data/sweet.db -owner raphael -owner-password 'something long'
 ```
 
-Open http://localhost:8080 and sign in as the owner. Images go to `-images-dir` (default `data/images`) unless `SWEET_S3_ENDPOINT` and `SWEET_S3_BUCKET` are set, with `SWEET_S3_ACCESS_KEY`, `SWEET_S3_SECRET_KEY`, optional `SWEET_S3_REGION` (default `auto`, right for R2), `SWEET_S3_PREFIX` and `SWEET_S3_INSECURE=1` for a plain-http stand-in. Flags: `-addr` (default `:8080`), `-db`, `-owner`, `-owner-password` (or `SWEET_OWNER_PASSWORD`; used only until the owner has a password). Everyone else joins through an invite link the owner makes on the People page.
+Open http://localhost:8080 and sign in as the owner.
+
+Settings come from the environment. Copy `.env.example` to `.env` (gitignored) and `make` targets load it; for a bare `./bin/sweet`, `set -a; . ./.env; set +a` first. Images go to `-images-dir` (default `data/images`) unless `SWEET_S3_ENDPOINT` and `SWEET_S3_BUCKET` are set. Flags: `-addr` (default `:8080`), `-db`, `-owner`, `-owner-password` (or `SWEET_OWNER_PASSWORD`; used only until the owner has a password). Everyone else joins through an invite link the owner makes on the People page.
 
 ## Develop
 
