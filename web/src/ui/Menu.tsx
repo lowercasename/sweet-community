@@ -47,7 +47,9 @@ export function Menu({ label, icon = 'more', items }: MenuProps) {
     whileElementsMounted: autoUpdate,
   })
   const click = useClick(context)
-  const dismiss = useDismiss(context)
+  // The menu is portalled to the body, so a scrolling pane would carry it over
+  // its own edge; closing on scroll is what menus do.
+  const dismiss = useDismiss(context, { ancestorScroll: true })
   const role = useRole(context, { role: 'menu' })
   const listNav = useListNavigation(context, { listRef, activeIndex, onNavigate: setActiveIndex, loop: true })
   const { getReferenceProps, getFloatingProps, getItemProps } = useInteractions([click, dismiss, role, listNav])

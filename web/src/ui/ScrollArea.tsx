@@ -1,14 +1,14 @@
 import { forwardRef, type ReactNode, type UIEvent } from 'react'
 
 interface ScrollAreaProps {
-  /** `cards` leaves room for card shadows; `inner` is inside a Card. */
+  /** `cards` is a column of cards on the paper; `inner` is inside a Card. */
   pad?: 'cards' | 'inner'
   onScroll?: (e: UIEvent<HTMLDivElement>) => void
   children?: ReactNode
 }
 
 const PADS: Record<NonNullable<ScrollAreaProps['pad']>, string> = {
-  cards: 'px-1 pt-1 pb-12',
+  cards: 'p-1',
   inner: 'px-4 py-3',
 }
 
