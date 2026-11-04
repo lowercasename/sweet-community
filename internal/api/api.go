@@ -110,6 +110,11 @@ func (s *Server) Routes(mux *http.ServeMux) {
 	mux.HandleFunc("POST /api/messages", s.requireAuth(s.createMessage))
 	mux.HandleFunc("GET /api/events", s.requireAuth(s.Hub.ServeHTTP))
 
+	// Anything else under /api/ is a 404 in JSON, never the SPA page.
+	mux.HandleFunc("/api/", func(w http.ResponseWriter, r *http.Request) {
+		writeErr(w, http.StatusNotFound, "no such endpoint: "+r.Method+" "+r.URL.Path)
+	})
+
 	// Owner.
 	mux.HandleFunc("GET /api/invites", s.requireOwner(s.listInvites))
 	mux.HandleFunc("POST /api/invites", s.requireOwner(s.createInvite))

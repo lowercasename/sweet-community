@@ -67,15 +67,22 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     ...init,
     headers: { Accept: 'application/json', ...(init?.headers ?? {}) },
   })
+  const isJson = (res.headers.get('content-type') ?? '').includes('application/json')
   if (!res.ok) {
     let message = `${res.status} ${res.statusText}`
-    try {
-      const body = (await res.json()) as { error?: string }
-      if (body.error) message = body.error
-    } catch {
-      // non-JSON error body; keep the status text
+    if (isJson) {
+      try {
+        const body = (await res.json()) as { error?: string }
+        if (body.error) message = body.error
+      } catch {
+        // keep the status text
+      }
     }
     throw new ApiError(res.status, message)
+  }
+  if (!isJson) {
+    // Usually a stale backend answering with the app page. Say so.
+    throw new ApiError(res.status, `The server sent a page instead of data for ${path}. Is the backend up to date?`)
   }
   return (await res.json()) as T
 }

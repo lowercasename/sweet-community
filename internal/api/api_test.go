@@ -278,3 +278,11 @@ func TestOwnerPasswordIsSetOnceOnly(t *testing.T) {
 		t.Fatalf("later -owner-password must be ignored, got %d", status)
 	}
 }
+
+func TestUnknownAPIPathIsJSON404(t *testing.T) {
+	_, owner := newTestServer(t)
+	status, body := owner.do("POST", "/api/nope", nil)
+	if status != 404 || body["error"] == nil {
+		t.Fatalf("unknown /api path: want JSON 404, got %d %v", status, body)
+	}
+}
