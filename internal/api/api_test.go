@@ -20,12 +20,20 @@ import (
 	"sweet/internal/db"
 	"sweet/internal/events"
 	"sweet/internal/images"
+	"sweet/internal/store"
 )
 
 // newTestServer boots a real server on a temp-file database with the owner
 // signed in. Each client has its own cookie jar, so tests can act as
 // several people at once.
 func newTestServer(t *testing.T) (*httptest.Server, *client) {
+	t.Helper()
+	ts, owner, _ := newTestServerWith(t)
+	return ts, owner
+}
+
+// newTestServerWith also hands back the Server, for tests that reach past HTTP.
+func newTestServerWith(t *testing.T) (*httptest.Server, *client, *Server) {
 	t.Helper()
 	d, err := db.Open(filepath.Join(t.TempDir(), "test.db"))
 	if err != nil {
@@ -49,7 +57,7 @@ func newTestServer(t *testing.T) (*httptest.Server, *client) {
 	t.Cleanup(ts.Close)
 	owner := newClient(t, ts)
 	owner.login("raphael", "correct horse")
-	return ts, owner
+	return ts, owner, srv
 }
 
 type client struct {
@@ -437,5 +445,95 @@ func TestImagesUploadServeAndPicture(t *testing.T) {
 	me = owner.mustStatus(200, "PUT", "/api/me/picture", map[string]any{"image_id": nil})
 	if me["picture"] != nil {
 		t.Fatalf("picture cleared: %v", me)
+	}
+}
+
+func TestDeletePost(t *testing.T) {
+	ts, owner, srv := newTestServerWith(t)
+	inv := owner.mustStatus(201, "POST", "/api/invites", nil)
+	kit := newClient(t, ts)
+	kit.mustStatus(201, "POST", "/api/register", map[string]string{"code": inv["code"].(string), "username": "kit", "password": "longenough"})
+
+	post := owner.mustStatus(201, "POST", "/api/posts", map[string]string{"body_html": "<p>going</p>"})
+	id := post["id"].(string)
+	kit.mustStatus(201, "POST", "/api/posts/"+id+"/comments", map[string]string{"body_html": "<p>a comment</p>"})
+
+	// A member cannot delete someone else's post; the author can, once.
+	kit.mustStatus(403, "DELETE", "/api/posts/"+id, nil)
+	gone := owner.mustStatus(200, "DELETE", "/api/posts/"+id, nil)
+	if gone["id"] != id {
+		t.Fatalf("delete reply: %v", gone)
+	}
+	owner.mustStatus(404, "DELETE", "/api/posts/"+id, nil)
+	owner.mustStatus(404, "PUT", "/api/posts/"+id, map[string]string{"body_html": "<p>too late</p>"})
+	if posts := owner.mustStatus(200, "GET", "/api/posts", nil); len(posts["posts"].([]any)) != 0 {
+		t.Fatalf("deleted post still listed: %v", posts)
+	}
+	// Its comments go with it.
+	kit.mustStatus(404, "GET", "/api/posts/"+id+"/comments", nil)
+	kit.mustStatus(404, "POST", "/api/posts/"+id+"/comments", map[string]string{"body_html": "<p>late</p>"})
+
+	// The owner can delete anyone's post.
+	theirs := kit.mustStatus(201, "POST", "/api/posts", map[string]string{"body_html": "<p>kit's</p>"})
+	owner.mustStatus(200, "DELETE", "/api/posts/"+theirs["id"].(string), nil)
+
+	// Both deletions are in the event log.
+	rows, err := srv.q().ListEventsSince(context.Background(), store.ListEventsSinceParams{After: 0, PageSize: 100})
+	if err != nil {
+		t.Fatal(err)
+	}
+	n := 0
+	for _, e := range rows {
+		if e.Kind == "post_delete" {
+			n++
+		}
+	}
+	if n != 2 {
+		t.Fatalf("post_delete events: want 2, got %d", n)
+	}
+}
+
+func TestImageSweep(t *testing.T) {
+	ts, owner, srv := newTestServerWith(t)
+	_ = ts
+	upload := func() (string, string) {
+		status, img := owner.upload(testPNG(40, 40))
+		if status != 201 {
+			t.Fatalf("upload: %d %v", status, img)
+		}
+		return img["id"].(string), img["url"].(string)
+	}
+	imgTag := func(id, url string) string {
+		return `<img src="` + url + `" alt="" width="40" height="40" data-image-id="` + id + `">`
+	}
+	_, draftURL := upload()           // never used
+	postID, postURL := upload()       // in a live post
+	deletedID, deletedURL := upload() // in a post that gets deleted
+	commentID, commentURL := upload() // in a comment
+	messageID, messageURL := upload() // in a chat message
+	pictureID, pictureURL := upload() // a profile picture
+
+	post := owner.mustStatus(201, "POST", "/api/posts", map[string]string{"body_html": imgTag(postID, postURL)})
+	owner.mustStatus(201, "POST", "/api/posts/"+post["id"].(string)+"/comments", map[string]string{"body_html": imgTag(commentID, commentURL)})
+	doomed := owner.mustStatus(201, "POST", "/api/posts", map[string]string{"body_html": imgTag(deletedID, deletedURL)})
+	owner.mustStatus(200, "DELETE", "/api/posts/"+doomed["id"].(string), nil)
+	owner.mustStatus(201, "POST", "/api/messages", map[string]string{"body_html": imgTag(messageID, messageURL)})
+	owner.mustStatus(200, "PUT", "/api/me/picture", map[string]string{"image_id": pictureID})
+
+	// Nothing younger than the grace period goes, however unreferenced.
+	n, err := images.Sweep(context.Background(), srv.q(), srv.Images, db.Now()-3_600_000)
+	if err != nil || n != 0 {
+		t.Fatalf("sweep inside grace: %d %v", n, err)
+	}
+	n, err = images.Sweep(context.Background(), srv.q(), srv.Images, db.Now()+1)
+	if err != nil || n != 2 {
+		t.Fatalf("sweep: want 2 removed (draft, deleted post), got %d %v", n, err)
+	}
+	for url, want := range map[string]int{draftURL: 404, deletedURL: 404, postURL: 200, commentURL: 200, messageURL: 200, pictureURL: 200} {
+		owner.mustStatus(want, "GET", url, nil)
+	}
+	// Idempotent.
+	if n, err = images.Sweep(context.Background(), srv.q(), srv.Images, db.Now()+1); err != nil || n != 0 {
+		t.Fatalf("second sweep: %d %v", n, err)
 	}
 }

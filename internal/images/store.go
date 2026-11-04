@@ -23,6 +23,8 @@ var ErrNotFound = errors.New("image not found")
 type Store interface {
 	Put(ctx context.Context, key, contentType string, r io.Reader, size int64) error
 	Get(ctx context.Context, key string) (io.ReadCloser, error)
+	// Delete removes a stored file; a missing key is not an error.
+	Delete(ctx context.Context, key string) error
 }
 
 // Local keeps files under one directory.
@@ -74,6 +76,17 @@ func (l *Local) Get(_ context.Context, key string) (io.ReadCloser, error) {
 		return nil, ErrNotFound
 	}
 	return f, err
+}
+
+func (l *Local) Delete(_ context.Context, key string) error {
+	p, err := l.path(key)
+	if err != nil {
+		return err
+	}
+	if err := os.Remove(p); err != nil && !errors.Is(err, os.ErrNotExist) {
+		return err
+	}
+	return nil
 }
 
 // S3Config is read from the environment by main; Endpoint and Bucket set
@@ -131,4 +144,8 @@ func (s *S3) Get(ctx context.Context, key string) (io.ReadCloser, error) {
 		return nil, err
 	}
 	return obj, nil
+}
+
+func (s *S3) Delete(ctx context.Context, key string) error {
+	return s.client.RemoveObject(ctx, s.bucket, s.key(key), minio.RemoveObjectOptions{})
 }

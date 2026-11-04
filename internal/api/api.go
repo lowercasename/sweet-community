@@ -120,6 +120,7 @@ func (s *Server) Routes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/posts", s.requireAuth(s.listPosts))
 	mux.HandleFunc("POST /api/posts", s.requireAuth(s.createPost))
 	mux.HandleFunc("PUT /api/posts/{id}", s.requireAuth(s.editPost))
+	mux.HandleFunc("DELETE /api/posts/{id}", s.requireAuth(s.deletePost))
 	mux.HandleFunc("GET /api/posts/{id}/comments", s.requireAuth(s.listComments))
 	mux.HandleFunc("POST /api/posts/{id}/comments", s.requireAuth(s.createComment))
 	mux.HandleFunc("PUT /api/comments/{id}", s.requireAuth(s.editComment))
@@ -284,5 +285,31 @@ func (s *Server) editPost(w http.ResponseWriter, r *http.Request) {
 		n, err := qtx.CountComments(r.Context(), p.ID)
 		p.CommentCount = n
 		return &p, http.StatusOK, err
+	})
+}
+
+// deletePost soft-deletes a post: the author's own, or any post for the
+// owner. Its comments go with it (they are reached through the post) and
+// its images are left to the sweep (images.Sweep), which frees anything no
+// live body references. The event carries only the id.
+func (s *Server) deletePost(w http.ResponseWriter, r *http.Request) {
+	id := r.PathValue("id")
+	me, _ := userFrom(r.Context())
+	now := db.Now()
+	s.logged(w, r, "post_delete", now, func(qtx *store.Queries) (any, int, error) {
+		authorID, err := qtx.GetPostAuthor(r.Context(), id)
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, http.StatusNotFound, errors.New("no such post")
+		}
+		if err != nil {
+			return nil, http.StatusInternalServerError, err
+		}
+		if authorID != me.ID && me.Role != "owner" {
+			return nil, http.StatusForbidden, errors.New("not your post")
+		}
+		if err := qtx.DeletePost(r.Context(), store.DeletePostParams{DeletedAt: sql.NullInt64{Int64: now, Valid: true}, ID: id}); err != nil {
+			return nil, http.StatusInternalServerError, err
+		}
+		return map[string]string{"id": id}, http.StatusOK, nil
 	})
 }

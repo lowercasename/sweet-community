@@ -4,7 +4,7 @@ export type StreamStatus = 'connecting' | 'live' | 'reconnecting' | 'offline'
 
 export type EventHandler = (kind: string, data: unknown, seq: number) => void
 
-const EVENT_KINDS = ['post', 'post_edit', 'message', 'comment', 'comment_edit'] as const
+const EVENT_KINDS = ['post', 'post_edit', 'post_delete', 'message', 'comment', 'comment_edit'] as const
 const HEALTH_INTERVAL_MS = 30_000
 const HEALTH_TIMEOUT_MS = 10_000
 

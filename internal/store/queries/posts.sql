@@ -17,3 +17,9 @@ RETURNING created_at;
 
 -- name: PostExists :one
 SELECT COUNT(*) FROM posts WHERE id = ? AND deleted_at IS NULL;
+
+-- name: GetPostAuthor :one
+SELECT author_id FROM posts WHERE id = sqlc.arg(id) AND deleted_at IS NULL;
+
+-- name: DeletePost :exec
+UPDATE posts SET deleted_at = sqlc.arg(deleted_at) WHERE id = sqlc.arg(id) AND deleted_at IS NULL;

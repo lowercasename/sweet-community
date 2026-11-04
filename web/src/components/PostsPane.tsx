@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { createPost, getPosts, updatePost, type Comment, type Post, type User } from '../api'
+import { createPost, deletePost, getPosts, updatePost, type Comment, type Post, type User } from '../api'
 import { useStreamEvents, useStreamStatus } from '../hooks/StreamContext'
 import { Button, Card, Measure, Pane, Row, ScrollArea, Stack, Text } from '../ui'
 import { postExtensions } from '../editor/extensions'
@@ -15,6 +15,10 @@ interface PostsPaneProps {
 
 function isPost(data: unknown): data is Post {
   return typeof data === 'object' && data !== null && typeof (data as Post).id === 'string'
+}
+
+function isDeletion(data: unknown): data is { id: string } {
+  return typeof data === 'object' && data !== null && typeof (data as { id?: unknown }).id === 'string'
 }
 
 function isComment(data: unknown): data is Comment {
@@ -42,6 +46,7 @@ export function PostsPane({ me, side = 'full' }: PostsPaneProps) {
   useStreamEvents((kind, data) => {
     if (kind === 'post' && isPost(data)) setPosts((prev) => prepend(prev, data))
     if (kind === 'post_edit' && isPost(data)) setPosts((prev) => replace(prev, data))
+    if (kind === 'post_delete' && isDeletion(data)) setPosts((prev) => prev.filter((p) => p.id !== data.id))
     // Counts come only from the event, which everyone gets, the author included.
     if (kind === 'comment' && isComment(data)) {
       setPosts((prev) => prev.map((p) => (p.id === data.post_id ? { ...p, comment_count: p.comment_count + 1 } : p)))
@@ -100,6 +105,11 @@ export function PostsPane({ me, side = 'full' }: PostsPaneProps) {
     setPosts((prev) => replace(prev, post))
   }
 
+  const remove = async (id: string) => {
+    await deletePost(id)
+    setPosts((prev) => prev.filter((p) => p.id !== id))
+  }
+
   return (
     <Pane side={side}>
       <ScrollArea>
@@ -122,7 +132,7 @@ export function PostsPane({ me, side = 'full' }: PostsPaneProps) {
               {loading && posts.length === 0 ? (
                 <Text variant="secondary">Loading…</Text>
               ) : (
-                <PostList posts={posts} me={me} disabled={status === 'offline'} onEdit={edit} />
+                <PostList posts={posts} me={me} disabled={status === 'offline'} onEdit={edit} onDelete={remove} />
               )}
               {loadError && <Text variant="secondary">{loadError}</Text>}
               {nextBefore != null && (

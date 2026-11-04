@@ -57,7 +57,7 @@ Edits: the client loads `body_html` into the editor with `setContent`, the user 
 
 **Rendering on the client** is the sanitised HTML inserted as-is. Safe because bluemonday ran; this is the one place `dangerouslySetInnerHTML` is allowed, and it is wrapped in a single component.
 
-Images are `<img data-image-id="…" src="/img/<id>" alt width height>`. No gallery markup: adjacent images render as a gallery. The `src` is a server path, not a storage URL, so storage can move without touching posts. Upload on insert, with a cleanup job for images whose post never got published.
+Images are `<img data-image-id="…" src="/img/<id>" alt width height>`. No gallery markup: adjacent images render as a gallery. The `src` is a server path, not a storage URL, so storage can move without touching posts. Upload on insert; an hourly sweep (`images.Sweep`) deletes images older than a day that no live post, comment, message or profile picture references, which covers abandoned drafts, images removed while editing, and the pictures of deleted posts.
 
 Mentions are `<span data-mention-id="uuid">@name</span>`; the server rewrites the visible name to the current username at serve time (or the client does from the id), so renames break nothing. Mentions work in posts, comments and chat.
 
@@ -90,6 +90,8 @@ Server-side on upload: apply EXIF orientation, strip metadata, generate sizes. D
 Images are protected per instance: served through the Go backend at `/img/<id>` with a session check. No images outside the web app (the digest carries no content), so no signed URLs.
 
 Images in the editor are cards: the picture small on the left, the alt text field taking the rest, a grip to drag the card between blocks, an X to remove it. No prompt on insert. Adjacent cards join into one block labelled "Gallery of N images", because the post renders a run of adjacent images as a grid: 2 across; 2 then 1; 2 and 2; 2, 2, 1; 4 then 2; 4, 2, 1; 4 and 4. Eight is the most in one gallery; a longer run splits. The gallery exists only at render time (`wrapGalleries` in the frontend): stored HTML is a plain run of `<img>`. Chat has no inline images: pictures attach above the text field as the same cards and are sent as a block of `<img>` before the text. Whether alt text is required is a feature flag.
+
+A post's three-dot menu (Floating UI) holds Edit for the author and Delete for the author or the owner. Delete asks first, in the browser's own dialog element. Deletion is soft (`deleted_at`): the post leaves every list, its comments go with it because they are only reachable through it, its images go with the next sweep, and a `post_delete` event carrying the id tells open pages to drop it.
 
 Per-image and per-post size caps; a per-instance storage quota enforced at upload (also a pricing lever).
 

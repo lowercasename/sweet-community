@@ -4,6 +4,7 @@ import {
   ChevronsLeft,
   GripVertical,
   ChevronsRight,
+  EllipsisVertical,
   House,
   Image as ImageIcon,
   Italic,
@@ -17,6 +18,7 @@ import {
   Search,
   Settings,
   TabletSmartphone,
+  Trash2,
   Users,
   X,
   type LucideIcon,
@@ -43,6 +45,8 @@ export type IconName =
   | 'devices'
   | 'grip'
   | 'remove'
+  | 'more'
+  | 'trash'
 
 const ICONS: Record<IconName, LucideIcon> = {
   bold: Bold,
@@ -65,6 +69,8 @@ const ICONS: Record<IconName, LucideIcon> = {
   devices: TabletSmartphone,
   grip: GripVertical,
   remove: X,
+  more: EllipsisVertical,
+  trash: Trash2,
 }
 
 interface IconProps {

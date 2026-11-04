@@ -183,6 +183,14 @@ export function listInvites(): Promise<{ invites: Invite[] }> {
   return request('/api/invites')
 }
 
+export async function deletePost(id: string): Promise<void> {
+  const res = await fetch(`/api/posts/${encodeURIComponent(id)}`, { method: 'DELETE' })
+  if (!res.ok) {
+    const body = (await res.json().catch(() => ({}))) as { error?: string }
+    throw new Error(body.error ?? `Could not delete (${res.status})`)
+  }
+}
+
 export async function revokeInvite(code: string): Promise<void> {
   await fetch(`/api/invites/${encodeURIComponent(code)}`, { method: 'DELETE' })
 }

@@ -12,6 +12,7 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@floating-ui/react": "^0.27.20",
     "@fontsource/ubuntu": "^5.3.0",
     "@tailwindcss/vite": "^4.3.4",
     "@tiptap/core": "^3.32.2",
@@ -26,6 +27,8 @@
     "tailwindcss": "^4.3.4"
   },
   "devDependencies": {
+    "@testing-library/dom": "^10.4.2",
+    "@testing-library/react": "^16.3.3",
     "@types/react": "^18.3.31",
     "@types/react-dom": "^18.3.7",
     "@vitejs/plugin-react": "^5.2.0",

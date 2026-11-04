@@ -33,6 +33,20 @@ func (q *Queries) CreatePost(ctx context.Context, arg CreatePostParams) error {
 	return err
 }
 
+const deletePost = `-- name: DeletePost :exec
+UPDATE posts SET deleted_at = ?1 WHERE id = ?2 AND deleted_at IS NULL
+`
+
+type DeletePostParams struct {
+	DeletedAt sql.NullInt64
+	ID        string
+}
+
+func (q *Queries) DeletePost(ctx context.Context, arg DeletePostParams) error {
+	_, err := q.db.ExecContext(ctx, deletePost, arg.DeletedAt, arg.ID)
+	return err
+}
+
 const editOwnPost = `-- name: EditOwnPost :one
 UPDATE posts SET body_html = ?, body_text = ?, edited_at = ?
 WHERE id = ? AND author_id = ? AND deleted_at IS NULL
@@ -58,6 +72,17 @@ func (q *Queries) EditOwnPost(ctx context.Context, arg EditOwnPostParams) (int64
 	var created_at int64
 	err := row.Scan(&created_at)
 	return created_at, err
+}
+
+const getPostAuthor = `-- name: GetPostAuthor :one
+SELECT author_id FROM posts WHERE id = ?1 AND deleted_at IS NULL
+`
+
+func (q *Queries) GetPostAuthor(ctx context.Context, id string) (string, error) {
+	row := q.db.QueryRowContext(ctx, getPostAuthor, id)
+	var author_id string
+	err := row.Scan(&author_id)
+	return author_id, err
 }
 
 const listPosts = `-- name: ListPosts :many

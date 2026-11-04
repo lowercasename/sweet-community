@@ -82,6 +82,9 @@ func main() {
 		log.Fatalf("images: %v", err)
 	}
 
+	// Unreferenced images go after a day: long enough for any draft.
+	go images.SweepEvery(ctx, d, imgStore, time.Hour, 24*time.Hour, log.Printf)
+
 	hub := events.NewHub(d)
 	srv := &api.Server{DB: d, Hub: hub, Images: imgStore}
 

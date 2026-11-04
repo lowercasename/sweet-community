@@ -32,6 +32,11 @@ const VARIANTS: Record<NonNullable<ButtonProps['variant']>, string> = {
     'aria-pressed:bg-blush aria-pressed:text-sweet disabled:text-line disabled:hover:bg-transparent',
 }
 
+/** The classes of a button, for the rare element that must be a button but not this component (a menu trigger). */
+export function buttonClass(variant: NonNullable<ButtonProps['variant']>, iconOnly: boolean): string {
+  return `${BASE} ${VARIANTS[variant]} ${iconOnly ? 'p-1.5' : 'px-3 py-1'}`
+}
+
 export function Button({
   variant = 'primary',
   type = 'button',
@@ -44,10 +49,9 @@ export function Button({
   children,
 }: ButtonProps) {
   const iconOnly = icon !== undefined && children === undefined && !count
-  const pad = iconOnly ? 'p-1.5' : 'px-3 py-1'
   return (
     <button
-      className={`${BASE} ${VARIANTS[variant]} ${pad}`}
+      className={buttonClass(variant, iconOnly)}
       type={type}
       disabled={disabled}
       aria-pressed={pressed === undefined ? undefined : pressed}

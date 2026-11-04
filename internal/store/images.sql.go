@@ -37,6 +37,15 @@ func (q *Queries) CreateImage(ctx context.Context, arg CreateImageParams) error 
 	return err
 }
 
+const deleteImage = `-- name: DeleteImage :exec
+DELETE FROM images WHERE id = ?1
+`
+
+func (q *Queries) DeleteImage(ctx context.Context, id string) error {
+	_, err := q.db.ExecContext(ctx, deleteImage, id)
+	return err
+}
+
 const getImage = `-- name: GetImage :one
 SELECT id, uploader_id, content_type, width, height, bytes, created_at FROM images WHERE id = ?
 `
@@ -54,6 +63,47 @@ func (q *Queries) GetImage(ctx context.Context, id string) (Image, error) {
 		&i.CreatedAt,
 	)
 	return i, err
+}
+
+const listUnreferencedImages = `-- name: ListUnreferencedImages :many
+SELECT i.id, i.content_type FROM images i
+WHERE i.created_at < ?1
+  AND NOT EXISTS (SELECT 1 FROM users u WHERE u.picture_id = i.id)
+  AND NOT EXISTS (SELECT 1 FROM posts p WHERE p.deleted_at IS NULL AND instr(p.body_html, i.id) > 0)
+  AND NOT EXISTS (SELECT 1 FROM comments c JOIN posts p ON p.id = c.post_id AND p.deleted_at IS NULL
+                  WHERE c.deleted_at IS NULL AND instr(c.body_html, i.id) > 0)
+  AND NOT EXISTS (SELECT 1 FROM messages m WHERE m.deleted_at IS NULL AND instr(m.body_html, i.id) > 0)
+`
+
+type ListUnreferencedImagesRow struct {
+	ID          string
+	ContentType string
+}
+
+// Images nothing points at: not a profile picture, not in a live post,
+// comment (of a live post) or message. instr() on the id is enough because
+// bodies reference images as /img/<id> and data-image-id="<id>".
+func (q *Queries) ListUnreferencedImages(ctx context.Context, before int64) ([]ListUnreferencedImagesRow, error) {
+	rows, err := q.db.QueryContext(ctx, listUnreferencedImages, before)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListUnreferencedImagesRow{}
+	for rows.Next() {
+		var i ListUnreferencedImagesRow
+		if err := rows.Scan(&i.ID, &i.ContentType); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const setUserPicture = `-- name: SetUserPicture :exec
