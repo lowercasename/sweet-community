@@ -1,7 +1,11 @@
 import StarterKit from '@tiptap/starter-kit'
 import Link from '@tiptap/extension-link'
+import { Placeholder } from '@tiptap/extensions'
 
 const link = Link.configure({ openOnClick: false, autolink: true, defaultProtocol: 'https' })
+
+// Old Sweet's one placeholder, for posts and comments alike.
+const placeholder = Placeholder.configure({ placeholder: 'What would you like to say?' })
 
 /**
  * The post schema, used by BodyEditor for posts and by the round-trip test.
@@ -23,6 +27,7 @@ export const postExtensions = [
     trailingNode: false,
   }),
   link,
+  placeholder,
 ]
 
 /**
@@ -44,6 +49,7 @@ export const chatExtensions = [
     trailingNode: false,
   }),
   link,
+  placeholder,
 ]
 
 /** The comment schema: chat plus blockquote, which is what a quote-reply is. */
@@ -61,4 +67,5 @@ export const commentExtensions = [
     trailingNode: false,
   }),
   link,
+  placeholder,
 ]

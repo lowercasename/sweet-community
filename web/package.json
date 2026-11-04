@@ -16,6 +16,7 @@
     "@tailwindcss/vite": "^4.3.4",
     "@tiptap/core": "^3.32.2",
     "@tiptap/extension-link": "^3.32.2",
+    "@tiptap/extensions": "^3.32.2",
     "@tiptap/react": "^3.32.2",
     "@tiptap/starter-kit": "^3.32.2",
     "lucide-react": "^1.66.0",
