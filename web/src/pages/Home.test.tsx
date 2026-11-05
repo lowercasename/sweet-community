@@ -17,6 +17,7 @@ vi.mock('../api', () => ({
   getMessages: vi.fn(() => Promise.resolve({ messages: [], next_before: null })),
   listUsers: vi.fn(),
   listGroups: vi.fn(),
+  listMembers: vi.fn(() => Promise.resolve({ members: [] })),
   getSettings: vi.fn(() => Promise.resolve({ group_creation: 'anyone' })),
   setSettings: vi.fn(),
   logout: vi.fn(() => Promise.resolve()),
@@ -87,6 +88,8 @@ describe('Home', () => {
     fireEvent.click(nav().getByRole('button', { name: 'Settings' }))
     await screen.findByText('Profile picture')
     expect(editors()).toBe(2)
+    // Mounted, but out of sight: another page is showing.
+    expect(container.querySelector('.ProseMirror')!.closest('.hidden')).not.toBeNull()
     fireEvent.click(nav().getByRole('button', { name: 'Home' }))
     expect(screen.getByRole('separator')).toBeTruthy()
 
@@ -118,11 +121,17 @@ describe('Home', () => {
 
     fireEvent.click(nav().getByRole('button', { name: 'Knitting' }))
     await vi.waitFor(() => expect(getMessages).toHaveBeenCalledWith('knit', null))
+    expect(container.querySelector('.ProseMirror')!.closest('.hidden')).toBeNull()
     // Chat only: no divider, no posts editor; the group's name and its Members control are shown.
     expect(screen.queryByRole('separator')).toBeNull()
     expect(screen.getByRole('heading', { name: 'Knitting' })).toBeTruthy()
     expect(screen.getByRole('button', { name: 'Members' })).toBeTruthy()
     expect(container.querySelectorAll('.ProseMirror').length).toBe(1)
+    // Members shows alone: the group's view is still mounted but out of sight.
+    fireEvent.click(screen.getByRole('button', { name: 'Members' }))
+    await screen.findByRole('heading', { name: 'Members' })
+    expect(container.querySelector('.ProseMirror')!.closest('.hidden')).not.toBeNull()
+    expect(screen.queryByRole('heading', { name: 'Knitting' })!.closest('.hidden')).not.toBeNull()
   })
 
   it('hides New group when the root group says I may not', async () => {
