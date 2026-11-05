@@ -8,6 +8,8 @@ interface ButtonProps {
   disabled?: boolean
   /** Toggles: the state is on (aria-pressed). */
   pressed?: boolean
+  /** The control for the page being viewed (aria-current), for a section's own control in the nav. */
+  current?: boolean
   /** Accessible name; required when the button has no text. */
   label?: string
   icon?: IconName
@@ -29,7 +31,7 @@ const VARIANTS: Record<NonNullable<ButtonProps['variant']>, string> = {
     'border border-line bg-card text-ink hover:border-pink hover:text-sweet disabled:text-mute disabled:hover:border-line',
   ghost:
     'border border-transparent bg-transparent text-mute hover:bg-field hover:text-ink ' +
-    'aria-pressed:bg-blush aria-pressed:text-sweet disabled:text-line disabled:hover:bg-transparent',
+    'aria-pressed:bg-blush aria-pressed:text-sweet aria-[current=page]:bg-blush aria-[current=page]:text-sweet disabled:text-line disabled:hover:bg-transparent',
 }
 
 /** The classes of a button, for the rare element that must be a button but not this component (a menu trigger). */
@@ -42,6 +44,7 @@ export function Button({
   type = 'button',
   disabled,
   pressed,
+  current,
   label,
   icon,
   count,
@@ -57,6 +60,7 @@ export function Button({
       type={type}
       disabled={disabled}
       aria-pressed={pressed === undefined ? undefined : pressed}
+      aria-current={current ? 'page' : undefined}
       aria-label={wordless ? label : undefined}
       title={label}
       onMouseDown={pressed === undefined ? undefined : (e) => e.preventDefault()} // toggles keep editor focus

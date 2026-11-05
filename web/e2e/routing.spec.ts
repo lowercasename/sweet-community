@@ -1,7 +1,9 @@
 import { expect, member, open, test } from './helpers'
 
 test.describe('routing', () => {
-  test('every page is a URL: reload keeps the place, back returns, unknown paths go home', async ({ browser }, testInfo) => {
+  test('every page is a URL: reload keeps the place, back returns, unknown paths go home', async ({
+    browser,
+  }, testInfo) => {
     const kit = await member(browser, testInfo)
     await open(kit.page)
     const nav = kit.page.getByRole('navigation', { name: 'Main' })

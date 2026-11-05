@@ -181,6 +181,24 @@ describe('applyEvent', () => {
 })
 
 describe('latest activity', () => {
+  it("a membership in a conversation changes its people, in the server's order, without waiting for the group event", () => {
+    qc.setQueryData(keys.groups, { groups: [group(ROOT, 'member'), dm('d1', [kit, mo])] })
+    const people = () =>
+      groups()
+        .find((g) => g.id === 'd1')
+        ?.members?.map((u) => u.id)
+    applyEvent(qc, 'membership', { group_id: 'd1', user: user('jo'), role: 'member', joined_at: 5 })
+    expect(people()).toEqual(['jo', 'kit', 'mo'])
+    // A replay adds nobody twice.
+    applyEvent(qc, 'membership', { group_id: 'd1', user: user('jo'), role: 'member', joined_at: 5 })
+    expect(people()).toEqual(['jo', 'kit', 'mo'])
+    applyEvent(qc, 'membership_delete', { group_id: 'd1', user_id: 'mo' })
+    expect(people()).toEqual(['jo', 'kit'])
+    // A room carries no people list, and gets none.
+    applyEvent(qc, 'membership', { group_id: CLUB, user: user('jo'), role: 'member', joined_at: 5 })
+    expect(groups().find((g) => g.id === CLUB)?.members).toBeUndefined()
+  })
+
   it("a DM's group event carries its people, so an added person is in its name at once", () => {
     qc.setQueryData(keys.groups, { groups: [group(ROOT, 'member'), dm('d1', [kit, mo])] })
     applyEvent(qc, 'group', dm('d1', [kit, mo, user('jo')]))

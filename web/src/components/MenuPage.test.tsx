@@ -18,7 +18,7 @@ const kit = user('kit')
 afterEach(cleanup)
 
 describe('MenuPage', () => {
-  it('lists Home, the Rooms section, Messages, then People and Settings, then Sign out', async () => {
+  it('lists Home, the Rooms section, the Messages section, then People and Settings, then Sign out', async () => {
     const { MenuPage } = await import('./MenuPage')
     const onGo = vi.fn()
     const onLogout = vi.fn()
@@ -34,19 +34,23 @@ describe('MenuPage', () => {
       'Home',
       'New room',
       'Knitting',
-      'Messages',
+      'New message',
+      'kit',
+      'All messages',
       'People',
       'Settings',
       'Sign out',
     ])
     expect(within(screen.getByRole('group', { name: 'Rooms' })).getByRole('button', { name: 'Knitting' })).toBeTruthy()
-    expect(screen.queryByRole('button', { name: 'kit' })).toBeNull()
+    expect(within(screen.getByRole('group', { name: 'Messages' })).getByRole('button', { name: 'kit' })).toBeTruthy()
     expect(screen.getByText('raphael')).toBeTruthy()
 
     fireEvent.click(screen.getByRole('button', { name: 'Home' }))
     expect(onGo).toHaveBeenCalledWith('/')
-    fireEvent.click(screen.getByRole('button', { name: 'Messages' }))
+    fireEvent.click(screen.getByRole('button', { name: 'All messages' }))
     expect(onGo).toHaveBeenCalledWith('/messages')
+    fireEvent.click(screen.getByRole('button', { name: 'kit' }))
+    expect(onGo).toHaveBeenCalledWith('/r/d1')
     fireEvent.click(screen.getByRole('button', { name: 'New room' }))
     expect(onGo).toHaveBeenCalledWith('/rooms/new')
     fireEvent.click(screen.getByRole('button', { name: 'Sign out' }))

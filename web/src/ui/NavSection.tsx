@@ -19,16 +19,25 @@ interface NavSectionProps {
 
 /**
  * A titled block inside the NavBar, for a list of places that grows (the
- * groups I am in). Its control is the section's own, so it never reads as
- * one more page.
+ * rooms I am in, my conversations). Its control is the section's own, so it
+ * never reads as one more page. Its items are the small size and sit with
+ * no gap, a stack under the title.
  */
 export function NavSection({ title, expanded, action, children }: NavSectionProps) {
   return (
-    <div role="group" aria-label={title} className="flex flex-col gap-1">
+    <div role="group" aria-label={title} className="flex flex-col gap-0">
       {expanded && (
         <div className="mt-1 flex h-7 items-center justify-between pr-1 pl-3">
           <span className="text-sm font-medium text-mute">{title}</span>
-          {action && <Button variant="ghost" icon={action.icon} label={action.label} onClick={action.onClick} />}
+          {action && (
+            <Button
+              variant="ghost"
+              icon={action.icon}
+              label={action.label}
+              current={action.current}
+              onClick={action.onClick}
+            />
+          )}
         </div>
       )}
       {children}
@@ -38,6 +47,7 @@ export function NavSection({ title, expanded, action, children }: NavSectionProp
           label={action.label}
           expanded={false}
           current={action.current}
+          size="sm"
           onClick={action.onClick}
         />
       )}

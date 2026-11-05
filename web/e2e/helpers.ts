@@ -29,12 +29,20 @@ async function prepare(page: Page) {
 /** A context made by hand needs the project's baseURL and viewport spelled out. */
 function options(info: TestInfo) {
   const use = info.project.use
-  return { baseURL: use.baseURL as string, viewport: use.viewport ?? undefined, isMobile: use.isMobile, hasTouch: use.hasTouch }
+  return {
+    baseURL: use.baseURL as string,
+    viewport: use.viewport ?? undefined,
+    isMobile: use.isMobile,
+    hasTouch: use.hasTouch,
+  }
 }
 
 /** The owner, signed in from the cookie the global setup saved. */
 export async function owner(browser: Browser, info: TestInfo): Promise<Person> {
-  const context = await browser.newContext({ ...options(info), storageState: `e2e/.auth/owner-${info.project.name}.json` })
+  const context = await browser.newContext({
+    ...options(info),
+    storageState: `e2e/.auth/owner-${info.project.name}.json`,
+  })
   const page = await context.newPage()
   await prepare(page)
   return { context, page, username: 'raphael' }

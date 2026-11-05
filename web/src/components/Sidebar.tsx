@@ -2,6 +2,7 @@ import type { Group, User } from '../api'
 import { useAuthor } from '../data/hooks'
 import { NEW_ROOM, groupPath } from '../routes'
 import { Hairline, NavAccount, NavBar, NavItem, NavSection, Tile, Wordmark } from '../ui'
+import { ConversationsSection } from './ConversationsSection'
 
 interface SidebarProps {
   me: User
@@ -20,16 +21,15 @@ function at(location: string, path: string): boolean {
 
 /**
  * The left navigation, in three blocks (architecture.md, Layout): places
- * (Home, then the rooms I am in, with New room as that section's
- * own control), the tools that reach across every place (Messages, Search,
- * Alerts), and the house (People, Settings, me). DMs are conversations,
- * not places: they live behind Messages, which is current inside one.
+ * (Home, then the rooms I am in, with New room as that section's own
+ * control, then my latest conversations with All messages at their foot),
+ * the tools that reach across every place (Search, Alerts), and the house
+ * (People, Settings, me).
  */
 export function Sidebar({ me, groups, location, expanded, onGo, onToggle }: SidebarProps) {
   const live = useAuthor(me)
   const root = groups.find((g) => g.kind === 'root')
   const mine = groups.filter((g) => g.kind === 'group')
-  const inDM = groups.some((g) => g.kind === 'dm' && at(location, groupPath(g.id)))
   const canCreate = root?.can.create_groups === true
   return (
     <NavBar
@@ -69,20 +69,15 @@ export function Sidebar({ me, groups, location, expanded, onGo, onToggle }: Side
               mark={<Tile name={g.name} />}
               label={g.name}
               expanded={expanded}
+              size="sm"
               current={at(location, groupPath(g.id))}
               onClick={() => onGo(groupPath(g.id))}
             />
           ))}
         </NavSection>
       )}
+      <ConversationsSection groups={groups} me={me} location={location} expanded={expanded} onGo={onGo} />
       <Hairline />
-      <NavItem
-        icon="mail"
-        label="Messages"
-        expanded={expanded}
-        current={at(location, '/messages') || inDM}
-        onClick={() => onGo('/messages')}
-      />
       <NavItem icon="search" label="Search" expanded={expanded} />
       <NavItem icon="bell" label="Alerts" expanded={expanded} />
       <Hairline />

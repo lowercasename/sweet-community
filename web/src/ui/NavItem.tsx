@@ -11,18 +11,20 @@ interface NavItemProps {
   expanded: boolean
   /** The item for the page being viewed. */
   current?: boolean
+  /** `sm` inside a section: shorter and quieter, so the items read as a stack under their title. */
+  size?: 'md' | 'sm'
   onClick?: () => void
 }
 
 /** One entry in the NavBar: an icon or a mark, plus its label when expanded. */
-export function NavItem({ icon, mark, label, expanded, current, onClick }: NavItemProps) {
+export function NavItem({ icon, mark, label, expanded, current, size = 'md', onClick }: NavItemProps) {
   return (
     <button
       type="button"
       aria-current={current ? 'page' : undefined}
       aria-label={expanded ? undefined : label}
       title={expanded ? undefined : label}
-      className={`flex h-10 cursor-pointer items-center gap-3 rounded-[4px] text-mute transition-colors hover:bg-field hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-pink aria-[current=page]:bg-blush aria-[current=page]:text-sweet ${expanded ? 'px-3' : 'justify-center'}`}
+      className={`flex cursor-pointer items-center gap-3 rounded-[4px] text-mute transition-colors hover:bg-field hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-pink aria-[current=page]:bg-blush aria-[current=page]:text-sweet ${size === 'sm' ? 'h-8 text-sm' : 'h-10'} ${expanded ? 'px-3' : 'justify-center'}`}
       onClick={onClick}
     >
       {mark ?? (icon && <Icon name={icon} size={20} />)}

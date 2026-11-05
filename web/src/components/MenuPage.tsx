@@ -2,6 +2,7 @@ import type { Group, User } from '../api'
 import { useAuthor } from '../data/hooks'
 import { NEW_ROOM, groupPath } from '../routes'
 import { Card, Hairline, NavAccount, NavItem, NavSection, Pane, Stack, Tile } from '../ui'
+import { ConversationsSection } from './ConversationsSection'
 
 interface MenuPageProps {
   me: User
@@ -39,12 +40,13 @@ export function MenuPage({ me, groups, onGo, onLogout }: MenuPageProps) {
                   mark={<Tile name={g.name} />}
                   label={g.name}
                   expanded
+                  size="sm"
                   onClick={() => onGo(groupPath(g.id))}
                 />
               ))}
             </NavSection>
           )}
-          <NavItem icon="mail" label="Messages" expanded onClick={() => onGo('/messages')} />
+          <ConversationsSection groups={groups} me={me} expanded onGo={onGo} />
           <Hairline />
           <NavItem icon="people" label="People" expanded onClick={() => onGo('/people')} />
           <NavItem icon="settings" label="Settings" expanded onClick={() => onGo('/settings')} />

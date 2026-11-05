@@ -154,9 +154,8 @@ test.describe('groups', () => {
     await expect(kit.page.locator('.editor-post')).toHaveCount(0)
     const text = uniq('psst ')
     await sendMessage(kit.page, text)
-    // Mo's Messages page names the DM after kit, live, and the message is there.
-    await nav(mo.page).getByRole('button', { name: 'Messages' }).click()
-    await mo.page.getByRole('list').getByRole('button', { name: kit.username }).click()
+    // Mo's nav names the conversation after kit, live, and the message is there.
+    await nav(mo.page).getByRole('button', { name: kit.username }).click()
     await expect(article(mo.page, text)).toBeVisible()
     // The same two people open the same DM again, and it is still named after mo, here and on Messages.
     await open(kit.page, '/people')
@@ -168,9 +167,10 @@ test.describe('groups', () => {
     await expect(article(kit.page, text)).toBeVisible()
     await expect(kit.page.getByRole('heading', { name: mo.username })).toBeVisible()
     await expect(kit.page.getByRole('heading', { name: 'Just you' })).toHaveCount(0)
-    await nav(kit.page).getByRole('button', { name: 'Messages' }).click()
+    await nav(kit.page).getByRole('button', { name: 'All messages' }).click()
     await expect(kit.page.getByRole('list').getByRole('button', { name: mo.username })).toBeVisible()
     await expect(kit.page.getByRole('list').getByRole('button', { name: 'Just you' })).toHaveCount(0)
+    await expect(nav(kit.page).getByRole('button', { name: 'Just you' })).toHaveCount(0)
     await kit.context.close()
     await mo.context.close()
   })
@@ -194,8 +194,7 @@ test.describe('groups', () => {
     await sendMessage(kit.page, before)
 
     // Mo, a plain member of it, brings jo in from its members page.
-    await nav(mo.page).getByRole('button', { name: 'Messages' }).click()
-    await mo.page.getByRole('list').getByRole('button', { name: kit.username }).click()
+    await nav(mo.page).getByRole('button', { name: kit.username }).click()
     await mo.page.getByRole('button', { name: 'Members', exact: true }).click()
     await expect(mo.page.getByRole('heading', { name: 'Room settings' })).toHaveCount(0)
     await mo.page.getByLabel('Add someone').selectOption({ label: jo.username })
@@ -205,10 +204,10 @@ test.describe('groups', () => {
     const names = (...people: string[]) => people.sort().join(', ')
     await expect(kit.page.getByRole('heading', { name: names(jo.username, mo.username) })).toBeVisible()
     await expect(mo.page.getByRole('heading', { name: names(jo.username, kit.username) })).toBeVisible()
-    await jo.page
-      .getByRole('list')
-      .getByRole('button', { name: names(kit.username, mo.username) })
-      .click()
+    // In the nav, three people are two faces; jo opens it from there and sees what was said before.
+    const three = nav(jo.page).getByRole('button', { name: names(kit.username, mo.username) })
+    await expect(three.locator('img')).toHaveCount(2)
+    await three.click()
     await expect(article(jo.page, before)).toBeVisible()
 
     // Kit and mo alone is another conversation, with nothing in it yet.

@@ -119,12 +119,12 @@ describe('Home', () => {
     expect(navAvatar()).toBe('/img/new-face')
   })
 
-  it('lists my groups in the nav, keeps DMs behind Messages, and opens a chat-only group with one pane', async () => {
+  it('lists my rooms and conversations in the nav, and opens a chat-only room with one pane', async () => {
     const { getMessages } = await import('../api')
     const { container } = await home()
     expect(nav().getByRole('button', { name: 'Knitting' })).toBeTruthy()
-    expect(nav().queryByRole('button', { name: 'kit' })).toBeNull()
-    expect(nav().getByRole('button', { name: 'Messages' })).toBeTruthy()
+    expect(nav().getByRole('button', { name: 'kit' })).toBeTruthy()
+    expect(nav().getByRole('button', { name: 'All messages' })).toBeTruthy()
     expect(nav().getByRole('button', { name: 'New room' })).toBeTruthy()
 
     fireEvent.click(nav().getByRole('button', { name: 'Knitting' }))
@@ -149,21 +149,22 @@ describe('Home', () => {
     expect(container.querySelector('.ProseMirror')!.closest('.hidden')).toBeNull()
   })
 
-  it('Messages lists my DMs by their people and stays current inside one', async () => {
+  it('All messages lists my conversations; one opens like a room and is marked in the nav', async () => {
     const { getMessages } = await import('../api')
     const { container } = await home()
-    fireEvent.click(nav().getByRole('button', { name: 'Messages' }))
+    fireEvent.click(nav().getByRole('button', { name: 'All messages' }))
     expect(window.location.pathname).toBe('/messages')
     await screen.findByRole('heading', { name: 'Messages' })
-    expect(nav().getByRole('button', { name: 'Messages' }).getAttribute('aria-current')).toBe('page')
+    expect(nav().getByRole('button', { name: 'All messages' }).getAttribute('aria-current')).toBe('page')
     // The feed and room stay mounted behind the page.
     expect(container.querySelector('.ProseMirror')!.closest('.hidden')).not.toBeNull()
 
-    fireEvent.click(screen.getByRole('button', { name: 'kit' }))
+    fireEvent.click(within(screen.getByRole('list')).getByRole('button', { name: 'kit' }))
     expect(window.location.pathname).toBe('/r/d1')
     await vi.waitFor(() => expect(getMessages).toHaveBeenCalledWith('d1', null))
     expect(screen.getByRole('heading', { name: 'kit' })).toBeTruthy()
-    expect(nav().getByRole('button', { name: 'Messages' }).getAttribute('aria-current')).toBe('page')
+    expect(nav().getByRole('button', { name: 'kit' }).getAttribute('aria-current')).toBe('page')
+    expect(nav().getByRole('button', { name: 'All messages' }).getAttribute('aria-current')).toBeNull()
     expect(nav().getByRole('button', { name: 'Home' }).getAttribute('aria-current')).toBeNull()
   })
 

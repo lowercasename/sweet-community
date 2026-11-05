@@ -11,5 +11,9 @@ export function groupPath(id: string, rootId?: string): string {
 
 export const NEW_ROOM = '/rooms/new'
 
+/** The full list of my conversations, and where a new one starts. */
+export const MESSAGES = '/messages'
+export const NEW_MESSAGE = '/messages/new'
+
 /** A room's members page. */
 export const membersPath = (g: Group) => `${groupPath(g.id)}/members`

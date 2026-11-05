@@ -4,13 +4,14 @@ import type { User } from '../api'
 import { useGroups } from '../data/hooks'
 import { StreamProvider } from '../hooks/StreamContext'
 import { useLayout } from '../hooks/useLayout'
-import { NEW_ROOM, groupPath, membersPath } from '../routes'
+import { NEW_MESSAGE, NEW_ROOM, groupPath, membersPath } from '../routes'
 import { GroupBar } from '../components/GroupBar'
 import { GroupView } from '../components/GroupView'
 import { MembersPage } from '../components/MembersPage'
 import { MenuPage } from '../components/MenuPage'
 import { MessagesPage } from '../components/MessagesPage'
 import { NewGroupPage } from '../components/NewGroupPage'
+import { NewMessagePage } from '../components/NewMessagePage'
 import { PeoplePage } from '../components/PeoplePage'
 import { SettingsPage } from '../components/SettingsPage'
 import { Sidebar } from '../components/Sidebar'
@@ -82,6 +83,9 @@ export function Home({ me, onSignOut }: HomeProps) {
           <Route path="/settings">{root && <SettingsPage me={me} root={root} onSignOut={onSignOut} />}</Route>
           <Route path="/messages">
             <MessagesPage me={me} onGo={navigate} />
+          </Route>
+          <Route path={NEW_MESSAGE}>
+            <NewMessagePage me={me} onOpened={(g) => navigate(groupPath(g.id, root?.id))} />
           </Route>
           <Route path="/menu">
             <MenuPage me={me} groups={groups} onGo={navigate} onLogout={onSignOut} />
