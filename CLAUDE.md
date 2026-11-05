@@ -16,7 +16,7 @@ Every statement about what old Sweet had, did, or what happened on it is checked
 
 ## How work is done
 
-- The failing test comes first. Go tests for handlers, rules and sweeps; Vitest with happy-dom and Testing Library for pure functions and component state. No browser-driven or visual suite (declined). Bugs found afterwards are the failure this exists to prevent.
+- The failing test comes first. Go tests for handlers, rules and sweeps; Vitest with happy-dom and Testing Library for pure functions and component state; Playwright (`web/e2e`) for flows through the real browser against the real binary and against the Vite dev server. A behaviour that crosses a boundary (server to client, stream to cache, CSS to layout) gets a Playwright test, not only unit tests. Bugs found afterwards are the failure this exists to prevent.
 - A change is verified on every surface it touches: phone width as well as desktop; every place a changed piece of data is shown. Name those surfaces before starting.
 - One place for each thing: rules in `internal/perm`, server data in the TanStack Query cache, body sanitising in bluemonday, styling in `web/src/ui`. If a second copy of something is appearing, that is the bug.
 - Keep it simple. Prefer a library over handwritten code when a well-known one does the job; flag such cases. Buttons are primary, secondary or ghost. Tailwind classes only inside `web/src/ui`; everything else composes primitives (`pnpm check:atomic`).
@@ -31,6 +31,7 @@ Raphael's `pnpm dev` serves the main working tree with hot reload, so a file wri
 ```
 go vet ./... && go test ./...
 cd web && pnpm typecheck && pnpm check:atomic && pnpm test
+make e2e
 ```
 
 ## Data to keep out of outputs

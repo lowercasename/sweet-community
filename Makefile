@@ -31,3 +31,7 @@ test: cmd/sweet/migrations
 
 clean:
 	rm -rf bin cmd/sweet/migrations internal/web/dist/assets
+
+# Flows through the real browser against the built binary and the dev server.
+e2e:
+	cd web && pnpm e2e

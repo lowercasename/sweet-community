@@ -1,0 +1,71 @@
+import { article, confirm, expect, member, open, pick, test, uniq, writePost } from './helpers'
+
+test.describe('posts and comments', () => {
+  test('write, edit, comment, delete; another person sees each change live', async ({ browser }, testInfo) => {
+    const kit = await member(browser, testInfo, 'kit')
+    const mo = await member(browser, testInfo, 'mo')
+    // A deep feed, so the pane can scroll: a menu opened on a button that
+    // had to be scrolled into view once closed itself a frame later.
+    for (let i = 0; i < 14; i++) {
+      await kit.context.request.post('/api/groups/00000000-0000-7000-8000-000000000000/posts', {
+        data: { body_html: `<p>filler ${i}</p>` },
+      })
+    }
+    await open(kit.page)
+    await open(mo.page)
+
+    const text = uniq('A post about trains ')
+    await writePost(kit.page, text)
+    await expect(article(mo.page, text)).toBeVisible()
+
+    // Edit: the author has the menu, a bystander does not.
+    await expect(article(mo.page, text).getByRole('button', { name: 'Post options' })).toHaveCount(0)
+    await pick(kit.page, article(kit.page, text), 'Post options', 'Edit')
+    await kit.page.locator('article .editor-post .ProseMirror').first().click()
+    await kit.page.keyboard.press('End')
+    await kit.page.keyboard.type(' and boats')
+    await kit.page.getByRole('button', { name: 'Save' }).click()
+    await expect(article(kit.page, text)).toContainText('and boats')
+    await expect(article(kit.page, text)).toContainText('edited')
+    await expect(article(mo.page, text)).toContainText('and boats')
+
+    // Comment: appears for both; the count on the post follows.
+    await article(mo.page, text).getByRole('button', { name: 'Show comments' }).click()
+    await article(mo.page, text).locator('.editor-line .ProseMirror').click()
+    await mo.page.keyboard.type('Boats are fine too')
+    await mo.page.getByRole('button', { name: 'Reply' }).click()
+    await expect(article(mo.page, text)).toContainText('Boats are fine too')
+    await expect(article(kit.page, text).getByRole('button', { name: 'Show comments' })).toContainText('1')
+    await article(kit.page, text).getByRole('button', { name: 'Show comments' }).click()
+    await expect(article(kit.page, text)).toContainText('Boats are fine too')
+
+    // The post's author may delete a comment on their post; the comment's author may too.
+    const comment = article(kit.page, text).getByRole('article').filter({ hasText: 'Boats are fine too' })
+    await pick(kit.page, comment, 'Comment options', 'Delete')
+    await confirm(kit.page, 'Delete')
+    await expect(article(kit.page, text)).not.toContainText('Boats are fine too')
+    await expect(article(mo.page, text)).not.toContainText('Boats are fine too')
+    await expect(article(kit.page, text).getByRole('button', { name: 'Hide comments' })).not.toContainText('1')
+
+    // Delete the post: asks first; gone for everyone.
+    await pick(kit.page, article(kit.page, text), 'Post options', 'Delete')
+    await confirm(kit.page, 'Delete')
+    await expect(article(kit.page, text)).toHaveCount(0)
+    await expect(article(mo.page, text)).toHaveCount(0)
+    await kit.context.close()
+    await mo.context.close()
+  })
+
+  test('Mod+Enter posts; the editor empties; the post is at the top', async ({ browser }, testInfo) => {
+    const kit = await member(browser, testInfo)
+    await open(kit.page)
+    const text = uniq('Quick one ')
+    await kit.page.locator('.editor-post .ProseMirror').first().click()
+    await kit.page.keyboard.type(text)
+    await kit.page.keyboard.press(process.platform === 'darwin' ? 'Meta+Enter' : 'Control+Enter')
+    await expect(article(kit.page, text)).toBeVisible()
+    await expect(kit.page.locator('.editor-post .ProseMirror').first()).toHaveText('')
+    await expect(kit.page.getByRole('article').first()).toContainText(text)
+    await kit.context.close()
+  })
+})
