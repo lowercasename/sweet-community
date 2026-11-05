@@ -1,4 +1,5 @@
 import type { Group, User } from '../api'
+import { conversationsOf } from '../data/groups'
 import { useUsers } from '../data/hooks'
 import { MESSAGES, NEW_MESSAGE, groupPath } from '../routes'
 import { FacePile, NavItem, NavSection } from '../ui'
@@ -6,13 +7,6 @@ import { groupLabel } from './GroupView'
 
 /** How many conversations the nav shows: the latest five, and the open one. */
 export const SHOWN = 5
-
-/** When the conversation last had a word in it, or when it was opened. */
-export const activity = (g: Group) => g.last_message_at ?? g.created_at
-
-/** My conversations, latest word first. */
-export const conversationsOf = (groups: Group[]) =>
-  groups.filter((g) => g.kind === 'dm').sort((a, b) => activity(b) - activity(a))
 
 /** The faces of a conversation's other people, as they are now. */
 export function ConversationFaces({ group, me }: { group: Group; me: User }) {

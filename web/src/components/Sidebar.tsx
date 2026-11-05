@@ -1,4 +1,5 @@
 import type { Group, User } from '../api'
+import { roomsOf } from '../data/groups'
 import { useAuthor } from '../data/hooks'
 import { NEW_ROOM, groupPath } from '../routes'
 import { Hairline, NavAccount, NavBar, NavItem, NavSection, Tile, Wordmark } from '../ui'
@@ -29,7 +30,7 @@ function at(location: string, path: string): boolean {
 export function Sidebar({ me, groups, location, expanded, onGo, onToggle }: SidebarProps) {
   const live = useAuthor(me)
   const root = groups.find((g) => g.kind === 'root')
-  const mine = groups.filter((g) => g.kind === 'group')
+  const mine = roomsOf(groups)
   const canCreate = root?.can.create_groups === true
   return (
     <NavBar

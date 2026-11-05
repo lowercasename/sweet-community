@@ -1,4 +1,5 @@
 import type { Group, User } from '../api'
+import { roomsOf } from '../data/groups'
 import { useAuthor } from '../data/hooks'
 import { NEW_ROOM, groupPath } from '../routes'
 import { Card, Hairline, NavAccount, NavItem, NavSection, Pane, Stack, Tile } from '../ui'
@@ -19,7 +20,7 @@ interface MenuPageProps {
 export function MenuPage({ me, groups, onGo, onLogout }: MenuPageProps) {
   const live = useAuthor(me)
   const root = groups.find((g) => g.kind === 'root')
-  const mine = groups.filter((g) => g.kind === 'group')
+  const mine = roomsOf(groups)
   const canCreate = root?.can.create_groups === true
   return (
     <Pane>

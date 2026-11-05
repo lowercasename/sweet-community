@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import type { Message } from '../api'
 import { useAuthor } from '../data/hooks'
-import { Avatar, Box, ConfirmDialog, HtmlContent, Menu, Row, Stack, Text, Time } from '../ui'
+import { Box, ConfirmDialog, HtmlContent, Menu, Row, Stack, Text, Time } from '../ui'
 import { PersonName } from './PersonName'
 
 interface MessageGroupProps {
@@ -43,8 +43,7 @@ export function MessageGroup({ messages, onDelete }: MessageGroupProps) {
             <Stack gap={1} fill>
               {i === 0 && (
                 <Row gap={2} align="center">
-                  <Avatar name={author.username} picture={author.picture} size="sm" />
-                  <PersonName user={author} />
+                  <PersonName user={author} avatar="sm" />
                   <Text as="span" variant="small">
                     <Time at={first.created_at} />
                   </Text>

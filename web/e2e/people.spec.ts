@@ -13,6 +13,11 @@ test.describe('people', () => {
 
     const name = article(mo.page, text).getByRole('button', { name: kit.username })
     const card = mo.page.getByRole('dialog', { name: `About ${kit.username}` })
+    // The picture beside the name is the same control.
+    await article(mo.page, text).getByRole('img', { name: kit.username }).hover()
+    await expect(card).toBeVisible()
+    await mo.page.mouse.move(8, 8)
+    await expect(card).toBeHidden()
     await name.hover()
     await expect(card).toBeVisible()
     await expect(card).toContainText(/joined (just now|\d+m ago)/)

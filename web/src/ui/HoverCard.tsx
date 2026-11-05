@@ -17,16 +17,16 @@ import {
 } from '@floating-ui/react'
 
 interface HoverCardProps {
-  /** Whose card: the dialog is named "About <name>". */
+  /** Whose card: the control's name, and the dialog is named "About <name>". */
   name: string
   /** What the card holds. */
   card: ReactNode
-  /** The trigger's content: the name, as written. */
+  /** The trigger's content: the name as written, with their picture before it where one is shown. */
   children?: ReactNode
 }
 
 const TRIGGER =
-  'inline cursor-pointer appearance-none rounded-[2px] border-0 bg-transparent p-0 text-left font-sans text-[inherit] leading-[inherit] ' +
+  'inline-flex cursor-pointer items-center gap-2 appearance-none rounded-[2px] border-0 bg-transparent p-0 text-left font-sans text-[inherit] leading-[inherit] ' +
   'font-medium text-sweet [overflow-wrap:anywhere] underline-offset-2 hover:underline ' +
   'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-pink'
 
@@ -57,7 +57,7 @@ export function HoverCard({ name, card, children }: HoverCardProps) {
 
   return (
     <>
-      <button ref={refs.setReference} type="button" className={TRIGGER} {...getReferenceProps()}>
+      <button ref={refs.setReference} type="button" className={TRIGGER} aria-label={name} {...getReferenceProps()}>
         {children}
       </button>
       {open && (

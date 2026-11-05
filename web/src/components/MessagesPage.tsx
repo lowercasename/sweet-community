@@ -16,7 +16,8 @@ import {
   Time,
 } from '../ui'
 import { groupPath } from '../routes'
-import { ConversationFaces, conversationsOf, activity } from './ConversationsSection'
+import { activity, conversationsOf } from '../data/groups'
+import { ConversationFaces } from './ConversationsSection'
 import { groupLabel } from './GroupView'
 
 interface MessagesPageProps {

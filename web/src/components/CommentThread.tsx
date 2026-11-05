@@ -2,7 +2,7 @@ import { useState } from 'react'
 import type { Comment as CommentData } from '../api'
 import { useAuthor, useCommentActions, useComments } from '../data/hooks'
 import { commentExtensions } from '../editor/extensions'
-import { Avatar, Box, ConfirmDialog, Hairline, HtmlContent, Menu, Row, Stack, Text, Time, type MenuItem } from '../ui'
+import { Box, ConfirmDialog, Hairline, HtmlContent, Menu, Row, Stack, Text, Time, type MenuItem } from '../ui'
 import { BodyEditor } from './BodyEditor'
 import { PersonName } from './PersonName'
 
@@ -52,8 +52,7 @@ function CommentItem({ comment, disabled, onEdit, onDelete }: CommentItemProps) 
       <Stack gap={1}>
         <Row justify="between" align="center">
           <Row gap={2} align="center">
-            <Avatar name={author.username} picture={author.picture} size="sm" />
-            <PersonName user={author} />
+            <PersonName user={author} avatar="sm" />
             <Text as="span" variant="small">
               <Time at={comment.created_at} />
               {comment.edited_at != null && (

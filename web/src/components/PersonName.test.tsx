@@ -53,6 +53,14 @@ describe('PersonName', () => {
     await vi.waitFor(() => expect(window.location.pathname).toBe('/r/d1'))
   })
 
+  it('the picture beside the name is part of the same control, so it opens the card too', async () => {
+    const { PersonName } = await import('./PersonName')
+    renderWithQuery(<PersonName user={user('mo')} avatar="md" />, (qc) => qc.setQueryData(keys.me, user('kit')))
+    const trigger = await screen.findByRole('button', { name: 'mo' })
+    fireEvent.click(within(trigger).getByRole('img', { name: 'mo' }))
+    expect(card('mo')).toBeTruthy()
+  })
+
   it('my own card has no Message', async () => {
     await draw('kit')
     fireEvent.click(screen.getByRole('button', { name: 'kit' }))

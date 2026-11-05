@@ -116,6 +116,21 @@ describe('Sidebar', () => {
     expect(item('jo, kit, mo').textContent).toBe('+2')
   })
 
+  it('lists rooms alphabetically, case aside, whatever order they came in', async () => {
+    await draw([
+      root(true),
+      group('mods', 'member', { name: 'Mod Team' }),
+      group('adhd', 'member', { name: 'adhd friends' }),
+      group('its', 'member', { name: "It's A Room" }),
+    ])
+    expect(within(groupsSection()).getAllByRole('button').map(nameOf)).toEqual([
+      'New room',
+      'adhd friends',
+      "It's A Room",
+      'Mod Team',
+    ])
+  })
+
   it('shows the Rooms section only when it has something to show', async () => {
     await draw([root(false), withKit])
     expect(screen.queryByRole('group', { name: 'Rooms' })).toBeNull()

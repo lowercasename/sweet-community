@@ -8,6 +8,8 @@ import { Avatar, Button, HoverCard, Row, Stack, Text, Time } from '../ui'
 interface PersonNameProps {
   /** The person as the content carried them; the card shows them as they are now. */
   user: User
+  /** Their picture before the name, inside the same control, so hovering it opens the card too. */
+  avatar?: 'sm' | 'md'
 }
 
 const ROLE_WORD: Record<Member['role'], string> = {
@@ -62,12 +64,13 @@ function PersonCard({ person, me }: { person: Member | User; me: User | null | u
  * the users cache, so a new picture or name shows here at once; the
  * snapshot the content carried is the fallback.
  */
-export function PersonName({ user }: PersonNameProps) {
+export function PersonName({ user, avatar }: PersonNameProps) {
   const { data: users } = useUsers()
   const { data: me } = useMe()
   const person = users?.get(user.id) ?? user
   return (
     <HoverCard name={person.username} card={<PersonCard person={person} me={me} />}>
+      {avatar && <Avatar name={person.username} picture={person.picture} size={avatar} />}
       {person.username}
     </HoverCard>
   )

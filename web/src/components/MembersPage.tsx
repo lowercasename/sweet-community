@@ -2,7 +2,6 @@ import { useState } from 'react'
 import type { Group, GroupMode, Membership, User } from '../api'
 import { useGroupActions, useMembers, useSetRole, useUsers } from '../data/hooks'
 import {
-  Avatar,
   Button,
   Card,
   ConfirmDialog,
@@ -163,8 +162,7 @@ export function MembersPage({ group, me, onLeft }: MembersPageProps) {
                       <ListItem key={m.user.id}>
                         <Row justify="between" align="center" wrap="narrow">
                           <Row gap={2} align="center">
-                            <Avatar name={m.user.username} picture={m.user.picture} />
-                            <PersonName user={m.user} />
+                            <PersonName user={m.user} avatar="md" />
                             <Text as="span" variant="small">
                               {ROLE_WORD[m.role] && `${ROLE_WORD[m.role]} · `}
                               joined <Time at={m.joined_at} />

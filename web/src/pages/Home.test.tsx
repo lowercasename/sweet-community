@@ -162,7 +162,8 @@ describe('Home', () => {
     fireEvent.click(within(screen.getByRole('list')).getByRole('button', { name: 'kit' }))
     expect(window.location.pathname).toBe('/r/d1')
     await vi.waitFor(() => expect(getMessages).toHaveBeenCalledWith('d1', null))
-    expect(screen.getByRole('heading', { name: 'kit' })).toBeTruthy()
+    // The bar is a title: its names are text, not cards.
+    expect(within(screen.getByRole('heading', { name: 'kit' })).queryByRole('button')).toBeNull()
     expect(nav().getByRole('button', { name: 'kit' }).getAttribute('aria-current')).toBe('page')
     expect(nav().getByRole('button', { name: 'All messages' }).getAttribute('aria-current')).toBeNull()
     expect(nav().getByRole('button', { name: 'Home' }).getAttribute('aria-current')).toBeNull()

@@ -1,22 +1,7 @@
 import { useState } from 'react'
 import type { Group, Invite, Member, User } from '../api'
 import { useGroupActions, useInviteActions, useInvites, useSetRole, useUsers } from '../data/hooks'
-import {
-  Avatar,
-  Button,
-  Card,
-  Heading,
-  Input,
-  List,
-  ListItem,
-  Measure,
-  Pane,
-  Row,
-  ScrollArea,
-  Stack,
-  Text,
-  Time,
-} from '../ui'
+import { Button, Card, Heading, Input, List, ListItem, Measure, Pane, Row, ScrollArea, Stack, Text, Time } from '../ui'
 import { PersonName } from './PersonName'
 
 interface PeoplePageProps {
@@ -126,8 +111,7 @@ export function PeoplePage({ me, root, onOpenGroup }: PeoplePageProps) {
                     <ListItem key={u.id}>
                       <Row justify="between" align="center" wrap="narrow">
                         <Row gap={2} align="center">
-                          <Avatar name={u.username} picture={u.picture} />
-                          <PersonName user={u} />
+                          <PersonName user={u} avatar="md" />
                           <Text as="span" variant="small">
                             {ROLE_WORD[u.role] && `${ROLE_WORD[u.role]} · `}joined <Time at={u.joined_at} />
                           </Text>

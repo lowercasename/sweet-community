@@ -2,7 +2,7 @@ import { useState } from 'react'
 import type { Post as PostData } from '../api'
 import { useAuthor } from '../data/hooks'
 import { postExtensions } from '../editor/extensions'
-import { Avatar, Button, Card, ConfirmDialog, HtmlContent, Menu, Row, Stack, Text, Time, type MenuItem } from '../ui'
+import { Button, Card, ConfirmDialog, HtmlContent, Menu, Row, Stack, Text, Time, type MenuItem } from '../ui'
 import { BodyEditor } from './BodyEditor'
 import { CommentThread } from './CommentThread'
 import { PersonName } from './PersonName'
@@ -53,8 +53,7 @@ export function Post({ post, disabled, onEdit, onDelete }: PostProps) {
       <Stack gap={2}>
         <Row justify="between" align="center">
           <Row gap={2} align="center">
-            <Avatar name={author.username} picture={author.picture} />
-            <PersonName user={author} />
+            <PersonName user={author} avatar="md" />
             <Text as="span" variant="small">
               <Time at={post.created_at} />
               {post.edited_at != null && (
