@@ -19,7 +19,7 @@ describe('NewGroupPage', () => {
     const onCreated = vi.fn()
     renderWithQuery(<NewGroupPage onCreated={onCreated} />)
     expect(screen.getByRole('button', { name: 'Create room' })).toHaveProperty('disabled', true)
-    fireEvent.change(screen.getByLabelText('Name'), { target: { value: 'Knitting' } })
+    fireEvent.change(screen.getByLabelText('Room name'), { target: { value: 'Knitting' } })
     fireEvent.change(screen.getByLabelText('Mode'), { target: { value: 'posts' } })
     fireEvent.click(screen.getByRole('button', { name: 'Create room' }))
     expect(createGroup).toHaveBeenCalledWith('Knitting', 'posts')

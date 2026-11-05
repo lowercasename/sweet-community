@@ -99,16 +99,12 @@ func ManageInstance(root Actor) bool { return root.Role == Owner }
 // Transfer: the owner hands ownership to another member of the group.
 func Transfer(a, target Actor) bool { return a.Role == Owner && target.member() && target.ID != a.ID }
 
-// AddMembers: the group's staff; in a DM, any of its people, since a DM is
-// its people and has no staff. In the root group, adding is an invite link.
-// RemoveMembers: the group's staff; in a DM nobody, people leave.
-func AddMembers(a Actor, g Group) bool {
-	if g.Kind == KindDM {
-		return a.member()
-	}
-	return a.staff()
-}
-func RemoveMembers(a Actor) bool { return a.staff() }
+// AddMembers: the group's staff. Nobody is added to a conversation: its
+// people are its identity, and a word with someone else is another
+// conversation. In the root group, adding is an invite link.
+// RemoveMembers: the group's staff; in a conversation nobody, people step out.
+func AddMembers(a Actor, g Group) bool { return g.Kind != KindDM && a.staff() }
+func RemoveMembers(a Actor) bool       { return a.staff() }
 
 // Invite: adding to the root group, which is an invite link.
 func Invite(root Actor) bool { return AddMembers(root, Group{Kind: KindRoot}) }
@@ -128,5 +124,7 @@ func Rename(a Actor, g Group) bool      { return a.Role == Owner && g.Kind == Ki
 func SetMode(a Actor, g Group) bool     { return a.Role == Owner && g.Kind != KindDM }
 func DeleteGroup(a Actor, g Group) bool { return a.Role == Owner && g.Kind != KindRoot }
 
-// Leave: any member but the owner, of any group but the root.
+// Leave: any member but the owner, of any group but the root. Leaving a
+// room removes you; leaving a conversation is stepping out, and opening it
+// again is stepping back in.
 func Leave(a Actor, g Group) bool { return a.member() && a.Role != Owner && g.Kind != KindRoot }

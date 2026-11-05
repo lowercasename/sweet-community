@@ -175,7 +175,7 @@ test.describe('groups', () => {
     await mo.context.close()
   })
 
-  test('a conversation grows when one of its people adds someone; the pair keeps its own', async ({
+  test('a conversation is its people: with someone else is another one; stepping out and back keeps it', async ({
     browser,
   }, testInfo) => {
     const kit = await member(browser, testInfo, 'kit')
@@ -183,42 +183,59 @@ test.describe('groups', () => {
     const jo = await member(browser, testInfo, 'jo')
     await open(kit.page, '/people')
     await open(mo.page)
-    await open(jo.page, '/messages')
+    await open(jo.page)
     await kit.page
       .getByRole('listitem')
       .filter({ hasText: mo.username })
       .getByRole('button', { name: 'Message' })
       .click()
     await expect(kit.page.getByRole('heading', { name: mo.username })).toBeVisible()
-    const before = uniq('before jo ')
-    await sendMessage(kit.page, before)
+    const between = uniq('between us ')
+    await sendMessage(kit.page, between)
 
-    // Mo, a plain member of it, brings jo in from its members page.
+    // Nobody is added. A word with jo too is another conversation, empty, and the pair stays what it was.
     await nav(mo.page).getByRole('button', { name: kit.username }).click()
     await mo.page.getByRole('button', { name: 'Members', exact: true }).click()
-    await expect(mo.page.getByRole('heading', { name: 'Room settings' })).toHaveCount(0)
-    await mo.page.getByLabel('Add someone').selectOption({ label: jo.username })
-    await mo.page.getByRole('button', { name: 'Add', exact: true }).click()
-
-    // Named by its people, everywhere, live: kit's bar, mo's bar, jo's Messages page; jo sees what was said before.
+    await expect(mo.page.getByLabel('Add someone')).toHaveCount(0)
+    await mo.page.getByLabel('With someone else').selectOption({ label: jo.username })
+    await mo.page.getByRole('button', { name: 'Open', exact: true }).click()
     const names = (...people: string[]) => people.sort().join(', ')
-    await expect(kit.page.getByRole('heading', { name: names(jo.username, mo.username) })).toBeVisible()
     await expect(mo.page.getByRole('heading', { name: names(jo.username, kit.username) })).toBeVisible()
-    // In the nav, three people are two faces; jo opens it from there and sees what was said before.
-    const three = nav(jo.page).getByRole('button', { name: names(kit.username, mo.username) })
-    await expect(three.locator('img')).toHaveCount(2)
-    await three.click()
-    await expect(article(jo.page, before)).toBeVisible()
-
-    // Kit and mo alone is another conversation, with nothing in it yet.
-    await open(kit.page, '/people')
-    await kit.page
-      .getByRole('listitem')
-      .filter({ hasText: mo.username })
-      .getByRole('button', { name: 'Message' })
-      .click()
+    await expect(article(mo.page, between)).toHaveCount(0)
+    const three = new URL(mo.page.url()).pathname
     await expect(kit.page.getByRole('heading', { name: mo.username, exact: true })).toBeVisible()
-    await expect(article(kit.page, before)).toHaveCount(0)
+    await expect(nav(kit.page).getByRole('button', { name: names(jo.username, mo.username) })).toBeVisible()
+    const all = uniq('all three ')
+    await sendMessage(mo.page, all)
+
+    // Jo steps out: gone from jo's nav, still of the three to the others, who see jo stepped out.
+    await nav(jo.page)
+      .getByRole('button', { name: names(kit.username, mo.username) })
+      .click()
+    await jo.page.getByRole('button', { name: 'Members', exact: true }).click()
+    await jo.page.getByRole('button', { name: 'Leave conversation' }).click()
+    await confirm(jo.page, 'Leave')
+    await expect(jo.page).toHaveURL(/\/messages$/)
+    await expect(nav(jo.page).getByRole('button', { name: names(kit.username, mo.username) })).toHaveCount(0)
+    await mo.page.getByRole('button', { name: 'Members', exact: true }).click()
+    await expect(mo.page.getByRole('listitem').filter({ hasText: jo.username })).toContainText('stepped out')
+    await expect(mo.page.getByRole('heading', { name: names(jo.username, kit.username) })).toBeVisible()
+    // What is said meanwhile is said in jo's conversation too.
+    await mo.page.getByRole('button', { name: /^Back to / }).click()
+    const meanwhile = uniq('while jo is out ')
+    await sendMessage(mo.page, meanwhile)
+
+    // Jo steps back in from All messages: the same conversation, everything said in it.
+    await expect(jo.page.getByRole('heading', { name: 'Stepped out of' })).toBeVisible()
+    await jo.page
+      .getByRole('list')
+      .last()
+      .getByRole('button', { name: names(kit.username, mo.username) })
+      .click()
+    await expect(jo.page).toHaveURL(new RegExp(three.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '$'))
+    await expect(article(jo.page, all)).toBeVisible()
+    await expect(article(jo.page, meanwhile)).toBeVisible()
+    await expect(nav(jo.page).getByRole('button', { name: names(kit.username, mo.username) })).toBeVisible()
     await kit.context.close()
     await mo.context.close()
     await jo.context.close()

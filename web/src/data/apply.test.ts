@@ -20,7 +20,7 @@ let qc: QueryClient
 const posts = (gid = ROOT) => (qc.getQueryData(keys.posts(gid)) as { pages: PostPage[] }).pages.flatMap((p) => p.posts)
 const groups = () => (qc.getQueryData(keys.groups) as { groups: Group[] }).groups
 const members = (gid: string) =>
-  (qc.getQueryData(keys.members(gid)) as { members: { user: User; role: string }[] }).members
+  (qc.getQueryData(keys.members(gid)) as { members: { user: User; role: string; left_at?: number | null }[] }).members
 
 beforeEach(() => {
   qc = makeQueryClient()
@@ -181,22 +181,26 @@ describe('applyEvent', () => {
 })
 
 describe('latest activity', () => {
-  it("a membership in a conversation changes its people, in the server's order, without waiting for the group event", () => {
+  it('my stepping out of a conversation keeps it listed as stepped out and drops what it holds; another person stepping out shows among its people', () => {
     qc.setQueryData(keys.groups, { groups: [group(ROOT, 'member'), dm('d1', [kit, mo])] })
-    const people = () =>
+    qc.setQueryData(keys.messages('d1'), { pages: [], pageParams: [] })
+    qc.setQueryData(keys.members('d1'), {
+      members: [
+        { group_id: 'd1', user: kit, role: 'member', joined_at: 1 },
+        { group_id: 'd1', user: mo, role: 'member', joined_at: 1 },
+      ],
+    })
+    applyEvent(qc, 'membership', { group_id: 'd1', user: mo, role: 'member', joined_at: 1, left_at: 9 })
+    expect(members('d1').find((m) => m.user.id === 'mo')?.left_at).toBe(9)
+    expect(
       groups()
         .find((g) => g.id === 'd1')
-        ?.members?.map((u) => u.id)
-    applyEvent(qc, 'membership', { group_id: 'd1', user: user('jo'), role: 'member', joined_at: 5 })
-    expect(people()).toEqual(['jo', 'kit', 'mo'])
-    // A replay adds nobody twice.
-    applyEvent(qc, 'membership', { group_id: 'd1', user: user('jo'), role: 'member', joined_at: 5 })
-    expect(people()).toEqual(['jo', 'kit', 'mo'])
-    applyEvent(qc, 'membership_delete', { group_id: 'd1', user_id: 'mo' })
-    expect(people()).toEqual(['jo', 'kit'])
-    // A room carries no people list, and gets none.
-    applyEvent(qc, 'membership', { group_id: CLUB, user: user('jo'), role: 'member', joined_at: 5 })
-    expect(groups().find((g) => g.id === CLUB)?.members).toBeUndefined()
+        ?.members?.map((u) => u.id),
+    ).toEqual(['kit', 'mo'])
+    applyEvent(qc, 'membership', { group_id: 'd1', user: kit, role: 'member', joined_at: 1, left_at: 10 })
+    expect(groups().find((g) => g.id === 'd1')?.left_at).toBe(10)
+    expect(qc.getQueryData(keys.messages('d1'))).toBeUndefined()
+    expect(qc.getQueryData(keys.members('d1'))).toBeUndefined()
   })
 
   it("a DM's group event carries its people, so an added person is in its name at once", () => {

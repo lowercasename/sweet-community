@@ -4,7 +4,7 @@ import type { User } from '../api'
 import { useGroups } from '../data/hooks'
 import { StreamProvider } from '../hooks/StreamContext'
 import { useLayout } from '../hooks/useLayout'
-import { NEW_MESSAGE, NEW_ROOM, groupPath, membersPath } from '../routes'
+import { MESSAGES, NEW_MESSAGE, NEW_ROOM, groupPath, membersPath } from '../routes'
 import { GroupBar } from '../components/GroupBar'
 import { GroupView } from '../components/GroupView'
 import { MembersPage } from '../components/MembersPage'
@@ -95,7 +95,13 @@ export function Home({ me, onSignOut }: HomeProps) {
           </Route>
           <Route path="/r/:id/members">
             {atMembers && current && current.id === membersParams.id && (
-              <MembersPage key={current.id} group={current} me={me} onLeft={() => navigate('/')} />
+              <MembersPage
+                key={current.id}
+                group={current}
+                me={me}
+                onLeft={() => navigate(current.kind === 'dm' ? MESSAGES : '/')}
+                onOpen={(g) => navigate(groupPath(g.id, root?.id))}
+              />
             )}
           </Route>
           <Route path="/" />
@@ -111,7 +117,7 @@ export function Home({ me, onSignOut }: HomeProps) {
               { key: 'posts', icon: 'posts', label: 'Posts' },
               { key: 'chat', icon: 'chat', label: 'Chat' },
               { key: 'search', icon: 'search', label: 'Search' },
-              { key: 'bell', icon: 'bell', label: 'Alerts' },
+              { key: 'bell', icon: 'bell', label: 'Notifications' },
               { key: 'menu', icon: 'menu', label: 'Menu' },
             ]}
             active={tabActive}

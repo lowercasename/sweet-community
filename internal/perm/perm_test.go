@@ -78,8 +78,9 @@ func TestRules(t *testing.T) {
 		{"member adds members", AddMembers(kit, club), false},
 		{"moderator invites", Invite(mod), true},
 		{"member invites", Invite(kit), false},
-		{"member adds to a dm", AddMembers(kit, Group{Kind: KindDM}), true},
-		{"outsider adds to a dm", AddMembers(outsider, Group{Kind: KindDM}), false},
+		{"nobody adds to a conversation", AddMembers(kit, Group{Kind: KindDM}), false},
+		{"staff neither", AddMembers(owner, Group{Kind: KindDM}), false},
+		{"a person steps out of a conversation", Leave(kit, Group{Kind: KindDM}), true},
 		{"moderator removes members", RemoveMembers(mod), true},
 		{"member removes members", RemoveMembers(kit), false},
 

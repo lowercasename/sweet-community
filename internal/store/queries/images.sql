@@ -14,12 +14,12 @@ UPDATE users SET picture_id = ? WHERE id = ?;
 -- name: ImageVisibleTo :one
 SELECT EXISTS (SELECT 1 FROM images i WHERE i.id = sqlc.arg(image_id) AND i.uploader_id = sqlc.arg(viewer_id))
     OR EXISTS (SELECT 1 FROM users u WHERE u.picture_id = sqlc.arg(image_id))
-    OR EXISTS (SELECT 1 FROM posts p JOIN memberships m ON m.group_id = p.group_id AND m.user_id = sqlc.arg(viewer_id)
+    OR EXISTS (SELECT 1 FROM posts p JOIN memberships m ON m.group_id = p.group_id AND m.user_id = sqlc.arg(viewer_id) AND m.left_at IS NULL
                WHERE p.deleted_at IS NULL AND instr(p.body_html, sqlc.arg(image_id)) > 0)
     OR EXISTS (SELECT 1 FROM comments c JOIN posts p ON p.id = c.post_id AND p.deleted_at IS NULL
-               JOIN memberships m ON m.group_id = p.group_id AND m.user_id = sqlc.arg(viewer_id)
+               JOIN memberships m ON m.group_id = p.group_id AND m.user_id = sqlc.arg(viewer_id) AND m.left_at IS NULL
                WHERE c.deleted_at IS NULL AND instr(c.body_html, sqlc.arg(image_id)) > 0)
-    OR EXISTS (SELECT 1 FROM messages x JOIN memberships m ON m.group_id = x.group_id AND m.user_id = sqlc.arg(viewer_id)
+    OR EXISTS (SELECT 1 FROM messages x JOIN memberships m ON m.group_id = x.group_id AND m.user_id = sqlc.arg(viewer_id) AND m.left_at IS NULL
                WHERE x.deleted_at IS NULL AND instr(x.body_html, sqlc.arg(image_id)) > 0) AS visible;
 
 -- Images nothing points at: not a profile picture, not in a live post,

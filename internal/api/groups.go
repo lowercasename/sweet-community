@@ -32,8 +32,11 @@ type Group struct {
 	LastMessageAt *int64   `json:"last_message_at"`
 	Role          string   `json:"role,omitempty"`
 	Can           GroupCan `json:"can"`
-	// Members is set for a DM only: a DM is named by its people.
+	// Members is set for a DM only: a DM is named by its people, present or away.
 	Members []User `json:"members,omitempty"`
+	// LeftAt is set when the viewer has stepped out of this conversation:
+	// it is listed for them (All messages), and nothing else of it is.
+	LeftAt *int64 `json:"left_at,omitempty"`
 }
 
 // GroupCan is what the viewer may do to a group. CreateGroups is meaningful
@@ -73,13 +76,15 @@ type Membership struct {
 	User     User   `json:"user"`
 	Role     string `json:"role"`
 	JoinedAt int64  `json:"joined_at"`
+	// LeftAt is set while this person has stepped out of a conversation.
+	LeftAt *int64 `json:"left_at"`
 }
 
 func groupFor(a perm.Actor, g Group, st Settings) Group {
 	pg := perm.Group{Kind: g.Kind}
 	g.Role = a.Role
 	g.Can = GroupCan{
-		// In the root group adding is an invite link and nobody is removed (member removal comes with admin tools); a DM grows by any of its people and shrinks only by leaving.
+		// In the root group adding is an invite link and nobody is removed (member removal comes with admin tools); nobody is added to a conversation.
 		AddMembers:    perm.AddMembers(a, pg),
 		RemoveMembers: perm.RemoveMembers(a) && g.Kind == perm.KindGroup,
 		SetRoles:      a.Role == perm.Owner,
@@ -168,6 +173,7 @@ func (s *Server) listGroups(w http.ResponseWriter, r *http.Request) {
 			writeErr(w, http.StatusInternalServerError, err.Error())
 			return
 		}
+		g.LeftAt = nullInt(row.LeftAt)
 		out = append(out, groupFor(perm.Actor{ID: me.ID, Role: row.Role}, g, st))
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"groups": out})
@@ -225,76 +231,95 @@ func (s *Server) createGroup(w http.ResponseWriter, r *http.Request) {
 		}
 		s.createGroupWith(w, r, perm.KindGroup, in.Name, in.Mode, now, map[string]string{me.ID: perm.Owner})
 	case perm.KindDM:
-		people := map[string]string{me.ID: perm.Member}
+		people := map[string]bool{me.ID: true}
 		for _, id := range in.Members {
-			people[id] = perm.Member
+			people[id] = true
 		}
 		if len(people) < 2 {
-			writeErr(w, http.StatusBadRequest, "a DM needs someone else in it")
+			writeErr(w, http.StatusBadRequest, "a conversation needs someone else in it")
 			return
 		}
-		if existing, err := s.findDM(r, me.ID, people); err != nil {
-			writeErr(w, http.StatusInternalServerError, err.Error())
-			return
-		} else if existing != "" {
-			row, err := s.q().GetGroup(r.Context(), existing)
-			if err != nil {
-				writeErr(w, http.StatusInternalServerError, err.Error())
-				return
-			}
-			g, err := wireGroup(r.Context(), s.q(), row)
-			if err != nil {
-				writeErr(w, http.StatusInternalServerError, err.Error())
-				return
-			}
-			writeJSON(w, http.StatusOK, groupFor(perm.Actor{ID: me.ID, Role: perm.Member}, g, st))
-			return
+		ids := make([]string, 0, len(people))
+		for id := range people {
+			ids = append(ids, id)
 		}
-		s.createGroupWith(w, r, perm.KindDM, "", perm.ModeChat, now, people)
+		s.openConversation(w, r, me, ids, now)
 	default:
 		writeErr(w, http.StatusBadRequest, "kind must be group or dm")
 	}
 }
 
-// findDM looks for a DM of the viewer whose members are exactly `people`.
-func (s *Server) findDM(r *http.Request, viewerID string, people map[string]string) (string, error) {
-	rows, err := s.q().ListMyDMMembers(r.Context(), viewerID)
+// openConversation is the conversation of exactly these people
+// (architecture.md, Groups): one per set, keyed by the sorted ids, found or
+// made inside one transaction so two openings cannot make two. The viewer
+// is one of them; having stepped out, they are present again, which is a
+// membership event. The reply is the group, 200 found or 201 made.
+func (s *Server) openConversation(w http.ResponseWriter, r *http.Request, me User, people []string, now int64) {
+	sort.Strings(people)
+	key := sql.NullString{String: strings.Join(people, ","), Valid: true}
+	id, err := uuid.NewV7()
 	if err != nil {
-		return "", err
+		writeErr(w, http.StatusInternalServerError, err.Error())
+		return
 	}
-	sets := map[string][]string{}
-	for _, row := range rows {
-		sets[row.GroupID] = append(sets[row.GroupID], row.UserID)
-	}
-	want := make([]string, 0, len(people))
-	for id := range people {
-		want = append(want, id)
-	}
-	sort.Strings(want)
-	// Two DMs can hold the same people once a larger one has shrunk; the
-	// newer is found (ids are UUIDv7, so the greatest is the newest).
-	found := ""
-	for gid, members := range sets {
-		sort.Strings(members)
-		if strings.Join(members, ",") == strings.Join(want, ",") && gid > found {
-			found = gid
+	gid := id.String()
+	ctx := r.Context()
+	s.loggedMany(w, r, now, func(qtx *store.Queries) ([]events.Entry, any, int, error) {
+		row, err := qtx.GetDMByPeople(ctx, key)
+		if err == nil {
+			g, err := wireGroup(ctx, qtx, store.GetGroupRow(row))
+			if err != nil {
+				return nil, nil, http.StatusInternalServerError, err
+			}
+			m, err := qtx.GetMember(ctx, store.GetMemberParams{GroupID: g.ID, UserID: me.ID})
+			if err != nil {
+				return nil, nil, http.StatusInternalServerError, err
+			}
+			var entries []events.Entry
+			if m.LeftAt.Valid {
+				if err := qtx.SetMembershipPresent(ctx, store.SetMembershipPresentParams{GroupID: g.ID, UserID: me.ID}); err != nil {
+					return nil, nil, http.StatusInternalServerError, err
+				}
+				if m, err = qtx.GetMember(ctx, store.GetMemberParams{GroupID: g.ID, UserID: me.ID}); err != nil {
+					return nil, nil, http.StatusInternalServerError, err
+				}
+				entries = append(entries, events.Entry{Kind: "membership", Payload: wireMembership(g.ID, m)})
+			}
+			return entries, &g, http.StatusOK, nil
+		} else if !errors.Is(err, sql.ErrNoRows) {
+			return nil, nil, http.StatusInternalServerError, err
 		}
-	}
-	return found, nil
-}
-
-// groupEntry is the group event a DM sends when its people change, since a
-// DM is named by them: the group re-read, so every open page has the list.
-func groupEntry(ctx context.Context, qtx *store.Queries, id string) (events.Entry, error) {
-	row, err := qtx.GetGroup(ctx, id)
-	if err != nil {
-		return events.Entry{}, err
-	}
-	g, err := wireGroup(ctx, qtx, row)
-	if err != nil {
-		return events.Entry{}, err
-	}
-	return events.Entry{Kind: "group", Payload: &g}, nil
+		if err := qtx.CreateGroup(ctx, store.CreateGroupParams{ID: gid, Kind: perm.KindDM, Name: "", Mode: perm.ModeChat, CreatedAt: now, PeopleKey: key}); err != nil {
+			return nil, nil, http.StatusInternalServerError, err
+		}
+		for _, uid := range people {
+			if _, err := qtx.GetUser(ctx, uid); errors.Is(err, sql.ErrNoRows) {
+				return nil, nil, http.StatusBadRequest, errors.New("no such person: " + uid)
+			} else if err != nil {
+				return nil, nil, http.StatusInternalServerError, err
+			}
+			if err := qtx.CreateMembership(ctx, store.CreateMembershipParams{GroupID: gid, UserID: uid, Role: perm.Member, JoinedAt: now}); err != nil {
+				return nil, nil, http.StatusInternalServerError, err
+			}
+		}
+		g, err := qtx.GetGroup(ctx, gid)
+		if err != nil {
+			return nil, nil, http.StatusInternalServerError, err
+		}
+		wg, err := wireGroup(ctx, qtx, g)
+		if err != nil {
+			return nil, nil, http.StatusInternalServerError, err
+		}
+		entries := []events.Entry{{Kind: "group", Payload: &wg}}
+		for _, uid := range people {
+			m, err := qtx.GetMember(ctx, store.GetMemberParams{GroupID: gid, UserID: uid})
+			if err != nil {
+				return nil, nil, http.StatusInternalServerError, err
+			}
+			entries = append(entries, events.Entry{Kind: "membership", Payload: wireMembership(gid, m)})
+		}
+		return entries, &wg, http.StatusCreated, nil
+	})
 }
 
 func validMode(m string) bool { return m == perm.ModePosts || m == perm.ModeChat || m == perm.ModeBoth }
@@ -309,7 +334,7 @@ func (s *Server) createGroupWith(w http.ResponseWriter, r *http.Request, kind, n
 	}
 	gid := id.String()
 	s.loggedMany(w, r, now, func(qtx *store.Queries) ([]events.Entry, any, int, error) {
-		if err := qtx.CreateGroup(r.Context(), store.CreateGroupParams{ID: gid, Kind: kind, Name: name, Mode: mode, CreatedAt: now}); err != nil {
+		if err := qtx.CreateGroup(r.Context(), store.CreateGroupParams{ID: gid, Kind: kind, Name: name, Mode: mode, CreatedAt: now, PeopleKey: sql.NullString{}}); err != nil {
 			return nil, nil, http.StatusInternalServerError, err
 		}
 		for uid, role := range people {
@@ -455,15 +480,7 @@ func (s *Server) addMember(w http.ResponseWriter, r *http.Request) {
 			return nil, nil, http.StatusInternalServerError, err
 		}
 		m := wireMembership(g.ID, row)
-		entries := []events.Entry{{Kind: "membership", Payload: m}}
-		if g.Kind == perm.KindDM {
-			e, err := groupEntry(r.Context(), qtx, g.ID)
-			if err != nil {
-				return nil, nil, http.StatusInternalServerError, err
-			}
-			entries = append(entries, e)
-		}
-		return entries, m, http.StatusCreated, nil
+		return []events.Entry{{Kind: "membership", Payload: m}}, m, http.StatusCreated, nil
 	})
 }
 
@@ -557,6 +574,20 @@ func (s *Server) removeMember(w http.ResponseWriter, r *http.Request) {
 		if !allowed {
 			return nil, nil, http.StatusForbidden, errors.New("not allowed")
 		}
+		if g.Kind == perm.KindDM {
+			// Stepping out of a conversation: the row stays, the person is away, and
+			// opening the conversation again is stepping back in (architecture.md, Groups).
+			if err := qtx.SetMembershipLeft(r.Context(), store.SetMembershipLeftParams{LeftAt: sql.NullInt64{Int64: db.Now(), Valid: true}, GroupID: g.ID, UserID: uid}); err != nil {
+				return nil, nil, http.StatusInternalServerError, err
+			}
+			m, err := qtx.GetMember(r.Context(), store.GetMemberParams{GroupID: g.ID, UserID: uid})
+			if err != nil {
+				return nil, nil, http.StatusInternalServerError, err
+			}
+			// The reply is the membership too, so the leaver's own page lists the conversation as stepped out at once.
+			mm := wireMembership(g.ID, m)
+			return []events.Entry{{Kind: "membership", Payload: mm}}, mm, http.StatusOK, nil
+		}
 		if _, err := qtx.DeleteMembership(r.Context(), store.DeleteMembershipParams{GroupID: g.ID, UserID: uid}); err != nil {
 			return nil, nil, http.StatusInternalServerError, err
 		}
@@ -570,12 +601,6 @@ func (s *Server) removeMember(w http.ResponseWriter, r *http.Request) {
 				return nil, nil, http.StatusInternalServerError, err
 			}
 			entries = append(entries, events.Entry{Kind: "group_delete", Payload: map[string]string{"id": g.ID}})
-		} else if g.Kind == perm.KindDM {
-			e, err := groupEntry(r.Context(), qtx, g.ID)
-			if err != nil {
-				return nil, nil, http.StatusInternalServerError, err
-			}
-			entries = append(entries, e)
 		}
 		return entries, nil, http.StatusNoContent, nil
 	})
@@ -594,7 +619,9 @@ func (s *Server) events(w http.ResponseWriter, r *http.Request) {
 	}
 	roles := map[string]string{}
 	for _, row := range rows {
-		roles[row.ID] = row.Role
+		if !row.LeftAt.Valid {
+			roles[row.ID] = row.Role
+		}
 	}
 	st, err := s.settings(r.Context())
 	if err != nil {
@@ -706,7 +733,12 @@ func filterEvent(viewer User, roles map[string]string, st *Settings, e events.Ev
 			return e, false
 		}
 		if m.User.ID == viewer.ID {
-			roles[m.GroupID] = m.Role
+			// My own: in, or stepped out of a conversation. Either way I hear it.
+			if m.LeftAt != nil {
+				delete(roles, m.GroupID)
+			} else {
+				roles[m.GroupID] = m.Role
+			}
 			return e, true
 		}
 		_, ok := roles[m.GroupID]

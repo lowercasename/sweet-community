@@ -1,5 +1,6 @@
-import type { User } from '../api'
-import { useGroups } from '../data/hooks'
+import { useState } from 'react'
+import type { Group, User } from '../api'
+import { useGroupActions, useGroups } from '../data/hooks'
 import {
   Button,
   Card,
@@ -16,7 +17,7 @@ import {
   Time,
 } from '../ui'
 import { groupPath } from '../routes'
-import { activity, conversationsOf } from '../data/groups'
+import { activity, conversationsOf, steppedOutOf } from '../data/groups'
 import { ConversationFaces } from './ConversationsSection'
 import { groupLabel } from './GroupView'
 
@@ -28,11 +29,39 @@ interface MessagesPageProps {
 /**
  * All my conversations, latest word first (architecture.md, Layout): the
  * nav shows the latest five, this page every one, each opening at its own
- * URL under its bar like any room.
+ * URL under its bar like any room. Below them, the ones I have stepped out
+ * of; opening one is stepping back in.
  */
 export function MessagesPage({ me, onGo }: MessagesPageProps) {
   const { groups, loading } = useGroups()
+  const { openDM } = useGroupActions()
+  const [problem, setProblem] = useState<string | null>(null)
   const dms = conversationsOf(groups)
+  const out = steppedOutOf(groups)
+  const stepBackIn = async (g: Group) => {
+    try {
+      const opened = await openDM((g.members ?? []).filter((u) => u.id !== me.id).map((u) => u.id))
+      onGo(groupPath(opened.id))
+    } catch (e) {
+      setProblem(e instanceof Error ? e.message : 'Could not open the conversation')
+    }
+  }
+  const row = (g: Group, onClick: () => void) => {
+    const label = groupLabel(g, me)
+    return (
+      <ListItem key={g.id}>
+        <ListRow label={label} onClick={onClick}>
+          <ConversationFaces group={g} me={me} />
+          <Text as="span" variant="name">
+            {label}
+          </Text>
+          <Text as="span" variant="small">
+            <Time at={activity(g)} />
+          </Text>
+        </ListRow>
+      </ListItem>
+    )
+  }
   return (
     <Pane>
       <ScrollArea>
@@ -40,7 +69,7 @@ export function MessagesPage({ me, onGo }: MessagesPageProps) {
           <Card>
             <Stack gap={2}>
               <Heading level={2}>Messages</Heading>
-              {!loading && dms.length === 0 && (
+              {!loading && dms.length === 0 && out.length === 0 && (
                 <Stack gap={2}>
                   <Text variant="secondary">
                     No messages yet. Start one with New message, or from someone's name on the People page.
@@ -52,25 +81,14 @@ export function MessagesPage({ me, onGo }: MessagesPageProps) {
                   </Row>
                 </Stack>
               )}
-              {dms.length > 0 && (
-                <List gap={1}>
-                  {dms.map((g) => {
-                    const label = groupLabel(g, me)
-                    return (
-                      <ListItem key={g.id}>
-                        <ListRow label={label} onClick={() => onGo(groupPath(g.id))}>
-                          <ConversationFaces group={g} me={me} />
-                          <Text as="span" variant="name">
-                            {label}
-                          </Text>
-                          <Text as="span" variant="small">
-                            <Time at={activity(g)} />
-                          </Text>
-                        </ListRow>
-                      </ListItem>
-                    )
-                  })}
-                </List>
+              {dms.length > 0 && <List gap={1}>{dms.map((g) => row(g, () => onGo(groupPath(g.id))))}</List>}
+              {out.length > 0 && (
+                <Stack gap={1}>
+                  <Heading level={3}>Stepped out of</Heading>
+                  <Text variant="small">Opening one steps back in.</Text>
+                  {problem && <Text variant="secondary">{problem}</Text>}
+                  <List gap={1}>{out.map((g) => row(g, () => void stepBackIn(g)))}</List>
+                </Stack>
               )}
             </Stack>
           </Card>

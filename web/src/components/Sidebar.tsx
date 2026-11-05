@@ -24,7 +24,7 @@ function at(location: string, path: string): boolean {
  * The left navigation, in three blocks (architecture.md, Layout): places
  * (Home, then the rooms I am in, with New room as that section's own
  * control, then my latest conversations with All messages at their foot),
- * the tools that reach across every place (Search, Alerts), and the house
+ * the tools that reach across every place (Search, Notifications), and the house
  * (People, Settings, me).
  */
 export function Sidebar({ me, groups, location, expanded, onGo, onToggle }: SidebarProps) {
@@ -80,7 +80,7 @@ export function Sidebar({ me, groups, location, expanded, onGo, onToggle }: Side
       <ConversationsSection groups={groups} me={me} location={location} expanded={expanded} onGo={onGo} />
       <Hairline />
       <NavItem icon="search" label="Search" expanded={expanded} />
-      <NavItem icon="bell" label="Alerts" expanded={expanded} />
+      <NavItem icon="bell" label="Notifications" expanded={expanded} />
       <Hairline />
       <NavItem
         icon="people"

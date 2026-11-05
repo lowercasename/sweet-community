@@ -42,11 +42,10 @@ export function NewGroupPage({ onCreated }: NewGroupPageProps) {
             <Stack gap={2}>
               <Heading level={2}>New room</Heading>
               <Text variant="secondary">
-                A room is private: only the people you add can see it exists. Tell people about it in a post and add
-                whoever asks.
+                Rooms are private and only visible to their members. You can add new members from the room settings.
               </Text>
               <Form onSubmit={() => void submit()}>
-                <Field label="Name">
+                <Field label="Room name">
                   <Input value={name} onChange={setName} autoFocus required />
                 </Field>
                 <Field label="Mode">

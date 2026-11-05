@@ -233,76 +233,83 @@ func TestDMFindOrCreate(t *testing.T) {
 	}
 }
 
-// A DM grows by its own people: any of them may add someone, who then sees
-// the whole conversation, as in a group DM anywhere. The pair's own
-// conversation is a different DM. When people leave, the DM is the people
-// left, and if two DMs come to hold the same people the newer is found.
-func TestDMGrowsByItsPeople(t *testing.T) {
+// A conversation is its people (architecture.md, Groups): one per set,
+// nobody added, a word with someone else is another conversation. Each
+// person's presence is their own: stepping out hides it from them and
+// tells the others; opening it again steps back in, history and all.
+func TestConversationIsItsPeople(t *testing.T) {
 	ts, owner := newTestServer(t)
-	kit, _ := registerMember(t, ts, owner, "kit")
+	kit, kitID := registerMember(t, ts, owner, "kit")
 	mo, moID := registerMember(t, ts, owner, "mo")
 	jo, joID := registerMember(t, ts, owner, "jo")
 
-	dm := kit.mustStatus(201, "POST", "/api/groups", map[string]any{"kind": "dm", "members": []string{moID}})
-	id := dm["id"].(string)
-	dp := "/api/groups/" + id
-	if !groupCan(dm, "add_members") || groupCan(dm, "remove_members") {
-		t.Fatalf("dm abilities: %v", dm)
-	}
-	kit.mustStatus(201, "POST", dp+"/messages", map[string]string{"body_html": "<p>before jo</p>"})
-
-	// Jo is not in it, so to jo it does not exist; mo, a plain member, brings jo in.
-	jo.mustStatus(404, "POST", dp+"/members", map[string]string{"user_id": joID})
-	mo.mustStatus(201, "POST", dp+"/members", map[string]string{"user_id": joID})
-	for who, c := range map[string]*client{"kit": kit, "mo": mo, "jo": jo} {
-		if got := memberNames(myGroups(c)[id]); got != "jo,kit,mo" {
-			t.Fatalf("%s lists the dm's people as %q, want jo,kit,mo", who, got)
-		}
-	}
-	if msgs := jo.mustStatus(200, "GET", dp+"/messages", nil)["messages"].([]any); len(msgs) != 1 {
-		t.Fatalf("jo sees %d messages, want the one from before", len(msgs))
-	}
-	// Every open page learns the new people from a group event, since a DM is named by them.
-	if got := memberNames(lastGroupEvent(t, kit, id)); got != "jo,kit,mo" {
-		t.Fatalf("kit's group event names %q, want jo,kit,mo", got)
-	}
-
-	// Kit and mo alone is another conversation; the three together is this one.
 	pair := kit.mustStatus(201, "POST", "/api/groups", map[string]any{"kind": "dm", "members": []string{moID}})
-	if pair["id"] == id {
-		t.Fatal("the pair's dm is the three-way one")
+	pid := pair["id"].(string)
+	pp := "/api/groups/" + pid
+	if groupCan(pair, "add_members") || groupCan(pair, "remove_members") || !groupCan(pair, "leave") {
+		t.Fatalf("conversation abilities: %v", pair)
 	}
-	if three := kit.mustStatus(200, "POST", "/api/groups", map[string]any{"kind": "dm", "members": []string{moID, joID}}); three["id"] != id {
-		t.Fatalf("the three together found %v, want %v", three["id"], id)
-	}
+	kit.mustStatus(201, "POST", pp+"/messages", map[string]string{"body_html": "<p>between us</p>"})
+	// Nobody is added, staff included.
+	mo.mustStatus(403, "POST", pp+"/members", map[string]string{"user_id": joID})
+	owner.mustStatus(404, "POST", pp+"/members", map[string]string{"user_id": joID})
 
-	// Jo leaves: the dm is kit and mo to those left, by a group event, and
-	// of the two dms now holding kit and mo, Message finds the newer.
-	jo.mustStatus(204, "DELETE", dp+"/members/"+joID, nil)
-	if got := memberNames(myGroups(kit)[id]); got != "kit,mo" {
-		t.Fatalf("after jo left: %q, want kit,mo", got)
+	// A word with jo too is another conversation, empty; the pair is untouched.
+	three := kit.mustStatus(201, "POST", "/api/groups", map[string]any{"kind": "dm", "members": []string{moID, joID}})
+	tid := three["id"].(string)
+	tp := "/api/groups/" + tid
+	if tid == pid || memberNames(three) != "jo,kit,mo" {
+		t.Fatalf("three: %v", three)
 	}
-	if got := memberNames(lastGroupEvent(t, mo, id)); got != "kit,mo" {
-		t.Fatalf("mo's group event after jo left names %q, want kit,mo", got)
+	if msgs := jo.mustStatus(200, "GET", tp+"/messages", nil)["messages"].([]any); len(msgs) != 0 {
+		t.Fatalf("the new conversation carries %d messages from the pair", len(msgs))
 	}
-	if again := kit.mustStatus(200, "POST", "/api/groups", map[string]any{"kind": "dm", "members": []string{moID}}); again["id"] != pair["id"] {
-		t.Fatalf("Message mo found %v, want the newer %v", again["id"], pair["id"])
+	if got := memberNames(kit.mustStatus(200, "GET", pp, nil)); got != "kit,mo" {
+		t.Fatalf("the pair after: %q", got)
 	}
-}
+	// The same people, in any order, from anyone of them, is the same conversation.
+	if again := mo.mustStatus(200, "POST", "/api/groups", map[string]any{"kind": "dm", "members": []string{joID, kitID}}); again["id"] != tid {
+		t.Fatalf("mo opening jo and kit got %v, want %v", again["id"], tid)
+	}
+	kit.mustStatus(201, "POST", tp+"/messages", map[string]string{"body_html": "<p>all three</p>"})
 
-// lastGroupEvent is the viewer's newest group event about one group.
-func lastGroupEvent(t *testing.T, c *client, id string) map[string]any {
-	t.Helper()
-	var found map[string]any
-	for _, e := range c.readEvents(80) {
-		if p, ok := e["payload"].(map[string]any); ok && e["kind"] == "group" && p["id"] == id {
-			found = p
+	// Jo steps out: gone from jo's sight, still of the three to the others, who are told.
+	if out := jo.mustStatus(200, "DELETE", tp+"/members/"+joID, nil); out["left_at"] == nil || out["user"].(map[string]any)["id"] != joID {
+		t.Fatalf("stepping out replies with the membership: %v", out)
+	}
+	jo.mustStatus(404, "GET", tp+"/messages", nil)
+	if g := myGroups(jo)[tid]; g == nil || g["left_at"] == nil {
+		t.Fatalf("jo's list after stepping out: %v", g)
+	}
+	if got := memberNames(kit.mustStatus(200, "GET", tp, nil)); got != "jo,kit,mo" {
+		t.Fatalf("the three after jo stepped out: %q", got)
+	}
+	away := false
+	for _, m := range kit.mustStatus(200, "GET", tp+"/members", nil)["members"].([]any) {
+		if mm := m.(map[string]any); mm["user"].(map[string]any)["id"] == joID && mm["left_at"] != nil {
+			away = true
 		}
 	}
-	if found == nil {
-		t.Fatalf("no group event for %s", id)
+	if !away {
+		t.Fatal("kit's members list does not show jo away")
 	}
-	return found
+	kit.mustStatus(201, "POST", tp+"/messages", map[string]string{"body_html": "<p>while jo is away</p>"})
+	// Even both the others stepping out deletes nothing.
+	kit.mustStatus(200, "DELETE", tp+"/members/"+kitID, nil)
+	mo.mustStatus(200, "DELETE", tp+"/members/"+moID, nil)
+	mo.mustStatus(404, "GET", tp, nil)
+
+	// Jo opens the conversation of the three again: the same one, back in, with everything said in it.
+	back := jo.mustStatus(200, "POST", "/api/groups", map[string]any{"kind": "dm", "members": []string{kitID, moID}})
+	if back["id"] != tid || back["left_at"] != nil {
+		t.Fatalf("jo stepping back in: %v", back)
+	}
+	if msgs := jo.mustStatus(200, "GET", tp+"/messages", nil)["messages"].([]any); len(msgs) != 2 {
+		t.Fatalf("jo back in sees %d messages, want 2", len(msgs))
+	}
+	if g := myGroups(jo)[tid]; g == nil || g["left_at"] != nil {
+		t.Fatalf("jo's list after stepping back in: %v", g)
+	}
 }
 
 // memberJoined is one member's joined time as the group's members list gives it.
@@ -464,21 +471,24 @@ func TestOwnershipNeverLapses(t *testing.T) {
 		t.Fatal("deleted group still listed")
 	}
 
-	// A DM has no owner: the last person leaving deletes it.
+	// A conversation has no owner and is never deleted: everyone may step out, and it waits.
 	dm := kit.mustStatus(201, "POST", "/api/groups", map[string]any{"kind": "dm", "members": []string{moID}})
 	dp := "/api/groups/" + dm["id"].(string)
-	kit.mustStatus(204, "DELETE", dp+"/members/"+kitID, nil)
+	kit.mustStatus(200, "DELETE", dp+"/members/"+kitID, nil)
 	mo.mustStatus(200, "GET", dp, nil)
-	mo.mustStatus(204, "DELETE", dp+"/members/"+moID, nil)
+	mo.mustStatus(200, "DELETE", dp+"/members/"+moID, nil)
 	mo.mustStatus(404, "GET", dp, nil)
-	// Nobody is left to receive it on the stream, so the log is the witness.
+	// Nobody is left to receive it on the stream, so the log is the witness: a membership stepping out, no deletion.
 	rows, err := srv.q().ListEventsSince(context.Background(), store.ListEventsSinceParams{After: 0, PageSize: 500})
 	if err != nil {
 		t.Fatal(err)
 	}
 	last := rows[len(rows)-1]
-	if last.Kind != "group_delete" || !strings.Contains(last.Payload, dm["id"].(string)) {
-		t.Fatalf("last event after the last member left: %s %s", last.Kind, last.Payload)
+	if last.Kind != "membership" || !strings.Contains(last.Payload, dm["id"].(string)) || !strings.Contains(last.Payload, `"left_at":1`) {
+		t.Fatalf("last event after everyone stepped out: %s %s", last.Kind, last.Payload)
+	}
+	if back := mo.mustStatus(200, "POST", "/api/groups", map[string]any{"kind": "dm", "members": []string{kitID}}); back["id"] != dm["id"] {
+		t.Fatalf("the pair opened again is %v, want %v", back["id"], dm["id"])
 	}
 
 	// The root group: its owner can hand over, but never leave.

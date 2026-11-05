@@ -248,9 +248,11 @@ export function useGroupActions() {
       await removeMember(groupId, userId)
       applyEvent(qc, 'membership_delete', { group_id: groupId, user_id: userId })
     },
+    /** Leaving a room removes me; stepping out of a conversation is a membership, stepped out. */
     async leave(groupId: string, meId: string) {
-      await removeMember(groupId, meId)
-      applyEvent(qc, 'membership_delete', { group_id: groupId, user_id: meId })
+      const m = await removeMember(groupId, meId)
+      if (m) applyEvent(qc, 'membership', m)
+      else applyEvent(qc, 'membership_delete', { group_id: groupId, user_id: meId })
     },
     /** A DM with these people: the existing one, or a new one; either way it is in my groups now. */
     async openDM(userIds: string[]): Promise<Group> {

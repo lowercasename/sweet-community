@@ -10,6 +10,7 @@ import { ROOT, dm, group, renderWithQuery, user } from '../test-utils'
  */
 vi.mock('../api', () => ({
   listGroups: vi.fn(),
+  openDM: vi.fn(),
   listUsers: vi.fn(() => Promise.resolve({ users: [] })),
 }))
 
@@ -49,6 +50,30 @@ describe('MessagesPage', () => {
     expect(screen.queryByText('Knitting')).toBeNull()
     fireEvent.click(screen.getByRole('button', { name: 'kit' }))
     expect(onGo).toHaveBeenCalledWith('/r/d1')
+  })
+
+  it('lists the conversations I have stepped out of below the others; opening one steps back in', async () => {
+    const { listGroups, openDM } = await import('../api')
+    vi.mocked(listGroups).mockResolvedValue({
+      groups: [group(ROOT, 'member'), dm('d1', [kit, raphael]), dm('d2', [mo, raphael], { left_at: 5 })],
+    })
+    vi.mocked(openDM).mockResolvedValue(dm('d2', [mo, raphael]))
+    const onGo = await draw()
+    await screen.findByRole('heading', { name: 'Stepped out of' })
+    const lists = screen.getAllByRole('list')
+    expect(
+      within(lists[0])
+        .getAllByRole('button')
+        .map((b) => b.getAttribute('aria-label')),
+    ).toEqual(['kit'])
+    expect(
+      within(lists[1])
+        .getAllByRole('button')
+        .map((b) => b.getAttribute('aria-label')),
+    ).toEqual(['mo'])
+    fireEvent.click(within(lists[1]).getByRole('button', { name: 'mo' }))
+    expect(openDM).toHaveBeenCalledWith(['mo'])
+    await vi.waitFor(() => expect(onGo).toHaveBeenCalledWith('/r/d2'))
   })
 
   it('says where a conversation starts when there are none', async () => {

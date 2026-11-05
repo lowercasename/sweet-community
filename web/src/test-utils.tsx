@@ -54,7 +54,7 @@ export const group = (id: string, role: Group['role'], extra: Partial<Group> = {
   ...extra,
 })
 
-/** A DM as its viewer sees it: chat only, named by its people, grown by any of them. */
+/** A conversation as its viewer sees it: chat only, named by its people, which are fixed. */
 export const dm = (id: string, people: User[], extra: Partial<Group> = {}): Group => ({
   id,
   kind: 'dm',
@@ -64,7 +64,7 @@ export const dm = (id: string, people: User[], extra: Partial<Group> = {}): Grou
   last_message_at: null,
   role: 'member',
   can: {
-    add_members: true,
+    add_members: false,
     remove_members: false,
     set_roles: false,
     transfer: false,

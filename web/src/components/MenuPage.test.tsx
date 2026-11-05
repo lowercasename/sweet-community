@@ -5,7 +5,7 @@ import { ROOT, dm, group, nameOf, renderWithQuery, user } from '../test-utils'
 
 /**
  * The phone's menu holds what the nav column holds, in the same blocks,
- * with the account first and Sign out last. Search and Alerts are tabs, so
+ * with the account first and Sign out last. Search and Notifications are tabs, so
  * they are not here; DMs are behind Messages, as in the column.
  */
 vi.mock('../api', () => ({

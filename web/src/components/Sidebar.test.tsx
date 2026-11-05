@@ -8,7 +8,7 @@ import { ROOT, dm, group, nameOf, renderWithQuery, user } from '../test-utils'
  * The nav column's three blocks (architecture.md, Layout): places (Home,
  * the Rooms section with its own New room control, the Messages section
  * of my five latest conversations with All messages at its foot), tools
- * (Search, Alerts), the house (People, Settings).
+ * (Search, Notifications), the house (People, Settings).
  */
 vi.mock('../api', () => ({
   listUsers: vi.fn(() => Promise.resolve({ users: [] })),
@@ -54,7 +54,7 @@ describe('Sidebar', () => {
       'kit',
       'All messages',
       'Search',
-      'Alerts',
+      'Notifications',
       'People',
       'Settings',
       'Collapse',
@@ -105,6 +105,11 @@ describe('Sidebar', () => {
     // No conversations yet: the section still offers to start one, and the full list.
     await draw([root(true), knitting])
     expect(within(messages()).getAllByRole('button').map(nameOf)).toEqual(['New message', 'All messages'])
+  })
+
+  it('a conversation I have stepped out of is not in the nav', async () => {
+    await draw([root(true), withKit, dm('out', [mo, raphael], { last_message_at: 100, left_at: 5 })])
+    expect(within(messages()).getAllByRole('button').map(nameOf)).toEqual(['New message', 'kit', 'All messages'])
   })
 
   it('names a conversation by its other people and marks it by their faces: one, two, or one and a count', async () => {
@@ -176,7 +181,7 @@ describe('Sidebar', () => {
       'All messages',
       'New message',
       'Search',
-      'Alerts',
+      'Notifications',
       'People',
       'Settings',
       'Expand',

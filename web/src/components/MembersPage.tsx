@@ -26,6 +26,8 @@ interface MembersPageProps {
   me: User
   /** After I have left or deleted the group: there is nothing here to show any more. */
   onLeft: () => void
+  /** A conversation with these people and someone else has opened: show it. */
+  onOpen?: (group: Group) => void
 }
 
 const MODES: { value: GroupMode; label: string }[] = [
@@ -45,7 +47,7 @@ const ROLE_WORD: Record<Membership['role'], string> = {
  * add and remove people, set roles, hand the group over, rename it, set its
  * mode, delete it, leave it. Nothing here reasons about roles.
  */
-export function MembersPage({ group, me, onLeft }: MembersPageProps) {
+export function MembersPage({ group, me, onLeft, onOpen }: MembersPageProps) {
   const { members, loading, error } = useMembers(group.id)
   const { data: users } = useUsers()
   const actions = useGroupActions()
@@ -76,6 +78,14 @@ export function MembersPage({ group, me, onLeft }: MembersPageProps) {
   const word = group.kind === 'dm' ? 'conversation' : 'room'
   const inGroup = new Set(members.map((m) => m.user.id))
   const candidates = [...(users?.values() ?? [])].filter((u) => !inGroup.has(u.id))
+  // A conversation's people are fixed (architecture.md, Groups): a word with
+  // someone else is another conversation, of these people and them.
+  const others = members.filter((m) => m.user.id !== me.id).map((m) => m.user.id)
+  const withSomeoneElse = async () => {
+    const g = await actions.openDM([...others, pick])
+    setPick('')
+    onOpen?.(g)
+  }
   const dirty = name.trim() !== group.name || mode !== group.mode
   const canEdit = group.can.rename || group.can.set_mode
 
@@ -155,6 +165,22 @@ export function MembersPage({ group, me, onLeft }: MembersPageProps) {
                     </Button>
                   </Row>
                 )}
+                {group.kind === 'dm' && !loading && candidates.length > 0 && (
+                  <Row gap={2} align="center">
+                    <Select
+                      label="With someone else"
+                      value={pick}
+                      options={[
+                        { value: '', label: 'Choose a person…' },
+                        ...candidates.map((u) => ({ value: u.id, label: u.username })),
+                      ]}
+                      onChange={setPick}
+                    />
+                    <Button variant="secondary" disabled={busy || !pick} onClick={() => void run(withSomeoneElse)}>
+                      Open
+                    </Button>
+                  </Row>
+                )}
                 <List>
                   {members.map((m) => {
                     const self = m.user.id === me.id
@@ -164,6 +190,7 @@ export function MembersPage({ group, me, onLeft }: MembersPageProps) {
                           <Row gap={2} align="center">
                             <PersonName user={m.user} avatar="md" />
                             <Text as="span" variant="small">
+                              {m.left_at != null && 'stepped out · '}
                               {ROLE_WORD[m.role] && `${ROLE_WORD[m.role]} · `}
                               joined <Time at={m.joined_at} />
                             </Text>

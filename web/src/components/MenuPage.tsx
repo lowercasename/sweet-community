@@ -14,7 +14,7 @@ interface MenuPageProps {
 
 /**
  * The phone's menu: what the nav column holds, in the same blocks, with
- * the account first and Sign out last. Search and Alerts are tabs, so they
+ * the account first and Sign out last. Search and Notifications are tabs, so they
  * are not repeated here.
  */
 export function MenuPage({ me, groups, onGo, onLogout }: MenuPageProps) {

@@ -173,35 +173,24 @@ function dropGroup(qc: QueryClient, id: string) {
 
 const ROOT_KIND = 'root'
 
-/**
- * A conversation is named by its people, which its group carries: a
- * membership in one changes them here too, in the server's order (by
- * username), so the name follows at once and the group event that comes
- * after it changes nothing. A room carries no people list.
- */
-function setPeople(qc: QueryClient, groupId: string, change: (people: User[]) => User[]) {
-  qc.setQueryData<Groups>(keys.groups, (old) =>
-    old
-      ? {
-          groups: old.groups.map((g) =>
-            g.id === groupId && g.kind === 'dm' && g.members ? { ...g, members: change(g.members) } : g,
-          ),
-        }
-      : old,
-  )
-}
-
 function upsertMembership(qc: QueryClient, m: Membership) {
+  // My stepping out of a conversation (architecture.md, Groups): it stays in my
+  // list, marked stepped out, and nothing else of it stays. Its people do not change.
+  const viewer = qc.getQueryData<User | null>(keys.me)
+  if (viewer && viewer.id === m.user.id && m.left_at != null) {
+    qc.setQueryData<Groups>(keys.groups, (old) =>
+      old ? { groups: old.groups.map((g) => (g.id === m.group_id ? { ...g, left_at: m.left_at } : g)) } : old,
+    )
+    qc.removeQueries({ queryKey: keys.posts(m.group_id) })
+    qc.removeQueries({ queryKey: keys.messages(m.group_id) })
+    qc.removeQueries({ queryKey: keys.members(m.group_id) })
+    return
+  }
   qc.setQueryData<Members>(keys.members(m.group_id), (old) => {
     if (!old) return old
     const known = old.members.some((x) => x.user.id === m.user.id)
     return { members: known ? old.members.map((x) => (x.user.id === m.user.id ? m : x)) : [...old.members, m] }
   })
-  setPeople(qc, m.group_id, (people) =>
-    people.some((u) => u.id === m.user.id)
-      ? people
-      : [...people, m.user].sort((a, b) => (a.username < b.username ? -1 : a.username > b.username ? 1 : 0)),
-  )
   // The root group's membership is the instance's people list.
   const groups = qc.getQueryData<Groups>(keys.groups)
   const isRoot = groups?.groups.some((g) => g.id === m.group_id && g.kind === ROOT_KIND) ?? isRootID(m.group_id)
@@ -239,7 +228,6 @@ function deleteMembership(qc: QueryClient, groupId: string, userId: string) {
   qc.setQueryData<Members>(keys.members(groupId), (old) =>
     old ? { members: old.members.filter((x) => x.user.id !== userId) } : old,
   )
-  setPeople(qc, groupId, (people) => people.filter((u) => u.id !== userId))
 }
 
 /** Does this thread's post live in this group, as far as the cache knows? */

@@ -10,6 +10,7 @@ import { group, member, renderWithQuery, user } from '../test-utils'
  */
 vi.mock('../api', () => ({
   getMe: vi.fn(() => Promise.resolve({ id: 'kit', username: 'kit', picture: null })),
+  openDM: vi.fn(),
   listUsers: vi.fn(),
   listMembers: vi.fn(),
   addMember: vi.fn(),
@@ -93,18 +94,28 @@ describe('MembersPage', () => {
     expect(updateGroup).toHaveBeenCalledWith('club', { name: 'Knitting', mode: 'chat' })
   })
 
-  it('a conversation: any of its people may add someone, and one leaves a conversation, not a room', async () => {
-    const { addMember } = await import('../api')
+  it('a conversation: nobody is added, a word with someone else is another one, and a person steps out of it', async () => {
+    const { listMembers, openDM } = await import('../api')
     const { MembersPage } = await import('./MembersPage')
     const { dm } = await import('../test-utils')
-    renderWithQuery(<MembersPage group={dm('club', [kit, mo])} me={mo} onLeft={() => {}} />)
+    vi.mocked(listMembers).mockResolvedValueOnce({
+      members: [
+        { group_id: 'club', user: kit, role: 'member', joined_at: 1, left_at: 7 },
+        { group_id: 'club', user: mo, role: 'member', joined_at: 1, left_at: null },
+      ],
+    })
+    vi.mocked(openDM).mockResolvedValue(dm('d2', [kit, mo, user('jo')]))
+    const onOpen = vi.fn()
+    renderWithQuery(<MembersPage group={dm('club', [kit, mo])} me={mo} onLeft={() => {}} onOpen={onOpen} />)
     await screen.findByText('mo')
     expect(screen.queryByLabelText('Name')).toBeNull()
+    expect(screen.queryByLabelText('Add someone')).toBeNull()
     expect(screen.queryByRole('button', { name: 'Remove' })).toBeNull()
-    fireEvent.change(screen.getByLabelText('Add someone'), { target: { value: 'jo' } })
-    fireEvent.click(screen.getByRole('button', { name: 'Add' }))
-    expect(addMember).toHaveBeenCalledWith('club', 'jo')
-    await screen.findByText('jo')
+    expect(rowOf('kit').textContent).toContain('stepped out')
+    fireEvent.change(await screen.findByLabelText('With someone else'), { target: { value: 'jo' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Open' }))
+    expect(openDM).toHaveBeenCalledWith(['kit', 'jo'])
+    await vi.waitFor(() => expect(onOpen).toHaveBeenCalledWith(expect.objectContaining({ id: 'd2' })))
     fireEvent.click(screen.getByRole('button', { name: 'Leave conversation' }))
     expect(within(screen.getByRole('dialog', { hidden: true })).getByText('Leave this conversation?')).toBeTruthy()
   })

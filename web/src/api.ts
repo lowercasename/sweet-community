@@ -57,8 +57,10 @@ export interface Group {
   /** The viewer's own role in it. */
   role: Role
   can: GroupCan
-  /** DMs only: a DM is named by its people. */
+  /** DMs only: a DM is named by its people, present or away. */
   members?: User[]
+  /** DMs only: set when I have stepped out of it. It is listed for me on All messages, and nothing else of it is. */
+  left_at?: number | null
 }
 
 export interface Membership {
@@ -66,6 +68,8 @@ export interface Membership {
   user: User
   role: Role
   joined_at: number
+  /** Set while this person has stepped out of a conversation. */
+  left_at?: number | null
 }
 
 export interface UploadedImage {
@@ -226,8 +230,9 @@ export function setMemberRole(groupId: string, userId: string, role: Role): Prom
 }
 
 /** Remove someone, or leave when it is yourself. */
-export async function removeMember(groupId: string, userId: string): Promise<void> {
-  await request(`${g(groupId)}/members/${encodeURIComponent(userId)}`, { method: 'DELETE' })
+/** Removes from a room (nothing comes back); steps out of a conversation (the membership, stepped out, comes back). */
+export function removeMember(groupId: string, userId: string): Promise<Membership | undefined> {
+  return request<Membership | undefined>(`${g(groupId)}/members/${encodeURIComponent(userId)}`, { method: 'DELETE' })
 }
 
 export function getPosts(groupId: string, before?: number | null, limit = 20): Promise<PostPage> {
