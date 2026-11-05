@@ -18,6 +18,7 @@ vi.mock('../api', () => ({
   listUsers: vi.fn(),
   listGroups: vi.fn(),
   listMembers: vi.fn(() => Promise.resolve({ members: [] })),
+  listInvites: vi.fn(() => Promise.resolve({ invites: [] })),
   getSettings: vi.fn(() => Promise.resolve({ group_creation: 'anyone' })),
   setSettings: vi.fn(),
   logout: vi.fn(() => Promise.resolve()),
@@ -52,11 +53,14 @@ beforeEach(async () => {
   localStorage.setItem('sweet.layout', 'both')
 })
 
-async function home() {
+async function home(path = '/') {
+  window.history.replaceState(null, '', path)
   const { Home } = await import('./Home')
   const result = renderWithQuery(<Home me={raphael} onSignOut={() => {}} />)
-  await screen.findByText('p1')
-  await screen.findByText('Nobody has said anything yet. Say hello.')
+  if (path === '/') {
+    await screen.findByText('p1')
+    await screen.findByText('Nobody has said anything yet. Say hello.')
+  }
   return result
 }
 
@@ -87,10 +91,12 @@ describe('Home', () => {
 
     fireEvent.click(nav().getByRole('button', { name: 'Settings' }))
     await screen.findByText('Profile picture')
+    expect(window.location.pathname).toBe('/settings')
     expect(editors()).toBe(2)
     // Mounted, but out of sight: another page is showing.
     expect(container.querySelector('.ProseMirror')!.closest('.hidden')).not.toBeNull()
     fireEvent.click(nav().getByRole('button', { name: 'Home' }))
+    expect(window.location.pathname).toBe('/')
     expect(screen.getByRole('separator')).toBeTruthy()
 
     expect(editors()).toBe(2)
@@ -121,6 +127,7 @@ describe('Home', () => {
 
     fireEvent.click(nav().getByRole('button', { name: 'Knitting' }))
     await vi.waitFor(() => expect(getMessages).toHaveBeenCalledWith('knit', null))
+    expect(window.location.pathname).toBe('/g/knit')
     expect(container.querySelector('.ProseMirror')!.closest('.hidden')).toBeNull()
     // Chat only: no divider, no posts editor; the group's name and its Members control are shown.
     expect(screen.queryByRole('separator')).toBeNull()
@@ -130,8 +137,32 @@ describe('Home', () => {
     // Members shows alone: the group's view is still mounted but out of sight.
     fireEvent.click(screen.getByRole('button', { name: 'Members' }))
     await screen.findByRole('heading', { name: 'Members' })
+    expect(window.location.pathname).toBe('/g/knit/members')
     expect(container.querySelector('.ProseMirror')!.closest('.hidden')).not.toBeNull()
     expect(screen.queryByRole('heading', { name: 'Knitting' })!.closest('.hidden')).not.toBeNull()
+  })
+
+  it('opens whatever page the URL names, and the back button returns', async () => {
+    const { getMessages } = await import('../api')
+    await home('/g/knit/members')
+    await screen.findByRole('heading', { name: 'Members' })
+    expect(screen.getByRole('heading', { name: 'Knitting' }).closest('.hidden')).not.toBeNull()
+    // The group named by the URL is the one mounted behind the page.
+    await vi.waitFor(() => expect(getMessages).toHaveBeenCalledWith('knit', null))
+    expect(getMessages).not.toHaveBeenCalledWith(ROOT, null)
+
+    fireEvent.click(nav().getByRole('button', { name: 'People' }))
+    await screen.findByRole('heading', { name: 'People' })
+    expect(window.location.pathname).toBe('/people')
+    window.history.back()
+    await screen.findByRole('heading', { name: 'Members' })
+    expect(window.location.pathname).toBe('/g/knit/members')
+  })
+
+  it('shows the root group for a path it does not know', async () => {
+    await home('/nowhere')
+    await screen.findByText('p1')
+    expect(window.location.pathname).toBe('/')
   })
 
   it('hides New group when the root group says I may not', async () => {

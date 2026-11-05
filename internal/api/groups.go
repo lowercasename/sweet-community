@@ -608,7 +608,7 @@ func filterEvent(viewer User, roles map[string]string, st *Settings, e events.Ev
 		if !ok {
 			return e, false
 		}
-		return encode(forViewer(a, &p))
+		return encode(forViewer(a, &p, *st))
 	case "comment":
 		var c Comment
 		if json.Unmarshal(e.Payload, &c) != nil {
@@ -618,7 +618,7 @@ func filterEvent(viewer User, roles map[string]string, st *Settings, e events.Ev
 		if !ok {
 			return e, false
 		}
-		return encode(forViewer(a, &c))
+		return encode(forViewer(a, &c, *st))
 	case "message":
 		var m Message
 		if json.Unmarshal(e.Payload, &m) != nil {
@@ -628,7 +628,7 @@ func filterEvent(viewer User, roles map[string]string, st *Settings, e events.Ev
 		if !ok {
 			return e, false
 		}
-		return encode(forViewer(a, &m))
+		return encode(forViewer(a, &m, *st))
 	case "group":
 		var g Group
 		if json.Unmarshal(e.Payload, &g) != nil {
@@ -638,7 +638,7 @@ func filterEvent(viewer User, roles map[string]string, st *Settings, e events.Ev
 		if !ok {
 			return e, false
 		}
-		return encode(groupFor(a, g, *st))
+		return encode(forViewer(a, &g, *st))
 	case "group_delete":
 		var d struct {
 			ID string `json:"id"`

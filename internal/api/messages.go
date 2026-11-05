@@ -44,7 +44,7 @@ func (s *Server) listMessages(w http.ResponseWriter, r *http.Request) {
 			BodyText:  row.BodyText,
 			CreatedAt: row.CreatedAt,
 		}
-		msgs = append(msgs, *forViewer(a, &m).(*Message))
+		msgs = append(msgs, *forViewer(a, &m, Settings{}).(*Message))
 	}
 	var next *int64
 	if len(msgs) > limit {

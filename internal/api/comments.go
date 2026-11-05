@@ -77,7 +77,7 @@ func (s *Server) listComments(w http.ResponseWriter, r *http.Request) {
 			CreatedAt:    row.CreatedAt,
 			EditedAt:     nullInt(row.EditedAt),
 		}
-		out = append(out, *forViewer(a, &c).(*Comment))
+		out = append(out, *forViewer(a, &c, Settings{}).(*Comment))
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"comments": out})
 }

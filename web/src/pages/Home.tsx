@@ -1,4 +1,5 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+import { Redirect, Route, Switch, useLocation, useRoute } from 'wouter'
 import type { User } from '../api'
 import { useGroups } from '../data/hooks'
 import { StreamProvider } from '../hooks/StreamContext'
@@ -9,7 +10,7 @@ import { MenuPage } from '../components/MenuPage'
 import { NewGroupPage } from '../components/NewGroupPage'
 import { PeoplePage } from '../components/PeoplePage'
 import { SettingsPage } from '../components/SettingsPage'
-import { Sidebar, type Page } from '../components/Sidebar'
+import { Sidebar } from '../components/Sidebar'
 import { Shell, TabBar } from '../ui'
 
 interface HomeProps {
@@ -18,29 +19,39 @@ interface HomeProps {
   onSignOut: () => void
 }
 
+/** The path of a group's view: the root group is Home. */
+export function groupPath(id: string, rootId: string | undefined): string {
+  return id === rootId ? '/' : `/g/${encodeURIComponent(id)}`
+}
+
 /**
- * The signed-in app: a nav column on the left, then the page. The page is
- * one group's view (the root group is Home), or People, Settings, a group's
- * members, or the new-group form. On a narrow screen the nav column is
- * replaced by a tab bar at the bottom.
- *
- * The current group's panes stay mounted whatever page is showing, so a
- * half-written post or message survives a visit to Settings or Members.
- * Switching to another group swaps them.
+ * The signed-in app: a nav column on the left, then the page the URL names
+ * (architecture.md, Layout). `/` and `/g/<id>` are a group's view; the other
+ * pages show over it. The last group the URL named stays mounted behind
+ * them, so a half-written post or message survives a visit to Settings or
+ * Members; naming another group swaps it.
  */
 export function Home({ me, onSignOut }: HomeProps) {
   const { layout, narrow, navExpanded, setLayout, toggleNav } = useLayout()
-  const { groups } = useGroups()
+  const { groups, loading } = useGroups()
   const root = groups.find((g) => g.kind === 'root')
-  const [page, setPage] = useState<Page>('home')
-  const [groupId, setGroupId] = useState<string | null>(null)
+  const [location, navigate] = useLocation()
+  const [atGroup, groupParams] = useRoute('/g/:id')
+  const [atMembers, membersParams] = useRoute('/g/:id/members')
+  const atRoot = location === '/'
 
-  const current = groups.find((g) => g.id === (groupId ?? root?.id)) ?? root
-  const openGroup = (id: string) => {
-    setGroupId(id)
-    setPage('home')
-  }
-  const tabActive = page === 'home' ? (layout === 'posts' ? 'posts' : 'chat') : page === 'menu' ? 'menu' : undefined
+  // The group the URL names, if any; else the last one it named, so its panes stay put.
+  const named = atRoot ? root?.id : (groupParams?.id ?? membersParams?.id)
+  const [last, setLast] = useState<string | undefined>()
+  useEffect(() => {
+    if (named) setLast(named)
+  }, [named])
+  const current = groups.find((g) => g.id === (named ?? last)) ?? root
+  const viewing = atRoot || atGroup
+  const tabActive = viewing ? (layout === 'posts' ? 'posts' : 'chat') : location === '/menu' ? 'menu' : undefined
+
+  // A group the URL names that is not mine (or is gone) does not exist to me.
+  if (!loading && named && !groups.some((g) => g.id === named)) return <Redirect to="/" replace />
 
   return (
     <StreamProvider>
@@ -50,40 +61,43 @@ export function Home({ me, onSignOut }: HomeProps) {
             <Sidebar
               me={me}
               groups={groups}
-              currentGroupId={page === 'home' ? current?.id : undefined}
-              page={page}
+              location={location}
               expanded={navExpanded}
-              onNavigate={setPage}
-              onOpenGroup={openGroup}
+              onGo={navigate}
               onToggle={toggleNav}
             />
           )
         }
       >
-        {page === 'people' && root && <PeoplePage me={me} root={root} onOpenGroup={openGroup} />}
-        {page === 'settings' && root && <SettingsPage me={me} root={root} onSignOut={onSignOut} />}
-        {page === 'menu' && (
-          <MenuPage me={me} groups={groups} onNavigate={setPage} onOpenGroup={openGroup} onLogout={onSignOut} />
-        )}
-        {page === 'new-group' && <NewGroupPage onCreated={(g) => openGroup(g.id)} />}
-        {page === 'members' && current && (
-          <MembersPage
-            key={current.id}
-            group={current}
-            me={me}
-            onLeft={() => {
-              setGroupId(null)
-              setPage('home')
-            }}
-          />
-        )}
+        <Switch>
+          <Route path="/people">
+            {root && <PeoplePage me={me} root={root} onOpenGroup={(id) => navigate(groupPath(id, root.id))} />}
+          </Route>
+          <Route path="/settings">{root && <SettingsPage me={me} root={root} onSignOut={onSignOut} />}</Route>
+          <Route path="/menu">
+            <MenuPage me={me} groups={groups} onGo={navigate} onLogout={onSignOut} />
+          </Route>
+          <Route path="/groups/new">
+            <NewGroupPage onCreated={(g) => navigate(groupPath(g.id, root?.id))} />
+          </Route>
+          <Route path="/g/:id/members">
+            {atMembers && current && current.id === membersParams.id && (
+              <MembersPage key={current.id} group={current} me={me} onLeft={() => navigate('/')} />
+            )}
+          </Route>
+          <Route path="/" />
+          <Route path="/g/:id" />
+          <Route>
+            <Redirect to="/" replace />
+          </Route>
+        </Switch>
         {current && (
           <GroupView
             key={current.id}
             group={current}
             me={me}
-            hidden={page !== 'home'}
-            onMembers={() => setPage('members')}
+            hidden={!viewing}
+            onMembers={() => navigate(`/g/${encodeURIComponent(current.id)}/members`)}
           />
         )}
         {narrow && (
@@ -98,9 +112,9 @@ export function Home({ me, onSignOut }: HomeProps) {
             active={tabActive}
             onSelect={(key) => {
               if (key === 'posts' || key === 'chat') {
-                setPage('home')
+                if (current) navigate(groupPath(current.id, root?.id))
                 setLayout(key)
-              } else if (key === 'menu') setPage('menu')
+              } else if (key === 'menu') navigate('/menu')
               // Search and alerts come with their features.
             }}
           />

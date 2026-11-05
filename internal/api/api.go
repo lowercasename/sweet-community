@@ -51,11 +51,14 @@ type Post struct {
 	Can          Can    `json:"can"`
 }
 
-// forViewer fills in the viewer's can flags on a post, comment or message,
-// given the viewer as perm sees them in that thing's group. Anything else
-// passes through. Used on every response and on the stream.
-func forViewer(a perm.Actor, v any) any {
+// forViewer fills in the viewer's can flags on a post, comment, message or
+// group, given the viewer as perm sees them in that thing's group. Anything
+// else passes through. Used on every response and on the stream.
+func forViewer(a perm.Actor, v any, st Settings) any {
 	switch x := v.(type) {
+	case *Group:
+		g := groupFor(a, *x, st)
+		return &g
 	case *Post:
 		p := *x
 		p.Can = Can{Edit: perm.EditPost(a, perm.Post{AuthorID: p.Author.ID}), Delete: perm.DeletePost(a, perm.Post{AuthorID: p.Author.ID})}
@@ -83,6 +86,8 @@ func groupIDOf(v any) string {
 		return x.GroupID
 	case *Message:
 		return x.GroupID
+	case *Group:
+		return x.ID
 	}
 	return ""
 }
@@ -250,7 +255,7 @@ func (s *Server) listPosts(w http.ResponseWriter, r *http.Request) {
 			EditedAt:     nullInt(row.EditedAt),
 			CommentCount: row.CommentCount,
 		}
-		posts = append(posts, *forViewer(a, &p).(*Post))
+		posts = append(posts, *forViewer(a, &p, Settings{}).(*Post))
 	}
 	var next *int64
 	if len(posts) > limit {
@@ -322,8 +327,13 @@ func (s *Server) loggedMany(w http.ResponseWriter, r *http.Request, now int64, f
 	me, _ := userFrom(ctx)
 	// The actor's own view of what they wrote, looked up while the tx is open.
 	a := perm.Actor{ID: me.ID}
+	st := Settings{}
 	if gid := groupIDOf(response); gid != "" {
 		if a, err = actorIn(ctx, qtx, me, gid); err != nil {
+			writeErr(w, http.StatusInternalServerError, err.Error())
+			return
+		}
+		if st, err = s.settings(ctx); err != nil {
 			writeErr(w, http.StatusInternalServerError, err.Error())
 			return
 		}
@@ -339,7 +349,7 @@ func (s *Server) loggedMany(w http.ResponseWriter, r *http.Request, now int64, f
 		w.WriteHeader(status)
 		return
 	}
-	writeJSON(w, status, forViewer(a, response))
+	writeJSON(w, status, forViewer(a, response, st))
 }
 
 var errNotFound = errors.New("not found")

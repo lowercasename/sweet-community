@@ -267,6 +267,11 @@ func TestGroupModeAndInstanceSetting(t *testing.T) {
 	if both["mode"] != "both" || both["name"] != "Room" {
 		t.Fatalf("mode change: %v", both)
 	}
+	// The reply is the group as its owner sees it, flags and all: a bare group
+	// would strip the owner's controls the moment they saved.
+	if both["role"] != "owner" || !groupCan(both, "rename") || !groupCan(both, "set_mode") || !groupCan(both, "delete") {
+		t.Fatalf("reply to an update is not personalised: %v", both)
+	}
 	kit.mustStatus(201, "POST", "/api/groups/"+rid+"/posts", map[string]string{"body_html": "<p>now ok</p>"})
 	kit.mustStatus(400, "PUT", "/api/groups/"+rid, map[string]string{"mode": "video"})
 	if g := kit.mustStatus(201, "POST", "/api/groups", map[string]string{"name": "Default"}); g["mode"] != "both" {

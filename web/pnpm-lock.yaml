@@ -50,6 +50,9 @@ importers:
       tailwindcss:
         specifier: ^4.3.4
         version: 4.3.4
+      wouter:
+        specifier: ^3.13.0
+        version: 3.13.0(react@18.3.1)
     devDependencies:
       '@testing-library/dom':
         specifier: ^10.4.2
@@ -1198,6 +1201,10 @@ packages:
     resolution: {integrity: sha512-wS+hAgJShR0KhEvPJArfuPVN1+Hz1t0Y6n5jLrGQbkb4urgPE/0Rve+1kMB1v/oWgHgm4WIcV+i7F2pTVj+2iQ==}
     engines: {node: '>=0.10.0'}
 
+  regexparam@3.0.0:
+    resolution: {integrity: sha512-RSYAtP31mvYLkAHrOlh25pCNQ5hWnT106VukGaaFfuJrZFkGRX5GhUAdPqpSDXxOhA2c4akmRuplv1mRqnBn6Q==}
+    engines: {node: '>=8'}
+
   rollup@4.67.4:
     resolution: {integrity: sha512-Lsv3oKcz5jgOQJej/p7nfwbVEdAbDT+z6OPf/SCdI+nF+q2ENp0pTKT35ZwXAmH8g45mfrIiJeEyAqKYSYoL9Q==}
     engines: {node: '>=18.0.0', npm: '>=8.0.0'}
@@ -1353,6 +1360,11 @@ packages:
     resolution: {integrity: sha512-Tb2FUhB4vUsGQlfSquQLYkApkuPAFQXGFzxWKHHumVz2dK+X1RUm/HnID4+TfIGYJ1kTcwOaCk/buYCEJr6YjQ==}
     engines: {node: '>=20.11'}
     hasBin: true
+
+  wouter@3.13.0:
+    resolution: {integrity: sha512-p1RoCuVyxwb3X5jLjDdkwDzlXj+/UGZqZb+806uaJOVEHvNfGkjET0KiQ/CGiDKC90rLsALMgMj4onNVKxgNdQ==}
+    peerDependencies:
+      react: '>=16.8.0'
 
   ws@8.22.1:
     resolution: {integrity: sha512-oyL6OPYme/CmiFvNuGzeoxCJ4nOrZE2O1FwM9MWM1AsGri6nLXB2pg+lNA8aLeXMSav0J6eIVS1j6vUPzUtK9g==}
@@ -2356,6 +2368,8 @@ snapshots:
     dependencies:
       loose-envify: 1.4.0
 
+  regexparam@3.0.0: {}
+
   rollup@4.67.4:
     dependencies:
       '@types/estree': 1.0.10
@@ -2471,6 +2485,12 @@ snapshots:
   whatwg-mimetype@3.0.0: {}
 
   why-is-node-running@3.2.1: {}
+
+  wouter@3.13.0(react@18.3.1):
+    dependencies:
+      react: 18.3.1
+      regexparam: 3.0.0
+      use-sync-external-store: 1.7.0(react@18.3.1)
 
   ws@8.22.1: {}
 
