@@ -213,7 +213,7 @@ func (s *Server) createGroup(w http.ResponseWriter, r *http.Request) {
 	case "", perm.KindGroup:
 		in.Name = strings.TrimSpace(in.Name)
 		if in.Name == "" || len(in.Name) > 80 {
-			writeErr(w, http.StatusBadRequest, "a group needs a name of up to 80 characters")
+			writeErr(w, http.StatusBadRequest, "a room needs a name of up to 80 characters")
 			return
 		}
 		if in.Mode == "" {
@@ -342,7 +342,7 @@ func (s *Server) updateGroup(w http.ResponseWriter, r *http.Request) {
 	if in.Name != nil {
 		name := strings.TrimSpace(*in.Name)
 		if name == "" || len(name) > 80 {
-			writeErr(w, http.StatusBadRequest, "a group needs a name of up to 80 characters")
+			writeErr(w, http.StatusBadRequest, "a room needs a name of up to 80 characters")
 			return
 		}
 		if !perm.Rename(a, pg) {

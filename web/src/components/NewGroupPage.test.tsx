@@ -18,10 +18,10 @@ describe('NewGroupPage', () => {
     const { NewGroupPage } = await import('./NewGroupPage')
     const onCreated = vi.fn()
     renderWithQuery(<NewGroupPage onCreated={onCreated} />)
-    expect(screen.getByRole('button', { name: 'Create group' })).toHaveProperty('disabled', true)
+    expect(screen.getByRole('button', { name: 'Create room' })).toHaveProperty('disabled', true)
     fireEvent.change(screen.getByLabelText('Name'), { target: { value: 'Knitting' } })
     fireEvent.change(screen.getByLabelText('Mode'), { target: { value: 'posts' } })
-    fireEvent.click(screen.getByRole('button', { name: 'Create group' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Create room' }))
     expect(createGroup).toHaveBeenCalledWith('Knitting', 'posts')
     await vi.waitFor(() =>
       expect(onCreated).toHaveBeenCalledWith(expect.objectContaining({ id: 'new', name: 'Knitting' })),

@@ -99,7 +99,7 @@ describe('MembersPage', () => {
     expect(screen.queryByRole('button', { name: /Make / })).toBeNull()
     expect(screen.queryByRole('button', { name: 'Remove' })).toBeNull()
     expect(screen.queryByLabelText('Name')).toBeNull()
-    fireEvent.click(screen.getByRole('button', { name: 'Leave group' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Leave room' }))
     fireEvent.click(within(screen.getByRole('dialog', { hidden: true })).getByRole('button', { name: 'Leave' }))
     expect(removeMember).toHaveBeenCalledWith('club', 'mo')
     await vi.waitFor(() => expect(onLeft).toHaveBeenCalled())

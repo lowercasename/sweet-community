@@ -85,7 +85,7 @@ export function SettingsPage({ me, root, onSignOut }: SettingsPageProps) {
               <Card>
                 <Stack gap={2}>
                   <Heading level={2}>This place</Heading>
-                  <Field label="Who can create groups">
+                  <Field label="Who can create rooms">
                     <Select
                       value={settings?.group_creation ?? 'anyone'}
                       options={CREATION}

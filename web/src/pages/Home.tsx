@@ -4,6 +4,7 @@ import type { User } from '../api'
 import { useGroups } from '../data/hooks'
 import { StreamProvider } from '../hooks/StreamContext'
 import { useLayout } from '../hooks/useLayout'
+import { NEW_ROOM, groupPath, membersPath } from '../routes'
 import { GroupBar } from '../components/GroupBar'
 import { GroupView } from '../components/GroupView'
 import { MembersPage } from '../components/MembersPage'
@@ -21,14 +22,9 @@ interface HomeProps {
   onSignOut: () => void
 }
 
-/** The path of a group's view: the root group is Home. */
-export function groupPath(id: string, rootId: string | undefined): string {
-  return id === rootId ? '/' : `/g/${encodeURIComponent(id)}`
-}
-
 /**
  * The signed-in app: a nav column on the left, then the page the URL names
- * (architecture.md, Layout). `/` and `/g/<id>` are a group's view (a DM's
+ * (architecture.md, Layout). `/` and `/r/<id>` are a group's view (a DM's
  * too); the other pages show over it. The last group the URL named stays mounted behind
  * them, so a half-written post or message survives a visit to Settings or
  * Members; naming another group swaps it.
@@ -38,8 +34,8 @@ export function Home({ me, onSignOut }: HomeProps) {
   const { groups, loading } = useGroups()
   const root = groups.find((g) => g.kind === 'root')
   const [location, navigate] = useLocation()
-  const [atGroup, groupParams] = useRoute('/g/:id')
-  const [atMembers, membersParams] = useRoute('/g/:id/members')
+  const [atGroup, groupParams] = useRoute('/r/:id')
+  const [atMembers, membersParams] = useRoute('/r/:id/members')
   const atRoot = location === '/'
 
   // The group the URL names, if any; else the last one it named, so its panes stay put.
@@ -76,7 +72,7 @@ export function Home({ me, onSignOut }: HomeProps) {
             group={current}
             me={me}
             onBack={atMembers ? () => navigate(groupPath(current.id, root?.id)) : undefined}
-            onMembers={viewing ? () => navigate(`/g/${encodeURIComponent(current.id)}/members`) : undefined}
+            onMembers={viewing ? () => navigate(membersPath(current)) : undefined}
           />
         )}
         <Switch>
@@ -90,16 +86,16 @@ export function Home({ me, onSignOut }: HomeProps) {
           <Route path="/menu">
             <MenuPage me={me} groups={groups} onGo={navigate} onLogout={onSignOut} />
           </Route>
-          <Route path="/groups/new">
+          <Route path={NEW_ROOM}>
             <NewGroupPage onCreated={(g) => navigate(groupPath(g.id, root?.id))} />
           </Route>
-          <Route path="/g/:id/members">
+          <Route path="/r/:id/members">
             {atMembers && current && current.id === membersParams.id && (
               <MembersPage key={current.id} group={current} me={me} onLeft={() => navigate('/')} />
             )}
           </Route>
           <Route path="/" />
-          <Route path="/g/:id" />
+          <Route path="/r/:id" />
           <Route>
             <Redirect to="/" replace />
           </Route>

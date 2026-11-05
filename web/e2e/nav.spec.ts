@@ -6,7 +6,7 @@ const nav = (p: Person) => p.page.getByRole('navigation', { name: 'Main' })
 async function messageFromPeople(p: Person, who: string) {
   await nav(p).getByRole('button', { name: 'People' }).click()
   await p.page.getByRole('listitem').filter({ hasText: who }).getByRole('button', { name: 'Message' }).click()
-  await expect(p.page).toHaveURL(/\/g\/[^/]+$/)
+  await expect(p.page).toHaveURL(/\/r\/[^/]+$/)
   await expect(p.page.getByRole('heading', { name: who })).toBeVisible()
 }
 
@@ -17,13 +17,13 @@ test.describe('nav', () => {
     const jo = await member(browser, testInfo, 'jo')
     await open(kit.page)
 
-    // A new group lands in the Groups section, made from that section's own control.
-    const groups = nav(kit).getByRole('group', { name: 'Groups' })
-    await groups.getByRole('button', { name: 'New group' }).click()
+    // A new group lands in the Rooms section, made from that section's own control.
+    const groups = nav(kit).getByRole('group', { name: 'Rooms' })
+    await groups.getByRole('button', { name: 'New room' }).click()
     const name = uniq('Knitting ')
     await kit.page.getByLabel('Name').fill(name)
-    await kit.page.getByRole('button', { name: 'Create group' }).click()
-    await expect(kit.page).toHaveURL(/\/g\/[^/]+$/)
+    await kit.page.getByRole('button', { name: 'Create room' }).click()
+    await expect(kit.page).toHaveURL(/\/r\/[^/]+$/)
     await expect(groups.getByRole('button', { name })).toBeVisible()
     await expect(groups.getByRole('button', { name })).toHaveAttribute('aria-current', 'page')
 
@@ -54,7 +54,7 @@ test.describe('nav', () => {
 
     // Opening one from the list.
     await rows.nth(0).getByRole('button').click()
-    await expect(kit.page).toHaveURL(/\/g\/[^/]+$/)
+    await expect(kit.page).toHaveURL(/\/r\/[^/]+$/)
     await expect(kit.page.getByRole('heading', { name: mo.username })).toBeVisible()
     await expect(nav(kit).getByRole('button', { name: 'Messages' })).toHaveAttribute('aria-current', 'page')
 
@@ -69,8 +69,8 @@ test.describe('nav', () => {
     await open(kit.page)
     await nav(kit).getByRole('button', { name: 'Menu' }).click()
     await expect(kit.page).toHaveURL(/\/menu$/)
-    const groups = kit.page.getByRole('group', { name: 'Groups' })
-    await expect(groups.getByRole('button', { name: 'New group' })).toBeVisible()
+    const groups = kit.page.getByRole('group', { name: 'Rooms' })
+    await expect(groups.getByRole('button', { name: 'New room' })).toBeVisible()
     await expect(kit.page.getByRole('button', { name: 'Messages' })).toBeVisible()
 
     // People, Message mo, then back through the menu to Messages, where mo is listed.

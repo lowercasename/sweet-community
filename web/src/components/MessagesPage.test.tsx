@@ -48,7 +48,7 @@ describe('MessagesPage', () => {
     expect(rows.map((b) => b.getAttribute('aria-label'))).toEqual(['jo', 'kit', 'mo'])
     expect(screen.queryByText('Knitting')).toBeNull()
     fireEvent.click(screen.getByRole('button', { name: 'kit' }))
-    expect(onGo).toHaveBeenCalledWith('/g/d1')
+    expect(onGo).toHaveBeenCalledWith('/r/d1')
   })
 
   it('says where a conversation starts when there are none', async () => {

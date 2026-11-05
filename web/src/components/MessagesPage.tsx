@@ -16,6 +16,7 @@ import {
   Text,
   Time,
 } from '../ui'
+import { groupPath } from '../routes'
 import { groupLabel } from './GroupView'
 
 interface MessagesPageProps {
@@ -66,7 +67,7 @@ export function MessagesPage({ me, onGo }: MessagesPageProps) {
                     const others = (g.members ?? []).filter((u) => u.id !== me.id)
                     return (
                       <ListItem key={g.id}>
-                        <ListRow label={label} onClick={() => onGo(`/g/${encodeURIComponent(g.id)}`)}>
+                        <ListRow label={label} onClick={() => onGo(groupPath(g.id))}>
                           <Row gap={1} align="center">
                             {others.map((u) => (
                               <LiveAvatar key={u.id} user={u} />

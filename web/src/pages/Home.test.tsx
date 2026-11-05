@@ -10,7 +10,7 @@ import { FakeEventSource, ROOT, dm, group, member, post, renderWithQuery, user }
  * the assertion. The avatar bug: a person's picture is shown from the users
  * cache, so a change arriving on the stream redraws it everywhere. And
  * groups: the nav lists mine, a group opens with the panes its mode says,
- * a DM is named by its people, and New group follows the root's flag.
+ * a DM is named by its people, and New room follows the root's flag.
  */
 vi.mock('../api', () => ({
   getPosts: vi.fn(),
@@ -124,11 +124,11 @@ describe('Home', () => {
     expect(nav().getByRole('button', { name: 'Knitting' })).toBeTruthy()
     expect(nav().queryByRole('button', { name: 'kit' })).toBeNull()
     expect(nav().getByRole('button', { name: 'Messages' })).toBeTruthy()
-    expect(nav().getByRole('button', { name: 'New group' })).toBeTruthy()
+    expect(nav().getByRole('button', { name: 'New room' })).toBeTruthy()
 
     fireEvent.click(nav().getByRole('button', { name: 'Knitting' }))
     await vi.waitFor(() => expect(getMessages).toHaveBeenCalledWith('knit', null))
-    expect(window.location.pathname).toBe('/g/knit')
+    expect(window.location.pathname).toBe('/r/knit')
     expect(container.querySelector('.ProseMirror')!.closest('.hidden')).toBeNull()
     // Chat only: no divider, no posts editor; the group's name and its Members control are shown.
     expect(screen.queryByRole('separator')).toBeNull()
@@ -138,13 +138,13 @@ describe('Home', () => {
     // Members shows alone: the group's view is still mounted but out of sight.
     fireEvent.click(screen.getByRole('button', { name: 'Members and settings' }))
     await screen.findByRole('heading', { name: 'Members' })
-    expect(window.location.pathname).toBe('/g/knit/members')
+    expect(window.location.pathname).toBe('/r/knit/members')
     expect(container.querySelector('.ProseMirror')!.closest('.hidden')).not.toBeNull()
     // The group's bar stays, with its name and a way back; Members is no longer offered there.
     expect(screen.getByRole('heading', { name: 'Knitting' }).closest('.hidden')).toBeNull()
     expect(screen.queryByRole('button', { name: 'Members and settings' })).toBeNull()
     fireEvent.click(screen.getByRole('button', { name: 'Back to Knitting' }))
-    expect(window.location.pathname).toBe('/g/knit')
+    expect(window.location.pathname).toBe('/r/knit')
     expect(container.querySelector('.ProseMirror')!.closest('.hidden')).toBeNull()
   })
 
@@ -159,7 +159,7 @@ describe('Home', () => {
     expect(container.querySelector('.ProseMirror')!.closest('.hidden')).not.toBeNull()
 
     fireEvent.click(screen.getByRole('button', { name: 'kit' }))
-    expect(window.location.pathname).toBe('/g/d1')
+    expect(window.location.pathname).toBe('/r/d1')
     await vi.waitFor(() => expect(getMessages).toHaveBeenCalledWith('d1', null))
     expect(screen.getByRole('heading', { name: 'kit' })).toBeTruthy()
     expect(nav().getByRole('button', { name: 'Messages' }).getAttribute('aria-current')).toBe('page')
@@ -168,7 +168,7 @@ describe('Home', () => {
 
   it('opens whatever page the URL names, and the back button returns', async () => {
     const { getMessages } = await import('../api')
-    await home('/g/knit/members')
+    await home('/r/knit/members')
     await screen.findByRole('heading', { name: 'Members' })
     expect(screen.getByRole('heading', { name: 'Knitting' }).closest('.hidden')).toBeNull()
     // The group named by the URL is the one mounted behind the page.
@@ -180,7 +180,7 @@ describe('Home', () => {
     expect(window.location.pathname).toBe('/people')
     window.history.back()
     await screen.findByRole('heading', { name: 'Members' })
-    expect(window.location.pathname).toBe('/g/knit/members')
+    expect(window.location.pathname).toBe('/r/knit/members')
   })
 
   it('shows the root group for a path it does not know', async () => {
@@ -189,12 +189,12 @@ describe('Home', () => {
     expect(window.location.pathname).toBe('/')
   })
 
-  it('hides New group when the root group says I may not', async () => {
+  it('hides New room when the root group says I may not', async () => {
     const { listGroups } = await import('../api')
     vi.mocked(listGroups).mockResolvedValue({
       groups: [group(ROOT, 'member', { can: { ...group(ROOT, 'member').can, create_groups: false } })],
     })
     await home()
-    expect(nav().queryByRole('button', { name: 'New group' })).toBeNull()
+    expect(nav().queryByRole('button', { name: 'New room' })).toBeNull()
   })
 })

@@ -13,7 +13,7 @@ const MODES: { value: GroupMode; label: string }[] = [
   { value: 'chat', label: 'Chat only' },
 ]
 
-/** A group needs a name and a mode; everything else is a membership. */
+/** A room needs a name and a mode; everything else is a membership. */
 export function NewGroupPage({ onCreated }: NewGroupPageProps) {
   const { create } = useGroupActions()
   const [name, setName] = useState('')
@@ -28,7 +28,7 @@ export function NewGroupPage({ onCreated }: NewGroupPageProps) {
     try {
       onCreated(await create(name.trim(), mode))
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Could not create the group')
+      setError(e instanceof Error ? e.message : 'Could not create the room')
     } finally {
       setBusy(false)
     }
@@ -40,9 +40,9 @@ export function NewGroupPage({ onCreated }: NewGroupPageProps) {
         <Measure>
           <Card>
             <Stack gap={2}>
-              <Heading level={2}>New group</Heading>
+              <Heading level={2}>New room</Heading>
               <Text variant="secondary">
-                A group is private: only the people you add can see it exists. Tell people about it in a post and add
+                A room is private: only the people you add can see it exists. Tell people about it in a post and add
                 whoever asks.
               </Text>
               <Form onSubmit={() => void submit()}>
@@ -55,7 +55,7 @@ export function NewGroupPage({ onCreated }: NewGroupPageProps) {
                 {error && <Text variant="secondary">{error}</Text>}
                 <Row>
                   <Button type="submit" disabled={busy || !name.trim()}>
-                    {busy ? 'Creating…' : 'Create group'}
+                    {busy ? 'Creating…' : 'Create room'}
                   </Button>
                 </Row>
               </Form>

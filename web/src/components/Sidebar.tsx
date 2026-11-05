@@ -1,5 +1,6 @@
 import type { Group, User } from '../api'
 import { useAuthor } from '../data/hooks'
+import { NEW_ROOM, groupPath } from '../routes'
 import { Hairline, NavAccount, NavBar, NavItem, NavSection, Tile, Wordmark } from '../ui'
 
 interface SidebarProps {
@@ -17,11 +18,9 @@ function at(location: string, path: string): boolean {
   return location === path || location.startsWith(path + '/')
 }
 
-const groupPath = (g: Group) => `/g/${encodeURIComponent(g.id)}`
-
 /**
  * The left navigation, in three blocks (architecture.md, Layout): places
- * (Home, then the named groups I am in, with New group as that section's
+ * (Home, then the rooms I am in, with New room as that section's
  * own control), the tools that reach across every place (Messages, Search,
  * Alerts), and the house (People, Settings, me). DMs are conversations,
  * not places: they live behind Messages, which is current inside one.
@@ -30,7 +29,7 @@ export function Sidebar({ me, groups, location, expanded, onGo, onToggle }: Side
   const live = useAuthor(me)
   const root = groups.find((g) => g.kind === 'root')
   const mine = groups.filter((g) => g.kind === 'group')
-  const inDM = groups.some((g) => g.kind === 'dm' && at(location, groupPath(g)))
+  const inDM = groups.some((g) => g.kind === 'dm' && at(location, groupPath(g.id)))
   const canCreate = root?.can.create_groups === true
   return (
     <NavBar
@@ -51,15 +50,15 @@ export function Sidebar({ me, groups, location, expanded, onGo, onToggle }: Side
       <NavItem icon="home" label="Home" expanded={expanded} current={location === '/'} onClick={() => onGo('/')} />
       {(mine.length > 0 || canCreate) && (
         <NavSection
-          title="Groups"
+          title="Rooms"
           expanded={expanded}
           action={
             canCreate
               ? {
                   icon: 'plus',
-                  label: 'New group',
-                  current: location === '/groups/new',
-                  onClick: () => onGo('/groups/new'),
+                  label: 'New room',
+                  current: location === NEW_ROOM,
+                  onClick: () => onGo(NEW_ROOM),
                 }
               : undefined
           }
@@ -70,8 +69,8 @@ export function Sidebar({ me, groups, location, expanded, onGo, onToggle }: Side
               mark={<Tile name={g.name} />}
               label={g.name}
               expanded={expanded}
-              current={at(location, groupPath(g))}
-              onClick={() => onGo(groupPath(g))}
+              current={at(location, groupPath(g.id))}
+              onClick={() => onGo(groupPath(g.id))}
             />
           ))}
         </NavSection>

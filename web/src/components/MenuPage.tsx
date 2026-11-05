@@ -1,5 +1,6 @@
 import type { Group, User } from '../api'
 import { useAuthor } from '../data/hooks'
+import { NEW_ROOM, groupPath } from '../routes'
 import { Card, Hairline, NavAccount, NavItem, NavSection, Pane, Stack, Tile } from '../ui'
 
 interface MenuPageProps {
@@ -28,9 +29,9 @@ export function MenuPage({ me, groups, onGo, onLogout }: MenuPageProps) {
           <NavItem icon="home" label="Home" expanded onClick={() => onGo('/')} />
           {(mine.length > 0 || canCreate) && (
             <NavSection
-              title="Groups"
+              title="Rooms"
               expanded
-              action={canCreate ? { icon: 'plus', label: 'New group', onClick: () => onGo('/groups/new') } : undefined}
+              action={canCreate ? { icon: 'plus', label: 'New room', onClick: () => onGo(NEW_ROOM) } : undefined}
             >
               {mine.map((g) => (
                 <NavItem
@@ -38,7 +39,7 @@ export function MenuPage({ me, groups, onGo, onLogout }: MenuPageProps) {
                   mark={<Tile name={g.name} />}
                   label={g.name}
                   expanded
-                  onClick={() => onGo(`/g/${encodeURIComponent(g.id)}`)}
+                  onClick={() => onGo(groupPath(g.id))}
                 />
               ))}
             </NavSection>

@@ -72,6 +72,8 @@ export function MembersPage({ group, me, onLeft }: MembersPageProps) {
     }
   }
 
+  // To people a named group is a room and a DM a conversation.
+  const word = group.kind === 'dm' ? 'conversation' : 'room'
   const inGroup = new Set(members.map((m) => m.user.id))
   const candidates = [...(users?.values() ?? [])].filter((u) => !inGroup.has(u.id))
   const dirty = name.trim() !== group.name || mode !== group.mode
@@ -85,7 +87,7 @@ export function MembersPage({ group, me, onLeft }: MembersPageProps) {
             {canEdit && (
               <Card>
                 <Stack gap={2}>
-                  <Heading level={2}>Group settings</Heading>
+                  <Heading level={2}>Room settings</Heading>
                   {group.can.rename && (
                     <Field label="Name">
                       <Input value={name} onChange={setName} />
@@ -117,7 +119,7 @@ export function MembersPage({ group, me, onLeft }: MembersPageProps) {
                         disabled={busy}
                         onClick={() => setConfirm({ kind: 'delete' })}
                       >
-                        Delete group
+                        Delete room
                       </Button>
                     )}
                   </Row>
@@ -216,7 +218,7 @@ export function MembersPage({ group, me, onLeft }: MembersPageProps) {
                       disabled={busy}
                       onClick={() => setConfirm({ kind: 'leave' })}
                     >
-                      Leave group
+                      Leave {word}
                     </Button>
                   </Row>
                 )}
@@ -239,7 +241,7 @@ export function MembersPage({ group, me, onLeft }: MembersPageProps) {
       </ConfirmDialog>
       <ConfirmDialog
         open={confirm?.kind === 'leave'}
-        title="Leave this group?"
+        title={`Leave this ${word}?`}
         confirmLabel="Leave"
         busy={busy}
         onConfirm={() => void run(() => actions.leave(group.id, me.id).then(onLeft))}
@@ -249,7 +251,7 @@ export function MembersPage({ group, me, onLeft }: MembersPageProps) {
       </ConfirmDialog>
       <ConfirmDialog
         open={confirm?.kind === 'delete'}
-        title="Delete this group?"
+        title="Delete this room?"
         confirmLabel="Delete"
         busy={busy}
         onConfirm={() => void run(() => actions.remove(group.id).then(onLeft))}

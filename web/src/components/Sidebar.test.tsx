@@ -6,7 +6,7 @@ import { ROOT, dm, group, nameOf, renderWithQuery, user } from '../test-utils'
 
 /**
  * The nav column's three blocks (architecture.md, Layout): places (Home,
- * then the Groups section with its own New group control), tools
+ * then the Rooms section with its own New room control), tools
  * (Messages, Search, Alerts), the house (People, Settings). DMs are not
  * places here; they are behind Messages, which is current inside one.
  */
@@ -33,7 +33,7 @@ async function draw(groups: Group[], location = '/', expanded = true) {
 }
 
 const names = () => screen.getAllByRole('button').map(nameOf)
-const groupsSection = () => screen.getByRole('group', { name: 'Groups' })
+const groupsSection = () => screen.getByRole('group', { name: 'Rooms' })
 
 describe('Sidebar', () => {
   it('holds places, then tools, then the house, with a rule between each block', async () => {
@@ -41,7 +41,7 @@ describe('Sidebar', () => {
     // Expanded, the section's control is in its title row, so it comes before the groups.
     expect(names()).toEqual([
       'Home',
-      'New group',
+      'New room',
       'Knitting',
       'Messages',
       'Search',
@@ -51,28 +51,28 @@ describe('Sidebar', () => {
       'Collapse',
     ])
     expect(within(groupsSection()).getByRole('button', { name: 'Knitting' })).toBeTruthy()
-    expect(within(groupsSection()).getByRole('button', { name: 'New group' })).toBeTruthy()
+    expect(within(groupsSection()).getByRole('button', { name: 'New room' })).toBeTruthy()
     expect(screen.queryByRole('button', { name: 'kit' })).toBeNull()
     expect(screen.getByRole('navigation').querySelectorAll('hr').length).toBe(2)
 
-    fireEvent.click(screen.getByRole('button', { name: 'New group' }))
-    expect(onGo).toHaveBeenCalledWith('/groups/new')
+    fireEvent.click(screen.getByRole('button', { name: 'New room' }))
+    expect(onGo).toHaveBeenCalledWith('/rooms/new')
     fireEvent.click(screen.getByRole('button', { name: 'Messages' }))
     expect(onGo).toHaveBeenCalledWith('/messages')
     fireEvent.click(screen.getByRole('button', { name: 'Knitting' }))
-    expect(onGo).toHaveBeenCalledWith('/g/knit')
+    expect(onGo).toHaveBeenCalledWith('/r/knit')
   })
 
-  it('shows the Groups section only when it has something to show', async () => {
+  it('shows the Rooms section only when it has something to show', async () => {
     await draw([root(false), withKit])
-    expect(screen.queryByRole('group', { name: 'Groups' })).toBeNull()
+    expect(screen.queryByRole('group', { name: 'Rooms' })).toBeNull()
     cleanup()
     await draw([root(false), knitting])
     expect(within(groupsSection()).getByRole('button', { name: 'Knitting' })).toBeTruthy()
-    expect(screen.queryByRole('button', { name: 'New group' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'New room' })).toBeNull()
     cleanup()
     await draw([root(true)])
-    expect(within(groupsSection()).getByRole('button', { name: 'New group' })).toBeTruthy()
+    expect(within(groupsSection()).getByRole('button', { name: 'New room' })).toBeTruthy()
   })
 
   it('marks the page being viewed: Messages for its page and for any DM', async () => {
@@ -84,10 +84,10 @@ describe('Sidebar', () => {
     await draw([root(true), knitting, withKit], '/messages')
     expect(current()).toEqual(['Messages'])
     cleanup()
-    await draw([root(true), knitting, withKit], '/g/d1')
+    await draw([root(true), knitting, withKit], '/r/d1')
     expect(current()).toEqual(['Messages'])
     cleanup()
-    await draw([root(true), knitting, withKit], '/g/knit/members')
+    await draw([root(true), knitting, withKit], '/r/knit/members')
     expect(current()).toEqual(['Knitting'])
     cleanup()
     await draw([root(true), knitting, withKit], '/')
@@ -100,7 +100,7 @@ describe('Sidebar', () => {
     expect(names()).toEqual([
       'Home',
       'Knitting',
-      'New group',
+      'New room',
       'Messages',
       'Search',
       'Alerts',
@@ -108,7 +108,7 @@ describe('Sidebar', () => {
       'Settings',
       'Expand',
     ])
-    expect(screen.queryByText('Groups')).toBeNull()
+    expect(screen.queryByText('Rooms')).toBeNull()
     expect(screen.getByRole('button', { name: 'Knitting' }).textContent).toBe('K')
     expect(nameOf(screen.getByRole('button', { name: 'Knitting' }))).toBe('Knitting')
     expect(screen.getByRole('navigation').querySelectorAll('hr').length).toBe(2)
