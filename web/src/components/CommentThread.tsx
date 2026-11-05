@@ -4,6 +4,7 @@ import { useAuthor, useCommentActions, useComments } from '../data/hooks'
 import { commentExtensions } from '../editor/extensions'
 import { Avatar, Box, ConfirmDialog, Hairline, HtmlContent, Menu, Row, Stack, Text, Time, type MenuItem } from '../ui'
 import { BodyEditor } from './BodyEditor'
+import { PersonName } from './PersonName'
 
 interface CommentThreadProps {
   postId: string
@@ -52,9 +53,7 @@ function CommentItem({ comment, disabled, onEdit, onDelete }: CommentItemProps) 
         <Row justify="between" align="center">
           <Row gap={2} align="center">
             <Avatar name={author.username} picture={author.picture} size="sm" />
-            <Text as="span" variant="name">
-              {author.username}
-            </Text>
+            <PersonName user={author} />
             <Text as="span" variant="small">
               <Time at={comment.created_at} />
               {comment.edited_at != null && (

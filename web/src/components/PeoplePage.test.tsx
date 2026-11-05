@@ -9,6 +9,7 @@ import { ROOT, group, member, renderWithQuery, user } from '../test-utils'
  * root group's can flags, never from a role check here.
  */
 vi.mock('../api', () => ({
+  getMe: vi.fn(() => Promise.resolve({ id: 'raphael', username: 'raphael', picture: null })),
   listUsers: vi.fn(),
   listInvites: vi.fn(() => Promise.resolve({ invites: [] })),
   createInvite: vi.fn(),
@@ -51,7 +52,7 @@ describe('PeoplePage', () => {
     const { PeoplePage } = await import('./PeoplePage')
     renderWithQuery(<PeoplePage me={user('raphael')} root={group(ROOT, 'owner')} onOpenGroup={() => {}} />)
     await screen.findByText('mo')
-    expect(within(rowOf('raphael')).queryByRole('button')).toBeNull()
+    expect(within(rowOf('raphael')).queryByRole('button', { name: /Message|Make/ })).toBeNull()
     fireEvent.click(within(rowOf('kit')).getByRole('button', { name: 'Make moderator' }))
     expect(setMemberRole).toHaveBeenCalledWith(ROOT, 'kit', 'moderator')
     await within(rowOf('kit')).findByRole('button', { name: 'Make member' })

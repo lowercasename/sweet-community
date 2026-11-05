@@ -9,6 +9,7 @@ import { group, member, renderWithQuery, user } from '../test-utils'
  * a member sees the list and Leave. Nothing here reasons about roles.
  */
 vi.mock('../api', () => ({
+  getMe: vi.fn(() => Promise.resolve({ id: 'kit', username: 'kit', picture: null })),
   listUsers: vi.fn(),
   listMembers: vi.fn(),
   addMember: vi.fn(),
@@ -72,7 +73,7 @@ describe('MembersPage', () => {
   it('lets the owner set roles and hand over, the latter after a confirm', async () => {
     const { setMemberRole } = await import('../api')
     await page('owner')
-    expect(within(rowOf('kit')).queryByRole('button')).toBeNull()
+    expect(within(rowOf('kit')).queryByRole('button', { name: /Make|Remove/ })).toBeNull()
     fireEvent.click(within(rowOf('mo')).getByRole('button', { name: 'Make moderator' }))
     expect(setMemberRole).toHaveBeenCalledWith('club', 'mo', 'moderator')
     await within(rowOf('mo')).findByRole('button', { name: 'Make member' })

@@ -5,6 +5,7 @@ import { postExtensions } from '../editor/extensions'
 import { Avatar, Button, Card, ConfirmDialog, HtmlContent, Menu, Row, Stack, Text, Time, type MenuItem } from '../ui'
 import { BodyEditor } from './BodyEditor'
 import { CommentThread } from './CommentThread'
+import { PersonName } from './PersonName'
 
 interface PostProps {
   post: PostData
@@ -53,9 +54,7 @@ export function Post({ post, disabled, onEdit, onDelete }: PostProps) {
         <Row justify="between" align="center">
           <Row gap={2} align="center">
             <Avatar name={author.username} picture={author.picture} />
-            <Text as="span" variant="name">
-              {author.username}
-            </Text>
+            <PersonName user={author} />
             <Text as="span" variant="small">
               <Time at={post.created_at} />
               {post.edited_at != null && (

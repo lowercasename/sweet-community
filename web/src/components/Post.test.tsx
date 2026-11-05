@@ -4,7 +4,10 @@ import { cleanup, fireEvent, screen } from '@testing-library/react'
 import { mine, nobody, post, renderWithQuery, user } from '../test-utils'
 
 /** A post's menu shows exactly what its can flags allow; nothing is decided here. */
-vi.mock('../api', () => ({ listUsers: vi.fn(() => Promise.resolve({ users: [] })) }))
+vi.mock('../api', () => ({
+  getMe: vi.fn(() => Promise.resolve({ id: 'kit', username: 'kit', picture: null })),
+  listUsers: vi.fn(() => Promise.resolve({ users: [] })),
+}))
 
 afterEach(cleanup)
 

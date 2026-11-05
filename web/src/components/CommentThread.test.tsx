@@ -14,6 +14,7 @@ vi.mock('../api', () => ({
   updateComment: vi.fn(),
   deleteComment: vi.fn(() => Promise.resolve()),
   listUsers: vi.fn(() => Promise.resolve({ users: [] })),
+  getMe: vi.fn(() => Promise.resolve({ id: 'kit', username: 'kit', picture: null })),
 }))
 
 const kit = user('kit')

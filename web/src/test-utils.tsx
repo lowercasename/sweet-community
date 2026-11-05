@@ -1,12 +1,13 @@
 import type { ReactNode } from 'react'
-import { QueryClientProvider } from '@tanstack/react-query'
+import { QueryClientProvider, type QueryClient } from '@tanstack/react-query'
 import { render } from '@testing-library/react'
 import { makeQueryClient } from './data/client'
 import type { Comment, Group, Member, Message, Post, User } from './api'
 
-/** Render inside a fresh query cache; returns the client so tests can seed or inspect it. */
-export function renderWithQuery(ui: ReactNode) {
+/** Render inside a fresh query cache, seeded first if asked; returns the client so tests can seed or inspect it. */
+export function renderWithQuery(ui: ReactNode, seed?: (qc: QueryClient) => void) {
   const qc = makeQueryClient()
+  seed?.(qc)
   const result = render(<QueryClientProvider client={qc}>{ui}</QueryClientProvider>)
   return { qc, ...result }
 }

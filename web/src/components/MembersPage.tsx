@@ -20,6 +20,7 @@ import {
   Text,
   Time,
 } from '../ui'
+import { PersonName } from './PersonName'
 
 interface MembersPageProps {
   group: Group
@@ -163,9 +164,7 @@ export function MembersPage({ group, me, onLeft }: MembersPageProps) {
                         <Row justify="between" align="center" wrap="narrow">
                           <Row gap={2} align="center">
                             <Avatar name={m.user.username} picture={m.user.picture} />
-                            <Text as="span" variant="name">
-                              {m.user.username}
-                            </Text>
+                            <PersonName user={m.user} />
                             <Text as="span" variant="small">
                               {ROLE_WORD[m.role] && `${ROLE_WORD[m.role]} · `}
                               joined <Time at={m.joined_at} />

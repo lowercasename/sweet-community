@@ -17,6 +17,7 @@ import {
   Text,
   Time,
 } from '../ui'
+import { PersonName } from './PersonName'
 
 interface PeoplePageProps {
   me: User
@@ -126,9 +127,7 @@ export function PeoplePage({ me, root, onOpenGroup }: PeoplePageProps) {
                       <Row justify="between" align="center" wrap="narrow">
                         <Row gap={2} align="center">
                           <Avatar name={u.username} picture={u.picture} />
-                          <Text as="span" variant="name">
-                            {u.username}
-                          </Text>
+                          <PersonName user={u} />
                           <Text as="span" variant="small">
                             {ROLE_WORD[u.role] && `${ROLE_WORD[u.role]} · `}joined <Time at={u.joined_at} />
                           </Text>

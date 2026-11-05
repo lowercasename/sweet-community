@@ -13,6 +13,7 @@ import { FakeEventSource, ROOT, dm, group, member, post, renderWithQuery, user }
  * a DM is named by its people, and New room follows the root's flag.
  */
 vi.mock('../api', () => ({
+  getMe: vi.fn(() => Promise.resolve({ id: 'raphael', username: 'raphael', picture: null })),
   getPosts: vi.fn(),
   getMessages: vi.fn(() => Promise.resolve({ messages: [], next_before: null })),
   listUsers: vi.fn(),

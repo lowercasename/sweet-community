@@ -5,12 +5,13 @@ interface AvatarProps {
   name: string
   /** URL of their picture. Without one, they are a donut, as on old Sweet. */
   picture?: string | null
-  size?: 'sm' | 'md'
+  size?: 'sm' | 'md' | 'lg'
 }
 
 const SIZES: Record<NonNullable<AvatarProps['size']>, string> = {
   sm: 'h-6 w-6',
   md: 'h-8 w-8',
+  lg: 'h-14 w-14',
 }
 
 /** A round profile picture. The default is Sweet's donut, which matters. */
