@@ -90,7 +90,9 @@ test.describe('groups', () => {
     await kit.context.close()
   })
 
-  test('ownership is handed over explicitly; the owner cannot leave before; the last out deletes', async ({ browser }, testInfo) => {
+  test('ownership is handed over explicitly; the owner cannot leave before; the last out deletes', async ({
+    browser,
+  }, testInfo) => {
     const kit = await member(browser, testInfo, 'kit')
     const mo = await member(browser, testInfo, 'mo')
     await open(kit.page, '/groups/new')
@@ -134,7 +136,11 @@ test.describe('groups', () => {
     const mo = await member(browser, testInfo, 'mo')
     await open(kit.page, '/people')
     await open(mo.page)
-    await kit.page.getByRole('listitem').filter({ hasText: mo.username }).getByRole('button', { name: 'Message' }).click()
+    await kit.page
+      .getByRole('listitem')
+      .filter({ hasText: mo.username })
+      .getByRole('button', { name: 'Message' })
+      .click()
     await expect(kit.page).toHaveURL(/\/g\/[^/]+$/)
     await expect(kit.page.getByRole('heading', { name: mo.username })).toBeVisible()
     await expect(kit.page.locator('.editor-post')).toHaveCount(0)
@@ -144,10 +150,19 @@ test.describe('groups', () => {
     await nav(mo.page).getByRole('button', { name: 'Messages' }).click()
     await mo.page.getByRole('list').getByRole('button', { name: kit.username }).click()
     await expect(article(mo.page, text)).toBeVisible()
-    // The same two people open the same DM again.
+    // The same two people open the same DM again, and it is still named after mo, here and on Messages.
     await open(kit.page, '/people')
-    await kit.page.getByRole('listitem').filter({ hasText: mo.username }).getByRole('button', { name: 'Message' }).click()
+    await kit.page
+      .getByRole('listitem')
+      .filter({ hasText: mo.username })
+      .getByRole('button', { name: 'Message' })
+      .click()
     await expect(article(kit.page, text)).toBeVisible()
+    await expect(kit.page.getByRole('heading', { name: mo.username })).toBeVisible()
+    await expect(kit.page.getByRole('heading', { name: 'Just you' })).toHaveCount(0)
+    await nav(kit.page).getByRole('button', { name: 'Messages' }).click()
+    await expect(kit.page.getByRole('list').getByRole('button', { name: mo.username })).toBeVisible()
+    await expect(kit.page.getByRole('list').getByRole('button', { name: 'Just you' })).toHaveCount(0)
     await kit.context.close()
     await mo.context.close()
   })

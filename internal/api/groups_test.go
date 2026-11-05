@@ -197,6 +197,17 @@ func TestDMFindOrCreate(t *testing.T) {
 	if again["id"] != dm["id"] {
 		t.Fatalf("second dm with the same people is a new group: %v vs %v", again["id"], dm["id"])
 	}
+	// A DM is named by its people, so every reply that carries a DM carries them:
+	// the creation, the find, the fetch. (A reply without them once showed "Just you".)
+	for what, g := range map[string]map[string]any{
+		"created": dm,
+		"found":   again,
+		"fetched": kit.mustStatus(200, "GET", "/api/groups/"+dm["id"].(string), nil),
+	} {
+		if got := memberNames(g); got != "kit,mo" {
+			t.Fatalf("%s dm members: %q, want kit,mo", what, got)
+		}
+	}
 	kit.mustStatus(201, "POST", "/api/groups/"+dm["id"].(string)+"/messages", map[string]string{"body_html": "<p>psst</p>"})
 	if got := myGroups(mo)[dm["id"].(string)]; got == nil {
 		t.Fatal("mo does not see the dm")
@@ -209,17 +220,23 @@ func TestDMFindOrCreate(t *testing.T) {
 	if dm["role"] != "member" || groupCan(dm, "rename") || groupCan(dm, "set_roles") || !groupCan(dm, "leave") {
 		t.Fatalf("dm abilities: %v", dm)
 	}
-	// A DM is named by its people, so it carries them; a named group does not.
-	names := []string{}
-	for _, u := range myGroups(mo)[dm["id"].(string)]["members"].([]any) {
-		names = append(names, u.(map[string]any)["username"].(string))
-	}
-	if strings.Join(names, ",") != "kit,mo" {
-		t.Fatalf("dm members: %v", names)
+	// Listed, the same; a named group does not carry people.
+	if got := memberNames(myGroups(mo)[dm["id"].(string)]); got != "kit,mo" {
+		t.Fatalf("listed dm members: %q", got)
 	}
 	if _, ok := myGroups(kit)[perm.Root]["members"]; ok {
 		t.Fatal("a non-dm group carries members")
 	}
+}
+
+// memberNames is a DM's people as the wire names them, joined; "" when it carries none.
+func memberNames(g map[string]any) string {
+	members, _ := g["members"].([]any)
+	names := []string{}
+	for _, u := range members {
+		names = append(names, u.(map[string]any)["username"].(string))
+	}
+	return strings.Join(names, ",")
 }
 
 func TestImagesFollowVisibility(t *testing.T) {

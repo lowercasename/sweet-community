@@ -62,6 +62,19 @@ func (s *Server) withDMMembers(ctx context.Context, g Group) (Group, error) {
 	return g, nil
 }
 
+// wireGroup is a group as the viewer receives it, from a row: a DM carries
+// its people, every group carries the viewer's role and flags. Every reply
+// and every event that carries a group goes through here or through
+// createGroupWith, so there is one shape (a DM without its people once
+// read "Just you" on the Messages page).
+func (s *Server) wireGroup(ctx context.Context, a perm.Actor, g Group, st Settings) (Group, error) {
+	g, err := s.withDMMembers(ctx, g)
+	if err != nil {
+		return g, err
+	}
+	return groupFor(a, g, st), nil
+}
+
 // GroupCan is what the viewer may do to a group. CreateGroups is meaningful
 // on the root group only: it carries the instance's group_creation setting.
 type GroupCan struct {
@@ -165,8 +178,12 @@ func (s *Server) requireGroup(next http.HandlerFunc) http.HandlerFunc {
 			writeErr(w, http.StatusInternalServerError, err.Error())
 			return
 		}
-		g := Group{ID: row.ID, Kind: row.Kind, Name: row.Name, Mode: row.Mode, CreatedAt: row.CreatedAt, LastMessageAt: lastAt(row.LastMessageAt)}
-		next(w, r.WithContext(withGroup(r.Context(), groupFor(a, g, st), a)))
+		g, err := s.wireGroup(r.Context(), a, Group{ID: row.ID, Kind: row.Kind, Name: row.Name, Mode: row.Mode, CreatedAt: row.CreatedAt, LastMessageAt: lastAt(row.LastMessageAt)}, st)
+		if err != nil {
+			writeErr(w, http.StatusInternalServerError, err.Error())
+			return
+		}
+		next(w, r.WithContext(withGroup(r.Context(), g, a)))
 	})
 }
 
@@ -185,12 +202,12 @@ func (s *Server) listGroups(w http.ResponseWriter, r *http.Request) {
 	out := make([]Group, 0, len(rows))
 	for _, row := range rows {
 		a := perm.Actor{ID: me.ID, Role: row.Role}
-		g, err := s.withDMMembers(r.Context(), Group{ID: row.ID, Kind: row.Kind, Name: row.Name, Mode: row.Mode, CreatedAt: row.CreatedAt, LastMessageAt: lastAt(row.LastMessageAt)})
+		g, err := s.wireGroup(r.Context(), a, Group{ID: row.ID, Kind: row.Kind, Name: row.Name, Mode: row.Mode, CreatedAt: row.CreatedAt, LastMessageAt: lastAt(row.LastMessageAt)}, st)
 		if err != nil {
 			writeErr(w, http.StatusInternalServerError, err.Error())
 			return
 		}
-		out = append(out, groupFor(a, g, st))
+		out = append(out, g)
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"groups": out})
 }
@@ -264,7 +281,12 @@ func (s *Server) createGroup(w http.ResponseWriter, r *http.Request) {
 				writeErr(w, http.StatusInternalServerError, err.Error())
 				return
 			}
-			writeJSON(w, http.StatusOK, groupFor(perm.Actor{ID: me.ID, Role: perm.Member}, Group{ID: row.ID, Kind: row.Kind, Name: row.Name, Mode: row.Mode, CreatedAt: row.CreatedAt, LastMessageAt: lastAt(row.LastMessageAt)}, st))
+			g, err := s.wireGroup(r.Context(), perm.Actor{ID: me.ID, Role: perm.Member}, Group{ID: row.ID, Kind: row.Kind, Name: row.Name, Mode: row.Mode, CreatedAt: row.CreatedAt, LastMessageAt: lastAt(row.LastMessageAt)}, st)
+			if err != nil {
+				writeErr(w, http.StatusInternalServerError, err.Error())
+				return
+			}
+			writeJSON(w, http.StatusOK, g)
 			return
 		}
 		s.createGroupWith(w, r, perm.KindDM, "", perm.ModeChat, now, people)
@@ -316,7 +338,7 @@ func (s *Server) createGroupWith(w http.ResponseWriter, r *http.Request, kind, n
 		if err := qtx.CreateGroup(r.Context(), store.CreateGroupParams{ID: g.ID, Kind: g.Kind, Name: g.Name, Mode: g.Mode, CreatedAt: now}); err != nil {
 			return nil, nil, http.StatusInternalServerError, err
 		}
-		entries := []events.Entry{{Kind: "group", Payload: g}}
+		users := map[string]User{}
 		for uid, role := range people {
 			row, err := qtx.GetUser(r.Context(), uid)
 			if errors.Is(err, sql.ErrNoRows) {
@@ -328,8 +350,19 @@ func (s *Server) createGroupWith(w http.ResponseWriter, r *http.Request, kind, n
 			if err := qtx.CreateMembership(r.Context(), store.CreateMembershipParams{GroupID: g.ID, UserID: uid, Role: role, JoinedAt: now}); err != nil {
 				return nil, nil, http.StatusInternalServerError, err
 			}
-			u := User{ID: row.ID, Username: row.Username, Picture: pictureURL(row.PictureID)}
-			entries = append(entries, events.Entry{Kind: "membership", Payload: Membership{GroupID: g.ID, User: u, Role: role, JoinedAt: now}})
+			users[uid] = User{ID: row.ID, Username: row.Username, Picture: pictureURL(row.PictureID)}
+		}
+		// A DM is named by its people, so it carries them from its first reply (the same shape wireGroup gives).
+		if g.Kind == perm.KindDM {
+			g.Members = make([]User, 0, len(users))
+			for _, u := range users {
+				g.Members = append(g.Members, u)
+			}
+			sort.Slice(g.Members, func(i, j int) bool { return g.Members[i].Username < g.Members[j].Username })
+		}
+		entries := []events.Entry{{Kind: "group", Payload: g}}
+		for uid, role := range people {
+			entries = append(entries, events.Entry{Kind: "membership", Payload: Membership{GroupID: g.ID, User: users[uid], Role: role, JoinedAt: now}})
 		}
 		return entries, groupFor(perm.Actor{ID: me.ID, Role: people[me.ID]}, g, st), http.StatusCreated, nil
 	})
