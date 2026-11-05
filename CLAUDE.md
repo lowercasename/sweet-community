@@ -22,9 +22,9 @@ Every statement about what old Sweet had, did, or what happened on it is checked
 - Keep it simple. Prefer a library over handwritten code when a well-known one does the job; flag such cases. Buttons are primary, secondary or ghost. Tailwind classes only inside `web/src/ui`; everything else composes primitives (`pnpm check:atomic`).
 - Prettier: two spaces, single quotes, no semicolons (`.prettierrc`). Go is gofmt.
 
-## Never edit the tree Raphael is running
+## Work on main, directly
 
-Raphael's `pnpm dev` serves the main working tree with hot reload, so a file written there lands in his open tab the moment it is saved, half-finished. Twice on 2026-11-04 and 05 that produced ghost layouts (a members page over a still-visible group view; a duplicated settings card) that did not exist in any commit. All work happens in a git worktree (the EnterWorktree tool) and reaches the main tree only as a commit that has passed the checks below. If the worktree is unavailable, say so and ask before writing into the main tree.
+Raphael (2026-11-05): no worktrees, no branches; they are annoying. Work in the main tree on `main`. His `pnpm dev` hot-reloads that tree, so a half-finished edit can land in his open tab: keep a change's files written together in one go, run the checks before saying a thing is done, and when he reports something odd that no commit explains, reproduce it on a clean build before treating it as a bug.
 
 ## Checks before a commit
 
