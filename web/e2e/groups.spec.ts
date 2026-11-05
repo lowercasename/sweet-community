@@ -108,9 +108,17 @@ test.describe('groups', () => {
     await expect(kit.page.getByRole('button', { name: 'Leave group' })).toHaveCount(0)
     await moRow.getByRole('button', { name: 'Make moderator' }).click()
     await expect(moRow).toContainText('moderator')
+    // Three actions and the longer role text still share the name's line: the text shrinks before the row wraps.
+    const face = await moRow.getByRole('img').boundingBox()
+    const action = await moRow.getByRole('button', { name: 'Remove' }).boundingBox()
+    expect(face && action && action.y < face.y + face.height && action.y + action.height > face.y).toBeTruthy()
     await moRow.getByRole('button', { name: 'Make owner' }).click()
-    await confirm(kit.page, 'Hand over')
+    await confirm(kit.page, 'Switch ownership')
     await expect(moRow).toContainText('owner')
+    await expect(moRow).toContainText(/joined (just now|\d+m ago)/)
+    await expect(kit.page.getByRole('listitem').filter({ hasText: kit.username })).toContainText(
+      /joined (just now|\d+m ago)/,
+    )
     await expect(kit.page.getByRole('button', { name: 'Leave group' })).toBeVisible()
     await expect(kit.page.getByRole('heading', { name: 'Group settings' })).toHaveCount(0)
     // Mo, now owner, sees the settings and cannot leave.

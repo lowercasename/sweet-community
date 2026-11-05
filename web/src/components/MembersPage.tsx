@@ -158,7 +158,7 @@ export function MembersPage({ group, me, onLeft }: MembersPageProps) {
                     const self = m.user.id === me.id
                     return (
                       <ListItem key={m.user.id}>
-                        <Row justify="between" align="center">
+                        <Row justify="between" align="center" wrap="narrow">
                           <Row gap={2} align="center">
                             <Avatar name={m.user.username} picture={m.user.picture} />
                             <Text as="span" variant="name">
@@ -170,7 +170,7 @@ export function MembersPage({ group, me, onLeft }: MembersPageProps) {
                             </Text>
                           </Row>
                           {!self && m.role !== 'owner' && (
-                            <Row gap={1} align="center">
+                            <Row gap={1} align="center" shrink={false}>
                               {group.can.set_roles && (
                                 <Button
                                   variant="ghost"
@@ -228,7 +228,7 @@ export function MembersPage({ group, me, onLeft }: MembersPageProps) {
       <ConfirmDialog
         open={confirm?.kind === 'handover'}
         title={confirm?.kind === 'handover' ? `Make ${confirm.to.user.username} the owner?` : ''}
-        confirmLabel="Hand over"
+        confirmLabel="Switch ownership"
         busy={busy}
         onConfirm={() => confirm?.kind === 'handover' && void run(() => setRole(confirm.to.user.id, 'owner'))}
         onClose={() => setConfirm(null)}

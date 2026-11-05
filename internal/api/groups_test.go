@@ -51,6 +51,10 @@ func TestRootGroupAndRoles(t *testing.T) {
 	if m["role"] != "moderator" || m["user"].(map[string]any)["username"] != "kit" || m["group_id"] != perm.Root {
 		t.Fatalf("promoted: %v", m)
 	}
+	// A role change is the same membership with a new role: it keeps its joined time (a zero once read "1 Jan 1970").
+	if joined := memberJoined(owner, rootPath, kitID); m["joined_at"] != joined || joined == float64(0) {
+		t.Fatalf("promoted: joined_at %v, listed %v", m["joined_at"], joined)
+	}
 	events := kit.readEvents(30)
 	if e := events[len(events)-1]; e["kind"] != "membership" || e["payload"].(map[string]any)["role"] != "moderator" {
 		t.Fatalf("last event after promotion: %v", e)
@@ -229,6 +233,16 @@ func TestDMFindOrCreate(t *testing.T) {
 	}
 }
 
+// memberJoined is one member's joined time as the group's members list gives it.
+func memberJoined(c *client, groupPath, userID string) any {
+	for _, m := range c.mustStatus(200, "GET", groupPath+"/members", nil)["members"].([]any) {
+		if mm := m.(map[string]any); mm["user"].(map[string]any)["id"] == userID {
+			return mm["joined_at"]
+		}
+	}
+	return nil
+}
+
 // memberNames is a DM's people as the wire names them, joined; "" when it carries none.
 func memberNames(g map[string]any) string {
 	members, _ := g["members"].([]any)
@@ -349,7 +363,11 @@ func TestOwnershipNeverLapses(t *testing.T) {
 	if !groupCan(myGroups(kit)[gid], "transfer") || groupCan(myGroups(mo)[gid], "transfer") {
 		t.Fatal("transfer flag")
 	}
+	kitJoined, moJoined := memberJoined(kit, gp, kitID), memberJoined(kit, gp, moID)
 	m := kit.mustStatus(200, "PUT", gp+"/members/"+moID, map[string]string{"role": "owner"})
+	if m["joined_at"] != moJoined || memberJoined(kit, gp, kitID) != kitJoined || memberJoined(kit, gp, moID) != moJoined {
+		t.Fatalf("handover changed joined times: reply %v, kit %v→%v, mo %v→%v", m["joined_at"], kitJoined, memberJoined(kit, gp, kitID), moJoined, memberJoined(kit, gp, moID))
+	}
 	if m["role"] != "owner" {
 		t.Fatalf("handover: %v", m)
 	}

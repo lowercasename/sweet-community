@@ -1,7 +1,9 @@
 import { article, confirm, expect, member, open, owner, pick, test, uniq, writePost } from './helpers'
 
 test.describe('roles', () => {
-  test('the owner promotes a member from People; a moderator deletes anything and edits nothing of others', async ({ browser }, testInfo) => {
+  test('the owner promotes a member from People; a moderator deletes anything and edits nothing of others', async ({
+    browser,
+  }, testInfo) => {
     const o = await owner(browser, testInfo)
     const kit = await member(browser, testInfo, 'kit')
     const mo = await member(browser, testInfo, 'mo')
@@ -18,6 +20,12 @@ test.describe('roles', () => {
     await row.getByRole('button', { name: 'Make moderator' }).click()
     await expect(row).toContainText('moderator')
     await expect(row.getByRole('button', { name: 'Make member' })).toBeVisible()
+    // The membership keeps its joined time, and the actions stay on the name's line at this width.
+    await expect(row).toContainText(/joined (just now|\d+m ago)/)
+    await expect(row).not.toContainText('1970')
+    const face = await row.getByRole('img').boundingBox()
+    const action = await row.getByRole('button', { name: 'Make member' }).boundingBox()
+    expect(face && action && action.y < face.y + face.height && action.y + action.height > face.y).toBeTruthy()
 
     // Kit's open page learns of the new role: the menu appears, with Delete and without Edit.
     await article(kit.page, text).getByRole('button', { name: 'Post options' }).click()

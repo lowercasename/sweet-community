@@ -7,7 +7,7 @@ SELECT g.id, g.kind, g.name, g.mode, g.created_at,
 FROM groups g WHERE g.id = sqlc.arg(id) AND g.deleted_at IS NULL;
 
 -- name: GetMembership :one
-SELECT role FROM memberships WHERE group_id = sqlc.arg(group_id) AND user_id = sqlc.arg(user_id);
+SELECT role, joined_at FROM memberships WHERE group_id = sqlc.arg(group_id) AND user_id = sqlc.arg(user_id);
 
 -- name: ListMyGroups :many
 SELECT g.id, g.kind, g.name, g.mode, g.created_at, m.role,

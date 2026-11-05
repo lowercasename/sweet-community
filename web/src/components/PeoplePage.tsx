@@ -123,7 +123,7 @@ export function PeoplePage({ me, root, onOpenGroup }: PeoplePageProps) {
                 <List>
                   {[...(users?.values() ?? [])].map((u) => (
                     <ListItem key={u.id}>
-                      <Row justify="between" align="center">
+                      <Row justify="between" align="center" wrap="narrow">
                         <Row gap={2} align="center">
                           <Avatar name={u.username} picture={u.picture} />
                           <Text as="span" variant="name">
@@ -133,7 +133,7 @@ export function PeoplePage({ me, root, onOpenGroup }: PeoplePageProps) {
                             {ROLE_WORD[u.role] && `${ROLE_WORD[u.role]} · `}joined <Time at={u.joined_at} />
                           </Text>
                         </Row>
-                        <Row gap={1} align="center">
+                        <Row gap={1} align="center" shrink={false}>
                           {u.id !== me.id && (
                             <Button variant="ghost" icon="chat" onClick={() => void message(u)}>
                               Message

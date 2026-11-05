@@ -244,7 +244,7 @@ One in-app notification table that every channel reads from.
 
 ## Admin tools at launch
 
-Roles: owner, moderator, member, as memberships of the root group (see Groups: the same three roles exist in every group). One owner: the person who runs this place. The owner sets anyone to member or moderator from the People page; a moderator can delete anything and edit nothing of others', exactly as the owner can, and can create and revoke invites (invites add people to the root group), but cannot change roles. Handing over ownership is an explicit action of the owner's, on the root group as on any other; the former owner becomes a moderator. A role change is a `membership` event, so every open page's controls follow it.
+Roles: owner, moderator, member, as memberships of the root group (see Groups: the same three roles exist in every group). One owner: the person who runs this place. The owner sets anyone to member or moderator from the People page; a moderator can delete anything and edit nothing of others', exactly as the owner can, and can create and revoke invites (invites add people to the root group), but cannot change roles. Handing over ownership is an explicit action of the owner's, on the root group as on any other; the former owner becomes a moderator. A role change is a `membership` event carrying the whole membership, joined time included (a reply that dropped it once read "joined 1 Jan 1970"), so every open page's controls follow it.
 
 Minimum shipped:
 

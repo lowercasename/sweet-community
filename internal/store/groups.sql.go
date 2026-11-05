@@ -129,7 +129,7 @@ func (q *Queries) GetGroup(ctx context.Context, id string) (GetGroupRow, error) 
 }
 
 const getMembership = `-- name: GetMembership :one
-SELECT role FROM memberships WHERE group_id = ?1 AND user_id = ?2
+SELECT role, joined_at FROM memberships WHERE group_id = ?1 AND user_id = ?2
 `
 
 type GetMembershipParams struct {
@@ -137,11 +137,16 @@ type GetMembershipParams struct {
 	UserID  string
 }
 
-func (q *Queries) GetMembership(ctx context.Context, arg GetMembershipParams) (string, error) {
+type GetMembershipRow struct {
+	Role     string
+	JoinedAt int64
+}
+
+func (q *Queries) GetMembership(ctx context.Context, arg GetMembershipParams) (GetMembershipRow, error) {
 	row := q.db.QueryRowContext(ctx, getMembership, arg.GroupID, arg.UserID)
-	var role string
-	err := row.Scan(&role)
-	return role, err
+	var i GetMembershipRow
+	err := row.Scan(&i.Role, &i.JoinedAt)
+	return i, err
 }
 
 const listMembers = `-- name: ListMembers :many

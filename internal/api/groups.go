@@ -138,14 +138,14 @@ func groupFor(a perm.Actor, g Group, st Settings) Group {
 // actorIn is the user as perm sees them in one group: their role there, or
 // none. Not being a member is not an error; it is an answer.
 func actorIn(ctx context.Context, q *store.Queries, u User, groupID string) (perm.Actor, error) {
-	role, err := q.GetMembership(ctx, store.GetMembershipParams{GroupID: groupID, UserID: u.ID})
+	row, err := q.GetMembership(ctx, store.GetMembershipParams{GroupID: groupID, UserID: u.ID})
 	if errors.Is(err, sql.ErrNoRows) {
 		return perm.Actor{ID: u.ID}, nil
 	}
 	if err != nil {
 		return perm.Actor{}, err
 	}
-	return perm.Actor{ID: u.ID, Role: role}, nil
+	return perm.Actor{ID: u.ID, Role: row.Role}, nil
 }
 
 // requireGroup is requireAuth plus membership of the group in the path. A
@@ -510,10 +510,19 @@ func (s *Server) setMemberRole(w http.ResponseWriter, r *http.Request) {
 			return nil, nil, http.StatusNotFound, errors.New("not a member")
 		}
 		u := User{ID: row.ID, Username: row.Username, Picture: pictureURL(row.PictureID)}
+		// A role change is the same membership with a new role: it keeps its joined time.
+		theirs, err := qtx.GetMembership(r.Context(), store.GetMembershipParams{GroupID: g.ID, UserID: uid})
+		if err != nil {
+			return nil, nil, http.StatusInternalServerError, err
+		}
 		if in.Role == perm.Owner {
 			// Handing over: the target becomes owner, the owner a moderator. Two memberships change.
 			if !perm.Transfer(a, target) {
 				return nil, nil, http.StatusForbidden, errors.New("not allowed")
+			}
+			mine, err := qtx.GetMembership(r.Context(), store.GetMembershipParams{GroupID: g.ID, UserID: me.ID})
+			if err != nil {
+				return nil, nil, http.StatusInternalServerError, err
 			}
 			if err := qtx.SetMembershipRole(r.Context(), store.SetMembershipRoleParams{Role: perm.Owner, GroupID: g.ID, UserID: uid}); err != nil {
 				return nil, nil, http.StatusInternalServerError, err
@@ -521,9 +530,9 @@ func (s *Server) setMemberRole(w http.ResponseWriter, r *http.Request) {
 			if err := qtx.SetMembershipRole(r.Context(), store.SetMembershipRoleParams{Role: perm.Moderator, GroupID: g.ID, UserID: me.ID}); err != nil {
 				return nil, nil, http.StatusInternalServerError, err
 			}
-			theirs := Membership{GroupID: g.ID, User: u, Role: perm.Owner}
-			mine := Membership{GroupID: g.ID, User: me, Role: perm.Moderator}
-			return []events.Entry{{Kind: "membership", Payload: theirs}, {Kind: "membership", Payload: mine}}, theirs, http.StatusOK, nil
+			newOwner := Membership{GroupID: g.ID, User: u, Role: perm.Owner, JoinedAt: theirs.JoinedAt}
+			oldOwner := Membership{GroupID: g.ID, User: me, Role: perm.Moderator, JoinedAt: mine.JoinedAt}
+			return []events.Entry{{Kind: "membership", Payload: newOwner}, {Kind: "membership", Payload: oldOwner}}, newOwner, http.StatusOK, nil
 		}
 		if !perm.SetRole(a, target, in.Role) {
 			return nil, nil, http.StatusForbidden, errors.New("not allowed")
@@ -531,7 +540,7 @@ func (s *Server) setMemberRole(w http.ResponseWriter, r *http.Request) {
 		if err := qtx.SetMembershipRole(r.Context(), store.SetMembershipRoleParams{Role: in.Role, GroupID: g.ID, UserID: uid}); err != nil {
 			return nil, nil, http.StatusInternalServerError, err
 		}
-		m := Membership{GroupID: g.ID, User: u, Role: in.Role}
+		m := Membership{GroupID: g.ID, User: u, Role: in.Role, JoinedAt: theirs.JoinedAt}
 		return []events.Entry{{Kind: "membership", Payload: m}}, m, http.StatusOK, nil
 	})
 }

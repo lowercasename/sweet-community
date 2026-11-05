@@ -15,13 +15,32 @@ interface RowProps {
   align?: 'baseline' | 'center' | 'start'
   /** A bar across the top of a pane: padded, with a hairline under it. */
   pad?: boolean
+  /**
+   * `always`: wrap whenever the children's natural widths overflow (flex
+   * wraps before it shrinks). `narrow`: stay on one line and let the
+   * children shrink while the nearest container (a ListItem) is at least
+   * 36rem wide; wrap below that. For a list row with actions on the right.
+   */
+  wrap?: 'always' | 'narrow'
+  /** Never shrink: an actions cluster keeps its buttons whole. */
+  shrink?: boolean
   children?: ReactNode
 }
 
 /** Horizontal flex row. Wraps at narrow widths. */
-export function Row({ gap = 2, justify = 'start', align = 'baseline', pad = false, children }: RowProps) {
+export function Row({
+  gap = 2,
+  justify = 'start',
+  align = 'baseline',
+  pad = false,
+  wrap = 'always',
+  shrink = true,
+  children,
+}: RowProps) {
   const cls = [
-    'flex min-w-0 flex-row flex-wrap',
+    'flex min-w-0 flex-row',
+    wrap === 'narrow' ? 'flex-wrap @xl:flex-nowrap' : 'flex-wrap',
+    shrink ? '' : 'flex-none',
     GAPS[gap],
     justify === 'between' ? 'justify-between' : 'justify-start',
     align === 'center' ? 'items-center' : align === 'start' ? 'items-start' : 'items-baseline',

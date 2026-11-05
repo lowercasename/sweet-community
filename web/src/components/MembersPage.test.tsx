@@ -79,7 +79,7 @@ describe('MembersPage', () => {
     fireEvent.click(within(rowOf('mo')).getByRole('button', { name: 'Make owner' }))
     expect(setMemberRole).not.toHaveBeenCalledWith('club', 'mo', 'owner')
     const dialog = screen.getByRole('dialog', { hidden: true })
-    fireEvent.click(within(dialog).getByRole('button', { name: 'Hand over' }))
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Switch ownership' }))
     expect(setMemberRole).toHaveBeenCalledWith('club', 'mo', 'owner')
   })
 
