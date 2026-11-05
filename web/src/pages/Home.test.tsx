@@ -132,21 +132,26 @@ describe('Home', () => {
     // Chat only: no divider, no posts editor; the group's name and its Members control are shown.
     expect(screen.queryByRole('separator')).toBeNull()
     expect(screen.getByRole('heading', { name: 'Knitting' })).toBeTruthy()
-    expect(screen.getByRole('button', { name: 'Members' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Members and settings' })).toBeTruthy()
     expect(container.querySelectorAll('.ProseMirror').length).toBe(1)
     // Members shows alone: the group's view is still mounted but out of sight.
-    fireEvent.click(screen.getByRole('button', { name: 'Members' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Members and settings' }))
     await screen.findByRole('heading', { name: 'Members' })
     expect(window.location.pathname).toBe('/g/knit/members')
     expect(container.querySelector('.ProseMirror')!.closest('.hidden')).not.toBeNull()
-    expect(screen.queryByRole('heading', { name: 'Knitting' })!.closest('.hidden')).not.toBeNull()
+    // The group's bar stays, with its name and a way back; Members is no longer offered there.
+    expect(screen.getByRole('heading', { name: 'Knitting' }).closest('.hidden')).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Members and settings' })).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: 'Back to Knitting' }))
+    expect(window.location.pathname).toBe('/g/knit')
+    expect(container.querySelector('.ProseMirror')!.closest('.hidden')).toBeNull()
   })
 
   it('opens whatever page the URL names, and the back button returns', async () => {
     const { getMessages } = await import('../api')
     await home('/g/knit/members')
     await screen.findByRole('heading', { name: 'Members' })
-    expect(screen.getByRole('heading', { name: 'Knitting' }).closest('.hidden')).not.toBeNull()
+    expect(screen.getByRole('heading', { name: 'Knitting' }).closest('.hidden')).toBeNull()
     // The group named by the URL is the one mounted behind the page.
     await vi.waitFor(() => expect(getMessages).toHaveBeenCalledWith('knit', null))
     expect(getMessages).not.toHaveBeenCalledWith(ROOT, null)

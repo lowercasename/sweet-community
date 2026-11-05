@@ -4,6 +4,7 @@ import type { User } from '../api'
 import { useGroups } from '../data/hooks'
 import { StreamProvider } from '../hooks/StreamContext'
 import { useLayout } from '../hooks/useLayout'
+import { GroupBar } from '../components/GroupBar'
 import { GroupView } from '../components/GroupView'
 import { MembersPage } from '../components/MembersPage'
 import { MenuPage } from '../components/MenuPage'
@@ -69,6 +70,14 @@ export function Home({ me, onSignOut }: HomeProps) {
           )
         }
       >
+        {current && current.kind !== 'root' && (viewing || atMembers) && (
+          <GroupBar
+            group={current}
+            me={me}
+            onBack={atMembers ? () => navigate(groupPath(current.id, root?.id)) : undefined}
+            onMembers={viewing ? () => navigate(`/g/${encodeURIComponent(current.id)}/members`) : undefined}
+          />
+        )}
         <Switch>
           <Route path="/people">
             {root && <PeoplePage me={me} root={root} onOpenGroup={(id) => navigate(groupPath(id, root.id))} />}
@@ -91,15 +100,7 @@ export function Home({ me, onSignOut }: HomeProps) {
             <Redirect to="/" replace />
           </Route>
         </Switch>
-        {current && (
-          <GroupView
-            key={current.id}
-            group={current}
-            me={me}
-            hidden={!viewing}
-            onMembers={() => navigate(`/g/${encodeURIComponent(current.id)}/members`)}
-          />
-        )}
+        {current && <GroupView key={current.id} group={current} hidden={!viewing} />}
         {narrow && (
           <TabBar
             tabs={[

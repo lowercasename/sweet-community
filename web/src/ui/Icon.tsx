@@ -1,4 +1,5 @@
 import {
+  ArrowLeft,
   Bell,
   Bold,
   ChevronsLeft,
@@ -49,6 +50,7 @@ export type IconName =
   | 'more'
   | 'trash'
   | 'plus'
+  | 'back'
 
 const ICONS: Record<IconName, LucideIcon> = {
   bold: Bold,
@@ -74,6 +76,7 @@ const ICONS: Record<IconName, LucideIcon> = {
   more: EllipsisVertical,
   trash: Trash2,
   plus: Plus,
+  back: ArrowLeft,
 }
 
 interface IconProps {

@@ -1,15 +1,13 @@
 import type { Group, User } from '../api'
 import { useLayout } from '../hooks/useLayout'
-import { Button, Heading, Rail, Row, Split, Stack } from '../ui'
+import { Rail, Split, Stack } from '../ui'
 import { ChatPane } from './ChatPane'
 import { PostsPane } from './PostsPane'
 
 interface GroupViewProps {
   group: Group
-  me: User
   /** Hidden behind another page, but kept mounted so drafts survive. */
   hidden: boolean
-  onMembers: () => void
 }
 
 /** What to call a group in the nav and at the top of its view: a DM is its other people. */
@@ -22,10 +20,9 @@ export function groupLabel(g: Group, me: User): string {
 /**
  * A group's panes: posts and chat side by side when its mode is both, drawn
  * exactly as the root group is; one pane across the whole width otherwise.
- * The root group has no bar; every other group shows its name and a way to
- * its members.
+ * The bar above them (GroupBar) is Home's, since it outlives the view.
  */
-export function GroupView({ group, me, hidden, onMembers }: GroupViewProps) {
+export function GroupView({ group, hidden }: GroupViewProps) {
   const { layout, narrow, ratio, setLayout, setRatio } = useLayout()
   const both = group.mode === 'both'
   const show = layout === 'both' ? 'both' : layout === 'posts' ? 'left' : 'right'
@@ -33,14 +30,6 @@ export function GroupView({ group, me, hidden, onMembers }: GroupViewProps) {
 
   return (
     <Stack gap={0} fill hidden={hidden}>
-      {group.kind !== 'root' && (
-        <Row justify="between" align="center" pad>
-          <Heading level={2}>{groupLabel(group, me)}</Heading>
-          <Button variant="ghost" icon="people" onClick={onMembers}>
-            Members and settings
-          </Button>
-        </Row>
-      )}
       {both ? (
         <Split
           show={show}

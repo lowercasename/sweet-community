@@ -36,16 +36,24 @@ test.describe('groups', () => {
     await expect(article(o.page, post)).toHaveCount(0)
 
     // Add mo: it appears in mo's nav at once; mo sees the post.
-    await kit.page.getByRole('button', { name: 'Members' }).click()
+    await kit.page.getByRole('button', { name: 'Members and settings' }).click()
     await expect(kit.page).toHaveURL(/\/members$/)
+    // The group's bar stays, with the way back.
+    await expect(kit.page.getByRole('heading', { name })).toBeVisible()
+    await expect(kit.page.getByRole('button', { name: `Back to ${name}` })).toBeVisible()
     await kit.page.getByLabel('Add someone').selectOption({ label: mo.username })
     await kit.page.getByRole('button', { name: 'Add', exact: true }).click()
     await expect(kit.page.getByRole('list').getByText(mo.username)).toBeVisible()
     await nav(mo.page).getByRole('button', { name }).click()
     await expect(article(mo.page, post)).toBeVisible()
 
+    // Back from Members to the view, then Members again.
+    await mo.page.getByRole('button', { name: 'Members and settings' }).click()
+    await mo.page.getByRole('button', { name: `Back to ${name}` }).click()
+    await expect(mo.page).toHaveURL(/\/g\/[^/]+$/)
+    await expect(article(mo.page, post)).toBeVisible()
     // Mo leaves; it is gone from mo's nav and mo is off the list.
-    await mo.page.getByRole('button', { name: 'Members' }).click()
+    await mo.page.getByRole('button', { name: 'Members and settings' }).click()
     await mo.page.getByRole('button', { name: 'Leave group' }).click()
     await confirm(mo.page, 'Leave')
     await expect(mo.page).toHaveURL(/\/$/)
@@ -62,7 +70,7 @@ test.describe('groups', () => {
     const name = uniq('Test Group ')
     await kit.page.getByLabel('Name').fill(name)
     await kit.page.getByRole('button', { name: 'Create group' }).click()
-    await kit.page.getByRole('button', { name: 'Members' }).click()
+    await kit.page.getByRole('button', { name: 'Members and settings' }).click()
     await expect(kit.page.getByRole('heading', { name: 'Group settings' })).toHaveCount(1)
 
     await kit.page.getByLabel('Name').fill(name + ' renamed')
@@ -89,7 +97,7 @@ test.describe('groups', () => {
     const name = uniq('Handover ')
     await kit.page.getByLabel('Name').fill(name)
     await kit.page.getByRole('button', { name: 'Create group' }).click()
-    await kit.page.getByRole('button', { name: 'Members' }).click()
+    await kit.page.getByRole('button', { name: 'Members and settings' }).click()
     await kit.page.getByLabel('Add someone').selectOption({ label: mo.username })
     await kit.page.getByRole('button', { name: 'Add', exact: true }).click()
     const moRow = kit.page.getByRole('listitem').filter({ hasText: mo.username })
@@ -106,7 +114,7 @@ test.describe('groups', () => {
     // Mo, now owner, sees the settings and cannot leave.
     await open(mo.page)
     await nav(mo.page).getByRole('button', { name }).click()
-    await mo.page.getByRole('button', { name: 'Members' }).click()
+    await mo.page.getByRole('button', { name: 'Members and settings' }).click()
     await expect(mo.page.getByRole('heading', { name: 'Group settings' })).toBeVisible()
     await expect(mo.page.getByRole('button', { name: 'Leave group' })).toHaveCount(0)
     // Kit leaves; mo deletes; it is gone for mo.
