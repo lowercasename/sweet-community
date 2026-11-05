@@ -84,11 +84,11 @@ describe('Home', () => {
     fireEvent.keyDown(screen.getByRole('separator'), { key: 'End' })
     expect(screen.queryByRole('separator')).toBeNull()
     expect(editors()).toBe(2)
-    fireEvent.click(screen.getByTitle('Show chat'))
+    fireEvent.click(screen.getByRole('button', { name: 'Show chat' }))
     expect(screen.getByRole('separator')).toBeTruthy()
 
     fireEvent.keyDown(screen.getByRole('separator'), { key: 'Home' })
-    fireEvent.click(screen.getByTitle('Show posts'))
+    fireEvent.click(screen.getByRole('button', { name: 'Show posts' }))
 
     fireEvent.click(nav().getByRole('button', { name: 'Settings' }))
     await screen.findByText('Profile picture')

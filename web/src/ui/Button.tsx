@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react'
 import { Icon, type IconName } from './Icon'
+import { useTooltip } from './Tooltip'
 
 interface ButtonProps {
   /** `primary` is filled pink; `secondary` is outlined; `ghost` is bare text or an icon. */
@@ -54,21 +55,28 @@ export function Button({
   const iconOnly = icon !== undefined && children === undefined && !count
   // No words of its own: the label is its name, whether or not a count shows.
   const wordless = children === undefined && label !== undefined
+  // A wordless button says its name in a tooltip.
+  const tip = useTooltip(label ?? '', wordless)
   return (
-    <button
-      className={buttonClass(variant, iconOnly)}
-      type={type}
-      disabled={disabled}
-      aria-pressed={pressed === undefined ? undefined : pressed}
-      aria-current={current ? 'page' : undefined}
-      aria-label={wordless ? label : undefined}
-      title={label}
-      onMouseDown={pressed === undefined ? undefined : (e) => e.preventDefault()} // toggles keep editor focus
-      onClick={onClick}
-    >
-      {icon && <Icon name={icon} />}
-      {count ? <span className="text-sm">{count}</span> : null}
-      {children}
-    </button>
+    <>
+      <button
+        ref={tip.ref}
+        className={buttonClass(variant, iconOnly)}
+        type={type}
+        disabled={disabled}
+        aria-pressed={pressed === undefined ? undefined : pressed}
+        aria-current={current ? 'page' : undefined}
+        aria-label={wordless ? label : undefined}
+        {...tip.props({
+          onMouseDown: pressed === undefined ? undefined : (e) => e.preventDefault(), // toggles keep editor focus
+          onClick,
+        })}
+      >
+        {icon && <Icon name={icon} />}
+        {count ? <span className="text-sm">{count}</span> : null}
+        {children}
+      </button>
+      {tip.tooltip}
+    </>
   )
 }

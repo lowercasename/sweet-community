@@ -1,7 +1,7 @@
 import donut from '../assets/donut.svg'
 
 interface AvatarProps {
-  /** The person's name, for assistive tech and the tooltip. */
+  /** The person's name, for assistive tech; the control around the picture names it to the eye. */
   name: string
   /** URL of their picture. Without one, they are a donut, as on old Sweet. */
   picture?: string | null
@@ -21,7 +21,6 @@ export function Avatar({ name, picture, size = 'md' }: AvatarProps) {
       className={`${SIZES[size]} flex-none rounded-full object-cover select-none`}
       src={picture || donut}
       alt={name}
-      title={name}
       draggable={false}
     />
   )

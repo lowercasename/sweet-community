@@ -15,8 +15,8 @@ export function Rail({ side, icon, label, onOpen }: RailProps) {
     <button
       type="button"
       className={`flex w-10 cursor-pointer flex-col items-center gap-3 ${border} border-line bg-card pt-4 text-mute transition-colors hover:bg-field hover:text-sweet focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-pink`}
+      aria-label={`Show ${label.toLowerCase()}`}
       onClick={onOpen}
-      title={`Show ${label.toLowerCase()}`}
     >
       <Icon name={icon} size={20} />
       <span className="text-sm font-medium [writing-mode:vertical-rl]">{label}</span>

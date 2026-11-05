@@ -10,10 +10,12 @@ import {
   useFloating,
   useInteractions,
   useListNavigation,
+  useMergeRefs,
   useRole,
 } from '@floating-ui/react'
 import { buttonClass } from './Button'
 import { Icon, type IconName } from './Icon'
+import { useTooltip } from './Tooltip'
 
 export interface MenuItem {
   label: string
@@ -54,19 +56,21 @@ export function Menu({ label, icon = 'more', items }: MenuProps) {
   const role = useRole(context, { role: 'menu' })
   const listNav = useListNavigation(context, { listRef, activeIndex, onNavigate: setActiveIndex, loop: true })
   const { getReferenceProps, getFloatingProps, getItemProps } = useInteractions([click, dismiss, role, listNav])
+  const tip = useTooltip(label, !open)
+  const triggerRef = useMergeRefs([refs.setReference, tip.ref])
 
   return (
     <>
       <button
-        ref={refs.setReference}
+        ref={triggerRef}
         type="button"
         className={buttonClass('ghost', true)}
         aria-label={label}
-        title={label}
-        {...getReferenceProps()}
+        {...getReferenceProps(tip.props())}
       >
         <Icon name={icon} />
       </button>
+      {tip.tooltip}
       {open && (
         <>
           <FloatingFocusManager context={context} modal={false} initialFocus={-1}>

@@ -82,6 +82,13 @@ test.describe('nav', () => {
     await expect(kit.page.getByRole('heading', { name: mo.username })).toBeVisible()
     await expect(conversations.getByRole('button', { name: mo.username })).toHaveAttribute('aria-current', 'page')
 
+    // Collapsed, a name hidden behind its mark is a tooltip, not the browser's title.
+    await nav(kit).getByRole('button', { name: 'Collapse' }).click()
+    const tile = nav(kit).getByRole('button', { name })
+    await expect(tile).not.toHaveAttribute('title')
+    await tile.hover()
+    await expect(kit.page.getByRole('tooltip')).toHaveText(name)
+
     await kit.context.close()
     await mo.context.close()
     await jo.context.close()

@@ -14,15 +14,15 @@ test.describe('layout', () => {
     // Close chat from the divider; the posts editor keeps its text; reopen from the rail.
     await kit.page.getByRole('separator', { name: 'Resize panes' }).focus()
     await kit.page.keyboard.press('End')
-    await expect(kit.page.getByTitle('Show chat')).toBeVisible()
+    await expect(kit.page.getByRole('button', { name: 'Show chat' })).toBeVisible()
     await expect(kit.page.locator('.editor-post .ProseMirror').first()).toHaveText(draft)
-    await kit.page.getByTitle('Show chat').click()
+    await kit.page.getByRole('button', { name: 'Show chat' }).click()
     await expect(kit.page.locator('.editor-line .ProseMirror').first()).toHaveText(chatDraft)
 
     // Close posts, reopen.
     await kit.page.getByRole('separator', { name: 'Resize panes' }).focus()
     await kit.page.keyboard.press('Home')
-    await kit.page.getByTitle('Show posts').click()
+    await kit.page.getByRole('button', { name: 'Show posts' }).click()
     await expect(kit.page.locator('.editor-post .ProseMirror').first()).toHaveText(draft)
 
     // Settings and back, by the nav and by the back button.
