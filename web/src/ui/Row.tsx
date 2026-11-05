@@ -20,8 +20,10 @@ interface RowProps {
    * wraps before it shrinks). `narrow`: stay on one line and let the
    * children shrink while the nearest container (a ListItem) is at least
    * 36rem wide; wrap below that. For a list row with actions on the right.
+   * `never`: one line always; a child that may shrink (HtmlContent fill)
+   * takes what is left. For a message body with its menu beside it.
    */
-  wrap?: 'always' | 'narrow'
+  wrap?: 'always' | 'narrow' | 'never'
   /** Never shrink: an actions cluster keeps its buttons whole. */
   shrink?: boolean
   children?: ReactNode
@@ -39,7 +41,7 @@ export function Row({
 }: RowProps) {
   const cls = [
     'flex min-w-0 flex-row',
-    wrap === 'narrow' ? 'flex-wrap @xl:flex-nowrap' : 'flex-wrap',
+    wrap === 'narrow' ? 'flex-wrap @xl:flex-nowrap' : wrap === 'never' ? 'flex-nowrap' : 'flex-wrap',
     shrink ? '' : 'flex-none',
     GAPS[gap],
     justify === 'between' ? 'justify-between' : 'justify-start',

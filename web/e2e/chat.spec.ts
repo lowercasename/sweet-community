@@ -1,4 +1,4 @@
-import { article, confirm, expect, member, open, pick, sendMessage, test, uniq } from './helpers'
+import { article, confirm, expect, member, open, pick, png, sendMessage, test, uniq } from './helpers'
 
 test.describe('chat', () => {
   test('a message reaches the other person live, and its author can delete it', async ({ browser }, testInfo) => {
@@ -34,6 +34,24 @@ test.describe('chat', () => {
     await expect(article(kit.page, a)).toHaveCount(0)
     await kit.page.keyboard.press('Enter')
     await expect(article(kit.page, a)).toContainText('line two')
+    await kit.context.close()
+  })
+
+  test('a picture in chat keeps its menu beside it, not under it', async ({ browser }, testInfo) => {
+    const kit = await member(browser, testInfo)
+    await open(kit.page)
+    const text = uniq('look at this ')
+    const chat = kit.page.locator('form', { has: kit.page.locator('.editor-line') })
+    await chat
+      .locator('input[type=file]')
+      .setInputFiles({ name: 'wide.png', mimeType: 'image/png', buffer: png(1200, 300) })
+    await expect(chat.locator('textarea')).toHaveCount(1)
+    await sendMessage(kit.page, text)
+    const msg = article(kit.page, text)
+    const img = await msg.locator('.content img').boundingBox()
+    const menu = await msg.getByRole('button', { name: 'Message options' }).boundingBox()
+    // The picture fills the line to the menu's left; the menu sits beside its top, never below it.
+    expect(img && menu && menu.x >= img.x + img.width && menu.y < img.y + img.height).toBeTruthy()
     await kit.context.close()
   })
 })

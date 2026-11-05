@@ -41,8 +41,8 @@ export function MessageGroup({ messages, onDelete }: MessageGroupProps) {
           </Text>
         </Row>
         {messages.map((m) => (
-          <Row key={m.id} justify="between" align="start">
-            <HtmlContent html={m.body_html} />
+          <Row key={m.id} justify="between" align="start" wrap="never">
+            <HtmlContent html={m.body_html} fill />
             {m.can.delete && (
               <Menu
                 label="Message options"
