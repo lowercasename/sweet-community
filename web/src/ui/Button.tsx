@@ -49,13 +49,15 @@ export function Button({
   children,
 }: ButtonProps) {
   const iconOnly = icon !== undefined && children === undefined && !count
+  // No words of its own: the label is its name, whether or not a count shows.
+  const wordless = children === undefined && label !== undefined
   return (
     <button
       className={buttonClass(variant, iconOnly)}
       type={type}
       disabled={disabled}
       aria-pressed={pressed === undefined ? undefined : pressed}
-      aria-label={iconOnly ? label : undefined}
+      aria-label={wordless ? label : undefined}
       title={label}
       onMouseDown={pressed === undefined ? undefined : (e) => e.preventDefault()} // toggles keep editor focus
       onClick={onClick}

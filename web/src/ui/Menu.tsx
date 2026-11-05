@@ -1,7 +1,6 @@
 import { useRef, useState } from 'react'
 import {
   FloatingFocusManager,
-  FloatingPortal,
   autoUpdate,
   flip,
   offset,
@@ -31,8 +30,12 @@ interface MenuProps {
 
 /**
  * A three-dot menu: a ghost icon button that opens a short list of actions.
- * Floating UI positions it, keeps it on screen, closes it on Escape or an
- * outside click, and moves through the items with the arrow keys.
+ * Floating UI positions it, keeps it inside the pane it is in (flipping up
+ * near the bottom), closes it on Escape or an outside click, and moves
+ * through the items with the arrow keys. It is rendered where its button
+ * is, not portalled to the body, so it scrolls with the button and is
+ * clipped by the pane's edge; it never needs to close on scroll, which once
+ * shut it one frame after it opened.
  */
 export function Menu({ label, icon = 'more', items }: MenuProps) {
   const [open, setOpen] = useState(false)
@@ -47,9 +50,7 @@ export function Menu({ label, icon = 'more', items }: MenuProps) {
     whileElementsMounted: autoUpdate,
   })
   const click = useClick(context)
-  // The menu is portalled to the body, so a scrolling pane would carry it over
-  // its own edge; closing on scroll is what menus do.
-  const dismiss = useDismiss(context, { ancestorScroll: true })
+  const dismiss = useDismiss(context)
   const role = useRole(context, { role: 'menu' })
   const listNav = useListNavigation(context, { listRef, activeIndex, onNavigate: setActiveIndex, loop: true })
   const { getReferenceProps, getFloatingProps, getItemProps } = useInteractions([click, dismiss, role, listNav])
@@ -67,7 +68,7 @@ export function Menu({ label, icon = 'more', items }: MenuProps) {
         <Icon name={icon} />
       </button>
       {open && (
-        <FloatingPortal>
+        <>
           <FloatingFocusManager context={context} modal={false} initialFocus={-1}>
             <div
               ref={refs.setFloating}
@@ -98,7 +99,7 @@ export function Menu({ label, icon = 'more', items }: MenuProps) {
               ))}
             </div>
           </FloatingFocusManager>
-        </FloatingPortal>
+        </>
       )}
     </>
   )

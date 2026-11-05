@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useSyncExternalStore } from 'react'
 import { SPLIT_DEFAULT, SPLIT_MAX, SPLIT_MIN } from '../ui'
 
 export type Layout = 'both' | 'posts' | 'chat'
@@ -38,6 +38,43 @@ export function useMediaQuery(query: string): boolean {
   return matches
 }
 
+interface LayoutState {
+  stored: Layout
+  ratio: number
+  navExpanded: boolean
+}
+
+// One store for the whole page (architecture.md, Layout): the tab bar in one
+// component changes the layout, the panes in another follow. Two hook calls
+// keeping their own state once left the Posts tab lit with chat still showing.
+let state: LayoutState | null = null
+const listeners = new Set<() => void>()
+
+function current(): LayoutState {
+  if (!state) {
+    const v = read(KEY)
+    const r = Number(read(SPLIT_KEY))
+    state = {
+      stored: v === 'both' || v === 'posts' || v === 'chat' ? v : 'both',
+      ratio: r >= SPLIT_MIN && r <= SPLIT_MAX ? r : SPLIT_DEFAULT,
+      navExpanded: read(NAV_KEY) === 'expanded',
+    }
+  }
+  return state
+}
+
+function update(patch: Partial<LayoutState>) {
+  state = { ...current(), ...patch }
+  for (const l of listeners) l()
+}
+
+function subscribe(l: () => void) {
+  listeners.add(l)
+  return () => {
+    listeners.delete(l)
+  }
+}
+
 /**
  * Which panes are open, how wide the posts pane is, and whether the nav is
  * expanded. All persist per browser; on a narrow screen only one pane shows, so `both` resolves to chat.
@@ -51,32 +88,23 @@ export function useLayout(): {
   setRatio: (r: number) => void
   toggleNav: () => void
 } {
-  const [stored, setStored] = useState<Layout>(() => {
-    const v = read(KEY)
-    return v === 'both' || v === 'posts' || v === 'chat' ? v : 'both'
-  })
-  const [ratio, setRatioState] = useState<number>(() => {
-    const v = Number(read(SPLIT_KEY))
-    return v >= SPLIT_MIN && v <= SPLIT_MAX ? v : SPLIT_DEFAULT
-  })
-  const [navExpanded, setNavExpanded] = useState(() => read(NAV_KEY) === 'expanded')
+  const s = useSyncExternalStore(subscribe, current, current)
   const narrow = useMediaQuery(NARROW)
 
   const setLayout = (l: Layout) => {
-    setStored(l)
+    update({ stored: l })
     write(KEY, l)
   }
   const setRatio = (r: number) => {
-    setRatioState(r)
+    update({ ratio: r })
     write(SPLIT_KEY, String(r))
   }
-
   const toggleNav = () => {
-    const next = !navExpanded
-    setNavExpanded(next)
+    const next = !current().navExpanded
+    update({ navExpanded: next })
     write(NAV_KEY, next ? 'expanded' : 'collapsed')
   }
 
-  const layout: Layout = narrow && stored === 'both' ? 'chat' : stored
-  return { layout, narrow, ratio, navExpanded, setLayout, setRatio, toggleNav }
+  const layout: Layout = narrow && s.stored === 'both' ? 'chat' : s.stored
+  return { layout, narrow, ratio: s.ratio, navExpanded: s.navExpanded, setLayout, setRatio, toggleNav }
 }
