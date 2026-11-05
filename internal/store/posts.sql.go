@@ -50,10 +50,9 @@ func (q *Queries) DeletePost(ctx context.Context, arg DeletePostParams) error {
 	return err
 }
 
-const editPost = `-- name: EditPost :one
+const editPost = `-- name: EditPost :exec
 UPDATE posts SET body_html = ?1, body_text = ?2, edited_at = ?3
 WHERE id = ?4 AND deleted_at IS NULL
-RETURNING created_at
 `
 
 type EditPostParams struct {
@@ -63,16 +62,53 @@ type EditPostParams struct {
 	ID       string
 }
 
-func (q *Queries) EditPost(ctx context.Context, arg EditPostParams) (int64, error) {
-	row := q.db.QueryRowContext(ctx, editPost,
+func (q *Queries) EditPost(ctx context.Context, arg EditPostParams) error {
+	_, err := q.db.ExecContext(ctx, editPost,
 		arg.BodyHtml,
 		arg.BodyText,
 		arg.EditedAt,
 		arg.ID,
 	)
-	var created_at int64
-	err := row.Scan(&created_at)
-	return created_at, err
+	return err
+}
+
+const getPost = `-- name: GetPost :one
+SELECT p.id, p.group_id, p.body_html, p.body_text, p.created_at, p.edited_at,
+       u.id AS author_id, u.username AS author_username, u.picture_id AS author_picture_id,
+       (SELECT COUNT(*) FROM comments c WHERE c.post_id = p.id AND c.deleted_at IS NULL) AS comment_count
+FROM posts p JOIN users u ON u.id = p.author_id
+WHERE p.id = ?1 AND p.deleted_at IS NULL
+`
+
+type GetPostRow struct {
+	ID              string
+	GroupID         string
+	BodyHtml        string
+	BodyText        string
+	CreatedAt       int64
+	EditedAt        sql.NullInt64
+	AuthorID        string
+	AuthorUsername  string
+	AuthorPictureID sql.NullString
+	CommentCount    int64
+}
+
+func (q *Queries) GetPost(ctx context.Context, id string) (GetPostRow, error) {
+	row := q.db.QueryRowContext(ctx, getPost, id)
+	var i GetPostRow
+	err := row.Scan(
+		&i.ID,
+		&i.GroupID,
+		&i.BodyHtml,
+		&i.BodyText,
+		&i.CreatedAt,
+		&i.EditedAt,
+		&i.AuthorID,
+		&i.AuthorUsername,
+		&i.AuthorPictureID,
+		&i.CommentCount,
+	)
+	return i, err
 }
 
 const getPostOwners = `-- name: GetPostOwners :one

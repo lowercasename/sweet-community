@@ -36,14 +36,7 @@ func (s *Server) listMessages(w http.ResponseWriter, r *http.Request) {
 	}
 	msgs := make([]Message, 0, len(rows))
 	for _, row := range rows {
-		m := Message{
-			ID:        row.ID,
-			GroupID:   row.GroupID,
-			Author:    User{ID: row.AuthorID, Username: row.AuthorUsername, Picture: pictureURL(row.AuthorPictureID)},
-			BodyHTML:  row.BodyHtml,
-			BodyText:  row.BodyText,
-			CreatedAt: row.CreatedAt,
-		}
+		m := wireMessage(store.GetMessageRow(row))
 		msgs = append(msgs, *forViewer(a, &m, Settings{}).(*Message))
 	}
 	var next *int64
@@ -75,9 +68,13 @@ func (s *Server) createMessage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	author, _ := userFrom(r.Context())
-	m := Message{ID: id.String(), GroupID: g.ID, Author: author, BodyHTML: clean, BodyText: sanitize.Text(clean), CreatedAt: db.Now()}
-	s.logged(w, r, "message", m.CreatedAt, func(qtx *store.Queries) (any, int, error) {
-		err := qtx.CreateMessage(r.Context(), store.CreateMessageParams{ID: m.ID, GroupID: g.ID, AuthorID: author.ID, BodyHtml: m.BodyHTML, BodyText: m.BodyText, CreatedAt: m.CreatedAt})
+	now := db.Now()
+	s.logged(w, r, "message", now, func(qtx *store.Queries) (any, int, error) {
+		if err := qtx.CreateMessage(r.Context(), store.CreateMessageParams{ID: id.String(), GroupID: g.ID, AuthorID: author.ID, BodyHtml: clean, BodyText: sanitize.Text(clean), CreatedAt: now}); err != nil {
+			return nil, http.StatusInternalServerError, err
+		}
+		row, err := qtx.GetMessage(r.Context(), id.String())
+		m := wireMessage(row)
 		return &m, http.StatusCreated, err
 	})
 }

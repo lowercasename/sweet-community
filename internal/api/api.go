@@ -245,16 +245,7 @@ func (s *Server) listPosts(w http.ResponseWriter, r *http.Request) {
 	}
 	posts := make([]Post, 0, len(rows))
 	for _, row := range rows {
-		p := Post{
-			ID:           row.ID,
-			GroupID:      row.GroupID,
-			Author:       User{ID: row.AuthorID, Username: row.AuthorUsername, Picture: pictureURL(row.AuthorPictureID)},
-			BodyHTML:     row.BodyHtml,
-			BodyText:     row.BodyText,
-			CreatedAt:    row.CreatedAt,
-			EditedAt:     nullInt(row.EditedAt),
-			CommentCount: row.CommentCount,
-		}
+		p := wirePost(store.GetPostRow(row))
 		posts = append(posts, *forViewer(a, &p, Settings{}).(*Post))
 	}
 	var next *int64
@@ -374,9 +365,13 @@ func (s *Server) createPost(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	author, _ := userFrom(r.Context())
-	p := Post{ID: id.String(), GroupID: g.ID, Author: author, BodyHTML: clean, BodyText: sanitize.Text(clean), CreatedAt: db.Now()}
-	s.logged(w, r, "post", p.CreatedAt, func(qtx *store.Queries) (any, int, error) {
-		err := qtx.CreatePost(r.Context(), store.CreatePostParams{ID: p.ID, GroupID: g.ID, AuthorID: author.ID, BodyHtml: p.BodyHTML, BodyText: p.BodyText, CreatedAt: p.CreatedAt})
+	now := db.Now()
+	s.logged(w, r, "post", now, func(qtx *store.Queries) (any, int, error) {
+		if err := qtx.CreatePost(r.Context(), store.CreatePostParams{ID: id.String(), GroupID: g.ID, AuthorID: author.ID, BodyHtml: clean, BodyText: sanitize.Text(clean), CreatedAt: now}); err != nil {
+			return nil, http.StatusInternalServerError, err
+		}
+		row, err := qtx.GetPost(r.Context(), id.String())
+		p := wirePost(row)
 		return &p, http.StatusCreated, err
 	})
 }
@@ -388,9 +383,9 @@ func (s *Server) editPost(w http.ResponseWriter, r *http.Request) {
 	}
 	now := db.Now()
 	author, _ := userFrom(r.Context())
-	p := Post{ID: r.PathValue("id"), Author: author, BodyHTML: clean, BodyText: sanitize.Text(clean), EditedAt: &now}
+	id := r.PathValue("id")
 	s.logged(w, r, "post", now, func(qtx *store.Queries) (any, int, error) {
-		owners, err := qtx.GetPostOwners(r.Context(), p.ID)
+		owners, err := qtx.GetPostOwners(r.Context(), id)
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, http.StatusNotFound, errors.New("no such post")
 		}
@@ -407,15 +402,13 @@ func (s *Server) editPost(w http.ResponseWriter, r *http.Request) {
 		if !perm.EditPost(a, perm.Post{AuthorID: owners.AuthorID}) {
 			return nil, http.StatusForbidden, errors.New("not your post")
 		}
-		createdAt, err := qtx.EditPost(r.Context(), store.EditPostParams{
-			BodyHtml: p.BodyHTML, BodyText: p.BodyText, EditedAt: sql.NullInt64{Int64: now, Valid: true}, ID: p.ID,
-		})
-		if err != nil {
+		if err := qtx.EditPost(r.Context(), store.EditPostParams{
+			BodyHtml: clean, BodyText: sanitize.Text(clean), EditedAt: sql.NullInt64{Int64: now, Valid: true}, ID: id,
+		}); err != nil {
 			return nil, http.StatusInternalServerError, err
 		}
-		p.GroupID, p.CreatedAt = owners.GroupID, createdAt
-		n, err := qtx.CountComments(r.Context(), p.ID)
-		p.CommentCount = n
+		row, err := qtx.GetPost(r.Context(), id)
+		p := wirePost(row)
 		return &p, http.StatusOK, err
 	})
 }

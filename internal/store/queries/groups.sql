@@ -20,6 +20,11 @@ ORDER BY g.kind = 'root' DESC, g.created_at;
 SELECT m.group_id FROM memberships m JOIN groups g ON g.id = m.group_id
 WHERE m.user_id = sqlc.arg(user_id) AND g.deleted_at IS NULL;
 
+-- name: GetMember :one
+SELECT u.id, u.username, u.picture_id, m.role, m.joined_at
+FROM memberships m JOIN users u ON u.id = m.user_id
+WHERE m.group_id = sqlc.arg(group_id) AND m.user_id = sqlc.arg(user_id);
+
 -- name: ListMembers :many
 SELECT u.id, u.username, u.picture_id, m.role, m.joined_at
 FROM memberships m JOIN users u ON u.id = m.user_id

@@ -66,17 +66,7 @@ func (s *Server) listComments(w http.ResponseWriter, r *http.Request) {
 	}
 	out := make([]Comment, 0, len(rows))
 	for _, row := range rows {
-		c := Comment{
-			ID:           row.ID,
-			PostID:       row.PostID,
-			GroupID:      row.GroupID,
-			PostAuthorID: row.PostAuthorID,
-			Author:       User{ID: row.AuthorID, Username: row.AuthorUsername, Picture: pictureURL(row.AuthorPictureID)},
-			BodyHTML:     row.BodyHtml,
-			BodyText:     row.BodyText,
-			CreatedAt:    row.CreatedAt,
-			EditedAt:     nullInt(row.EditedAt),
-		}
+		c := wireComment(store.GetCommentRow(row))
 		out = append(out, *forViewer(a, &c, Settings{}).(*Comment))
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"comments": out})
@@ -94,19 +84,22 @@ func (s *Server) createComment(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	author, _ := userFrom(r.Context())
-	c := Comment{ID: id.String(), PostID: postID, Author: author, BodyHTML: clean, BodyText: sanitize.Text(clean), CreatedAt: db.Now()}
-	s.logged(w, r, "comment", c.CreatedAt, func(qtx *store.Queries) (any, int, error) {
-		owners, a, status, err := s.postActor(r, qtx, postID)
+	now := db.Now()
+	s.logged(w, r, "comment", now, func(qtx *store.Queries) (any, int, error) {
+		_, a, status, err := s.postActor(r, qtx, postID)
 		if err != nil {
 			return nil, status, err
 		}
 		if !perm.Write(a) {
 			return nil, http.StatusForbidden, errors.New("not allowed")
 		}
-		c.GroupID, c.PostAuthorID = owners.GroupID, owners.AuthorID
-		err = qtx.CreateComment(r.Context(), store.CreateCommentParams{
-			ID: c.ID, PostID: postID, AuthorID: author.ID, BodyHtml: c.BodyHTML, BodyText: c.BodyText, CreatedAt: c.CreatedAt,
-		})
+		if err := qtx.CreateComment(r.Context(), store.CreateCommentParams{
+			ID: id.String(), PostID: postID, AuthorID: author.ID, BodyHtml: clean, BodyText: sanitize.Text(clean), CreatedAt: now,
+		}); err != nil {
+			return nil, http.StatusInternalServerError, err
+		}
+		row, err := qtx.GetComment(r.Context(), id.String())
+		c := wireComment(row)
 		return &c, http.StatusCreated, err
 	})
 }
@@ -137,24 +130,23 @@ func (s *Server) editComment(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	now := db.Now()
-	author, _ := userFrom(r.Context())
-	c := Comment{ID: r.PathValue("id"), Author: author, BodyHTML: clean, BodyText: sanitize.Text(clean), EditedAt: &now}
+	id := r.PathValue("id")
 	s.logged(w, r, "comment", now, func(qtx *store.Queries) (any, int, error) {
-		owners, a, status, err := s.commentActor(r, qtx, c.ID)
+		owners, a, status, err := s.commentActor(r, qtx, id)
 		if err != nil {
 			return nil, status, err
 		}
 		if !perm.EditComment(a, perm.Comment{AuthorID: owners.AuthorID, PostAuthorID: owners.PostAuthorID}) {
 			return nil, http.StatusForbidden, errors.New("not your comment")
 		}
-		row, err := qtx.EditComment(r.Context(), store.EditCommentParams{
-			BodyHtml: c.BodyHTML, BodyText: c.BodyText, EditedAt: sql.NullInt64{Int64: now, Valid: true}, ID: c.ID,
-		})
-		if err != nil {
+		if err := qtx.EditComment(r.Context(), store.EditCommentParams{
+			BodyHtml: clean, BodyText: sanitize.Text(clean), EditedAt: sql.NullInt64{Int64: now, Valid: true}, ID: id,
+		}); err != nil {
 			return nil, http.StatusInternalServerError, err
 		}
-		c.PostID, c.GroupID, c.PostAuthorID, c.CreatedAt = row.PostID, owners.GroupID, owners.PostAuthorID, row.CreatedAt
-		return &c, http.StatusOK, nil
+		row, err := qtx.GetComment(r.Context(), id)
+		c := wireComment(row)
+		return &c, http.StatusOK, err
 	})
 }
 

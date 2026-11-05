@@ -55,7 +55,7 @@ func (s *Server) listInvites(w http.ResponseWriter, r *http.Request) {
 	for _, row := range rows {
 		out = append(out, Invite{
 			Code: row.Code, URL: "/join/" + row.Code, CreatedAt: row.CreatedAt, ExpiresAt: row.ExpiresAt,
-			CreatedBy: User{ID: row.CreatorID, Username: row.CreatorUsername, Picture: pictureURL(row.CreatorPictureID)},
+			CreatedBy: wireUser(row.CreatorID, row.CreatorUsername, row.CreatorPictureID),
 		})
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"invites": out})
@@ -158,7 +158,14 @@ func (s *Server) register(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusInternalServerError, err.Error())
 		return
 	}
-	ev, err := events.Log(ctx, tx, "membership", Membership{GroupID: perm.Root, User: u, Role: perm.Member, JoinedAt: now}, now)
+	joined, err := qtx.GetMember(ctx, store.GetMemberParams{GroupID: perm.Root, UserID: u.ID})
+	if err != nil {
+		writeErr(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	m := wireMembership(perm.Root, joined)
+	u = m.User // what the row says, which is what everyone else receives
+	ev, err := events.Log(ctx, tx, "membership", m, now)
 	if err != nil {
 		writeErr(w, http.StatusInternalServerError, err.Error())
 		return

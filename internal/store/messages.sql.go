@@ -50,6 +50,40 @@ func (q *Queries) DeleteMessage(ctx context.Context, arg DeleteMessageParams) er
 	return err
 }
 
+const getMessage = `-- name: GetMessage :one
+SELECT m.id, m.group_id, m.body_html, m.body_text, m.created_at,
+       u.id AS author_id, u.username AS author_username, u.picture_id AS author_picture_id
+FROM messages m JOIN users u ON u.id = m.author_id
+WHERE m.id = ?1 AND m.deleted_at IS NULL
+`
+
+type GetMessageRow struct {
+	ID              string
+	GroupID         string
+	BodyHtml        string
+	BodyText        string
+	CreatedAt       int64
+	AuthorID        string
+	AuthorUsername  string
+	AuthorPictureID sql.NullString
+}
+
+func (q *Queries) GetMessage(ctx context.Context, id string) (GetMessageRow, error) {
+	row := q.db.QueryRowContext(ctx, getMessage, id)
+	var i GetMessageRow
+	err := row.Scan(
+		&i.ID,
+		&i.GroupID,
+		&i.BodyHtml,
+		&i.BodyText,
+		&i.CreatedAt,
+		&i.AuthorID,
+		&i.AuthorUsername,
+		&i.AuthorPictureID,
+	)
+	return i, err
+}
+
 const getMessageOwners = `-- name: GetMessageOwners :one
 SELECT m.author_id, m.group_id FROM messages m JOIN groups g ON g.id = m.group_id
 WHERE m.id = ?1 AND m.deleted_at IS NULL AND g.deleted_at IS NULL

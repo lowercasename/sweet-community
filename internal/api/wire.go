@@ -1,0 +1,95 @@
+package api
+
+import (
+	"context"
+	"database/sql"
+	"sort"
+
+	"sweet/internal/perm"
+	"sweet/internal/store"
+)
+
+// The builders: the only way a resource becomes its wire shape. Each takes
+// the store's row for that resource and nothing else, so a reply or an
+// event cannot be assembled by hand with a field left out (which is how a
+// group once lacked its flags, a DM its people, and a membership its
+// joined time). Handlers write, re-read the row inside the same
+// transaction, and hand the row here; list handlers convert their list
+// rows to the same type, which the compiler checks field for field.
+// Personalising for a viewer (can flags, role) is forViewer's job, on the
+// way out, never here.
+
+func wireUser(id, username string, pictureID sql.NullString) User {
+	return User{ID: id, Username: username, Picture: pictureURL(pictureID)}
+}
+
+func wirePost(row store.GetPostRow) Post {
+	return Post{
+		ID:           row.ID,
+		GroupID:      row.GroupID,
+		Author:       wireUser(row.AuthorID, row.AuthorUsername, row.AuthorPictureID),
+		BodyHTML:     row.BodyHtml,
+		BodyText:     row.BodyText,
+		CreatedAt:    row.CreatedAt,
+		EditedAt:     nullInt(row.EditedAt),
+		CommentCount: row.CommentCount,
+	}
+}
+
+func wireComment(row store.GetCommentRow) Comment {
+	return Comment{
+		ID:           row.ID,
+		PostID:       row.PostID,
+		GroupID:      row.GroupID,
+		PostAuthorID: row.PostAuthorID,
+		Author:       wireUser(row.AuthorID, row.AuthorUsername, row.AuthorPictureID),
+		BodyHTML:     row.BodyHtml,
+		BodyText:     row.BodyText,
+		CreatedAt:    row.CreatedAt,
+		EditedAt:     nullInt(row.EditedAt),
+	}
+}
+
+func wireMessage(row store.GetMessageRow) Message {
+	return Message{
+		ID:        row.ID,
+		GroupID:   row.GroupID,
+		Author:    wireUser(row.AuthorID, row.AuthorUsername, row.AuthorPictureID),
+		BodyHTML:  row.BodyHtml,
+		BodyText:  row.BodyText,
+		CreatedAt: row.CreatedAt,
+	}
+}
+
+func wireMembership(groupID string, row store.GetMemberRow) Membership {
+	return Membership{GroupID: groupID, User: wireUser(row.ID, row.Username, row.PictureID), Role: row.Role, JoinedAt: row.JoinedAt}
+}
+
+// wireGroup builds a group from its row: a DM carries its people, every
+// group the time of its newest live message. It reads through q so that a
+// group made in a transaction is complete before that transaction commits.
+func wireGroup(ctx context.Context, q *store.Queries, row store.GetGroupRow) (Group, error) {
+	g := Group{ID: row.ID, Kind: row.Kind, Name: row.Name, Mode: row.Mode, CreatedAt: row.CreatedAt, LastMessageAt: lastAt(row.LastMessageAt)}
+	if g.Kind != perm.KindDM {
+		return g, nil
+	}
+	rows, err := q.ListMembers(ctx, g.ID)
+	if err != nil {
+		return g, err
+	}
+	g.Members = make([]User, 0, len(rows))
+	for _, m := range rows {
+		g.Members = append(g.Members, wireUser(m.ID, m.Username, m.PictureID))
+	}
+	sort.Slice(g.Members, func(i, j int) bool { return g.Members[i].Username < g.Members[j].Username })
+	return g, nil
+}
+
+// lastAt turns the driver's MAX(created_at) (an int64, or nil when there is
+// no live message) into the wire's nullable time.
+func lastAt(v any) *int64 {
+	if n, ok := v.(int64); ok {
+		return &n
+	}
+	return nil
+}

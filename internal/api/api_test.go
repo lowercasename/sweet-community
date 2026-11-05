@@ -15,6 +15,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 	"time"
@@ -699,6 +700,9 @@ func (c *client) readEvents(n int) []map[string]any {
 	for sc.Scan() && len(out) < n {
 		line := sc.Text()
 		switch {
+		case line == ": caught up":
+			// The replay is complete; nothing more is coming without another write.
+			return out
 		case strings.HasPrefix(line, "event: "):
 			kind = strings.TrimPrefix(line, "event: ")
 		case strings.HasPrefix(line, "data: "):
@@ -774,4 +778,108 @@ func TestDeleteMessage(t *testing.T) {
 	if e := events[len(events)-1]; e["kind"] != "message_delete" || e["payload"].(map[string]any)["id"] != theirs["id"] {
 		t.Fatalf("last event: %v", e)
 	}
+}
+
+// Every reply to a write, and every event it logs, is the resource exactly
+// as a fetch would return it to that viewer. This is the property behind
+// "the stream carries the whole thing": a handler must not assemble a
+// payload by hand (three bugs came from that: a group without its flags,
+// a DM without its people, a membership without its joined time).
+func TestRepliesAndEventsMatchTheRow(t *testing.T) {
+	ts, owner := newTestServer(t)
+	kit, kitID := registerMember(t, ts, owner, "kit")
+	mo, moID := registerMember(t, ts, owner, "mo")
+
+	// byID finds one item in a listed collection.
+	byID := func(list map[string]any, key, id string) map[string]any {
+		t.Helper()
+		for _, x := range list[key].([]any) {
+			if m := x.(map[string]any); m["id"] == id {
+				return m
+			}
+		}
+		t.Fatalf("%s %s not listed", key, id)
+		return nil
+	}
+	byUser := func(list map[string]any, uid string) map[string]any {
+		t.Helper()
+		for _, x := range list["members"].([]any) {
+			if m := x.(map[string]any); m["user"].(map[string]any)["id"] == uid {
+				return m
+			}
+		}
+		t.Fatalf("member %s not listed", uid)
+		return nil
+	}
+	// lastEvent is the viewer's newest event of a kind about one thing.
+	lastEvent := func(c *client, kind string, match func(map[string]any) bool) map[string]any {
+		t.Helper()
+		var found map[string]any
+		for _, e := range c.readEvents(80) {
+			if e["kind"] == kind && match(e["payload"].(map[string]any)) {
+				found = e["payload"].(map[string]any)
+			}
+		}
+		if found == nil {
+			t.Fatalf("no %s event", kind)
+		}
+		return found
+	}
+	same := func(what string, reply, fetched, event map[string]any) {
+		t.Helper()
+		if !reflect.DeepEqual(reply, fetched) {
+			t.Errorf("%s: reply differs from fetch\nreply:   %v\nfetched: %v", what, reply, fetched)
+		}
+		if !reflect.DeepEqual(event, fetched) {
+			t.Errorf("%s: event differs from fetch\nevent:   %v\nfetched: %v", what, event, fetched)
+		}
+	}
+	isID := func(id string) func(map[string]any) bool { return func(m map[string]any) bool { return m["id"] == id } }
+	isMember := func(gid, uid string) func(map[string]any) bool {
+		return func(m map[string]any) bool { return m["group_id"] == gid && m["user"].(map[string]any)["id"] == uid }
+	}
+
+	// Posts: created, commented on, edited (the edit carries the live comment count).
+	post := kit.mustStatus(201, "POST", rootPath+"/posts", map[string]string{"body_html": "<p>v1</p>"})
+	pid := post["id"].(string)
+	same("created post", post, byID(kit.mustStatus(200, "GET", rootPath+"/posts", nil), "posts", pid), lastEvent(kit, "post", isID(pid)))
+	comment := kit.mustStatus(201, "POST", "/api/posts/"+pid+"/comments", map[string]string{"body_html": "<p>c1</p>"})
+	cid := comment["id"].(string)
+	same("created comment", comment, byID(kit.mustStatus(200, "GET", "/api/posts/"+pid+"/comments", nil), "comments", cid), lastEvent(kit, "comment", isID(cid)))
+	edited := kit.mustStatus(200, "PUT", "/api/posts/"+pid, map[string]string{"body_html": "<p>v2</p>"})
+	same("edited post", edited, byID(kit.mustStatus(200, "GET", rootPath+"/posts", nil), "posts", pid), lastEvent(kit, "post", isID(pid)))
+	editedC := kit.mustStatus(200, "PUT", "/api/comments/"+cid, map[string]string{"body_html": "<p>c2</p>"})
+	same("edited comment", editedC, byID(kit.mustStatus(200, "GET", "/api/posts/"+pid+"/comments", nil), "comments", cid), lastEvent(kit, "comment", isID(cid)))
+	// The owner's view of the same post differs from kit's only by its can flags, and the stream agrees with the fetch for them too.
+	same("post as the owner", byID(owner.mustStatus(200, "GET", rootPath+"/posts", nil), "posts", pid), byID(owner.mustStatus(200, "GET", rootPath+"/posts", nil), "posts", pid), lastEvent(owner, "post", isID(pid)))
+
+	// Messages.
+	msg := kit.mustStatus(201, "POST", rootPath+"/messages", map[string]string{"body_html": "<p>hi</p>"})
+	mid := msg["id"].(string)
+	same("message", msg, byID(kit.mustStatus(200, "GET", rootPath+"/messages", nil), "messages", mid), lastEvent(kit, "message", isID(mid)))
+
+	// Groups: created, renamed, a member added, promoted, handed to; and a DM, created then found.
+	group := kit.mustStatus(201, "POST", "/api/groups", map[string]any{"kind": "group", "name": "Knitting", "mode": "both"})
+	gid := group["id"].(string)
+	gp := "/api/groups/" + gid
+	same("created group", group, kit.mustStatus(200, "GET", gp, nil), lastEvent(kit, "group", isID(gid)))
+	same("creator's membership", byUser(kit.mustStatus(200, "GET", gp+"/members", nil), kitID), byUser(kit.mustStatus(200, "GET", gp+"/members", nil), kitID), lastEvent(kit, "membership", isMember(gid, kitID)))
+	renamed := kit.mustStatus(200, "PUT", gp, map[string]string{"name": "Knitting circle"})
+	same("renamed group", renamed, kit.mustStatus(200, "GET", gp, nil), lastEvent(kit, "group", isID(gid)))
+	added := kit.mustStatus(201, "POST", gp+"/members", map[string]string{"user_id": moID})
+	same("added member", added, byUser(kit.mustStatus(200, "GET", gp+"/members", nil), moID), lastEvent(kit, "membership", isMember(gid, moID)))
+	promoted := kit.mustStatus(200, "PUT", gp+"/members/"+moID, map[string]string{"role": "moderator"})
+	same("promoted member", promoted, byUser(kit.mustStatus(200, "GET", gp+"/members", nil), moID), lastEvent(kit, "membership", isMember(gid, moID)))
+	handed := kit.mustStatus(200, "PUT", gp+"/members/"+moID, map[string]string{"role": "owner"})
+	same("new owner", handed, byUser(kit.mustStatus(200, "GET", gp+"/members", nil), moID), lastEvent(kit, "membership", isMember(gid, moID)))
+	same("former owner", byUser(kit.mustStatus(200, "GET", gp+"/members", nil), kitID), byUser(kit.mustStatus(200, "GET", gp+"/members", nil), kitID), lastEvent(kit, "membership", isMember(gid, kitID)))
+	// Mo, now owner, sees the group with owner's flags on the stream and on a fetch alike.
+	same("group as its new owner", mo.mustStatus(200, "GET", gp, nil), mo.mustStatus(200, "GET", gp, nil), lastEvent(mo, "group", isID(gid)))
+
+	dm := kit.mustStatus(201, "POST", "/api/groups", map[string]any{"kind": "dm", "members": []string{moID}})
+	did := dm["id"].(string)
+	same("created dm", dm, kit.mustStatus(200, "GET", "/api/groups/"+did, nil), lastEvent(kit, "group", isID(did)))
+	found := kit.mustStatus(200, "POST", "/api/groups", map[string]any{"kind": "dm", "members": []string{moID}})
+	same("found dm", found, kit.mustStatus(200, "GET", "/api/groups/"+did, nil), lastEvent(kit, "group", isID(did)))
+	same("dm as mo", mo.mustStatus(200, "GET", "/api/groups/"+did, nil), byID(mo.mustStatus(200, "GET", "/api/groups", nil), "groups", did), lastEvent(mo, "group", isID(did)))
 }

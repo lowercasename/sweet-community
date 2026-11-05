@@ -155,6 +155,9 @@ func (h *Hub) Serve(w http.ResponseWriter, r *http.Request, filter func(Event) (
 				write(e)
 				last = e.Seq
 			}
+			// A comment marks the end of the replay, so a reader that wants
+			// only the backlog knows when it has it.
+			fmt.Fprint(w, ": caught up\n\n")
 			flusher.Flush()
 		}
 	}

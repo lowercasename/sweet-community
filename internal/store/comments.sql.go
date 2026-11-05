@@ -10,17 +10,6 @@ import (
 	"database/sql"
 )
 
-const countComments = `-- name: CountComments :one
-SELECT COUNT(*) FROM comments WHERE post_id = ?1 AND deleted_at IS NULL
-`
-
-func (q *Queries) CountComments(ctx context.Context, postID string) (int64, error) {
-	row := q.db.QueryRowContext(ctx, countComments, postID)
-	var count int64
-	err := row.Scan(&count)
-	return count, err
-}
-
 const createComment = `-- name: CreateComment :exec
 INSERT INTO comments (id, post_id, author_id, body_html, body_text, created_at)
 VALUES (?1, ?2, ?3, ?4, ?5, ?6)
@@ -61,10 +50,9 @@ func (q *Queries) DeleteComment(ctx context.Context, arg DeleteCommentParams) er
 	return err
 }
 
-const editComment = `-- name: EditComment :one
+const editComment = `-- name: EditComment :exec
 UPDATE comments SET body_html = ?1, body_text = ?2, edited_at = ?3
 WHERE id = ?4 AND deleted_at IS NULL
-RETURNING post_id, created_at
 `
 
 type EditCommentParams struct {
@@ -74,20 +62,53 @@ type EditCommentParams struct {
 	ID       string
 }
 
-type EditCommentRow struct {
-	PostID    string
-	CreatedAt int64
-}
-
-func (q *Queries) EditComment(ctx context.Context, arg EditCommentParams) (EditCommentRow, error) {
-	row := q.db.QueryRowContext(ctx, editComment,
+func (q *Queries) EditComment(ctx context.Context, arg EditCommentParams) error {
+	_, err := q.db.ExecContext(ctx, editComment,
 		arg.BodyHtml,
 		arg.BodyText,
 		arg.EditedAt,
 		arg.ID,
 	)
-	var i EditCommentRow
-	err := row.Scan(&i.PostID, &i.CreatedAt)
+	return err
+}
+
+const getComment = `-- name: GetComment :one
+SELECT c.id, c.post_id, c.body_html, c.body_text, c.created_at, c.edited_at, p.author_id AS post_author_id, p.group_id,
+       u.id AS author_id, u.username AS author_username, u.picture_id AS author_picture_id
+FROM comments c JOIN users u ON u.id = c.author_id JOIN posts p ON p.id = c.post_id
+WHERE c.id = ?1 AND c.deleted_at IS NULL
+`
+
+type GetCommentRow struct {
+	ID              string
+	PostID          string
+	BodyHtml        string
+	BodyText        string
+	CreatedAt       int64
+	EditedAt        sql.NullInt64
+	PostAuthorID    string
+	GroupID         string
+	AuthorID        string
+	AuthorUsername  string
+	AuthorPictureID sql.NullString
+}
+
+func (q *Queries) GetComment(ctx context.Context, id string) (GetCommentRow, error) {
+	row := q.db.QueryRowContext(ctx, getComment, id)
+	var i GetCommentRow
+	err := row.Scan(
+		&i.ID,
+		&i.PostID,
+		&i.BodyHtml,
+		&i.BodyText,
+		&i.CreatedAt,
+		&i.EditedAt,
+		&i.PostAuthorID,
+		&i.GroupID,
+		&i.AuthorID,
+		&i.AuthorUsername,
+		&i.AuthorPictureID,
+	)
 	return i, err
 }
 
