@@ -8,7 +8,12 @@ interface NavSectionProps {
   title: string
   expanded: boolean
   /** An action that belongs to the section as a whole (New group): in the title row, or an item closing the block when collapsed. */
-  action?: { icon: IconName; label: string; current?: boolean; onClick: () => void }
+  action?: {
+    icon: IconName
+    label: string
+    current?: boolean
+    onClick: () => void
+  }
   children?: ReactNode
 }
 
@@ -22,7 +27,7 @@ export function NavSection({ title, expanded, action, children }: NavSectionProp
     <div role="group" aria-label={title} className="flex flex-col gap-1">
       {expanded && (
         <div className="mt-1 flex h-7 items-center justify-between pr-1 pl-3">
-          <span className="text-[11px] font-medium tracking-[0.08em] text-mute uppercase">{title}</span>
+          <span className="text-sm font-medium text-mute">{title}</span>
           {action && <Button variant="ghost" icon={action.icon} label={action.label} onClick={action.onClick} />}
         </div>
       )}
