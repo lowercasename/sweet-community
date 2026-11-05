@@ -37,7 +37,9 @@ test.describe('chat', () => {
     await kit.context.close()
   })
 
-  test('a picture in chat keeps its menu beside it, not under it', async ({ browser }, testInfo) => {
+  test("a message's menu sits on the author line; a later one in the run sits beside its own line", async ({
+    browser,
+  }, testInfo) => {
     const kit = await member(browser, testInfo)
     await open(kit.page)
     const text = uniq('look at this ')
@@ -49,9 +51,19 @@ test.describe('chat', () => {
     await sendMessage(kit.page, text)
     const msg = article(kit.page, text)
     const img = await msg.locator('.content img').boundingBox()
-    const menu = await msg.getByRole('button', { name: 'Message options' }).boundingBox()
-    // The picture fills the line to the menu's left; the menu sits beside its top, never below it.
-    expect(img && menu && menu.x >= img.x + img.width && menu.y < img.y + img.height).toBeTruthy()
+    const author = await msg.getByRole('button', { name: kit.username }).boundingBox()
+    const menu = await msg.getByRole('button', { name: 'Message options' }).first().boundingBox()
+    // The first message's menu shares the author's line, to the right of the picture, never under it.
+    expect(img && author && menu && menu.x >= img.x + img.width).toBeTruthy()
+    expect(author && menu && menu.y < author.y + author.height && menu.y + menu.height > author.y).toBeTruthy()
+    // A second message joins the run; its menu sits beside its own line, below the picture.
+    const more = uniq('and this ')
+    await sendMessage(kit.page, more)
+    const second = article(kit.page, text).getByText(more)
+    const line = await second.boundingBox()
+    const menu2 = await msg.getByRole('button', { name: 'Message options' }).nth(1).boundingBox()
+    expect(img && line && menu2 && line.y >= img.y + img.height && menu2.y < line.y + line.height).toBeTruthy()
+    expect(line && menu2 && menu2.y + menu2.height > line.y).toBeTruthy()
     await kit.context.close()
   })
 })

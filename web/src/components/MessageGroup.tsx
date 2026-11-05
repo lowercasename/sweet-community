@@ -11,7 +11,13 @@ interface MessageGroupProps {
   onDelete: (id: string) => Promise<void>
 }
 
-/** One person's run of messages: avatar, name and time once, then the bodies close together. */
+/**
+ * One person's run of messages: avatar, name and time once, then the bodies
+ * close together. Each message has its own menu at the top right of its
+ * block, so the first one's shares the author's line and a later one's sits
+ * beside its own line (Discord's and Slack's shape). A block never wraps:
+ * the body shrinks before the menu moves, however wide a picture is.
+ */
 export function MessageGroup({ messages, onDelete }: MessageGroupProps) {
   const first = messages[0]
   const author = useAuthor(first.author)
@@ -32,16 +38,20 @@ export function MessageGroup({ messages, onDelete }: MessageGroupProps) {
   return (
     <Box as="article">
       <Stack gap={1}>
-        <Row gap={2} align="center">
-          <Avatar name={author.username} picture={author.picture} size="sm" />
-          <PersonName user={author} />
-          <Text as="span" variant="small">
-            <Time at={first.created_at} />
-          </Text>
-        </Row>
-        {messages.map((m) => (
+        {messages.map((m, i) => (
           <Row key={m.id} justify="between" align="start" wrap="never">
-            <HtmlContent html={m.body_html} fill />
+            <Stack gap={1} fill>
+              {i === 0 && (
+                <Row gap={2} align="center">
+                  <Avatar name={author.username} picture={author.picture} size="sm" />
+                  <PersonName user={author} />
+                  <Text as="span" variant="small">
+                    <Time at={first.created_at} />
+                  </Text>
+                </Row>
+              )}
+              <HtmlContent html={m.body_html} />
+            </Stack>
             {m.can.delete && (
               <Menu
                 label="Message options"

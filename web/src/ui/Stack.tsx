@@ -13,7 +13,7 @@ const GAPS: Record<Gap, string> = {
 interface StackProps {
   gap?: Gap
   as?: 'div' | 'section' | 'main' | 'ul'
-  /** Take the parent's remaining height, for a column of panes. */
+  /** Take the parent's remaining room: height in a column (a column of panes), width in a row (a message beside its menu). */
   fill?: boolean
   /** Out of sight but still mounted. */
   hidden?: boolean
