@@ -92,6 +92,22 @@ describe('MembersPage', () => {
     expect(updateGroup).toHaveBeenCalledWith('club', { name: 'Knitting', mode: 'chat' })
   })
 
+  it('a conversation: any of its people may add someone, and one leaves a conversation, not a room', async () => {
+    const { addMember } = await import('../api')
+    const { MembersPage } = await import('./MembersPage')
+    const { dm } = await import('../test-utils')
+    renderWithQuery(<MembersPage group={dm('club', [kit, mo])} me={mo} onLeft={() => {}} />)
+    await screen.findByText('mo')
+    expect(screen.queryByLabelText('Name')).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Remove' })).toBeNull()
+    fireEvent.change(screen.getByLabelText('Add someone'), { target: { value: 'jo' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Add' }))
+    expect(addMember).toHaveBeenCalledWith('club', 'jo')
+    await screen.findByText('jo')
+    fireEvent.click(screen.getByRole('button', { name: 'Leave conversation' }))
+    expect(within(screen.getByRole('dialog', { hidden: true })).getByText('Leave this conversation?')).toBeTruthy()
+  })
+
   it('shows a member the list and Leave, nothing else', async () => {
     const { removeMember } = await import('../api')
     const onLeft = await page('member')

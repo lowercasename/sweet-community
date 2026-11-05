@@ -181,6 +181,16 @@ describe('applyEvent', () => {
 })
 
 describe('latest activity', () => {
+  it("a DM's group event carries its people, so an added person is in its name at once", () => {
+    qc.setQueryData(keys.groups, { groups: [group(ROOT, 'member'), dm('d1', [kit, mo])] })
+    applyEvent(qc, 'group', dm('d1', [kit, mo, user('jo')]))
+    expect(
+      groups()
+        .find((g) => g.id === 'd1')
+        ?.members?.map((u) => u.id),
+    ).toEqual(['kit', 'mo', 'jo'])
+  })
+
   it("a message moves its group's last_message_at forward, and a replayed older one never moves it back", () => {
     qc.setQueryData(keys.groups, { groups: [group(ROOT, 'member'), dm('d1', [kit, mo])] })
     applyEvent(qc, 'message', message('m5', mo, { group_id: 'd1', created_at: 500 }))

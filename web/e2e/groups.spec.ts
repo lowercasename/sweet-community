@@ -175,6 +175,56 @@ test.describe('groups', () => {
     await mo.context.close()
   })
 
+  test('a conversation grows when one of its people adds someone; the pair keeps its own', async ({
+    browser,
+  }, testInfo) => {
+    const kit = await member(browser, testInfo, 'kit')
+    const mo = await member(browser, testInfo, 'mo')
+    const jo = await member(browser, testInfo, 'jo')
+    await open(kit.page, '/people')
+    await open(mo.page)
+    await open(jo.page, '/messages')
+    await kit.page
+      .getByRole('listitem')
+      .filter({ hasText: mo.username })
+      .getByRole('button', { name: 'Message' })
+      .click()
+    await expect(kit.page.getByRole('heading', { name: mo.username })).toBeVisible()
+    const before = uniq('before jo ')
+    await sendMessage(kit.page, before)
+
+    // Mo, a plain member of it, brings jo in from its members page.
+    await nav(mo.page).getByRole('button', { name: 'Messages' }).click()
+    await mo.page.getByRole('list').getByRole('button', { name: kit.username }).click()
+    await mo.page.getByRole('button', { name: 'Members', exact: true }).click()
+    await expect(mo.page.getByRole('heading', { name: 'Room settings' })).toHaveCount(0)
+    await mo.page.getByLabel('Add someone').selectOption({ label: jo.username })
+    await mo.page.getByRole('button', { name: 'Add', exact: true }).click()
+
+    // Named by its people, everywhere, live: kit's bar, mo's bar, jo's Messages page; jo sees what was said before.
+    const names = (...people: string[]) => people.sort().join(', ')
+    await expect(kit.page.getByRole('heading', { name: names(jo.username, mo.username) })).toBeVisible()
+    await expect(mo.page.getByRole('heading', { name: names(jo.username, kit.username) })).toBeVisible()
+    await jo.page
+      .getByRole('list')
+      .getByRole('button', { name: names(kit.username, mo.username) })
+      .click()
+    await expect(article(jo.page, before)).toBeVisible()
+
+    // Kit and mo alone is another conversation, with nothing in it yet.
+    await open(kit.page, '/people')
+    await kit.page
+      .getByRole('listitem')
+      .filter({ hasText: mo.username })
+      .getByRole('button', { name: 'Message' })
+      .click()
+    await expect(kit.page.getByRole('heading', { name: mo.username, exact: true })).toBeVisible()
+    await expect(article(kit.page, before)).toHaveCount(0)
+    await kit.context.close()
+    await mo.context.close()
+    await jo.context.close()
+  })
+
   test('the instance setting decides who sees New room', async ({ browser }, testInfo) => {
     const o = await owner(browser, testInfo)
     const kit = await member(browser, testInfo)

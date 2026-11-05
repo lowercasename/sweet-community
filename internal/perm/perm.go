@@ -99,9 +99,19 @@ func ManageInstance(root Actor) bool { return root.Role == Owner }
 // Transfer: the owner hands ownership to another member of the group.
 func Transfer(a, target Actor) bool { return a.Role == Owner && target.member() && target.ID != a.ID }
 
-// AddMembers and RemoveMembers: the group's staff. In the root group, adding is an invite link.
-func AddMembers(a Actor) bool    { return a.staff() }
+// AddMembers: the group's staff; in a DM, any of its people, since a DM is
+// its people and has no staff. In the root group, adding is an invite link.
+// RemoveMembers: the group's staff; in a DM nobody, people leave.
+func AddMembers(a Actor, g Group) bool {
+	if g.Kind == KindDM {
+		return a.member()
+	}
+	return a.staff()
+}
 func RemoveMembers(a Actor) bool { return a.staff() }
+
+// Invite: adding to the root group, which is an invite link.
+func Invite(root Actor) bool { return AddMembers(root, Group{Kind: KindRoot}) }
 
 // SetRole: the group's owner makes anyone else a member or a moderator. The
 // owner's own role never changes this way (transfer is a separate action, later).

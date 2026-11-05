@@ -73,9 +73,13 @@ func TestRules(t *testing.T) {
 		{"owner sets a dm's mode", SetMode(owner, Group{Kind: KindDM}), false},
 		{"owner renames a dm", Rename(owner, Group{Kind: KindDM}), false},
 
-		{"owner adds members", AddMembers(owner), true},
-		{"moderator adds members", AddMembers(mod), true},
-		{"member adds members", AddMembers(kit), false},
+		{"owner adds members", AddMembers(owner, club), true},
+		{"moderator adds members", AddMembers(mod, club), true},
+		{"member adds members", AddMembers(kit, club), false},
+		{"moderator invites", Invite(mod), true},
+		{"member invites", Invite(kit), false},
+		{"member adds to a dm", AddMembers(kit, Group{Kind: KindDM}), true},
+		{"outsider adds to a dm", AddMembers(outsider, Group{Kind: KindDM}), false},
 		{"moderator removes members", RemoveMembers(mod), true},
 		{"member removes members", RemoveMembers(kit), false},
 

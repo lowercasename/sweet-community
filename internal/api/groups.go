@@ -79,8 +79,8 @@ func groupFor(a perm.Actor, g Group, st Settings) Group {
 	pg := perm.Group{Kind: g.Kind}
 	g.Role = a.Role
 	g.Can = GroupCan{
-		// In the root group adding is an invite link and nobody is removed (member removal comes with admin tools); a DM's membership is fixed.
-		AddMembers:    perm.AddMembers(a) && g.Kind != perm.KindDM,
+		// In the root group adding is an invite link and nobody is removed (member removal comes with admin tools); a DM grows by any of its people and shrinks only by leaving.
+		AddMembers:    perm.AddMembers(a, pg),
 		RemoveMembers: perm.RemoveMembers(a) && g.Kind == perm.KindGroup,
 		SetRoles:      a.Role == perm.Owner,
 		Transfer:      a.Role == perm.Owner,
@@ -271,13 +271,30 @@ func (s *Server) findDM(r *http.Request, viewerID string, people map[string]stri
 		want = append(want, id)
 	}
 	sort.Strings(want)
+	// Two DMs can hold the same people once a larger one has shrunk; the
+	// newer is found (ids are UUIDv7, so the greatest is the newest).
+	found := ""
 	for gid, members := range sets {
 		sort.Strings(members)
-		if strings.Join(members, ",") == strings.Join(want, ",") {
-			return gid, nil
+		if strings.Join(members, ",") == strings.Join(want, ",") && gid > found {
+			found = gid
 		}
 	}
-	return "", nil
+	return found, nil
+}
+
+// groupEntry is the group event a DM sends when its people change, since a
+// DM is named by them: the group re-read, so every open page has the list.
+func groupEntry(ctx context.Context, qtx *store.Queries, id string) (events.Entry, error) {
+	row, err := qtx.GetGroup(ctx, id)
+	if err != nil {
+		return events.Entry{}, err
+	}
+	g, err := wireGroup(ctx, qtx, row)
+	if err != nil {
+		return events.Entry{}, err
+	}
+	return events.Entry{Kind: "group", Payload: &g}, nil
 }
 
 func validMode(m string) bool { return m == perm.ModePosts || m == perm.ModeChat || m == perm.ModeBoth }
@@ -416,28 +433,37 @@ func (s *Server) addMember(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	g, a := groupFrom(r.Context())
-	if !perm.AddMembers(a) || g.Kind == perm.KindRoot {
+	if !perm.AddMembers(a, perm.Group{Kind: g.Kind}) || g.Kind == perm.KindRoot {
 		writeErr(w, http.StatusForbidden, "not allowed")
 		return
 	}
 	now := db.Now()
-	s.logged(w, r, "membership", now, func(qtx *store.Queries) (any, int, error) {
+	s.loggedMany(w, r, now, func(qtx *store.Queries) ([]events.Entry, any, int, error) {
 		if _, err := qtx.GetUser(r.Context(), in.UserID); errors.Is(err, sql.ErrNoRows) {
-			return nil, http.StatusNotFound, errors.New("no such person")
+			return nil, nil, http.StatusNotFound, errors.New("no such person")
 		} else if err != nil {
-			return nil, http.StatusInternalServerError, err
+			return nil, nil, http.StatusInternalServerError, err
 		}
 		if err := qtx.CreateMembership(r.Context(), store.CreateMembershipParams{GroupID: g.ID, UserID: in.UserID, Role: perm.Member, JoinedAt: now}); err != nil {
 			if db.IsUniqueViolation(err) {
-				return nil, http.StatusConflict, errors.New("already a member")
+				return nil, nil, http.StatusConflict, errors.New("already a member")
 			}
-			return nil, http.StatusInternalServerError, err
+			return nil, nil, http.StatusInternalServerError, err
 		}
 		row, err := qtx.GetMember(r.Context(), store.GetMemberParams{GroupID: g.ID, UserID: in.UserID})
 		if err != nil {
-			return nil, http.StatusInternalServerError, err
+			return nil, nil, http.StatusInternalServerError, err
 		}
-		return wireMembership(g.ID, row), http.StatusCreated, nil
+		m := wireMembership(g.ID, row)
+		entries := []events.Entry{{Kind: "membership", Payload: m}}
+		if g.Kind == perm.KindDM {
+			e, err := groupEntry(r.Context(), qtx, g.ID)
+			if err != nil {
+				return nil, nil, http.StatusInternalServerError, err
+			}
+			entries = append(entries, e)
+		}
+		return entries, m, http.StatusCreated, nil
 	})
 }
 
@@ -544,6 +570,12 @@ func (s *Server) removeMember(w http.ResponseWriter, r *http.Request) {
 				return nil, nil, http.StatusInternalServerError, err
 			}
 			entries = append(entries, events.Entry{Kind: "group_delete", Payload: map[string]string{"id": g.ID}})
+		} else if g.Kind == perm.KindDM {
+			e, err := groupEntry(r.Context(), qtx, g.ID)
+			if err != nil {
+				return nil, nil, http.StatusInternalServerError, err
+			}
+			entries = append(entries, e)
 		}
 		return entries, nil, http.StatusNoContent, nil
 	})

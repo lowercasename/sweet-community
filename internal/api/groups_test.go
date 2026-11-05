@@ -233,6 +233,78 @@ func TestDMFindOrCreate(t *testing.T) {
 	}
 }
 
+// A DM grows by its own people: any of them may add someone, who then sees
+// the whole conversation, as in a group DM anywhere. The pair's own
+// conversation is a different DM. When people leave, the DM is the people
+// left, and if two DMs come to hold the same people the newer is found.
+func TestDMGrowsByItsPeople(t *testing.T) {
+	ts, owner := newTestServer(t)
+	kit, _ := registerMember(t, ts, owner, "kit")
+	mo, moID := registerMember(t, ts, owner, "mo")
+	jo, joID := registerMember(t, ts, owner, "jo")
+
+	dm := kit.mustStatus(201, "POST", "/api/groups", map[string]any{"kind": "dm", "members": []string{moID}})
+	id := dm["id"].(string)
+	dp := "/api/groups/" + id
+	if !groupCan(dm, "add_members") || groupCan(dm, "remove_members") {
+		t.Fatalf("dm abilities: %v", dm)
+	}
+	kit.mustStatus(201, "POST", dp+"/messages", map[string]string{"body_html": "<p>before jo</p>"})
+
+	// Jo is not in it, so to jo it does not exist; mo, a plain member, brings jo in.
+	jo.mustStatus(404, "POST", dp+"/members", map[string]string{"user_id": joID})
+	mo.mustStatus(201, "POST", dp+"/members", map[string]string{"user_id": joID})
+	for who, c := range map[string]*client{"kit": kit, "mo": mo, "jo": jo} {
+		if got := memberNames(myGroups(c)[id]); got != "jo,kit,mo" {
+			t.Fatalf("%s lists the dm's people as %q, want jo,kit,mo", who, got)
+		}
+	}
+	if msgs := jo.mustStatus(200, "GET", dp+"/messages", nil)["messages"].([]any); len(msgs) != 1 {
+		t.Fatalf("jo sees %d messages, want the one from before", len(msgs))
+	}
+	// Every open page learns the new people from a group event, since a DM is named by them.
+	if got := memberNames(lastGroupEvent(t, kit, id)); got != "jo,kit,mo" {
+		t.Fatalf("kit's group event names %q, want jo,kit,mo", got)
+	}
+
+	// Kit and mo alone is another conversation; the three together is this one.
+	pair := kit.mustStatus(201, "POST", "/api/groups", map[string]any{"kind": "dm", "members": []string{moID}})
+	if pair["id"] == id {
+		t.Fatal("the pair's dm is the three-way one")
+	}
+	if three := kit.mustStatus(200, "POST", "/api/groups", map[string]any{"kind": "dm", "members": []string{moID, joID}}); three["id"] != id {
+		t.Fatalf("the three together found %v, want %v", three["id"], id)
+	}
+
+	// Jo leaves: the dm is kit and mo to those left, by a group event, and
+	// of the two dms now holding kit and mo, Message finds the newer.
+	jo.mustStatus(204, "DELETE", dp+"/members/"+joID, nil)
+	if got := memberNames(myGroups(kit)[id]); got != "kit,mo" {
+		t.Fatalf("after jo left: %q, want kit,mo", got)
+	}
+	if got := memberNames(lastGroupEvent(t, mo, id)); got != "kit,mo" {
+		t.Fatalf("mo's group event after jo left names %q, want kit,mo", got)
+	}
+	if again := kit.mustStatus(200, "POST", "/api/groups", map[string]any{"kind": "dm", "members": []string{moID}}); again["id"] != pair["id"] {
+		t.Fatalf("Message mo found %v, want the newer %v", again["id"], pair["id"])
+	}
+}
+
+// lastGroupEvent is the viewer's newest group event about one group.
+func lastGroupEvent(t *testing.T, c *client, id string) map[string]any {
+	t.Helper()
+	var found map[string]any
+	for _, e := range c.readEvents(80) {
+		if p, ok := e["payload"].(map[string]any); ok && e["kind"] == "group" && p["id"] == id {
+			found = p
+		}
+	}
+	if found == nil {
+		t.Fatalf("no group event for %s", id)
+	}
+	return found
+}
+
 // memberJoined is one member's joined time as the group's members list gives it.
 func memberJoined(c *client, groupPath, userID string) any {
 	for _, m := range c.mustStatus(200, "GET", groupPath+"/members", nil)["members"].([]any) {

@@ -207,9 +207,9 @@ func (s *Server) Routes(mux *http.ServeMux) {
 	})
 
 	// The root group's staff: an invite link adds someone to the root group.
-	mux.HandleFunc("GET /api/invites", s.requireRoot(perm.AddMembers, s.listInvites))
-	mux.HandleFunc("POST /api/invites", s.requireRoot(perm.AddMembers, s.createInvite))
-	mux.HandleFunc("DELETE /api/invites/{code}", s.requireRoot(perm.AddMembers, s.deleteInvite))
+	mux.HandleFunc("GET /api/invites", s.requireRoot(perm.Invite, s.listInvites))
+	mux.HandleFunc("POST /api/invites", s.requireRoot(perm.Invite, s.createInvite))
+	mux.HandleFunc("DELETE /api/invites/{code}", s.requireRoot(perm.Invite, s.deleteInvite))
 }
 
 func writeJSON(w http.ResponseWriter, status int, v any) {
