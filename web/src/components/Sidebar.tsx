@@ -1,7 +1,6 @@
 import type { Group, User } from '../api'
 import { useAuthor } from '../data/hooks'
-import { NavAccount, NavBar, NavItem, Wordmark } from '../ui'
-import { groupLabel } from './GroupView'
+import { Hairline, NavAccount, NavBar, NavItem, NavSection, Tile, Wordmark } from '../ui'
 
 interface SidebarProps {
   me: User
@@ -18,14 +17,21 @@ function at(location: string, path: string): boolean {
   return location === path || location.startsWith(path + '/')
 }
 
+const groupPath = (g: Group) => `/g/${encodeURIComponent(g.id)}`
+
 /**
- * The left navigation: Home is the root group; then the pages; then my
- * groups and DMs, and New group when the root group says I may.
+ * The left navigation, in three blocks (architecture.md, Layout): places
+ * (Home, then the named groups I am in, with New group as that section's
+ * own control), the tools that reach across every place (Messages, Search,
+ * Alerts), and the house (People, Settings, me). DMs are conversations,
+ * not places: they live behind Messages, which is current inside one.
  */
 export function Sidebar({ me, groups, location, expanded, onGo, onToggle }: SidebarProps) {
   const live = useAuthor(me)
   const root = groups.find((g) => g.kind === 'root')
-  const mine = groups.filter((g) => g.kind !== 'root')
+  const mine = groups.filter((g) => g.kind === 'group')
+  const inDM = groups.some((g) => g.kind === 'dm' && at(location, groupPath(g)))
+  const canCreate = root?.can.create_groups === true
   return (
     <NavBar
       expanded={expanded}
@@ -43,8 +49,44 @@ export function Sidebar({ me, groups, location, expanded, onGo, onToggle }: Side
       }
     >
       <NavItem icon="home" label="Home" expanded={expanded} current={location === '/'} onClick={() => onGo('/')} />
+      {(mine.length > 0 || canCreate) && (
+        <NavSection
+          title="Groups"
+          expanded={expanded}
+          action={
+            canCreate
+              ? {
+                  icon: 'plus',
+                  label: 'New group',
+                  current: location === '/groups/new',
+                  onClick: () => onGo('/groups/new'),
+                }
+              : undefined
+          }
+        >
+          {mine.map((g) => (
+            <NavItem
+              key={g.id}
+              mark={<Tile name={g.name} />}
+              label={g.name}
+              expanded={expanded}
+              current={at(location, groupPath(g))}
+              onClick={() => onGo(groupPath(g))}
+            />
+          ))}
+        </NavSection>
+      )}
+      <Hairline />
+      <NavItem
+        icon="mail"
+        label="Messages"
+        expanded={expanded}
+        current={at(location, '/messages') || inDM}
+        onClick={() => onGo('/messages')}
+      />
       <NavItem icon="search" label="Search" expanded={expanded} />
-      <NavItem icon="bell" label="Notifications" expanded={expanded} />
+      <NavItem icon="bell" label="Alerts" expanded={expanded} />
+      <Hairline />
       <NavItem
         icon="people"
         label="People"
@@ -59,28 +101,6 @@ export function Sidebar({ me, groups, location, expanded, onGo, onToggle }: Side
         current={at(location, '/settings')}
         onClick={() => onGo('/settings')}
       />
-      {mine.map((g) => {
-        const path = `/g/${encodeURIComponent(g.id)}`
-        return (
-          <NavItem
-            key={g.id}
-            icon={g.kind === 'dm' ? 'chat' : 'people'}
-            label={groupLabel(g, me)}
-            expanded={expanded}
-            current={at(location, path)}
-            onClick={() => onGo(path)}
-          />
-        )
-      })}
-      {root?.can.create_groups && (
-        <NavItem
-          icon="plus"
-          label="New group"
-          expanded={expanded}
-          current={location === '/groups/new'}
-          onClick={() => onGo('/groups/new')}
-        />
-      )}
     </NavBar>
   )
 }

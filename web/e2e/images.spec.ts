@@ -22,9 +22,10 @@ test.describe('images', () => {
     await expect(post.locator('.gallery img')).toHaveCount(3)
     await expect(post.locator('.gallery')).toHaveAttribute('data-count', '3')
     await expect(post.locator('.gallery img').nth(1)).toHaveAttribute('alt', 'A tall blue rectangle')
-    // The pictures really are served: natural size, not a broken image.
-    const width = await post.locator('.gallery img').first().evaluate((img: HTMLImageElement) => img.naturalWidth)
-    expect(width).toBe(320)
+    // The pictures really are served: natural size once decoded, not a broken image.
+    await expect
+      .poll(() => post.locator('.gallery img').first().evaluate((img: HTMLImageElement) => img.naturalWidth))
+      .toBe(320)
     await kit.context.close()
   })
 

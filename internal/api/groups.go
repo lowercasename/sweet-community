@@ -24,12 +24,25 @@ type Group struct {
 	Kind string `json:"kind"`
 	Name string `json:"name"`
 	// Mode is the group's one setting: posts, chat or both. A DM is chat.
-	Mode      string   `json:"mode"`
-	CreatedAt int64    `json:"created_at"`
-	Role      string   `json:"role,omitempty"`
-	Can       GroupCan `json:"can"`
+	Mode      string `json:"mode"`
+	CreatedAt int64  `json:"created_at"`
+	// LastMessageAt is the time of the group's newest live message, or null:
+	// computed on the way out, never stored, so the Messages page can order
+	// DMs by latest activity (architecture.md, Layout).
+	LastMessageAt *int64   `json:"last_message_at"`
+	Role          string   `json:"role,omitempty"`
+	Can           GroupCan `json:"can"`
 	// Members is set for a DM only: a DM is named by its people.
 	Members []User `json:"members,omitempty"`
+}
+
+// lastAt turns the driver's MAX(created_at) (an int64, or nil when there is
+// no live message) into the wire's nullable time.
+func lastAt(v any) *int64 {
+	if n, ok := v.(int64); ok {
+		return &n
+	}
+	return nil
 }
 
 // withDMMembers fills in a DM's people, sorted by name; other groups are left alone.
@@ -152,7 +165,7 @@ func (s *Server) requireGroup(next http.HandlerFunc) http.HandlerFunc {
 			writeErr(w, http.StatusInternalServerError, err.Error())
 			return
 		}
-		g := Group{ID: row.ID, Kind: row.Kind, Name: row.Name, Mode: row.Mode, CreatedAt: row.CreatedAt}
+		g := Group{ID: row.ID, Kind: row.Kind, Name: row.Name, Mode: row.Mode, CreatedAt: row.CreatedAt, LastMessageAt: lastAt(row.LastMessageAt)}
 		next(w, r.WithContext(withGroup(r.Context(), groupFor(a, g, st), a)))
 	})
 }
@@ -172,7 +185,7 @@ func (s *Server) listGroups(w http.ResponseWriter, r *http.Request) {
 	out := make([]Group, 0, len(rows))
 	for _, row := range rows {
 		a := perm.Actor{ID: me.ID, Role: row.Role}
-		g, err := s.withDMMembers(r.Context(), Group{ID: row.ID, Kind: row.Kind, Name: row.Name, Mode: row.Mode, CreatedAt: row.CreatedAt})
+		g, err := s.withDMMembers(r.Context(), Group{ID: row.ID, Kind: row.Kind, Name: row.Name, Mode: row.Mode, CreatedAt: row.CreatedAt, LastMessageAt: lastAt(row.LastMessageAt)})
 		if err != nil {
 			writeErr(w, http.StatusInternalServerError, err.Error())
 			return
@@ -251,7 +264,7 @@ func (s *Server) createGroup(w http.ResponseWriter, r *http.Request) {
 				writeErr(w, http.StatusInternalServerError, err.Error())
 				return
 			}
-			writeJSON(w, http.StatusOK, groupFor(perm.Actor{ID: me.ID, Role: perm.Member}, Group{ID: row.ID, Kind: row.Kind, Name: row.Name, Mode: row.Mode, CreatedAt: row.CreatedAt}, st))
+			writeJSON(w, http.StatusOK, groupFor(perm.Actor{ID: me.ID, Role: perm.Member}, Group{ID: row.ID, Kind: row.Kind, Name: row.Name, Mode: row.Mode, CreatedAt: row.CreatedAt, LastMessageAt: lastAt(row.LastMessageAt)}, st))
 			return
 		}
 		s.createGroupWith(w, r, perm.KindDM, "", perm.ModeChat, now, people)
@@ -362,7 +375,7 @@ func (s *Server) updateGroup(w http.ResponseWriter, r *http.Request) {
 		}
 		g.Mode = *in.Mode
 	}
-	logged := Group{ID: g.ID, Kind: g.Kind, Name: g.Name, Mode: g.Mode, CreatedAt: g.CreatedAt}
+	logged := Group{ID: g.ID, Kind: g.Kind, Name: g.Name, Mode: g.Mode, CreatedAt: g.CreatedAt, LastMessageAt: g.LastMessageAt}
 	s.logged(w, r, "group", db.Now(), func(qtx *store.Queries) (any, int, error) {
 		err := qtx.UpdateGroup(r.Context(), store.UpdateGroupParams{Name: g.Name, Mode: g.Mode, ID: g.ID})
 		return &logged, http.StatusOK, err

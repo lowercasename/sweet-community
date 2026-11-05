@@ -4,7 +4,7 @@ import type { QueryClient } from '@tanstack/react-query'
 import { makeQueryClient } from './client'
 import { keys } from './keys'
 import { applyEvent } from './apply'
-import { ROOT, comment, group, member, message, mine, post, user } from '../test-utils'
+import { ROOT, comment, dm, group, member, message, mine, post, user } from '../test-utils'
 import type { Group, Member, PostPage, User } from '../api'
 
 /**
@@ -177,5 +177,16 @@ describe('applyEvent', () => {
   it('keeps can flags from the stream, which the server computed for this viewer', () => {
     applyEvent(qc, 'post', post('p5', kit, { can: mine }))
     expect(posts()[0].can).toEqual(mine)
+  })
+})
+
+describe('latest activity', () => {
+  it("a message moves its group's last_message_at forward, and a replayed older one never moves it back", () => {
+    qc.setQueryData(keys.groups, { groups: [group(ROOT, 'member'), dm('d1', [kit, mo])] })
+    applyEvent(qc, 'message', message('m5', mo, { group_id: 'd1', created_at: 500 }))
+    expect(groups().find((g) => g.id === 'd1')!.last_message_at).toBe(500)
+    expect(groups().find((g) => g.id === ROOT)!.last_message_at).toBeNull()
+    applyEvent(qc, 'message', message('m1', mo, { group_id: 'd1', created_at: 100 }))
+    expect(groups().find((g) => g.id === 'd1')!.last_message_at).toBe(500)
   })
 })

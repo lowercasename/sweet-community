@@ -11,6 +11,14 @@ export function renderWithQuery(ui: ReactNode) {
   return { qc, ...result }
 }
 
+/** A control's name as assistive tech reads it: its aria-label, else its text without aria-hidden decoration. */
+export const nameOf = (el: HTMLElement): string =>
+  el.getAttribute('aria-label') ??
+  [...el.childNodes]
+    .filter((n) => !(n instanceof HTMLElement && n.getAttribute('aria-hidden') === 'true'))
+    .map((n) => n.textContent)
+    .join('')
+
 export const nobody = { edit: false, delete: false }
 export const mine = { edit: true, delete: true }
 
@@ -28,6 +36,7 @@ export const group = (id: string, role: Group['role'], extra: Partial<Group> = {
   name: id === ROOT ? '' : id,
   mode: 'both',
   created_at: 1,
+  last_message_at: null,
   role,
   can: {
     add_members: role !== 'member',
@@ -45,12 +54,13 @@ export const group = (id: string, role: Group['role'], extra: Partial<Group> = {
 })
 
 /** A DM as its viewer sees it: chat only, named by its people. */
-export const dm = (id: string, people: User[]): Group => ({
+export const dm = (id: string, people: User[], extra: Partial<Group> = {}): Group => ({
   id,
   kind: 'dm',
   name: '',
   mode: 'chat',
   created_at: 1,
+  last_message_at: null,
   role: 'member',
   can: {
     add_members: false,
@@ -63,6 +73,7 @@ export const dm = (id: string, people: User[]): Group => ({
     leave: true,
   },
   members: people,
+  ...extra,
 })
 
 export const post = (id: string, author: User, extra: Partial<Post> = {}): Post => ({

@@ -118,6 +118,18 @@ function deleteComment(qc: QueryClient, id: string, postId: string, groupId: str
 }
 
 function upsertMessage(qc: QueryClient, m: Message) {
+  // The newest word in a group is what orders the Messages page; a replay never moves it back.
+  qc.setQueryData<Groups>(keys.groups, (old) =>
+    old
+      ? {
+          groups: old.groups.map((g) =>
+            g.id === m.group_id && (g.last_message_at ?? -Infinity) < m.created_at
+              ? { ...g, last_message_at: m.created_at }
+              : g,
+          ),
+        }
+      : old,
+  )
   qc.setQueryData<Messages>(keys.messages(m.group_id), (old) => {
     if (!old) return old
     const known = old.pages.some((p) => p.messages.some((x) => x.id === m.id))

@@ -384,3 +384,38 @@ func TestOwnershipNeverLapses(t *testing.T) {
 		t.Fatalf("former instance owner: %v", got)
 	}
 }
+
+// A group carries the time of its newest live message, computed on the way
+// out, so the Messages page can order DMs by latest activity without the
+// client keeping a second copy of anything.
+func TestGroupsCarryLastActivity(t *testing.T) {
+	ts, owner := newTestServer(t)
+	kit, _ := registerMember(t, ts, owner, "kit")
+	_, moID := registerMember(t, ts, owner, "mo")
+
+	dm := kit.mustStatus(201, "POST", "/api/groups", map[string]any{"kind": "dm", "members": []string{moID}})
+	id := dm["id"].(string)
+	if v, ok := dm["last_message_at"]; !ok || v != nil {
+		t.Fatalf("a new dm: last_message_at %v (present %v), want null", v, ok)
+	}
+	if v := myGroups(kit)[id]["last_message_at"]; v != nil {
+		t.Fatalf("listed new dm: last_message_at %v, want null", v)
+	}
+
+	msg := kit.mustStatus(201, "POST", "/api/groups/"+id+"/messages", map[string]string{"body_html": "<p>psst</p>"})
+	if got := myGroups(kit)[id]["last_message_at"]; got != msg["created_at"] {
+		t.Fatalf("listed dm after a message: last_message_at %v, want %v", got, msg["created_at"])
+	}
+	if got := kit.mustStatus(200, "GET", "/api/groups/"+id, nil)["last_message_at"]; got != msg["created_at"] {
+		t.Fatalf("fetched dm after a message: last_message_at %v, want %v", got, msg["created_at"])
+	}
+	// The root group carries it too: one shape for every group.
+	if _, ok := myGroups(kit)[perm.Root]["last_message_at"]; !ok {
+		t.Fatal("root group lacks last_message_at")
+	}
+	// Deleting the only message is as if it were never said.
+	kit.mustStatus(200, "DELETE", "/api/messages/"+msg["id"].(string), nil)
+	if v := myGroups(kit)[id]["last_message_at"]; v != nil {
+		t.Fatalf("dm after deleting its only message: last_message_at %v, want null", v)
+	}
+}

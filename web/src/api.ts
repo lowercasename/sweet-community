@@ -52,6 +52,8 @@ export interface Group {
   /** The group's one setting: posts, chat or both. A DM is chat. */
   mode: GroupMode
   created_at: number
+  /** When its newest live message was sent, or null. Server-computed; orders the Messages page. */
+  last_message_at: number | null
   /** The viewer's own role in it. */
   role: Role
   can: GroupCan

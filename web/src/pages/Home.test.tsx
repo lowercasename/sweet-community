@@ -118,11 +118,12 @@ describe('Home', () => {
     expect(navAvatar()).toBe('/img/new-face')
   })
 
-  it('lists my groups in the nav, names a DM by the other person, and opens a chat-only group with one pane', async () => {
+  it('lists my groups in the nav, keeps DMs behind Messages, and opens a chat-only group with one pane', async () => {
     const { getMessages } = await import('../api')
     const { container } = await home()
     expect(nav().getByRole('button', { name: 'Knitting' })).toBeTruthy()
-    expect(nav().getByRole('button', { name: 'kit' })).toBeTruthy()
+    expect(nav().queryByRole('button', { name: 'kit' })).toBeNull()
+    expect(nav().getByRole('button', { name: 'Messages' })).toBeTruthy()
     expect(nav().getByRole('button', { name: 'New group' })).toBeTruthy()
 
     fireEvent.click(nav().getByRole('button', { name: 'Knitting' }))
@@ -145,6 +146,24 @@ describe('Home', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Back to Knitting' }))
     expect(window.location.pathname).toBe('/g/knit')
     expect(container.querySelector('.ProseMirror')!.closest('.hidden')).toBeNull()
+  })
+
+  it('Messages lists my DMs by their people and stays current inside one', async () => {
+    const { getMessages } = await import('../api')
+    const { container } = await home()
+    fireEvent.click(nav().getByRole('button', { name: 'Messages' }))
+    expect(window.location.pathname).toBe('/messages')
+    await screen.findByRole('heading', { name: 'Messages' })
+    expect(nav().getByRole('button', { name: 'Messages' }).getAttribute('aria-current')).toBe('page')
+    // The feed and room stay mounted behind the page.
+    expect(container.querySelector('.ProseMirror')!.closest('.hidden')).not.toBeNull()
+
+    fireEvent.click(screen.getByRole('button', { name: 'kit' }))
+    expect(window.location.pathname).toBe('/g/d1')
+    await vi.waitFor(() => expect(getMessages).toHaveBeenCalledWith('d1', null))
+    expect(screen.getByRole('heading', { name: 'kit' })).toBeTruthy()
+    expect(nav().getByRole('button', { name: 'Messages' }).getAttribute('aria-current')).toBe('page')
+    expect(nav().getByRole('button', { name: 'Home' }).getAttribute('aria-current')).toBeNull()
   })
 
   it('opens whatever page the URL names, and the back button returns', async () => {

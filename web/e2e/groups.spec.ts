@@ -140,8 +140,9 @@ test.describe('groups', () => {
     await expect(kit.page.locator('.editor-post')).toHaveCount(0)
     const text = uniq('psst ')
     await sendMessage(kit.page, text)
-    // Mo's nav names the DM after kit and the message is there.
-    await nav(mo.page).getByRole('button', { name: kit.username }).click()
+    // Mo's Messages page names the DM after kit, live, and the message is there.
+    await nav(mo.page).getByRole('button', { name: 'Messages' }).click()
+    await mo.page.getByRole('list').getByRole('button', { name: kit.username }).click()
     await expect(article(mo.page, text)).toBeVisible()
     // The same two people open the same DM again.
     await open(kit.page, '/people')

@@ -8,6 +8,7 @@ import { GroupBar } from '../components/GroupBar'
 import { GroupView } from '../components/GroupView'
 import { MembersPage } from '../components/MembersPage'
 import { MenuPage } from '../components/MenuPage'
+import { MessagesPage } from '../components/MessagesPage'
 import { NewGroupPage } from '../components/NewGroupPage'
 import { PeoplePage } from '../components/PeoplePage'
 import { SettingsPage } from '../components/SettingsPage'
@@ -27,8 +28,8 @@ export function groupPath(id: string, rootId: string | undefined): string {
 
 /**
  * The signed-in app: a nav column on the left, then the page the URL names
- * (architecture.md, Layout). `/` and `/g/<id>` are a group's view; the other
- * pages show over it. The last group the URL named stays mounted behind
+ * (architecture.md, Layout). `/` and `/g/<id>` are a group's view (a DM's
+ * too); the other pages show over it. The last group the URL named stays mounted behind
  * them, so a half-written post or message survives a visit to Settings or
  * Members; naming another group swaps it.
  */
@@ -83,6 +84,9 @@ export function Home({ me, onSignOut }: HomeProps) {
             {root && <PeoplePage me={me} root={root} onOpenGroup={(id) => navigate(groupPath(id, root.id))} />}
           </Route>
           <Route path="/settings">{root && <SettingsPage me={me} root={root} onSignOut={onSignOut} />}</Route>
+          <Route path="/messages">
+            <MessagesPage me={me} onGo={navigate} />
+          </Route>
           <Route path="/menu">
             <MenuPage me={me} groups={groups} onGo={navigate} onLogout={onSignOut} />
           </Route>

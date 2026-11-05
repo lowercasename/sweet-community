@@ -11,6 +11,7 @@ import {
   Italic,
   Link,
   LogOut,
+  Mail,
   Menu,
   MessageCircle,
   MessagesSquare,
@@ -41,6 +42,7 @@ export type IconName =
   | 'chat'
   | 'menu'
   | 'logout'
+  | 'mail'
   | 'comment'
   | 'image'
   | 'pencil'
@@ -67,6 +69,7 @@ const ICONS: Record<IconName, LucideIcon> = {
   chat: MessagesSquare,
   menu: Menu,
   logout: LogOut,
+  mail: Mail,
   comment: MessageCircle,
   image: ImageIcon,
   pencil: Pencil,

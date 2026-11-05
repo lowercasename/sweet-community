@@ -98,15 +98,18 @@ func (q *Queries) DeleteMembership(ctx context.Context, arg DeleteMembershipPara
 
 const getGroup = `-- name: GetGroup :one
 
-SELECT id, kind, name, mode, created_at FROM groups WHERE id = ?1 AND deleted_at IS NULL
+SELECT g.id, g.kind, g.name, g.mode, g.created_at,
+       (SELECT MAX(created_at) FROM messages WHERE group_id = g.id AND deleted_at IS NULL) AS last_message_at
+FROM groups g WHERE g.id = ?1 AND g.deleted_at IS NULL
 `
 
 type GetGroupRow struct {
-	ID        string
-	Kind      string
-	Name      string
-	Mode      string
-	CreatedAt int64
+	ID            string
+	Kind          string
+	Name          string
+	Mode          string
+	CreatedAt     int64
+	LastMessageAt interface{}
 }
 
 // Groups and memberships (architecture.md, Groups). Roles live here, not
@@ -120,6 +123,7 @@ func (q *Queries) GetGroup(ctx context.Context, id string) (GetGroupRow, error) 
 		&i.Name,
 		&i.Mode,
 		&i.CreatedAt,
+		&i.LastMessageAt,
 	)
 	return i, err
 }
@@ -249,19 +253,21 @@ func (q *Queries) ListMyGroupIDs(ctx context.Context, userID string) ([]string, 
 }
 
 const listMyGroups = `-- name: ListMyGroups :many
-SELECT g.id, g.kind, g.name, g.mode, g.created_at, m.role
+SELECT g.id, g.kind, g.name, g.mode, g.created_at, m.role,
+       (SELECT MAX(created_at) FROM messages WHERE group_id = g.id AND deleted_at IS NULL) AS last_message_at
 FROM memberships m JOIN groups g ON g.id = m.group_id
 WHERE m.user_id = ?1 AND g.deleted_at IS NULL
 ORDER BY g.kind = 'root' DESC, g.created_at
 `
 
 type ListMyGroupsRow struct {
-	ID        string
-	Kind      string
-	Name      string
-	Mode      string
-	CreatedAt int64
-	Role      string
+	ID            string
+	Kind          string
+	Name          string
+	Mode          string
+	CreatedAt     int64
+	Role          string
+	LastMessageAt interface{}
 }
 
 func (q *Queries) ListMyGroups(ctx context.Context, userID string) ([]ListMyGroupsRow, error) {
@@ -280,6 +286,7 @@ func (q *Queries) ListMyGroups(ctx context.Context, userID string) ([]ListMyGrou
 			&i.Mode,
 			&i.CreatedAt,
 			&i.Role,
+			&i.LastMessageAt,
 		); err != nil {
 			return nil, err
 		}

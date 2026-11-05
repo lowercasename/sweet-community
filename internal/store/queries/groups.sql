@@ -2,13 +2,16 @@
 -- on users. Who may do what is perm's call; the queries do not check.
 
 -- name: GetGroup :one
-SELECT id, kind, name, mode, created_at FROM groups WHERE id = sqlc.arg(id) AND deleted_at IS NULL;
+SELECT g.id, g.kind, g.name, g.mode, g.created_at,
+       (SELECT MAX(created_at) FROM messages WHERE group_id = g.id AND deleted_at IS NULL) AS last_message_at
+FROM groups g WHERE g.id = sqlc.arg(id) AND g.deleted_at IS NULL;
 
 -- name: GetMembership :one
 SELECT role FROM memberships WHERE group_id = sqlc.arg(group_id) AND user_id = sqlc.arg(user_id);
 
 -- name: ListMyGroups :many
-SELECT g.id, g.kind, g.name, g.mode, g.created_at, m.role
+SELECT g.id, g.kind, g.name, g.mode, g.created_at, m.role,
+       (SELECT MAX(created_at) FROM messages WHERE group_id = g.id AND deleted_at IS NULL) AS last_message_at
 FROM memberships m JOIN groups g ON g.id = m.group_id
 WHERE m.user_id = sqlc.arg(user_id) AND g.deleted_at IS NULL
 ORDER BY g.kind = 'root' DESC, g.created_at;
