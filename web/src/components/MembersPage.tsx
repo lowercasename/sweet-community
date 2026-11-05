@@ -34,7 +34,11 @@ const MODES: { value: GroupMode; label: string }[] = [
   { value: 'chat', label: 'Chat only' },
 ]
 
-const ROLE_WORD: Record<Membership['role'], string> = { owner: 'owner', moderator: 'moderator', member: '' }
+const ROLE_WORD: Record<Membership['role'], string> = {
+  owner: 'owner',
+  moderator: 'moderator',
+  member: '',
+}
 
 /**
  * Who is in a group and, for those the group's can flags allow, the controls:
@@ -133,7 +137,10 @@ export function MembersPage({ group, me, onLeft }: MembersPageProps) {
                       value={pick}
                       options={[
                         { value: '', label: 'Choose a person…' },
-                        ...candidates.map((u) => ({ value: u.id, label: u.username })),
+                        ...candidates.map((u) => ({
+                          value: u.id,
+                          label: u.username,
+                        })),
                       ]}
                       onChange={setPick}
                     />
@@ -158,7 +165,8 @@ export function MembersPage({ group, me, onLeft }: MembersPageProps) {
                               {m.user.username}
                             </Text>
                             <Text as="span" variant="small">
-                              {ROLE_WORD[m.role] && `${ROLE_WORD[m.role]} · `}joined <Time at={m.joined_at} />
+                              {ROLE_WORD[m.role] && `${ROLE_WORD[m.role]} · `}
+                              joined <Time at={m.joined_at} />
                             </Text>
                           </Row>
                           {!self && m.role !== 'owner' && (
@@ -225,7 +233,9 @@ export function MembersPage({ group, me, onLeft }: MembersPageProps) {
         onConfirm={() => confirm?.kind === 'handover' && void run(() => setRole(confirm.to.user.id, 'owner'))}
         onClose={() => setConfirm(null)}
       >
-        <Text variant="secondary">You will become a moderator. Only the new owner can hand it back.</Text>
+        <Text variant="secondary">
+          You will become a moderator. Only the new owner can make you or someone else an owner.
+        </Text>
       </ConfirmDialog>
       <ConfirmDialog
         open={confirm?.kind === 'leave'}

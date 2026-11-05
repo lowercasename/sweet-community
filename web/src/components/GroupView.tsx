@@ -37,7 +37,7 @@ export function GroupView({ group, me, hidden, onMembers }: GroupViewProps) {
         <Row justify="between" align="center" pad>
           <Heading level={2}>{groupLabel(group, me)}</Heading>
           <Button variant="ghost" icon="people" onClick={onMembers}>
-            Members
+            Members and settings
           </Button>
         </Row>
       )}
