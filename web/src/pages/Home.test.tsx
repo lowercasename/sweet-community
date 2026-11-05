@@ -139,14 +139,19 @@ describe('Home', () => {
     await screen.findByRole('heading', { name: 'Members' })
     expect(window.location.pathname).toBe('/g/knit/members')
     expect(container.querySelector('.ProseMirror')!.closest('.hidden')).not.toBeNull()
-    expect(screen.queryByRole('heading', { name: 'Knitting' })!.closest('.hidden')).not.toBeNull()
+    // The group's bar stays, with its name and a way back; Members is no longer offered there.
+    expect(screen.getByRole('heading', { name: 'Knitting' }).closest('.hidden')).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Members' })).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: 'Back to Knitting' }))
+    expect(window.location.pathname).toBe('/g/knit')
+    expect(container.querySelector('.ProseMirror')!.closest('.hidden')).toBeNull()
   })
 
   it('opens whatever page the URL names, and the back button returns', async () => {
     const { getMessages } = await import('../api')
     await home('/g/knit/members')
     await screen.findByRole('heading', { name: 'Members' })
-    expect(screen.getByRole('heading', { name: 'Knitting' }).closest('.hidden')).not.toBeNull()
+    expect(screen.getByRole('heading', { name: 'Knitting' }).closest('.hidden')).toBeNull()
     // The group named by the URL is the one mounted behind the page.
     await vi.waitFor(() => expect(getMessages).toHaveBeenCalledWith('knit', null))
     expect(getMessages).not.toHaveBeenCalledWith(ROOT, null)
