@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import type { Message } from '../api'
 import { useAuthor } from '../data/hooks'
-import { Box, ConfirmDialog, HtmlContent, Menu, Row, Stack, Text, Time } from '../ui'
+import { Box, ConfirmDialog, HtmlContent, Menu, MessageBlock, Row, Stack, Text, Time } from '../ui'
 import { PersonName } from './PersonName'
 
 interface MessageGroupProps {
@@ -13,10 +13,9 @@ interface MessageGroupProps {
 
 /**
  * One person's run of messages: avatar, name and time once, then the bodies
- * close together. Each message has its own menu at the top right of its
- * block, so the first one's shares the author's line and a later one's sits
- * beside its own line (Discord's and Slack's shape). A block never wraps:
- * the body shrinks before the menu moves, however wide a picture is.
+ * close together, each its own block. A message's menu floats at the top
+ * right of its own block, the first one's too, never on the author's line;
+ * the block takes a blush while hovered (Raphael, 2026-11-06).
  */
 export function MessageGroup({ messages, onDelete }: MessageGroupProps) {
   const first = messages[0]
@@ -37,28 +36,28 @@ export function MessageGroup({ messages, onDelete }: MessageGroupProps) {
 
   return (
     <Box as="article">
-      <Stack gap={1}>
-        {messages.map((m, i) => (
-          <Row key={m.id} justify="between" align="start" wrap="never" block="message">
-            <Stack gap={1} fill>
-              {i === 0 && (
-                <Row gap={2} align="center">
-                  <PersonName user={author} avatar="sm" />
-                  <Text as="span" variant="small">
-                    <Time at={first.created_at} />
-                  </Text>
-                </Row>
-              )}
-              <HtmlContent html={m.body_html} />
-            </Stack>
-            {m.can.delete && (
-              <Menu
-                label="Message options"
-                items={[{ label: 'Delete', icon: 'trash', onSelect: () => setConfirming(m.id) }]}
-                reveal="message"
-              />
-            )}
-          </Row>
+      <Stack gap={0}>
+        <Row gap={2} align="center">
+          <PersonName user={author} avatar="sm" />
+          <Text as="span" variant="small">
+            <Time at={first.created_at} />
+          </Text>
+        </Row>
+        {messages.map((m) => (
+          <MessageBlock
+            key={m.id}
+            menu={
+              m.can.delete ? (
+                <Menu
+                  label="Message options"
+                  items={[{ label: 'Delete', icon: 'trash', onSelect: () => setConfirming(m.id) }]}
+                  reveal="message"
+                />
+              ) : undefined
+            }
+          >
+            <HtmlContent html={m.body_html} />
+          </MessageBlock>
         ))}
       </Stack>
       <ConfirmDialog

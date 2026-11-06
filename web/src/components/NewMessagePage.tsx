@@ -42,8 +42,8 @@ export function NewMessagePage({ me, onOpened }: NewMessagePageProps) {
           <Card>
             <Stack gap={2}>
               <Text variant="secondary">
-                A conversation with one person: the one you already have with them, or a new one. For more people, make
-                a room.
+                Start a direct, private conversation with one person. If you want to create a private space with
+                multiple people, create a Room.
               </Text>
               <Form onSubmit={() => void start()}>
                 <Field label="To">

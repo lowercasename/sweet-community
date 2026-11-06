@@ -26,8 +26,6 @@ interface RowProps {
   wrap?: 'always' | 'narrow' | 'never'
   /** Never shrink: an actions cluster keeps its buttons whole. */
   shrink?: boolean
-  /** A message's row: its revealed Menu shows while the row is hovered (ui/Menu). */
-  block?: 'message'
   children?: ReactNode
 }
 
@@ -39,11 +37,10 @@ export function Row({
   pad = false,
   wrap = 'always',
   shrink = true,
-  block,
   children,
 }: RowProps) {
   const cls = [
-    block === 'message' ? 'block-message flex min-w-0 flex-row' : 'flex min-w-0 flex-row',
+    'flex min-w-0 flex-row',
     wrap === 'narrow' ? 'flex-wrap @xl:flex-nowrap' : wrap === 'never' ? 'flex-nowrap' : 'flex-wrap',
     shrink ? '' : 'flex-none',
     GAPS[gap],

@@ -37,7 +37,7 @@ test.describe('chat', () => {
     await kit.context.close()
   })
 
-  test("a message's menu sits on the author line; a later one in the run sits beside its own line", async ({
+  test("a message's menu floats at the top right of its own block, the first one too; a hovered message blushes", async ({
     browser,
   }, testInfo) => {
     const kit = await member(browser, testInfo)
@@ -50,26 +50,33 @@ test.describe('chat', () => {
     await expect(chat.locator('textarea')).toHaveCount(1)
     await sendMessage(kit.page, text)
     const msg = article(kit.page, text)
-    const img = await msg.locator('.content img').boundingBox()
-    const author = await msg.getByRole('button', { name: kit.username }).boundingBox()
-    const menu = await msg.getByRole('button', { name: 'Message options' }).first().boundingBox()
-    // The first message's menu shares the author's line, to the right of the picture, never under it.
-    expect(img && author && menu && menu.x >= img.x + img.width).toBeTruthy()
-    expect(author && menu && menu.y < author.y + author.height && menu.y + menu.height > author.y).toBeTruthy()
-    // A second message joins the run; its menu sits beside its own line, below the picture.
+    const author = (await msg.getByRole('button', { name: kit.username }).boundingBox())!
+    const block = msg.locator('.content').first()
+    const b1 = (await block.boundingBox())!
+    const menu = (await msg.getByRole('button', { name: 'Message options' }).first().boundingBox())!
+    // Below the author's line, at the top right of the message's own block, however tall the picture.
+    expect(menu.y).toBeGreaterThanOrEqual(author.y + author.height - 1)
+    expect(Math.abs(menu.y - b1.y)).toBeLessThan(6)
+    expect(menu.x).toBeGreaterThan(b1.x + b1.width - 1)
+    // A second message joins the run; its menu sits at the top right of its own block too.
     const more = uniq('and this ')
     await sendMessage(kit.page, more)
-    const second = article(kit.page, text).getByText(more)
-    const line = await second.boundingBox()
-    const menu2 = await msg.getByRole('button', { name: 'Message options' }).nth(1).boundingBox()
-    expect(img && line && menu2 && line.y >= img.y + img.height && menu2.y < line.y + line.height).toBeTruthy()
-    expect(line && menu2 && menu2.y + menu2.height > line.y).toBeTruthy()
-    // A third: the lines of a run keep their 4px rhythm; a menu beside a line never makes its row taller.
+    const line = (await msg.getByText(more).boundingBox())!
+    const menu2 = (await msg.getByRole('button', { name: 'Message options' }).nth(1).boundingBox())!
+    expect(Math.abs(menu2.y - line.y)).toBeLessThan(6)
+    expect(menu2.x).toBeGreaterThan(line.x + line.width - 1)
+    // A third: the lines of a run keep their 4px rhythm; a menu never makes its block taller.
     const third = uniq('and that ')
     await sendMessage(kit.page, third)
-    const l2 = (await article(kit.page, text).getByText(more).boundingBox())!
-    const l3 = (await article(kit.page, text).getByText(third).boundingBox())!
+    const l2 = (await msg.getByText(more).boundingBox())!
+    const l3 = (await msg.getByText(third).boundingBox())!
     expect(Math.round(l3.y - (l2.y + l2.height))).toBe(4)
+    // Hovering a message blushes it.
+    await msg.getByText(third).hover()
+    await expect(msg.getByText(third).locator('xpath=ancestor::div[contains(@class,"block-message")][1]')).toHaveCSS(
+      'background-color',
+      'rgb(255, 250, 252)',
+    )
     await kit.context.close()
   })
 })

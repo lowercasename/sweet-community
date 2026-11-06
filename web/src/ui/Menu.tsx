@@ -40,7 +40,7 @@ interface MenuProps {
 
 /**
  * The classes that hide a revealed menu until its block is hovered or focused, on pointer screens only. The blocks
- * are marked `block-post` (Card as article), `block-comment` (Box as article) and `block-message` (Row block="message").
+ * are marked `block-post` (Card as article), `block-comment` (Box as article) and `block-message` (MessageBlock).
  */
 const REVEAL: Record<NonNullable<MenuProps['reveal']>, string> = {
   post: 'pointer-fine:opacity-0 pointer-fine:[.block-post:hover:not(:has(.block-comment:hover))_&]:opacity-100 pointer-fine:[.block-post:focus-within:not(:has(.block-comment:focus-within))_&]:opacity-100',
@@ -84,8 +84,7 @@ export function Menu({ label, icon = 'more', items, reveal }: MenuProps) {
       <button
         ref={triggerRef}
         type="button"
-        // Beside a message's line the trigger overlaps its row vertically (-my-1), so a 32px button never makes a 24px line's row taller.
-        className={`${buttonClass('ghost', true)} ${reveal === 'message' ? '-my-1' : ''} ${reveal && !open ? REVEAL[reveal] : ''}`}
+        className={`${buttonClass('ghost', true)} ${reveal && !open ? REVEAL[reveal] : ''}`}
         aria-label={label}
         {...getReferenceProps(tip.props())}
       >
