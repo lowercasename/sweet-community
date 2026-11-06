@@ -41,7 +41,6 @@ describe('MenuPage', () => {
       'Knitting, unread',
       'New message',
       'kit',
-      'All messages',
       'People',
       'Sign out',
     ])
@@ -54,8 +53,6 @@ describe('MenuPage', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Home' }))
     expect(onGo).toHaveBeenCalledWith('/')
-    fireEvent.click(screen.getByRole('button', { name: 'All messages' }))
-    expect(onGo).toHaveBeenCalledWith('/messages')
     fireEvent.click(screen.getByRole('button', { name: 'kit' }))
     expect(onGo).toHaveBeenCalledWith('/r/d1')
     fireEvent.click(screen.getByRole('button', { name: 'New room' }))

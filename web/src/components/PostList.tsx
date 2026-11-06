@@ -1,5 +1,5 @@
 import type { Post as PostData } from '../api'
-import { Stack, Text } from '../ui'
+import { Alert, Stack } from '../ui'
 import { Post } from './Post'
 
 interface PostListProps {
@@ -11,7 +11,7 @@ interface PostListProps {
 }
 
 export function PostList({ posts, disabled, onEdit, onDelete }: PostListProps) {
-  if (posts.length === 0) return <Text variant="secondary">Nothing here yet. Write the first post.</Text>
+  if (posts.length === 0) return <Alert>Nothing here yet. Write the first post.</Alert>
   return (
     <Stack gap={3}>
       {posts.map((post) => (

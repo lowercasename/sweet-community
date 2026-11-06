@@ -167,7 +167,7 @@ test.describe('groups', () => {
     await expect(article(kit.page, text)).toBeVisible()
     await expect(kit.page.getByRole('heading', { name: mo.username })).toBeVisible()
     await expect(kit.page.getByRole('heading', { name: 'Just you' })).toHaveCount(0)
-    await nav(kit.page).getByRole('button', { name: 'All messages' }).click()
+    await open(kit.page, '/messages')
     await expect(kit.page.getByRole('list').getByRole('button', { name: mo.username })).toBeVisible()
     await expect(kit.page.getByRole('list').getByRole('button', { name: 'Just you' })).toHaveCount(0)
     await expect(nav(kit.page).getByRole('button', { name: 'Just you' })).toHaveCount(0)

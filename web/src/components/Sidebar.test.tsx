@@ -53,7 +53,6 @@ describe('Sidebar', () => {
       'Knitting',
       'New message',
       'kit',
-      'All messages',
       'Search',
       'Notifications',
       'People',
@@ -67,8 +66,6 @@ describe('Sidebar', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'New room' }))
     expect(onGo).toHaveBeenCalledWith('/rooms/new')
-    fireEvent.click(screen.getByRole('button', { name: 'All messages' }))
-    expect(onGo).toHaveBeenCalledWith('/messages')
     fireEvent.click(screen.getByRole('button', { name: 'New message' }))
     expect(onGo).toHaveBeenCalledWith('/messages/new')
     fireEvent.click(screen.getByRole('button', { name: 'kit' }))
@@ -103,9 +100,9 @@ describe('Sidebar', () => {
     ])
     expect(within(messages()).getByRole('button', { name: 'p1' }).getAttribute('aria-current')).toBe('page')
     cleanup()
-    // No conversations yet: the section still offers to start one, and the full list.
+    // No conversations yet: the section still offers to start one; All messages has nothing to add.
     await draw([root(true), knitting])
-    expect(within(messages()).getAllByRole('button').map(nameOf)).toEqual(['New message', 'All messages'])
+    expect(within(messages()).getAllByRole('button').map(nameOf)).toEqual(['New message'])
   })
 
   it('a conversation I have hidden is not in the nav', async () => {
@@ -153,7 +150,8 @@ describe('Sidebar', () => {
         .getAllByRole('button')
         .filter((b) => b.getAttribute('aria-current') === 'page')
         .map(nameOf)
-    await draw([root(true), knitting, withKit], '/messages')
+    // All messages is there to be current only when the section does not show everything.
+    await draw([root(true), knitting, ...many], '/messages')
     expect(current()).toEqual(['All messages'])
     cleanup()
     await draw([root(true), knitting, withKit], '/messages/new')
@@ -172,17 +170,7 @@ describe('Sidebar', () => {
   it('collapsed, keeps every name, drops the section title, and shows a group by its initial', async () => {
     await draw([root(true), knitting, withKit], '/', false)
     // Collapsed, there is no title row and no section control: a plus among the tiles took the room of a place.
-    expect(names()).toEqual([
-      'Home',
-      'Knitting',
-      'kit',
-      'All messages',
-      'Search',
-      'Notifications',
-      'People',
-      'raphael',
-      'Expand',
-    ])
+    expect(names()).toEqual(['Home', 'Knitting', 'kit', 'Search', 'Notifications', 'People', 'raphael', 'Expand'])
     expect(screen.queryByText('Rooms')).toBeNull()
     expect(screen.queryByText('Messages')).toBeNull()
     expect(screen.getByRole('button', { name: 'Knitting' }).textContent).toBe('K')

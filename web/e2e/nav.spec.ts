@@ -11,7 +11,7 @@ async function messageFromPeople(p: Person, who: string) {
 }
 
 test.describe('nav', () => {
-  test('rooms and conversations sit in their own sections; conversations by latest word, All messages at the foot', async ({
+  test('rooms and conversations sit in their own sections; conversations by latest word; the page lists them all', async ({
     browser,
   }, testInfo) => {
     const kit = await member(browser, testInfo, 'kit')
@@ -48,19 +48,16 @@ test.describe('nav', () => {
     await expect(kit.page.getByRole('heading', { name: jo.username })).toBeVisible()
     await sendMessage(kit.page, uniq('hi jo '))
 
-    // The section orders by latest word; All messages lists them all the same way.
+    // The section orders by latest word; with everything shown there is no All messages row. The page lists them the same way.
     const items = conversations.getByRole('button')
-    await expect(items).toHaveCount(4)
+    await expect(items).toHaveCount(3)
     await expect(items.nth(0)).toHaveAccessibleName('New message')
     await expect(items.nth(1)).toHaveText(jo.username)
     await expect(items.nth(2)).toHaveText(mo.username)
-    await expect(items.nth(3)).toHaveText('All messages')
     const a = await items.nth(1).boundingBox()
     const b = await items.nth(2).boundingBox()
     expect(a && b && b.y - (a.y + a.height) <= 1).toBeTruthy()
-    await conversations.getByRole('button', { name: 'All messages' }).click()
-    await expect(kit.page).toHaveURL(/\/messages$/)
-    await expect(conversations.getByRole('button', { name: 'All messages' })).toHaveAttribute('aria-current', 'page')
+    await kit.page.goto('/messages')
     await expect(kit.page.getByRole('heading', { name: 'Messages' })).toBeVisible()
     const rows = kit.page.getByRole('list').getByRole('listitem')
     await expect(rows).toHaveCount(2)
@@ -117,8 +114,8 @@ test.describe('nav', () => {
     await nav(kit).getByRole('button', { name: 'Menu' }).click()
     const conversations = kit.page.getByRole('group', { name: 'Messages' })
     await expect(conversations.getByRole('button', { name: mo.username })).toBeVisible()
-    await conversations.getByRole('button', { name: 'All messages' }).click()
-    await expect(kit.page).toHaveURL(/\/messages$/)
+    await expect(conversations.getByRole('button', { name: 'All messages' })).toHaveCount(0)
+    await kit.page.goto('/messages')
     await expect(kit.page.getByRole('list').getByRole('button', { name: mo.username })).toBeVisible()
 
     // Home from the menu.

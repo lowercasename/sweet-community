@@ -152,7 +152,8 @@ describe('Home', () => {
     const { container } = await home()
     expect(nav().getByRole('button', { name: 'Knitting' })).toBeTruthy()
     expect(nav().getByRole('button', { name: 'kit' })).toBeTruthy()
-    expect(nav().getByRole('button', { name: 'All messages' })).toBeTruthy()
+    // One conversation: no All messages, since the section shows it all.
+    expect(nav().queryByRole('button', { name: 'All messages' })).toBeNull()
     expect(nav().getByRole('button', { name: 'New room' })).toBeTruthy()
 
     fireEvent.click(nav().getByRole('button', { name: 'Knitting' }))
@@ -177,13 +178,11 @@ describe('Home', () => {
     expect(container.querySelector('.ProseMirror')!.closest('.hidden')).toBeNull()
   })
 
-  it('All messages lists my conversations; one opens like a room and is marked in the nav', async () => {
+  it('the Messages page lists my conversations; one opens like a room and is marked in the nav', async () => {
     const { getMessages } = await import('../api')
-    const { container } = await home()
-    fireEvent.click(nav().getByRole('button', { name: 'All messages' }))
+    const { container } = await home('/messages')
     expect(window.location.pathname).toBe('/messages')
     await screen.findByRole('heading', { name: 'Messages' })
-    expect(nav().getByRole('button', { name: 'All messages' }).getAttribute('aria-current')).toBe('page')
     // The feed and room stay mounted behind the page.
     expect(container.querySelector('.ProseMirror')!.closest('.hidden')).not.toBeNull()
 
@@ -193,7 +192,6 @@ describe('Home', () => {
     // The bar is a title: its names are text, not cards.
     expect(within(screen.getByRole('heading', { name: 'kit' })).queryByRole('button')).toBeNull()
     expect(nav().getByRole('button', { name: 'kit' }).getAttribute('aria-current')).toBe('page')
-    expect(nav().getByRole('button', { name: 'All messages' }).getAttribute('aria-current')).toBeNull()
     expect(nav().getByRole('button', { name: 'Home' }).getAttribute('aria-current')).toBeNull()
   })
 

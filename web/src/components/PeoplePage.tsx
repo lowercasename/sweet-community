@@ -61,7 +61,7 @@ function InviteRow({ invite, onRevoke }: { invite: Invite; onRevoke: () => void 
 }
 
 const ROLE_WORD: Record<Member['role'], string> = {
-  owner: 'runs this place',
+  owner: 'runs this community',
   moderator: 'moderator',
   member: '',
 }

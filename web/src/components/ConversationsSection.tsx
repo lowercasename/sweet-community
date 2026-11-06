@@ -1,5 +1,5 @@
 import type { Group, User } from '../api'
-import { conversationsOf } from '../data/groups'
+import { conversationsOf, hiddenOf } from '../data/groups'
 import { anyUnread, type UnreadPlace } from '../data/notifications'
 import { useUsers } from '../data/hooks'
 import { MESSAGES, NEW_MESSAGE, groupPath } from '../routes'
@@ -37,7 +37,8 @@ interface ConversationsSectionProps {
  * The Messages section of the nav (architecture.md, Layout): New message as
  * its own control, the five conversations with the latest word, the open
  * one too if it is older, each named by its other person and marked by
- * their face, and All messages at the foot. A conversation is a room
+ * their face, and All messages at the foot when there is more than it
+ * shows (Raphael, 2026-11-06: with five or fewer it was a row for nothing). A conversation is a room
  * without a name, so it sits with the rooms, drawn the same way.
  */
 export function ConversationsSection({ groups, me, location, places, expanded, onGo }: ConversationsSectionProps) {
@@ -47,6 +48,8 @@ export function ConversationsSection({ groups, me, location, places, expanded, o
     : undefined
   const shown = all.slice(0, SHOWN)
   if (open && !shown.includes(open)) shown.push(open)
+  // All messages earns its place only when the section does not show everything: more than the five, or hidden ones to bring back; never on the collapsed bar.
+  const more = expanded && (all.length > SHOWN || hiddenOf(groups).length > 0)
   return (
     <NavSection
       title="Messages"
@@ -70,14 +73,16 @@ export function ConversationsSection({ groups, me, location, places, expanded, o
           onClick={() => onGo(groupPath(g.id))}
         />
       ))}
-      <NavItem
-        icon="mail"
-        label="All messages"
-        expanded={expanded}
-        size="sm"
-        current={location === MESSAGES}
-        onClick={() => onGo(MESSAGES)}
-      />
+      {more && (
+        <NavItem
+          icon="mail"
+          label="All messages"
+          expanded={expanded}
+          size="sm"
+          current={location === MESSAGES}
+          onClick={() => onGo(MESSAGES)}
+        />
+      )}
     </NavSection>
   )
 }
