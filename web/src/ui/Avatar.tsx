@@ -5,12 +5,13 @@ interface AvatarProps {
   name: string
   /** URL of their picture. Without one, they are a donut, as on old Sweet. */
   picture?: string | null
-  size?: 'sm' | 'md' | 'lg'
+  size?: 'xs' | 'sm' | 'md' | 'lg'
   /** Hidden from assistive tech: the control it sits in says the name (a nav item's mark). */
   decorative?: boolean
 }
 
 const SIZES: Record<NonNullable<AvatarProps['size']>, string> = {
+  xs: 'h-5 w-5',
   sm: 'h-6 w-6',
   md: 'h-8 w-8',
   lg: 'h-14 w-14',

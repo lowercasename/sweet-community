@@ -1,11 +1,14 @@
 import { useRef, useState } from 'react'
 import { useEditor, useEditorState, type Extensions } from '@tiptap/react'
+import { withPlaceholder } from '../editor/extensions'
 import { Alert, Button, EditorSurface, Form, ImageCard, Row, Stack } from '../ui'
 import { imageFiles, imagesHtml, insertImages, uploadImages, type AttachedImage } from '../editor/images'
 import { EditorToolbar, promptLink } from './EditorToolbar'
 
 interface BodyEditorProps {
   extensions: Extensions
+  /** What the empty box says; the schema's own words when unset. */
+  placeholder?: string
   /** `post` is a tall box; `line` starts one line high and grows. */
   size: 'post' | 'line'
   /** Enter submits (chat). Otherwise Enter is a newline and Mod+Enter submits. */
@@ -34,6 +37,7 @@ interface BodyEditorProps {
 /** The one editor: posts, chat and comments differ only in schema, size, submit key and where images go. */
 export function BodyEditor({
   extensions,
+  placeholder,
   size,
   enterSubmits = false,
   images = 'inline',
@@ -55,7 +59,7 @@ export function BodyEditor({
   cancelRef.current = onCancel
 
   const editor = useEditor({
-    extensions,
+    extensions: placeholder ? withPlaceholder(extensions, placeholder) : extensions,
     content: initialHtml ?? '',
     autofocus: editing ? 'end' : false,
     editorProps: {

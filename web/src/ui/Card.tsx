@@ -15,8 +15,9 @@ interface CardProps {
 export function Card({ as = 'div', fill = false, flush = false, tone = 'card', children }: CardProps) {
   const bg = tone === 'field' ? 'bg-ground' : 'bg-card'
   const frame = flush ? bg : tone === 'field' ? `rounded-card ${bg}` : `rounded-card border border-line ${bg}`
-  const pad = 'p-4'
-  // An article (a post) is a `group`: a revealed Menu inside shows when it is hovered (ui/Menu). A pane's card is not, or hovering a room would show every message's menu.
-  const cls = `${as === 'article' ? 'group ' : ''}${frame} ${fill ? 'flex min-h-0 flex-1 flex-col overflow-hidden' : pad}`
+  // A thread's ground is drawn with 12px all round; a card with 16.
+  const pad = tone === 'field' ? 'p-3' : 'p-4'
+  // An article (a post) is a `block-post`: its revealed Menu shows while it is hovered (ui/Menu).
+  const cls = `${as === 'article' ? 'block-post ' : ''}${frame} ${fill ? 'flex min-h-0 flex-1 flex-col overflow-hidden' : pad}`
   return as === 'article' ? <article className={cls}>{children}</article> : <div className={cls}>{children}</div>
 }

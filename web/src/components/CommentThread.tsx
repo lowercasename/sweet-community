@@ -22,6 +22,8 @@ import { PersonName } from './PersonName'
 interface CommentThreadProps {
   postId: string
   groupId: string
+  /** The post's author, whom a reply answers. */
+  replyTo: string
   disabled: boolean
 }
 
@@ -65,7 +67,7 @@ function CommentItem({ comment, disabled, onEdit, onDelete }: CommentItemProps) 
       <Stack gap={1}>
         <Row justify="between" align="center">
           <Row gap={2} align="center">
-            <PersonName user={author} avatar="sm" />
+            <PersonName user={author} avatar="xs" small />
             <Text as="span" variant="small">
               <Time at={comment.created_at} />
               {comment.edited_at != null && (
@@ -76,7 +78,7 @@ function CommentItem({ comment, disabled, onEdit, onDelete }: CommentItemProps) 
               )}
             </Text>
           </Row>
-          {items.length > 0 && !editing && !disabled && <Menu label="Comment options" items={items} reveal />}
+          {items.length > 0 && !editing && !disabled && <Menu label="Comment options" items={items} reveal="comment" />}
         </Row>
         {editing ? (
           <BodyEditor
@@ -113,31 +115,36 @@ function CommentItem({ comment, disabled, onEdit, onDelete }: CommentItemProps) 
  * grey panel holding the comments, oldest first, a hairline between each,
  * and the reply editor at its foot, the one white thing in it.
  */
-export function CommentThread({ postId, groupId, disabled }: CommentThreadProps) {
+export function CommentThread({ postId, groupId, replyTo, disabled }: CommentThreadProps) {
   const { comments, loading, error } = useComments(postId)
   const { create, edit, remove } = useCommentActions(postId, groupId)
 
   return (
     <Card tone="field">
-      <Stack gap={2}>
-        {loading && <Text variant="secondary">Loading comments…</Text>}
-        {error && <Alert tone="error">{error.message}</Alert>}
-        {comments.map((c, i) => (
-          <Box key={c.id}>
-            <Stack gap={2}>
-              {i > 0 && <Hairline />}
-              <CommentItem
-                comment={c}
-                disabled={disabled}
-                onEdit={(html) => edit(c.id, html)}
-                onDelete={() => remove(c.id)}
-              />
-            </Stack>
-          </Box>
-        ))}
+      <Stack gap={3}>
+        {(loading || error || comments.length > 0) && (
+          <Stack gap={2}>
+            {loading && <Text variant="secondary">Loading comments…</Text>}
+            {error && <Alert tone="error">{error.message}</Alert>}
+            {comments.map((c, i) => (
+              <Box key={c.id}>
+                <Stack gap={2}>
+                  {i > 0 && <Hairline />}
+                  <CommentItem
+                    comment={c}
+                    disabled={disabled}
+                    onEdit={(html) => edit(c.id, html)}
+                    onDelete={() => remove(c.id)}
+                  />
+                </Stack>
+              </Box>
+            ))}
+          </Stack>
+        )}
         <BodyEditor
           extensions={commentExtensions}
           size="line"
+          placeholder={`Reply to ${replyTo}…`}
           submitLabel="Reply"
           busyLabel="Replying…"
           disabled={disabled}

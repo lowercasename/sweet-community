@@ -86,6 +86,7 @@ test.describe('post page', () => {
 
     // The thread is open: a reply from here counts on the feed behind.
     const shown = kit.page.locator('article:visible').filter({ hasText: text })
+    await expect(shown.locator('[data-placeholder]')).toHaveAttribute('data-placeholder', `Reply to ${kit.username}…`)
     await shown.locator('.editor-line .ProseMirror').click()
     await kit.page.keyboard.type('From the page')
     await kit.page.getByRole('button', { name: 'Reply' }).click()
@@ -154,6 +155,10 @@ test.describe('menus', () => {
     await comment.hover()
     await expect(comment.getByRole('button', { name: 'Comment options' })).toHaveCSS('opacity', '1')
     await expect(menu).toHaveCSS('opacity', '0')
+    // On the card but off the comment, the comment's menu goes and the post's returns.
+    await post.getByRole('button', { name: 'Hide comments' }).hover()
+    await expect(comment.getByRole('button', { name: 'Comment options' })).toHaveCSS('opacity', '0')
+    await expect(menu).toHaveCSS('opacity', '1')
     // The open menu stays while the pointer is on it.
     await menu.click({ force: true })
     await expect(kit.page.getByRole('menuitem', { name: 'Edit' })).toBeVisible()

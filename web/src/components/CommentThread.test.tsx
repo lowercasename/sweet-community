@@ -35,13 +35,18 @@ beforeEach(async () => {
 
 async function thread() {
   const { CommentThread } = await import('./CommentThread')
-  renderWithQuery(<CommentThread postId="p1" groupId={ROOT} disabled={false} />)
+  renderWithQuery(<CommentThread postId="p1" groupId={ROOT} replyTo="kit" disabled={false} />)
   await screen.findByText('c-jo says hi')
 }
 
 const menuOf = (text: string) => within(screen.getByText(text).closest('article')!).queryByLabelText('Comment options')
 
 describe('CommentThread', () => {
+  it('says whom the reply box answers', async () => {
+    await thread()
+    expect(document.querySelector('[data-placeholder]')?.getAttribute('data-placeholder')).toBe('Reply to kit…')
+  })
+
   it('shows a menu with exactly the actions the can flags allow', async () => {
     await thread()
     fireEvent.click(menuOf('c-mo says hi')!)

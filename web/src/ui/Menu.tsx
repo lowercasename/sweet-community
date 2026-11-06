@@ -29,17 +29,26 @@ interface MenuProps {
   icon?: IconName
   items: MenuItem[]
   /**
-   * Out of sight until its block (the nearest `group`: a card, a row) is
-   * hovered or holds focus, where there is a pointer to hover with; always
-   * shown on a touch screen, and while open. Quiet by default on a page of
-   * posts or a room of messages, where every block has one.
+   * Out of sight until its own block is hovered or holds focus, where there
+   * is a pointer to hover with; always shown on a touch screen, and while
+   * open. The block is named by level, since a post holds its comments: a
+   * post's menu shows while its card is hovered and no comment in it is; a
+   * comment's while its own article is; a message's while its own row is.
    */
-  reveal?: boolean
+  reveal?: 'post' | 'comment' | 'message'
 }
 
-/** The classes that hide a revealed menu until its nearest group is hovered or focused, on pointer screens only. */
-const REVEAL =
-  'pointer-fine:opacity-0 pointer-fine:[.group:hover:not(:has(.group:hover))_&]:opacity-100 pointer-fine:[.group:focus-within:not(:has(.group:focus-within))_&]:opacity-100 pointer-fine:focus-visible:opacity-100'
+/**
+ * The classes that hide a revealed menu until its block is hovered or focused, on pointer screens only. The blocks
+ * are marked `block-post` (Card as article), `block-comment` (Box as article) and `block-message` (Row block="message").
+ */
+const REVEAL: Record<NonNullable<MenuProps['reveal']>, string> = {
+  post: 'pointer-fine:opacity-0 pointer-fine:[.block-post:hover:not(:has(.block-comment:hover))_&]:opacity-100 pointer-fine:[.block-post:focus-within:not(:has(.block-comment:focus-within))_&]:opacity-100',
+  comment:
+    'pointer-fine:opacity-0 pointer-fine:[.block-comment:hover_&]:opacity-100 pointer-fine:[.block-comment:focus-within_&]:opacity-100',
+  message:
+    'pointer-fine:opacity-0 pointer-fine:[.block-message:hover_&]:opacity-100 pointer-fine:[.block-message:focus-within_&]:opacity-100',
+}
 
 /**
  * A three-dot menu: a ghost icon button that opens a short list of actions.
@@ -50,7 +59,7 @@ const REVEAL =
  * clipped by the pane's edge; it never needs to close on scroll, which once
  * shut it one frame after it opened.
  */
-export function Menu({ label, icon = 'more', items, reveal = false }: MenuProps) {
+export function Menu({ label, icon = 'more', items, reveal }: MenuProps) {
   const [open, setOpen] = useState(false)
   const [activeIndex, setActiveIndex] = useState<number | null>(null)
   const listRef = useRef<(HTMLElement | null)[]>([])
@@ -75,7 +84,7 @@ export function Menu({ label, icon = 'more', items, reveal = false }: MenuProps)
       <button
         ref={triggerRef}
         type="button"
-        className={`${buttonClass('ghost', true)} ${reveal && !open ? REVEAL : ''}`}
+        className={`${buttonClass('ghost', true)} ${reveal && !open ? REVEAL[reveal] : ''}`}
         aria-label={label}
         {...getReferenceProps(tip.props())}
       >

@@ -1,6 +1,7 @@
 import StarterKit from '@tiptap/starter-kit'
 import Link from '@tiptap/extension-link'
 import { Placeholder } from '@tiptap/extensions'
+import type { Extensions } from '@tiptap/react'
 import Image from '@tiptap/extension-image'
 import { ReactNodeViewRenderer } from '@tiptap/react'
 import { EditorImage } from '../ui'
@@ -30,6 +31,11 @@ export const SweetImage = Image.extend({
 }).configure({ inline: false, allowBase64: false })
 
 const placeholder = Placeholder.configure({ placeholder: 'What would you like to say?' })
+
+/** The same schema with another placeholder: a reply box says whom it answers. */
+export function withPlaceholder(extensions: Extensions, text: string): Extensions {
+  return [...extensions.filter((e) => e.name !== 'placeholder'), Placeholder.configure({ placeholder: text })]
+}
 
 /**
  * The post schema, used by BodyEditor for posts and by the round-trip test.

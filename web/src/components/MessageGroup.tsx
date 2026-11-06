@@ -39,7 +39,7 @@ export function MessageGroup({ messages, onDelete }: MessageGroupProps) {
     <Box as="article">
       <Stack gap={1}>
         {messages.map((m, i) => (
-          <Row key={m.id} justify="between" align="start" wrap="never">
+          <Row key={m.id} justify="between" align="start" wrap="never" block="message">
             <Stack gap={1} fill>
               {i === 0 && (
                 <Row gap={2} align="center">
@@ -55,7 +55,7 @@ export function MessageGroup({ messages, onDelete }: MessageGroupProps) {
               <Menu
                 label="Message options"
                 items={[{ label: 'Delete', icon: 'trash', onSelect: () => setConfirming(m.id) }]}
-                reveal
+                reveal="message"
               />
             )}
           </Row>

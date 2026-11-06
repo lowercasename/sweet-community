@@ -89,7 +89,7 @@ export function Post({ post, linked = true, expanded = false, disabled, onEdit, 
                 {linked ? <Link href={postPath(post.id)}>{when}</Link> : when}
               </Text>
             </Row>
-            {items.length > 0 && !editing && !disabled && <Menu label="Post options" items={items} reveal />}
+            {items.length > 0 && !editing && !disabled && <Menu label="Post options" items={items} reveal="post" />}
           </Row>
           {editing ? (
             // The stored HTML is the editor's input: no separate document format.
@@ -119,7 +119,9 @@ export function Post({ post, linked = true, expanded = false, disabled, onEdit, 
             onClick={() => setOpen((o) => !o)}
           />
         </Row>
-        {open && <CommentThread postId={post.id} groupId={post.group_id} disabled={disabled} />}
+        {open && (
+          <CommentThread postId={post.id} groupId={post.group_id} replyTo={author.username} disabled={disabled} />
+        )}
       </Stack>
       <ConfirmDialog
         open={confirming}

@@ -23,6 +23,8 @@ interface HoverCardProps {
   card: ReactNode
   /** The trigger's content: the name as written, with their picture before it where one is shown. */
   children?: ReactNode
+  /** A size under the running text: a comment's author. */
+  small?: boolean
 }
 
 const TRIGGER =
@@ -39,7 +41,7 @@ const TRIGGER =
  * keeps it on its name while the pane scrolls. Escape, an outside press,
  * or leaving both closes it.
  */
-export function HoverCard({ name, card, children }: HoverCardProps) {
+export function HoverCard({ name, card, children, small = false }: HoverCardProps) {
   const [open, setOpen] = useState(false)
   const { refs, floatingStyles, context } = useFloating({
     open,
@@ -57,7 +59,13 @@ export function HoverCard({ name, card, children }: HoverCardProps) {
 
   return (
     <>
-      <button ref={refs.setReference} type="button" className={TRIGGER} aria-label={name} {...getReferenceProps()}>
+      <button
+        ref={refs.setReference}
+        type="button"
+        className={small ? `${TRIGGER} text-[15px]` : TRIGGER}
+        aria-label={name}
+        {...getReferenceProps()}
+      >
         {children}
       </button>
       {open && (

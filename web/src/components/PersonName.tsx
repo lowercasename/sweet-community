@@ -9,7 +9,9 @@ interface PersonNameProps {
   /** The person as the content carried them; the card shows them as they are now. */
   user: User
   /** Their picture before the name, inside the same control, so hovering it opens the card too. */
-  avatar?: 'sm' | 'md'
+  avatar?: 'xs' | 'sm' | 'md'
+  /** A comment's author: a 20px face and a 15px name, a size under the post's. */
+  small?: boolean
 }
 
 const ROLE_WORD: Record<Member['role'], string> = {
@@ -64,12 +66,12 @@ function PersonCard({ person, me }: { person: Member | User; me: User | null | u
  * the users cache, so a new picture or name shows here at once; the
  * snapshot the content carried is the fallback.
  */
-export function PersonName({ user, avatar }: PersonNameProps) {
+export function PersonName({ user, avatar, small = false }: PersonNameProps) {
   const { data: users } = useUsers()
   const { data: me } = useMe()
   const person = users?.get(user.id) ?? user
   return (
-    <HoverCard name={person.username} card={<PersonCard person={person} me={me} />}>
+    <HoverCard name={person.username} card={<PersonCard person={person} me={me} />} small={small}>
       {avatar && <Avatar name={person.username} picture={person.picture} size={avatar} />}
       {person.username}
     </HoverCard>
