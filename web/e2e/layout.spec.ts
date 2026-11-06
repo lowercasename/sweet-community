@@ -56,6 +56,30 @@ test.describe('layout', () => {
     await kit.context.close()
   })
 
+  test('on a short window the nav column scrolls in the middle; the account and Collapse stay at the foot', async ({
+    browser,
+  }, testInfo) => {
+    const kit = await member(browser, testInfo)
+    await kit.page.setViewportSize({ width: 1100, height: 420 })
+    for (const name of ['Alpha', 'Beta', 'Gamma', 'Delta']) {
+      await kit.context.request.post('/api/groups', { data: { kind: 'group', name: uniq(name), mode: 'both' } })
+    }
+    await open(kit.page)
+    const nav = kit.page.getByRole('navigation', { name: 'Main' })
+    const collapse = nav.getByRole('button', { name: 'Collapse' })
+    await expect(collapse).toBeVisible()
+    const c = (await collapse.boundingBox())!
+    expect(c.y + c.height).toBeLessThanOrEqual(420)
+    const n = (await nav.boundingBox())!
+    expect(n.height).toBeLessThanOrEqual(420)
+    // Settings is below the fold of the middle; scrolling the middle brings it up, the foot does not move.
+    const settings = nav.getByRole('button', { name: 'Settings' })
+    await settings.scrollIntoViewIfNeeded()
+    await expect(settings).toBeInViewport()
+    expect((await collapse.boundingBox())!.y).toBe(c.y)
+    await kit.context.close()
+  })
+
   test('dragging the divider resizes; double-click resets', async ({ browser }, testInfo) => {
     const kit = await member(browser, testInfo)
     await open(kit.page)
