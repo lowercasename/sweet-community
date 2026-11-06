@@ -1,4 +1,4 @@
-import { article, expect, member, open, sendMessage, test, uniq, writePost } from './helpers'
+import { anyView, article, expect, member, open, sendMessage, test, uniq, writePost } from './helpers'
 
 test.describe('people', () => {
   test('a name opens a card about the person, which the pointer may enter, with a way to message them', async ({
@@ -56,7 +56,7 @@ test.describe('people', () => {
       data: { body_html: `<p>${text}</p>` },
     })
     await open(mo.page)
-    await mo.page.locator('nav').last().getByRole('button', { name: 'Posts' }).click()
+    await anyView(mo.page, 'Posts').click()
     await article(mo.page, text).getByRole('button', { name: kit.username }).click()
     const card = mo.page.getByRole('dialog', { name: `About ${kit.username}` })
     await expect(card).toBeVisible()

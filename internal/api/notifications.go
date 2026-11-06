@@ -51,6 +51,7 @@ type Marker struct {
 const (
 	StreamNotifications = "notifications"
 	streamChatPrefix    = "chat:"
+	streamFeedPrefix    = "feed:"
 )
 
 // notify writes one notification inside the caller's transaction and returns
@@ -117,8 +118,8 @@ func (s *Server) listMarkers(w http.ResponseWriter, r *http.Request) {
 }
 
 // setMarker moves my marker on one stream forward to read_at (held to now,
-// never backwards). The stream is `notifications`, or `chat:<group>` for a
-// group I am in; a group I am not in does not exist to me.
+// never backwards). The stream is `notifications`, or `chat:<group>` or
+// `feed:<group>` for a group I am in; a group I am not in does not exist to me.
 func (s *Server) setMarker(w http.ResponseWriter, r *http.Request) {
 	var in struct {
 		ReadAt int64 `json:"read_at"`
@@ -143,8 +144,9 @@ func (s *Server) setMarker(w http.ResponseWriter, r *http.Request) {
 				row, err := qtx.GetNotificationsMarker(r.Context(), me.ID)
 				return store.ListMarkersRow(row), err
 			}
-		case strings.HasPrefix(stream, streamChatPrefix):
-			gid := strings.TrimPrefix(stream, streamChatPrefix)
+		case strings.HasPrefix(stream, streamChatPrefix), strings.HasPrefix(stream, streamFeedPrefix):
+			chat := strings.HasPrefix(stream, streamChatPrefix)
+			gid := strings.TrimPrefix(strings.TrimPrefix(stream, streamChatPrefix), streamFeedPrefix)
 			a, err := actorIn(r.Context(), qtx, me, gid)
 			if err != nil {
 				return nil, http.StatusInternalServerError, err
@@ -153,7 +155,11 @@ func (s *Server) setMarker(w http.ResponseWriter, r *http.Request) {
 				return nil, http.StatusNotFound, errors.New("no such group")
 			}
 			reread = func() (store.ListMarkersRow, error) {
-				row, err := qtx.GetChatMarker(r.Context(), store.GetChatMarkerParams{UserID: me.ID, GroupID: gid})
+				if chat {
+					row, err := qtx.GetChatMarker(r.Context(), store.GetChatMarkerParams{UserID: me.ID, GroupID: gid})
+					return store.ListMarkersRow(row), err
+				}
+				row, err := qtx.GetFeedMarker(r.Context(), store.GetFeedMarkerParams{UserID: me.ID, GroupID: gid})
 				return store.ListMarkersRow(row), err
 			}
 		default:

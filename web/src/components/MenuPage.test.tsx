@@ -33,11 +33,11 @@ describe('MenuPage', () => {
         onLogout={onLogout}
       />,
     )
-    await screen.findByRole('button', { name: 'Knitting, 2 unread' })
+    await screen.findByRole('button', { name: 'Knitting, unread' })
     expect(screen.getAllByRole('button').map(nameOf)).toEqual([
       'Home',
       'New room',
-      'Knitting, 2 unread',
+      'Knitting, unread',
       'New message',
       'kit',
       'All messages',
@@ -46,7 +46,7 @@ describe('MenuPage', () => {
       'Sign out',
     ])
     expect(
-      within(screen.getByRole('group', { name: 'Rooms' })).getByRole('button', { name: 'Knitting, 2 unread' }),
+      within(screen.getByRole('group', { name: 'Rooms' })).getByRole('button', { name: 'Knitting, unread' }),
     ).toBeTruthy()
     expect(within(screen.getByRole('group', { name: 'Messages' })).getByRole('button', { name: 'kit' })).toBeTruthy()
     expect(screen.getByText('raphael')).toBeTruthy()

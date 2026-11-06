@@ -71,6 +71,14 @@ export async function open(page: Page, path = '/') {
   await expect(page.getByRole('navigation', { name: 'Main' })).toBeVisible()
 }
 
+/** On the phone, the choice between a place's views sits in the bar: Posts or Chat. */
+export const view = (page: Page, name: 'Posts' | 'Chat' | 'Posts, unread' | 'Chat, unread', exact = true) =>
+  page.getByRole('group', { name: 'View' }).getByRole('button', { name, exact })
+
+/** The same choice, whether or not it carries an unread dot: for going there, not for checking the dot. */
+export const anyView = (page: Page, name: 'Posts' | 'Chat') =>
+  page.getByRole('group', { name: 'View' }).getByRole('button', { name: new RegExp(`^${name}`) })
+
 /** The posts editor's surface and the chat editor's surface. */
 export const postEditor = (page: Page) => page.locator('.editor-post .ProseMirror').first()
 export const chatEditor = (page: Page) => page.locator('.editor-line .ProseMirror').first()

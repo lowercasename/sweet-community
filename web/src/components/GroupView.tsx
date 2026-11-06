@@ -1,4 +1,5 @@
 import type { Group, User } from '../api'
+import { useUnreadPlaces } from '../data/hooks'
 import { useLayout } from '../hooks/useLayout'
 import { Rail, Split, Stack } from '../ui'
 import { ChatPane } from './ChatPane'
@@ -27,6 +28,7 @@ export function GroupView({ group, hidden }: GroupViewProps) {
   const both = group.mode === 'both'
   const show = layout === 'both' ? 'both' : layout === 'posts' ? 'left' : 'right'
   const rails = !narrow
+  const unread = useUnreadPlaces().get(group.id)
 
   return (
     <Stack gap={0} fill hidden={hidden}>
@@ -37,12 +39,34 @@ export function GroupView({ group, hidden }: GroupViewProps) {
           onRatio={setRatio}
           onCollapse={(side) => setLayout(side === 'left' ? 'chat' : 'posts')}
           leftRail={
-            rails ? <Rail side="left" icon="posts" label="Posts" onOpen={() => setLayout('both')} /> : undefined
+            rails ? (
+              <Rail
+                side="left"
+                icon="posts"
+                label="Posts"
+                dot={unread?.feed === true}
+                onOpen={() => setLayout('both')}
+              />
+            ) : undefined
           }
           rightRail={
-            rails ? <Rail side="right" icon="chat" label="Chat" onOpen={() => setLayout('both')} /> : undefined
+            rails ? (
+              <Rail
+                side="right"
+                icon="chat"
+                label="Chat"
+                dot={unread?.chat === true}
+                onOpen={() => setLayout('both')}
+              />
+            ) : undefined
           }
-          left={<PostsPane groupId={group.id} side={show === 'both' ? 'left' : 'full'} />}
+          left={
+            <PostsPane
+              groupId={group.id}
+              side={show === 'both' ? 'left' : 'full'}
+              watching={!hidden && show !== 'right'}
+            />
+          }
           right={
             <ChatPane
               groupId={group.id}
@@ -52,7 +76,7 @@ export function GroupView({ group, hidden }: GroupViewProps) {
           }
         />
       ) : group.mode === 'posts' ? (
-        <PostsPane groupId={group.id} />
+        <PostsPane groupId={group.id} watching={!hidden} />
       ) : (
         <ChatPane groupId={group.id} watching={!hidden} />
       )}

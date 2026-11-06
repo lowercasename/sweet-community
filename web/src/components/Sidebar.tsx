@@ -1,6 +1,7 @@
 import type { Group, User } from '../api'
 import { roomsOf } from '../data/groups'
-import { useAuthor, useChatUnread, useUnreadNotifications } from '../data/hooks'
+import { useAuthor, useUnreadPlaces, useUnreadNotifications } from '../data/hooks'
+import { anyUnread } from '../data/notifications'
 import { NEW_ROOM, NOTIFICATIONS, groupPath } from '../routes'
 import { Hairline, NavAccount, NavBar, NavItem, NavSection, Tile, Wordmark } from '../ui'
 import { ConversationsSection } from './ConversationsSection'
@@ -30,7 +31,7 @@ function at(location: string, path: string): boolean {
 export function Sidebar({ me, groups, location, expanded, onGo, onToggle }: SidebarProps) {
   const live = useAuthor(me)
   const unread = useUnreadNotifications()
-  const counts = useChatUnread()
+  const places = useUnreadPlaces()
   const root = groups.find((g) => g.kind === 'root')
   const mine = roomsOf(groups)
   const canCreate = root?.can.create_groups === true
@@ -54,7 +55,7 @@ export function Sidebar({ me, groups, location, expanded, onGo, onToggle }: Side
         icon="home"
         label="Home"
         expanded={expanded}
-        count={root ? (counts.get(root.id) ?? 0) : 0}
+        dot={!!root && anyUnread(places.get(root.id))}
         current={location === '/'}
         onClick={() => onGo('/')}
       />
@@ -80,7 +81,7 @@ export function Sidebar({ me, groups, location, expanded, onGo, onToggle }: Side
               label={g.name}
               expanded={expanded}
               size="sm"
-              count={counts.get(g.id) ?? 0}
+              dot={anyUnread(places.get(g.id))}
               current={at(location, groupPath(g.id))}
               onClick={() => onGo(groupPath(g.id))}
             />
@@ -91,7 +92,7 @@ export function Sidebar({ me, groups, location, expanded, onGo, onToggle }: Side
         groups={groups}
         me={me}
         location={location}
-        counts={counts}
+        places={places}
         expanded={expanded}
         onGo={onGo}
       />

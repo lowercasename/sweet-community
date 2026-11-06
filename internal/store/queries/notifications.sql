@@ -26,8 +26,9 @@ ON CONFLICT (user_id, stream) DO UPDATE SET read_at = MAX(read_at, excluded.read
 
 -- A marker row exists for every stream of mine whether or not I have read
 -- anything: the notifications stream, and the chat of every group I am
--- present in. Unread is what is newer than where I have read to; in a chat,
--- others' live messages since my marker, or since I joined if I never read.
+-- present in, its chat and its feed. Unread is what is newer than where I
+-- have read to: others' live messages or posts since my marker, or since I
+-- joined if I never read.
 
 -- name: GetNotificationsMarker :one
 SELECT u.id AS user_id, CAST('notifications' AS TEXT) AS stream, CAST(COALESCE(r.read_at, 0) AS INTEGER) AS read_at,
@@ -42,6 +43,13 @@ SELECT m.user_id, CAST('chat:' || m.group_id AS TEXT) AS stream, CAST(COALESCE(r
 FROM memberships m LEFT JOIN read_markers r ON r.user_id = m.user_id AND r.stream = 'chat:' || m.group_id
 WHERE m.user_id = sqlc.arg(user_id) AND m.group_id = sqlc.arg(group_id) AND m.hidden_at IS NULL;
 
+-- name: GetFeedMarker :one
+SELECT m.user_id, CAST('feed:' || m.group_id AS TEXT) AS stream, CAST(COALESCE(r.read_at, m.joined_at) AS INTEGER) AS read_at,
+       (SELECT COUNT(*) FROM posts x WHERE x.group_id = m.group_id AND x.deleted_at IS NULL AND x.author_id != m.user_id
+          AND x.created_at > COALESCE(r.read_at, m.joined_at)) AS unread
+FROM memberships m LEFT JOIN read_markers r ON r.user_id = m.user_id AND r.stream = 'feed:' || m.group_id
+WHERE m.user_id = sqlc.arg(user_id) AND m.group_id = sqlc.arg(group_id) AND m.hidden_at IS NULL;
+
 -- name: ListMarkers :many
 SELECT u.id AS user_id, CAST('notifications' AS TEXT) AS stream, CAST(COALESCE(r.read_at, 0) AS INTEGER) AS read_at,
        (SELECT COUNT(*) FROM notifications n WHERE n.user_id = u.id AND n.created_at > COALESCE(r.read_at, 0)) AS unread
@@ -53,4 +61,11 @@ SELECT m.user_id, CAST('chat:' || m.group_id AS TEXT) AS stream, CAST(COALESCE(r
           AND x.created_at > COALESCE(r.read_at, m.joined_at)) AS unread
 FROM memberships m JOIN groups g ON g.id = m.group_id AND g.deleted_at IS NULL
 LEFT JOIN read_markers r ON r.user_id = m.user_id AND r.stream = 'chat:' || m.group_id
+WHERE m.user_id = sqlc.arg(user_id) AND m.hidden_at IS NULL
+UNION ALL
+SELECT m.user_id, CAST('feed:' || m.group_id AS TEXT) AS stream, CAST(COALESCE(r.read_at, m.joined_at) AS INTEGER) AS read_at,
+       (SELECT COUNT(*) FROM posts x WHERE x.group_id = m.group_id AND x.deleted_at IS NULL AND x.author_id != m.user_id
+          AND x.created_at > COALESCE(r.read_at, m.joined_at)) AS unread
+FROM memberships m JOIN groups g ON g.id = m.group_id AND g.deleted_at IS NULL
+LEFT JOIN read_markers r ON r.user_id = m.user_id AND r.stream = 'feed:' || m.group_id
 WHERE m.user_id = sqlc.arg(user_id) AND m.hidden_at IS NULL;

@@ -123,7 +123,8 @@ test.describe('nav', () => {
 
     // Home from the menu.
     await nav(kit).getByRole('button', { name: 'Menu' }).click()
-    await kit.page.getByRole('button', { name: 'Home' }).click()
+    // The menu's Home, not the tab bar's.
+    await kit.page.getByRole('button', { name: 'Home' }).first().click()
     await expect(kit.page).toHaveURL(/\/$/)
     await kit.context.close()
     await mo.context.close()

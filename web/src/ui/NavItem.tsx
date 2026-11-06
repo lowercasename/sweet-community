@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react'
-import { Count } from './Count'
+import { Dotted } from './Dotted'
 import { Icon, type IconName } from './Icon'
 import { useTooltip } from './Tooltip'
 
@@ -15,10 +15,8 @@ interface NavItemProps {
   current?: boolean
   /** `sm` inside a section: shorter and quieter, so the items read as a stack under their title. */
   size?: 'md' | 'sm'
-  /** Something unread behind it: a dot on the icon, never a count, and "unread" in its name (the name is then the aria-label, in both states). */
+  /** Something unread behind it: a dot on the icon or mark, never a count, and "unread" in its name (the name is then the aria-label, in both states). */
   dot?: boolean
-  /** Unread messages behind a place: the number in a pill when expanded, a dot when collapsed, and "N unread" in its name. */
-  count?: number
   onClick?: () => void
 }
 
@@ -30,20 +28,9 @@ export function UnreadDot() {
 }
 
 /** One entry in the NavBar: an icon or a mark, plus its label when expanded. */
-export function NavItem({
-  icon,
-  mark,
-  label,
-  expanded,
-  current,
-  size = 'md',
-  dot = false,
-  count = 0,
-  onClick,
-}: NavItemProps) {
+export function NavItem({ icon, mark, label, expanded, current, size = 'md', dot = false, onClick }: NavItemProps) {
   const tip = useTooltip(label, !expanded, 'right')
-  const name = count > 0 ? `${label}, ${count} unread` : dot ? `${label}, unread` : label
-  const marked = dot || (count > 0 && !expanded)
+  const name = dot ? `${label}, unread` : label
   const glyph = mark ?? (icon && <Icon name={icon} size={20} />)
   return (
     <>
@@ -55,16 +42,8 @@ export function NavItem({
         className={`flex cursor-pointer items-center gap-3 rounded-[4px] text-mute transition-colors hover:bg-field hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-pink aria-[current=page]:bg-blush aria-[current=page]:text-sweet ${size === 'sm' ? 'h-8 text-sm' : 'h-10'} ${expanded ? 'px-3' : 'justify-center'}`}
         {...tip.props({ onClick })}
       >
-        {marked ? (
-          <span className="relative flex flex-none">
-            {glyph}
-            <UnreadDot />
-          </span>
-        ) : (
-          glyph
-        )}
+        <Dotted shown={dot}>{glyph}</Dotted>
         {expanded && <span className="truncate font-medium">{label}</span>}
-        {expanded && <Count n={count} />}
       </button>
       {tip.tooltip}
     </>

@@ -39,7 +39,6 @@ async function draw() {
   const { MessagesPage } = await import('./MessagesPage')
   const onGo = vi.fn()
   renderWithQuery(<MessagesPage me={raphael} onGo={onGo} />)
-  await screen.findByRole('heading', { name: 'Messages' })
   return onGo
 }
 
@@ -77,14 +76,14 @@ describe('MessagesPage', () => {
     await vi.waitFor(() => expect(onGo).toHaveBeenCalledWith('/r/d2'))
   })
 
-  it('counts unread messages on a conversation', async () => {
+  it('marks a conversation with unread messages with a dot', async () => {
     const { listMarkers } = await import('../api')
     vi.mocked(listMarkers).mockResolvedValue({
       markers: [{ user_id: 'raphael', stream: 'chat:d1', read_at: 0, unread: 4 }],
     })
     await draw()
-    const row = await screen.findByRole('button', { name: 'kit, 4 unread' })
-    expect(row.textContent).toContain('4')
+    const row = await screen.findByRole('button', { name: 'kit, unread' })
+    expect(row.textContent).not.toContain('4')
     expect(screen.getByRole('button', { name: 'jo' })).toBeTruthy()
   })
 

@@ -1,5 +1,5 @@
 import { Icon, type IconName } from './Icon'
-import { UnreadDot } from './NavItem'
+import { Dotted } from './Dotted'
 
 interface Tab<K extends string> {
   key: K
@@ -29,10 +29,9 @@ export function TabBar<K extends string>({ tabs, active, onSelect }: TabBarProps
           className="flex flex-1 cursor-pointer flex-col items-center gap-0.5 pt-2 pb-1.5 text-[11px] font-medium text-mute transition-colors hover:text-ink aria-[current=page]:text-sweet focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-pink"
           onClick={() => onSelect(t.key)}
         >
-          <span className="relative flex">
+          <Dotted shown={t.dot === true}>
             <Icon name={t.icon} size={22} />
-            {t.dot && <UnreadDot />}
-          </span>
+          </Dotted>
           {t.label}
         </button>
       ))}

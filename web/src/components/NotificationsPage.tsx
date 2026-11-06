@@ -2,22 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import type { Group, Notification } from '../api'
 import { useAuthor, useMarkRead, useMarkers, useNotifications } from '../data/hooks'
 import { NOTIFICATIONS, describe, markerOf, targetOf, unreadOf } from '../data/notifications'
-import {
-  Avatar,
-  Button,
-  Card,
-  Heading,
-  List,
-  ListItem,
-  ListRow,
-  Measure,
-  Pane,
-  Row,
-  ScrollArea,
-  Stack,
-  Text,
-  Time,
-} from '../ui'
+import { Avatar, Button, Card, List, ListItem, ListRow, Measure, Pane, Row, ScrollArea, Stack, Text, Time } from '../ui'
 
 interface NotificationsPageProps {
   groups: Group[]
@@ -60,7 +45,6 @@ export function NotificationsPage({ groups, onGo }: NotificationsPageProps) {
         <Measure>
           <Card>
             <Stack gap={2}>
-              <Heading level={2}>Notifications</Heading>
               {error && <Text variant="secondary">{error.message}</Text>}
               {!loading && notifications.length === 0 && (
                 <Text variant="secondary">

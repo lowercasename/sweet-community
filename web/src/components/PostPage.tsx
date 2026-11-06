@@ -1,8 +1,8 @@
 import type { Group, Post as PostData } from '../api'
-import { useAuthor, usePost, usePostActions } from '../data/hooks'
+import { usePost, usePostActions } from '../data/hooks'
 import { useStreamStatus } from '../hooks/StreamContext'
 import { groupPath } from '../routes'
-import { Button, Card, Heading, Measure, Pane, Row, ScrollArea, Stack, Text } from '../ui'
+import { Button, Card, Measure, Pane, Row, ScrollArea, Stack, Text } from '../ui'
 import { Post } from './Post'
 
 interface PostPageProps {
@@ -13,8 +13,8 @@ interface PostPageProps {
 
 /**
  * A post at its own address, `/p/<id>` (architecture.md, Posts): the post
- * with its thread open, under a bar that says whose it is and leads back to
- * the room it is in. Notifications land here. A post that is gone, or in a
+ * with its thread open. The bar above (Home's) says whose it is and leads
+ * back to the room it is in. Notifications land here. A post that is gone, or in a
  * room I am not in, is the same to me: not here.
  */
 export function PostPage({ postId, groups, onGo }: PostPageProps) {
@@ -45,21 +45,12 @@ export function PostPage({ postId, groups, onGo }: PostPageProps) {
 }
 
 function Loaded({ post, groups, onGo }: { post: PostData; groups: Group[]; onGo: (path: string) => void }) {
-  const author = useAuthor(post.author)
   const status = useStreamStatus()
   const actions = usePostActions(post.group_id)
   const root = groups.find((g) => g.kind === 'root')
-  const room = groups.find((g) => g.id === post.group_id)
-  const place = !room || room.kind === 'root' ? 'Home' : room.name
   const back = groupPath(post.group_id, root?.id)
   return (
     <>
-      <Row justify="between" align="center" pad>
-        <Row gap={1} align="center">
-          <Button variant="ghost" icon="back" label={`Back to ${place}`} onClick={() => onGo(back)} />
-          <Heading level={2}>Post by {author.username}</Heading>
-        </Row>
-      </Row>
       <Pane>
         <ScrollArea>
           <Measure>

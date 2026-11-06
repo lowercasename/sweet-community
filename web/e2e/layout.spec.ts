@@ -1,4 +1,4 @@
-import { expect, member, open, test, uniq } from './helpers'
+import { expect, member, open, test, uniq, view } from './helpers'
 
 test.describe('layout', () => {
   test('a draft survives closing its pane, reopening it, and a visit to Settings', async ({ browser }, testInfo) => {
@@ -54,15 +54,18 @@ test.describe('layout', () => {
     await open(kit.page)
     // Narrow: no nav column, no divider, the tab bar instead.
     await expect(kit.page.getByRole('separator', { name: 'Resize panes' })).toHaveCount(0)
-    const tabs = kit.page.getByRole('tablist').or(kit.page.locator('nav').last())
-    await expect(tabs.getByRole('button', { name: 'Chat' })).toBeVisible()
-    await tabs.getByRole('button', { name: 'Chat' }).click()
+    // The bar names the view, and holds the choice of its panes; the tab bar holds places and tools.
+    await expect(kit.page.getByRole('heading', { name: 'Home' })).toBeVisible()
+    const tabs = kit.page.locator('nav').last()
+    await expect(tabs.getByRole('button')).toHaveText(['Home', 'Search', 'Notifications', 'Menu'])
+    await expect(view(kit.page, 'Chat')).toBeVisible()
+    await view(kit.page, 'Chat').click()
     const chat = kit.page.locator('.editor-line').first()
     await expect(chat).toBeVisible()
     const pane = await chat.locator('xpath=ancestor::section[1]').boundingBox()
     const viewport = kit.page.viewportSize()!
     expect(pane!.width).toBeGreaterThan(viewport.width - 4)
-    await tabs.getByRole('button', { name: 'Posts' }).click()
+    await view(kit.page, 'Posts').click()
     await expect(kit.page.locator('.editor-post').first()).toBeVisible()
     await expect(kit.page.locator('.editor-line').first()).toBeHidden()
     // The menu tab holds People and Settings.

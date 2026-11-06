@@ -81,7 +81,7 @@ func TestNotifications(t *testing.T) {
 
 	// Read markers: a row per stream of mine from the start (notifications, the root's chat, Knitting's chat),
 	// unread counted; reading moves one forward, never backwards; told to me alone.
-	if m := kit.mustStatus(200, "GET", "/api/markers", nil)["markers"].([]any); len(m) != 3 {
+	if m := kit.mustStatus(200, "GET", "/api/markers", nil)["markers"].([]any); len(m) != 5 {
 		t.Fatalf("markers before reading: %v", m)
 	}
 	readAt := int64(added["created_at"].(float64))
@@ -114,7 +114,7 @@ func TestNotifications(t *testing.T) {
 	mo.mustStatus(404, "PUT", "/api/markers/chat:"+gid, map[string]any{"read_at": readAt})
 	kit.mustStatus(400, "PUT", "/api/markers/feed", map[string]any{"read_at": readAt})
 	kit.mustStatus(400, "PUT", "/api/markers/notifications", map[string]any{"read_at": 0})
-	if m := kit.mustStatus(200, "GET", "/api/markers", nil)["markers"].([]any); len(m) != 3 {
+	if m := kit.mustStatus(200, "GET", "/api/markers", nil)["markers"].([]any); len(m) != 5 {
 		t.Fatalf("markers after chat: %v", m)
 	}
 
@@ -153,9 +153,9 @@ func TestChatUnread(t *testing.T) {
 	}
 	rootChat := "chat:" + perm.Root
 
-	// Every stream of mine has a row, read or not: notifications and the root's chat, unread 0.
+	// Every stream of mine has a row, read or not: notifications, the root's chat and its feed, unread 0.
 	ms := markers(kit)
-	if len(ms) != 2 || ms["notifications"]["unread"] != float64(0) || ms[rootChat]["unread"] != float64(0) || ms[rootChat]["user_id"] != kitID {
+	if len(ms) != 3 || ms["notifications"]["unread"] != float64(0) || ms[rootChat]["unread"] != float64(0) || ms[rootChat]["user_id"] != kitID || ms["feed:"+perm.Root]["unread"] != float64(0) {
 		t.Fatalf("kit's markers to begin with: %v", ms)
 	}
 
@@ -215,9 +215,28 @@ func TestChatUnread(t *testing.T) {
 	if n := unread(kit, "notifications"); n != 1 {
 		t.Fatalf("notifications unread: %v", n)
 	}
-	// Leaving the room takes its marker with it.
+	// The feed has a marker of its own, counted the same way: others' live posts since my marker or my joining; an edit is not new.
+	if n := unread(kit, "feed:"+gid); n != 0 {
+		t.Fatalf("history posts counted as unread: %v", n)
+	}
+	post := owner.mustStatus(201, "POST", "/api/groups/"+gid+"/posts", map[string]string{"body_html": "<p>wool</p>"})
+	owner.mustStatus(200, "PUT", "/api/posts/"+post["id"].(string), map[string]string{"body_html": "<p>wool!</p>"})
+	kit.mustStatus(201, "POST", "/api/groups/"+gid+"/posts", map[string]string{"body_html": "<p>mine</p>"})
+	if n := unread(kit, "feed:"+gid); n != 1 {
+		t.Fatalf("feed unread: %v", n)
+	}
+	read := kit.mustStatus(200, "PUT", "/api/markers/feed:"+gid, map[string]any{"read_at": int64(post["created_at"].(float64))})
+	if read["unread"] != float64(0) || !reflect.DeepEqual(markers(kit)["feed:"+gid], read) {
+		t.Fatalf("feed marker after reading: %v listed %v", read, markers(kit)["feed:"+gid])
+	}
+	mo.mustStatus(404, "PUT", "/api/markers/feed:"+gid, map[string]any{"read_at": readAt})
+
+	// Leaving the room takes its markers with it.
 	kit.mustStatus(204, "DELETE", "/api/groups/"+gid+"/members/"+kitID, nil)
 	if _, ok := markers(kit)["chat:"+gid]; ok {
 		t.Fatalf("a marker for a room I left: %v", markers(kit))
+	}
+	if _, ok := markers(kit)["feed:"+gid]; ok {
+		t.Fatalf("a feed marker for a room I left: %v", markers(kit))
 	}
 }

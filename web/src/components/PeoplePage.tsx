@@ -135,7 +135,6 @@ export function PeoplePage({ me, root, onOpenGroup }: PeoplePageProps) {
             )}
             <Card>
               <Stack gap={2}>
-                <Heading level={2}>People</Heading>
                 {error && <Text variant="secondary">{error}</Text>}
                 <List>
                   {[...(users?.values() ?? [])].map((u) => (

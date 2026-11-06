@@ -38,7 +38,6 @@ async function draw() {
   const { NotificationsPage } = await import('./NotificationsPage')
   const onGo = vi.fn()
   renderWithQuery(<NotificationsPage groups={[group(ROOT, 'member'), knitting]} onGo={onGo} />)
-  await screen.findByRole('heading', { name: 'Notifications' })
   return onGo
 }
 

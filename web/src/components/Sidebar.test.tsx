@@ -216,24 +216,25 @@ describe('Sidebar', () => {
     expect(screen.queryByRole('button', { name: 'Notifications, unread' })).toBeNull()
   })
 
-  it('counts unread messages on Home, a room and a conversation; collapsed, a dot stands for the count', async () => {
+  it('marks unread messages on Home, a room and a conversation with a dot, never a number', async () => {
     const { listMarkers } = await import('../api')
     vi.mocked(listMarkers).mockResolvedValue({
       markers: [
         marker('notifications', 0),
         marker(`chat:${ROOT}`, 0, 3),
         marker('chat:knit', 0, 0),
+        marker('feed:knit', 0, 2),
         marker('chat:d1', 0, 12),
       ],
     })
     await draw([root(false), knitting, withKit])
-    await screen.findByRole('button', { name: 'Home, 3 unread' })
-    expect(screen.getByRole('button', { name: 'Home, 3 unread' }).textContent).toContain('3')
-    expect(screen.getByRole('button', { name: 'Knitting' })).toBeTruthy()
-    expect(screen.getByRole('button', { name: 'kit, 12 unread' }).textContent).toContain('12')
+    const home = await screen.findByRole('button', { name: 'Home, unread' })
+    expect(home.textContent).not.toContain('3')
+    // Either stream lights a room.
+    expect(screen.getByRole('button', { name: 'Knitting, unread' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'kit, unread' }).textContent).not.toContain('12')
     cleanup()
     await draw([root(false), knitting, withKit], '/', false)
-    const home = await screen.findByRole('button', { name: 'Home, 3 unread' })
-    expect(home.textContent).not.toContain('3')
+    await screen.findByRole('button', { name: 'Home, unread' })
   })
 })

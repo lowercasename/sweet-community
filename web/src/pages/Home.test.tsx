@@ -258,6 +258,19 @@ describe('Home', () => {
     expect(nav().getByRole('button', { name: 'Notifications' }).getAttribute('aria-current')).toBe('page')
   })
 
+  it("a folded pane's rail carries its own stream's dot; opening the pane reads it at once", async () => {
+    await home()
+    fireEvent.keyDown(screen.getByRole('separator'), { key: 'Home' })
+    expect(screen.getByRole('button', { name: 'Show posts' })).toBeTruthy()
+    FakeEventSource.last!.emit('post', post('p9', kit, { created_at: 99 }), 9)
+    await screen.findByRole('button', { name: 'Show posts, unread' })
+    fireEvent.click(screen.getByRole('button', { name: 'Show posts, unread' }))
+    await screen.findByRole('separator')
+    fireEvent.keyDown(screen.getByRole('separator'), { key: 'Home' })
+    await screen.findByRole('button', { name: 'Show posts' })
+    expect(screen.queryByRole('button', { name: 'Show posts, unread' })).toBeNull()
+  })
+
   it('hides New room when the root group says I may not', async () => {
     const { listGroups } = await import('../api')
     vi.mocked(listGroups).mockResolvedValue({

@@ -45,7 +45,7 @@ import {
 } from '../api'
 import { applyEvent, findPost } from './apply'
 import { ROOT_ID, keys } from './keys'
-import { NOTIFICATIONS, chatUnread } from './notifications'
+import { NOTIFICATIONS, unreadPlaces, type UnreadPlace } from './notifications'
 
 /*
  * Reads are queries; writes call the API and then feed the reply through
@@ -336,10 +336,10 @@ export function useUnreadNotifications(): boolean {
   return (markers.find((m) => m.stream === NOTIFICATIONS)?.unread ?? 0) > 0
 }
 
-/** Unread messages by group id, for the counts in the nav. */
-export function useChatUnread(): Map<string, number> {
+/** The places with something unread, by group id, and in which stream: the dots in the nav and inside a room. */
+export function useUnreadPlaces(): Map<string, UnreadPlace> {
   const { markers } = useMarkers()
-  return chatUnread(markers)
+  return unreadPlaces(markers)
 }
 
 /** PUTs waiting to go, one per stream: the latest time wins. */

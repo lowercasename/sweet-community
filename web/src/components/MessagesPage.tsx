@@ -1,10 +1,10 @@
 import { useState } from 'react'
 import type { Group, User } from '../api'
-import { useChatUnread, useGroupActions, useGroups } from '../data/hooks'
+import { useGroupActions, useGroups, useUnreadPlaces } from '../data/hooks'
 import {
   Button,
   Card,
-  Count,
+  Dotted,
   Heading,
   List,
   ListItem,
@@ -36,7 +36,7 @@ interface MessagesPageProps {
 export function MessagesPage({ me, onGo }: MessagesPageProps) {
   const { groups, loading } = useGroups()
   const { openDM } = useGroupActions()
-  const counts = useChatUnread()
+  const places = useUnreadPlaces()
   const [problem, setProblem] = useState<string | null>(null)
   const dms = conversationsOf(groups)
   const out = hiddenOf(groups)
@@ -50,18 +50,19 @@ export function MessagesPage({ me, onGo }: MessagesPageProps) {
   }
   const row = (g: Group, onClick: () => void) => {
     const label = groupLabel(g, me)
-    const n = counts.get(g.id) ?? 0
+    const n = places.get(g.id)?.chat ? 1 : 0
     return (
       <ListItem key={g.id}>
-        <ListRow label={n > 0 ? `${label}, ${n} unread` : label} onClick={onClick}>
-          <ConversationFaces group={g} me={me} />
+        <ListRow label={n > 0 ? `${label}, unread` : label} onClick={onClick}>
+          <Dotted shown={n > 0}>
+            <ConversationFaces group={g} me={me} />
+          </Dotted>
           <Text as="span" variant="name">
             {label}
           </Text>
           <Text as="span" variant="small">
             <Time at={activity(g)} />
           </Text>
-          <Count n={n} />
         </ListRow>
       </ListItem>
     )
@@ -72,7 +73,6 @@ export function MessagesPage({ me, onGo }: MessagesPageProps) {
         <Measure>
           <Card>
             <Stack gap={2}>
-              <Heading level={2}>Messages</Heading>
               {!loading && dms.length === 0 && out.length === 0 && (
                 <Stack gap={2}>
                   <Text variant="secondary">

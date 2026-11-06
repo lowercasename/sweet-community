@@ -73,6 +73,38 @@ func (q *Queries) GetChatMarker(ctx context.Context, arg GetChatMarkerParams) (G
 	return i, err
 }
 
+const getFeedMarker = `-- name: GetFeedMarker :one
+SELECT m.user_id, CAST('feed:' || m.group_id AS TEXT) AS stream, CAST(COALESCE(r.read_at, m.joined_at) AS INTEGER) AS read_at,
+       (SELECT COUNT(*) FROM posts x WHERE x.group_id = m.group_id AND x.deleted_at IS NULL AND x.author_id != m.user_id
+          AND x.created_at > COALESCE(r.read_at, m.joined_at)) AS unread
+FROM memberships m LEFT JOIN read_markers r ON r.user_id = m.user_id AND r.stream = 'feed:' || m.group_id
+WHERE m.user_id = ?1 AND m.group_id = ?2 AND m.hidden_at IS NULL
+`
+
+type GetFeedMarkerParams struct {
+	UserID  string
+	GroupID string
+}
+
+type GetFeedMarkerRow struct {
+	UserID string
+	Stream string
+	ReadAt int64
+	Unread int64
+}
+
+func (q *Queries) GetFeedMarker(ctx context.Context, arg GetFeedMarkerParams) (GetFeedMarkerRow, error) {
+	row := q.db.QueryRowContext(ctx, getFeedMarker, arg.UserID, arg.GroupID)
+	var i GetFeedMarkerRow
+	err := row.Scan(
+		&i.UserID,
+		&i.Stream,
+		&i.ReadAt,
+		&i.Unread,
+	)
+	return i, err
+}
+
 const getNotification = `-- name: GetNotification :one
 SELECT n.id, n.user_id, n.kind, n.group_id, n.post_id, n.created_at,
        u.id AS actor_id, u.username AS actor_username, u.picture_id AS actor_picture_id
@@ -126,8 +158,9 @@ type GetNotificationsMarkerRow struct {
 
 // A marker row exists for every stream of mine whether or not I have read
 // anything: the notifications stream, and the chat of every group I am
-// present in. Unread is what is newer than where I have read to; in a chat,
-// others' live messages since my marker, or since I joined if I never read.
+// present in, its chat and its feed. Unread is what is newer than where I
+// have read to: others' live messages or posts since my marker, or since I
+// joined if I never read.
 func (q *Queries) GetNotificationsMarker(ctx context.Context, userID string) (GetNotificationsMarkerRow, error) {
 	row := q.db.QueryRowContext(ctx, getNotificationsMarker, userID)
 	var i GetNotificationsMarkerRow
@@ -151,6 +184,13 @@ SELECT m.user_id, CAST('chat:' || m.group_id AS TEXT) AS stream, CAST(COALESCE(r
           AND x.created_at > COALESCE(r.read_at, m.joined_at)) AS unread
 FROM memberships m JOIN groups g ON g.id = m.group_id AND g.deleted_at IS NULL
 LEFT JOIN read_markers r ON r.user_id = m.user_id AND r.stream = 'chat:' || m.group_id
+WHERE m.user_id = ?1 AND m.hidden_at IS NULL
+UNION ALL
+SELECT m.user_id, CAST('feed:' || m.group_id AS TEXT) AS stream, CAST(COALESCE(r.read_at, m.joined_at) AS INTEGER) AS read_at,
+       (SELECT COUNT(*) FROM posts x WHERE x.group_id = m.group_id AND x.deleted_at IS NULL AND x.author_id != m.user_id
+          AND x.created_at > COALESCE(r.read_at, m.joined_at)) AS unread
+FROM memberships m JOIN groups g ON g.id = m.group_id AND g.deleted_at IS NULL
+LEFT JOIN read_markers r ON r.user_id = m.user_id AND r.stream = 'feed:' || m.group_id
 WHERE m.user_id = ?1 AND m.hidden_at IS NULL
 `
 

@@ -1,21 +1,39 @@
 import type { Group, Marker, Notification } from '../api'
 import { groupPath, postPath } from '../routes'
 
-/** The notifications stream's marker name; a chat's is its group's. */
+/** The notifications stream's marker name; a room's chat and feed each have their own. */
 export const NOTIFICATIONS = 'notifications'
 export const chatStream = (groupId: string) => `chat:${groupId}`
+export const feedStream = (groupId: string) => `feed:${groupId}`
+
+/** What is unread in a place, by stream. A place is marked when either is. */
+export interface UnreadPlace {
+  chat: boolean
+  feed: boolean
+}
 
 /** Where I have read a stream to, or nothing if never. */
 export function markerOf(markers: Marker[] | undefined, stream: string): number | undefined {
   return markers?.find((m) => m.stream === stream)?.read_at
 }
 
-/** Unread messages per group, from my chat markers. */
-export function chatUnread(markers: Marker[]): Map<string, number> {
-  const out = new Map<string, number>()
-  for (const m of markers) if (m.stream.startsWith('chat:') && m.unread > 0) out.set(m.stream.slice(5), m.unread)
+/** The places with something unread, by group id, from my chat and feed markers. */
+export function unreadPlaces(markers: Marker[]): Map<string, UnreadPlace> {
+  const out = new Map<string, UnreadPlace>()
+  for (const m of markers) {
+    if (m.unread <= 0) continue
+    const [kind, id] = [m.stream.slice(0, 5), m.stream.slice(5)]
+    if (kind !== 'chat:' && kind !== 'feed:') continue
+    const place = out.get(id) ?? { chat: false, feed: false }
+    if (kind === 'chat:') place.chat = true
+    else place.feed = true
+    out.set(id, place)
+  }
   return out
 }
+
+/** Is anything in this place unread? */
+export const anyUnread = (p: UnreadPlace | undefined) => p !== undefined && (p.chat || p.feed)
 
 /** The ones newer than my marker. */
 export function unreadOf(notifications: Notification[], readAt: number | undefined): Notification[] {

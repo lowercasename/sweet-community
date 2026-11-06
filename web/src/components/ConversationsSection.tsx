@@ -1,5 +1,6 @@
 import type { Group, User } from '../api'
 import { conversationsOf } from '../data/groups'
+import { anyUnread, type UnreadPlace } from '../data/notifications'
 import { useUsers } from '../data/hooks'
 import { MESSAGES, NEW_MESSAGE, groupPath } from '../routes'
 import { FacePile, NavItem, NavSection } from '../ui'
@@ -20,8 +21,8 @@ interface ConversationsSectionProps {
   me: User
   /** The current path, when the column marks the page being viewed. */
   location?: string
-  /** Unread messages by group id. */
-  counts: Map<string, number>
+  /** The places with something unread, by group id. */
+  places: Map<string, UnreadPlace>
   expanded: boolean
   onGo: (path: string) => void
 }
@@ -33,7 +34,7 @@ interface ConversationsSectionProps {
  * their faces, and All messages at the foot. A conversation is a room
  * without a name, so it sits with the rooms, drawn the same way.
  */
-export function ConversationsSection({ groups, me, location, counts, expanded, onGo }: ConversationsSectionProps) {
+export function ConversationsSection({ groups, me, location, places, expanded, onGo }: ConversationsSectionProps) {
   const all = conversationsOf(groups)
   const open = location
     ? all.find((g) => location === groupPath(g.id) || location.startsWith(groupPath(g.id) + '/'))
@@ -58,7 +59,7 @@ export function ConversationsSection({ groups, me, location, counts, expanded, o
           label={groupLabel(g, me)}
           expanded={expanded}
           size="sm"
-          count={counts.get(g.id) ?? 0}
+          dot={anyUnread(places.get(g.id))}
           current={g === open}
           onClick={() => onGo(groupPath(g.id))}
         />

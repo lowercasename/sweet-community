@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import type { Group, Member, User } from '../api'
 import { useGroupActions, useUsers } from '../data/hooks'
-import { Avatar, Button, Card, Field, Form, Heading, Measure, Pane, Row, ScrollArea, Select, Stack, Text } from '../ui'
+import { Avatar, Button, Card, Field, Form, Measure, Pane, Row, ScrollArea, Select, Stack, Text } from '../ui'
 
 interface NewMessagePageProps {
   me: User
@@ -44,7 +44,6 @@ export function NewMessagePage({ me, initial = [], onOpened }: NewMessagePagePro
         <Measure>
           <Card>
             <Stack gap={2}>
-              <Heading level={2}>New message</Heading>
               <Text variant="secondary">
                 A conversation with these people: the one you already have with exactly them, or a new one.
               </Text>

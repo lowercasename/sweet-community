@@ -94,6 +94,10 @@ export function findPost(qc: QueryClient, id: string): Post | undefined {
 }
 
 function upsertPost(qc: QueryClient, post: Post) {
+  // Someone else's new post I have not read counts on the room's feed; an edit is not new.
+  const me = qc.getQueryData<User | null>(keys.me)
+  if (post.edited_at == null && (!me || me.id !== post.author.id))
+    bumpMarker(qc, `feed:${post.group_id}`, post.created_at)
   // Its page, if open, shows the same post.
   qc.setQueryData<Post>(keys.post(post.id), (old) => (old ? post : old))
   qc.setQueryData<Posts>(keys.posts(post.group_id), (old) => {
@@ -280,6 +284,7 @@ function dropGroup(qc: QueryClient, id: string) {
     predicate: (q) => q.queryKey[0] === 'post' && (q.state.data as Post | undefined)?.group_id === id,
   })
   dropMarker(qc, `chat:${id}`)
+  dropMarker(qc, `feed:${id}`)
 }
 
 const ROOT_KIND = 'root'
@@ -296,6 +301,7 @@ function upsertMembership(qc: QueryClient, m: Membership) {
     qc.removeQueries({ queryKey: keys.messages(m.group_id) })
     qc.removeQueries({ queryKey: keys.members(m.group_id) })
     dropMarker(qc, `chat:${m.group_id}`)
+    dropMarker(qc, `feed:${m.group_id}`)
     return
   }
   qc.setQueryData<Members>(keys.members(m.group_id), (old) => {

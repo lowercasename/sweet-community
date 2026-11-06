@@ -1,4 +1,4 @@
-import { article, confirm, expect, member, open, pick, test, uniq, writePost } from './helpers'
+import { article, confirm, expect, member, open, pick, test, uniq, view, writePost } from './helpers'
 
 test.describe('posts and comments', () => {
   test('write, edit, comment, delete; another person sees each change live', async ({ browser }, testInfo) => {
@@ -119,7 +119,7 @@ test.describe('post page', () => {
   test('@phone the post page fills the screen, and Back returns to the feed', async ({ browser }, testInfo) => {
     const kit = await member(browser, testInfo)
     await open(kit.page)
-    await kit.page.locator('nav').last().getByRole('button', { name: 'Posts' }).click()
+    await view(kit.page, 'Posts').click()
     const text = uniq('Phone post ')
     await writePost(kit.page, text)
     await article(kit.page, text).getByRole('link').click()

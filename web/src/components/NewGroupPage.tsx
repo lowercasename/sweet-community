@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import type { Group, GroupMode } from '../api'
 import { useGroupActions } from '../data/hooks'
-import { Button, Card, Field, Form, Heading, Input, Measure, Pane, Row, ScrollArea, Select, Stack, Text } from '../ui'
+import { Button, Card, Field, Form, Input, Measure, Pane, Row, ScrollArea, Select, Stack, Text } from '../ui'
 
 interface NewGroupPageProps {
   onCreated: (group: Group) => void
@@ -40,7 +40,6 @@ export function NewGroupPage({ onCreated }: NewGroupPageProps) {
         <Measure>
           <Card>
             <Stack gap={2}>
-              <Heading level={2}>New room</Heading>
               <Text variant="secondary">
                 Rooms are private and only visible to their members. You can add new members from the room settings.
               </Text>

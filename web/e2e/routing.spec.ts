@@ -20,6 +20,17 @@ test.describe('routing', () => {
     await kit.page.goto('/nowhere/at/all')
     await expect(kit.page).toHaveURL(/\/$/)
     await expect(kit.page.locator('.editor-post').first()).toBeVisible()
+    // The bar names every view, Home included.
+    await expect(kit.page.getByRole('heading', { name: 'Home' })).toBeVisible()
+    for (const [path, title] of [
+      ['/messages', 'Messages'],
+      ['/messages/new', 'New message'],
+      ['/notifications', 'Notifications'],
+      ['/settings', 'Settings'],
+    ]) {
+      await kit.page.goto(path)
+      await expect(kit.page.getByRole('heading', { name: title, exact: true })).toBeVisible()
+    }
     await kit.context.close()
   })
 })

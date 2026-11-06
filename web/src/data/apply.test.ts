@@ -88,6 +88,14 @@ describe('applyEvent', () => {
     applyEvent(qc, 'message', message('c1', mo, { group_id: CLUB, created_at: 30 }))
     expect(unread(`chat:${ROOT}`)).toBe(1)
     expect(unread(`chat:${CLUB}`)).toBe(3)
+    // A post counts on the feed the same way; an edit of one is not new.
+    qc.setQueryData(keys.markers, {
+      markers: [...(qc.getQueryData(keys.markers) as { markers: Marker[] }).markers, marker(`feed:${CLUB}`, 10, 0)],
+    })
+    applyEvent(qc, 'post', post('p7', mo, { group_id: CLUB, created_at: 11 }))
+    applyEvent(qc, 'post', post('p7', mo, { group_id: CLUB, created_at: 11, edited_at: 12 }))
+    applyEvent(qc, 'post', post('p8', kit, { group_id: CLUB, created_at: 13 }))
+    expect(unread(`feed:${CLUB}`)).toBe(1)
     applyEvent(qc, 'notification', notification('n6', 'comment', mo))
     applyEvent(qc, 'notification', notification('n4', 'comment', mo))
     expect(unread('notifications')).toBe(1)
