@@ -84,7 +84,8 @@ export function Menu({ label, icon = 'more', items, reveal }: MenuProps) {
       <button
         ref={triggerRef}
         type="button"
-        className={`${buttonClass('ghost', true)} ${reveal && !open ? REVEAL[reveal] : ''}`}
+        // Beside a message's line the trigger overlaps its row vertically (-my-1), so a 32px button never makes a 24px line's row taller.
+        className={`${buttonClass('ghost', true)} ${reveal === 'message' ? '-my-1' : ''} ${reveal && !open ? REVEAL[reveal] : ''}`}
         aria-label={label}
         {...getReferenceProps(tip.props())}
       >

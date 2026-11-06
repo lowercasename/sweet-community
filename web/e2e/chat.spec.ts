@@ -64,6 +64,12 @@ test.describe('chat', () => {
     const menu2 = await msg.getByRole('button', { name: 'Message options' }).nth(1).boundingBox()
     expect(img && line && menu2 && line.y >= img.y + img.height && menu2.y < line.y + line.height).toBeTruthy()
     expect(line && menu2 && menu2.y + menu2.height > line.y).toBeTruthy()
+    // A third: the lines of a run keep their 4px rhythm; a menu beside a line never makes its row taller.
+    const third = uniq('and that ')
+    await sendMessage(kit.page, third)
+    const l2 = (await article(kit.page, text).getByText(more).boundingBox())!
+    const l3 = (await article(kit.page, text).getByText(third).boundingBox())!
+    expect(Math.round(l3.y - (l2.y + l2.height))).toBe(4)
     await kit.context.close()
   })
 })
