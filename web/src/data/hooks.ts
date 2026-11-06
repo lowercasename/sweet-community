@@ -32,6 +32,7 @@ import {
   removeMember,
   removeUser,
   revokeInvite,
+  search,
   setBio,
   setGroupPicture,
   setMarker,
@@ -431,6 +432,12 @@ export function useUserPosts(name: string) {
     hasMore: q.hasNextPage,
     loadMore: () => void q.fetchNextPage(),
   }
+}
+
+/** What matches what I typed; nothing is asked for an empty query. */
+export function useSearch(q: string) {
+  const query = useQuery({ queryKey: keys.search(q), queryFn: () => search(q), enabled: q.trim() !== '' })
+  return { hits: query.data?.hits ?? [], loading: query.isPending && q.trim() !== '', error: query.error }
 }
 
 /** My bio: the reply is my profile, applied as the stream would apply it. */

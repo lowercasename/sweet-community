@@ -236,4 +236,12 @@ describe('Sidebar', () => {
     expect(screen.getByRole('button', { name: 'Knitting' }).querySelector('img')).toBeNull()
     expect(screen.getByRole('button', { name: 'Knitting' }).textContent).toContain('K')
   })
+
+  it('Search opens its page and is current there', async () => {
+    const onGo = await draw([root(false)], '/search')
+    const item = screen.getByRole('button', { name: 'Search' })
+    expect(item.getAttribute('aria-current')).toBe('page')
+    fireEvent.click(item)
+    expect(onGo).toHaveBeenCalledWith('/search')
+  })
 })

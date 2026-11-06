@@ -1,11 +1,11 @@
 import { useEffect, useState } from 'react'
-import { Redirect, Route, Switch, useLocation, useRoute } from 'wouter'
+import { Redirect, Route, Switch, useLocation, useRoute, useSearch } from 'wouter'
 import type { User } from '../api'
 import { useAuthor, useGroupActions, useGroups, usePost, useUnreadNotifications, useUnreadPlaces } from '../data/hooks'
 import { anyUnread } from '../data/notifications'
 import { StreamProvider } from '../hooks/StreamContext'
 import { useLayout } from '../hooks/useLayout'
-import { MESSAGES, NEW_MESSAGE, NEW_ROOM, NOTIFICATIONS, groupPath, membersPath, profilePath } from '../routes'
+import { MESSAGES, NEW_MESSAGE, NEW_ROOM, NOTIFICATIONS, SEARCH, groupPath, membersPath, profilePath } from '../routes'
 import { GroupView, groupLabel } from '../components/GroupView'
 import { MembersPage } from '../components/MembersPage'
 import { MenuPage } from '../components/MenuPage'
@@ -17,6 +17,7 @@ import { PageBar } from '../components/PageBar'
 import { PeoplePage } from '../components/PeoplePage'
 import { PostPage } from '../components/PostPage'
 import { ProfilePage } from '../components/ProfilePage'
+import { SearchPage } from '../components/SearchPage'
 import { SettingsPage } from '../components/SettingsPage'
 import { Sidebar } from '../components/Sidebar'
 import { Button, ConfirmDialog, Menu, Segmented, Shell, TabBar, Text } from '../ui'
@@ -27,6 +28,7 @@ const PAGE_TITLES: Record<string, string> = {
   [NEW_MESSAGE]: 'New message',
   [NEW_ROOM]: 'New room',
   [NOTIFICATIONS]: 'Notifications',
+  [SEARCH]: 'Search',
   '/people': 'People',
   '/settings': 'Settings',
 }
@@ -56,6 +58,8 @@ export function Home({ me, onSignOut }: HomeProps) {
   const [atMembers, membersParams] = useRoute('/r/:id/members')
   const [atPost, postParams] = useRoute('/p/:id')
   const [atProfile, profileParams] = useRoute('/u/:name')
+  // The words searched for live in the URL.
+  const searched = new URLSearchParams(useSearch()).get('q') ?? ''
   const atRoot = location === '/'
   // A post's page sits over the room the post is in, once the post is known.
   const { post: openPost } = usePost(postParams?.id ?? '', atPost)
@@ -68,7 +72,15 @@ export function Home({ me, onSignOut }: HomeProps) {
   }, [named])
   const current = groups.find((g) => g.id === (named ?? last)) ?? root
   const viewing = atRoot || atGroup
-  const tabActive = atRoot ? 'home' : location === '/menu' ? 'menu' : location === NOTIFICATIONS ? 'bell' : undefined
+  const tabActive = atRoot
+    ? 'home'
+    : location === '/menu'
+      ? 'menu'
+      : location === NOTIFICATIONS
+        ? 'bell'
+        : location === SEARCH
+          ? 'search'
+          : undefined
   const postAuthor = useAuthor(openPost?.author ?? me)
   // Hiding a conversation (architecture.md, Groups): from its bar's menu, after a word of confirmation.
   const groupActions = useGroupActions()
@@ -178,6 +190,9 @@ export function Home({ me, onSignOut }: HomeProps) {
             {root && <PeoplePage me={me} root={root} onOpenGroup={(id) => navigate(groupPath(id, root.id))} />}
           </Route>
           <Route path="/settings">{root && <SettingsPage me={me} root={root} onSignOut={onSignOut} />}</Route>
+          <Route path={SEARCH}>
+            <SearchPage key={searched} query={searched} groups={groups} onGo={navigate} />
+          </Route>
           <Route path={NOTIFICATIONS}>
             <NotificationsPage groups={groups} onGo={navigate} />
           </Route>
@@ -244,7 +259,7 @@ export function Home({ me, onSignOut }: HomeProps) {
               if (key === 'home') navigate('/')
               else if (key === 'menu') navigate('/menu')
               else if (key === 'bell') navigate(NOTIFICATIONS)
-              // Search comes with its feature.
+              else if (key === 'search') navigate(SEARCH)
             }}
           />
         )}

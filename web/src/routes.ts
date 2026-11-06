@@ -15,6 +15,9 @@ export const NEW_ROOM = '/rooms/new'
 export const MESSAGES = '/messages'
 export const NEW_MESSAGE = '/messages/new'
 
+/** What matches what I typed (architecture.md, Search): `?q=` carries the words. */
+export const SEARCH = '/search'
+
 /** What was done to me (architecture.md, Notifications). */
 export const NOTIFICATIONS = '/notifications'
 

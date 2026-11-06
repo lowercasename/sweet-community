@@ -196,6 +196,7 @@ func (s *Server) Routes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/groups/{gid}/messages", s.requireGroup(s.listMessages))
 	mux.HandleFunc("POST /api/groups/{gid}/messages", s.requireGroup(s.createMessage))
 	mux.HandleFunc("GET /api/posts/{id}", s.requireAuth(s.getPost))
+	mux.HandleFunc("GET /api/search", s.requireAuth(s.search))
 	mux.HandleFunc("PUT /api/posts/{id}", s.requireAuth(s.editPost))
 	mux.HandleFunc("DELETE /api/posts/{id}", s.requireAuth(s.deletePost))
 	mux.HandleFunc("GET /api/posts/{id}/comments", s.requireAuth(s.listComments))

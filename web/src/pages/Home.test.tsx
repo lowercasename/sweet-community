@@ -37,6 +37,7 @@ vi.mock('../api', async (importOriginal) => ({
   setSettings: vi.fn(),
   logout: vi.fn(() => Promise.resolve()),
   readNotification: vi.fn(),
+  search: vi.fn(() => Promise.resolve({ hits: [] })),
   removeMember: vi.fn(),
 }))
 

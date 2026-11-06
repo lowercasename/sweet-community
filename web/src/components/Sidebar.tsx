@@ -2,7 +2,7 @@ import type { Group, User } from '../api'
 import { roomsOf } from '../data/groups'
 import { useAuthor, useUnreadPlaces, useUnreadNotifications } from '../data/hooks'
 import { anyUnread } from '../data/notifications'
-import { NEW_ROOM, NOTIFICATIONS, groupPath, profilePath } from '../routes'
+import { NEW_ROOM, NOTIFICATIONS, SEARCH, groupPath, profilePath } from '../routes'
 import { Avatar, Hairline, NavBar, NavItem, NavSection, Tile, Wordmark } from '../ui'
 import { ConversationsSection } from './ConversationsSection'
 
@@ -103,7 +103,13 @@ export function Sidebar({ me, groups, location, expanded, onGo, onToggle }: Side
         onGo={onGo}
       />
       <Hairline />
-      <NavItem icon="search" label="Search" expanded={expanded} />
+      <NavItem
+        icon="search"
+        label="Search"
+        expanded={expanded}
+        current={at(location, SEARCH)}
+        onClick={() => onGo(SEARCH)}
+      />
       <NavItem
         icon="bell"
         label="Notifications"

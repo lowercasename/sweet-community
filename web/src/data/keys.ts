@@ -16,6 +16,7 @@ export const keys = {
   notifications: ['notifications'] as const,
   profile: (name: string) => ['profile', name] as const,
   userPosts: (name: string) => ['userPosts', name] as const,
+  search: (q: string) => ['search', q] as const,
   markers: ['markers'] as const,
   settings: ['settings'] as const,
 }

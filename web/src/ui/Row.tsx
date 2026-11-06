@@ -12,7 +12,8 @@ const GAPS: Record<Gap, string> = {
 interface RowProps {
   gap?: Gap
   justify?: 'start' | 'between'
-  align?: 'baseline' | 'center' | 'start'
+  /** `end` lines a control up with the foot of a labelled field beside it. */
+  align?: 'baseline' | 'center' | 'start' | 'end'
   /** A bar across the top of a pane: padded, with a hairline under it. */
   pad?: boolean
   /**
@@ -45,7 +46,13 @@ export function Row({
     shrink ? '' : 'flex-none',
     GAPS[gap],
     justify === 'between' ? 'justify-between' : 'justify-start',
-    align === 'center' ? 'items-center' : align === 'start' ? 'items-start' : 'items-baseline',
+    align === 'center'
+      ? 'items-center'
+      : align === 'start'
+        ? 'items-start'
+        : align === 'end'
+          ? 'items-end'
+          : 'items-baseline',
     pad ? 'border-b border-line bg-card px-4 py-2' : '',
   ]
   return <div className={cls.join(' ')}>{children}</div>

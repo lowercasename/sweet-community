@@ -170,6 +170,18 @@ export interface Marker {
   unread: number
 }
 
+/** One search result (architecture.md, Search): what kind of thing, where, who said it, and an excerpt with its matches marked. */
+export interface Hit {
+  kind: 'post' | 'comment' | 'message'
+  id: string
+  group_id: string
+  post_id: string | null
+  author: User
+  created_at: number
+  /** Plain text; a match is wrapped in \x01 and \x02. */
+  excerpt: string
+}
+
 export interface MessagePage {
   messages: Message[]
   next_before: number | null
@@ -341,6 +353,11 @@ export function readNotification(id: string): Promise<Notification> {
 /** Clears the notifications I have opened, for good. */
 export function clearNotifications(): Promise<Cleared> {
   return request<Cleared>('/api/notifications', { method: 'DELETE' })
+}
+
+/** What matches, from the rooms I am in, best first, up to fifty. */
+export function search(q: string): Promise<{ hits: Hit[] }> {
+  return request(`/api/search?q=${encodeURIComponent(q)}`)
 }
 
 export function listMarkers(): Promise<{ markers: Marker[] }> {
