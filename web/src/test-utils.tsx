@@ -2,7 +2,7 @@ import type { ReactNode } from 'react'
 import { QueryClientProvider, type QueryClient } from '@tanstack/react-query'
 import { render } from '@testing-library/react'
 import { makeQueryClient } from './data/client'
-import type { Comment, Group, Member, Message, Post, User } from './api'
+import type { Comment, Group, Marker, Member, Message, Notification, Post, User } from './api'
 
 /** Render inside a fresh query cache, seeded first if asked; returns the client so tests can seed or inspect it. */
 export function renderWithQuery(ui: ReactNode, seed?: (qc: QueryClient) => void) {
@@ -107,6 +107,28 @@ export const comment = (id: string, postId: string, author: User, extra: Partial
   edited_at: null,
   can: nobody,
   ...extra,
+})
+
+export const notification = (
+  id: string,
+  kind: Notification['kind'],
+  actor: User,
+  extra: Partial<Notification> = {},
+): Notification => ({
+  id,
+  user_id: 'raphael',
+  kind,
+  actor,
+  group_id: ROOT,
+  post_id: kind === 'comment' ? `p-${id}` : null,
+  created_at: Number.parseInt(id.replace(/\D/g, ''), 10) || 1,
+  ...extra,
+})
+
+export const marker = (stream: string, readAt: number, userId = 'raphael'): Marker => ({
+  user_id: userId,
+  stream,
+  read_at: readAt,
 })
 
 export const message = (id: string, author: User, extra: Partial<Message> = {}): Message => ({

@@ -1,9 +1,12 @@
 import { Icon, type IconName } from './Icon'
+import { UnreadDot } from './NavItem'
 
 interface Tab<K extends string> {
   key: K
   icon: IconName
   label: string
+  /** Something unread behind it: a dot, never a count. */
+  dot?: boolean
 }
 
 interface TabBarProps<K extends string> {
@@ -22,10 +25,14 @@ export function TabBar<K extends string>({ tabs, active, onSelect }: TabBarProps
           key={t.key}
           type="button"
           aria-current={t.key === active ? 'page' : undefined}
+          aria-label={t.dot ? `${t.label}, unread` : undefined}
           className="flex flex-1 cursor-pointer flex-col items-center gap-0.5 pt-2 pb-1.5 text-[11px] font-medium text-mute transition-colors hover:text-ink aria-[current=page]:text-sweet focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-pink"
           onClick={() => onSelect(t.key)}
         >
-          <Icon name={t.icon} size={22} />
+          <span className="relative flex">
+            <Icon name={t.icon} size={22} />
+            {t.dot && <UnreadDot />}
+          </span>
           {t.label}
         </button>
       ))}

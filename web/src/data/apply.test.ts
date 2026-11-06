@@ -4,8 +4,8 @@ import type { QueryClient } from '@tanstack/react-query'
 import { makeQueryClient } from './client'
 import { keys } from './keys'
 import { applyEvent } from './apply'
-import { ROOT, comment, dm, group, member, message, mine, post, user } from '../test-utils'
-import type { Group, Member, Post, PostPage, User } from '../api'
+import { ROOT, comment, dm, group, marker, member, message, mine, notification, post, user } from '../test-utils'
+import type { Group, Marker, Member, Notification, Post, PostPage, User } from '../api'
 
 /**
  * The event stream is the cache's write path: one upsert and one delete per
@@ -52,6 +52,30 @@ beforeEach(() => {
 })
 
 describe('applyEvent', () => {
+  it('prepends a notification to my loaded list once, and moves a marker forward only', () => {
+    const list = () =>
+      (qc.getQueryData(keys.notifications) as { pages: { notifications: Notification[] }[] }).pages.flatMap(
+        (p) => p.notifications,
+      )
+    qc.setQueryData(keys.notifications, {
+      pages: [{ notifications: [notification('n1', 'comment', mo)], next_before: null }],
+      pageParams: [null],
+    })
+    applyEvent(qc, 'notification', notification('n2', 'added', mo))
+    applyEvent(qc, 'notification', notification('n2', 'added', mo))
+    expect(list().map((n) => n.id)).toEqual(['n2', 'n1'])
+
+    qc.setQueryData(keys.markers, { markers: [marker('notifications', 5)] })
+    const markers = () => (qc.getQueryData(keys.markers) as { markers: Marker[] }).markers
+    applyEvent(qc, 'marker', marker('notifications', 9))
+    applyEvent(qc, 'marker', marker('notifications', 7))
+    applyEvent(qc, 'marker', marker(`chat:${CLUB}`, 3))
+    expect(markers().map((m) => [m.stream, m.read_at])).toEqual([
+      ['notifications', 9],
+      [`chat:${CLUB}`, 3],
+    ])
+  })
+
   it('keeps a post page in step with its feed: edits, comment counts, authors and deletion reach the post query', () => {
     qc.setQueryData(keys.post('p2'), post('p2', mo))
     const page = () => qc.getQueryData(keys.post('p2')) as Post | undefined

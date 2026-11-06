@@ -18,6 +18,8 @@ const EVENT_KINDS = [
   'membership',
   'membership_delete',
   'settings',
+  'notification',
+  'marker',
 ] as const
 const HEALTH_INTERVAL_MS = 30_000
 const HEALTH_TIMEOUT_MS = 10_000

@@ -133,6 +133,29 @@ export interface Message {
   can: Can
 }
 
+/** One thing done to me (architecture.md, Notifications): who, what kind, where; a comment's post. Read is my marker, not a flag here. */
+export interface Notification {
+  id: string
+  user_id: string
+  kind: 'comment' | 'added'
+  actor: User
+  group_id: string
+  post_id: string | null
+  created_at: number
+}
+
+export interface NotificationPage {
+  notifications: Notification[]
+  next_before: number | null
+}
+
+/** How far along a stream I have read: `notifications`, or `chat:<group id>`. Forward only. */
+export interface Marker {
+  user_id: string
+  stream: string
+  read_at: number
+}
+
 export interface MessagePage {
   messages: Message[]
   next_before: number | null
@@ -277,6 +300,21 @@ export function createMessage(groupId: string, bodyHtml: string): Promise<Messag
 
 export async function deleteMessage(id: string): Promise<void> {
   await request(`/api/messages/${encodeURIComponent(id)}`, { method: 'DELETE' })
+}
+
+export function listNotifications(before?: number | null, limit = 30): Promise<NotificationPage> {
+  const params = new URLSearchParams({ limit: String(limit) })
+  if (before != null) params.set('before', String(before))
+  return request<NotificationPage>(`/api/notifications?${params}`)
+}
+
+export function listMarkers(): Promise<{ markers: Marker[] }> {
+  return request('/api/markers')
+}
+
+/** I have read this stream up to this time. The server holds it to now and never moves it back. */
+export function setMarker(stream: string, readAt: number): Promise<Marker> {
+  return request<Marker>(`/api/markers/${encodeURIComponent(stream)}`, json('PUT', { read_at: readAt }))
 }
 
 export function getComments(postId: string): Promise<{ comments: Comment[] }> {

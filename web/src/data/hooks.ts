@@ -19,13 +19,16 @@ import {
   getSettings,
   listGroups,
   listInvites,
+  listMarkers,
   listMembers,
+  listNotifications,
   listUsers,
   logout,
   openDM,
   removeMember,
   removeUser,
   revokeInvite,
+  setMarker,
   setMemberRole,
   setPicture,
   setSettings,
@@ -42,6 +45,7 @@ import {
 } from '../api'
 import { applyEvent, findPost } from './apply'
 import { ROOT_ID, keys } from './keys'
+import { NOTIFICATIONS, markerOf, unreadOf } from './notifications'
 
 /*
  * Reads are queries; writes call the API and then feed the reply through
@@ -295,6 +299,51 @@ export function useGroupActions() {
       applyEvent(qc, 'group', g)
       return g
     },
+  }
+}
+
+/** What was done to me, newest first, paged. */
+export function useNotifications() {
+  const q = useInfiniteQuery({
+    queryKey: keys.notifications,
+    queryFn: ({ pageParam }) => listNotifications(pageParam),
+    initialPageParam: null as number | null,
+    getNextPageParam: (last) => last.next_before,
+  })
+  const seen = new Set<string>()
+  const notifications = (q.data?.pages ?? [])
+    .flatMap((p) => p.notifications)
+    .filter((n) => !seen.has(n.id) && seen.add(n.id))
+    .sort((a, b) => b.created_at - a.created_at)
+  return {
+    notifications,
+    loading: q.isPending || q.isFetchingNextPage,
+    error: q.error,
+    hasMore: q.hasNextPage,
+    loadMore: () => void q.fetchNextPage(),
+  }
+}
+
+/** How far I have read each stream. `loaded` says the answer is in, not merely empty. */
+export function useMarkers() {
+  const q = useQuery({ queryKey: keys.markers, queryFn: listMarkers })
+  return { markers: q.data?.markers ?? [], loaded: q.data !== undefined }
+}
+
+/** Is anything on the notifications stream newer than where I have read to? The bell's dot. */
+export function useUnreadNotifications(): boolean {
+  const { notifications } = useNotifications()
+  const { markers } = useMarkers()
+  return unreadOf(notifications, markerOf(markers, NOTIFICATIONS)).length > 0
+}
+
+/** I have read a stream up to a time: the cache moves at once, the server's answer follows through the same path. */
+export function useMarkRead() {
+  const qc = useQueryClient()
+  return async (stream: string, readAt: number) => {
+    const me = qc.getQueryData<User | null>(keys.me)
+    applyEvent(qc, 'marker', { user_id: me?.id ?? '', stream, read_at: readAt })
+    applyEvent(qc, 'marker', await setMarker(stream, readAt))
   }
 }
 

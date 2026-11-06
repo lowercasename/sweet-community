@@ -2,7 +2,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, screen, within } from '@testing-library/react'
 import type { Group } from '../api'
-import { ROOT, dm, group, nameOf, renderWithQuery, user } from '../test-utils'
+import { ROOT, dm, group, marker, nameOf, notification, renderWithQuery, user } from '../test-utils'
 
 /**
  * The nav column's three blocks (architecture.md, Layout): places (Home,
@@ -12,6 +12,8 @@ import { ROOT, dm, group, nameOf, renderWithQuery, user } from '../test-utils'
  */
 vi.mock('../api', () => ({
   listUsers: vi.fn(() => Promise.resolve({ users: [] })),
+  listNotifications: vi.fn(() => Promise.resolve({ notifications: [], next_before: null })),
+  listMarkers: vi.fn(() => Promise.resolve({ markers: [] })),
 }))
 
 const raphael = user('raphael')
@@ -191,5 +193,26 @@ describe('Sidebar', () => {
     expect(screen.getByRole('button', { name: 'Knitting' }).textContent).toBe('K')
     expect(nameOf(screen.getByRole('button', { name: 'Knitting' }))).toBe('Knitting')
     expect(screen.getByRole('navigation').querySelectorAll('hr').length).toBe(2)
+  })
+
+  it('the bell carries a dot while a notification is newer than my marker, and opens the page', async () => {
+    const { listNotifications, listMarkers } = await import('../api')
+    vi.mocked(listNotifications).mockResolvedValue({
+      notifications: [notification('n9', 'comment', kit), notification('n3', 'added', kit)],
+      next_before: null,
+    })
+    vi.mocked(listMarkers).mockResolvedValue({ markers: [marker('notifications', 3)] })
+    const onGo = await draw([root(false)])
+    const bell = await screen.findByRole('button', { name: 'Notifications, unread' })
+    fireEvent.click(bell)
+    expect(onGo).toHaveBeenCalledWith('/notifications')
+    cleanup()
+
+    vi.mocked(listMarkers).mockResolvedValue({ markers: [marker('notifications', 9)] })
+    await draw([root(false)], '/notifications')
+    await vi.waitFor(() =>
+      expect(screen.getByRole('button', { name: 'Notifications' }).getAttribute('aria-current')).toBe('page'),
+    )
+    expect(screen.queryByRole('button', { name: 'Notifications, unread' })).toBeNull()
   })
 })

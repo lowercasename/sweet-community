@@ -61,6 +61,27 @@ func wireMessage(row store.GetMessageRow) Message {
 	}
 }
 
+func wireNotification(row store.GetNotificationRow) Notification {
+	var pid *string
+	if row.PostID.Valid {
+		p := row.PostID.String
+		pid = &p
+	}
+	return Notification{
+		ID:        row.ID,
+		UserID:    row.UserID,
+		Kind:      row.Kind,
+		Actor:     wireUser(row.ActorID, row.ActorUsername, row.ActorPictureID),
+		GroupID:   row.GroupID,
+		PostID:    pid,
+		CreatedAt: row.CreatedAt,
+	}
+}
+
+func wireMarker(row store.ReadMarker) Marker {
+	return Marker{UserID: row.UserID, Stream: row.Stream, ReadAt: row.ReadAt}
+}
+
 func wireMembership(groupID string, row store.GetMemberRow) Membership {
 	return Membership{GroupID: groupID, User: wireUser(row.ID, row.Username, row.PictureID), Role: row.Role, JoinedAt: row.JoinedAt, HiddenAt: nullInt(row.HiddenAt)}
 }

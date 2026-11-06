@@ -7,11 +7,14 @@ test.describe('images', () => {
     const text = uniq('Three from the walk ')
     await kit.page.locator('.editor-post .ProseMirror').first().click()
     await kit.page.keyboard.type(text)
-    await kit.page.locator('section input[type=file]').first().setInputFiles([
-      { name: 'a.png', mimeType: 'image/png', buffer: png(320, 200, [206, 23, 23]) },
-      { name: 'b.png', mimeType: 'image/png', buffer: png(200, 320, [42, 143, 203]) },
-      { name: 'c.png', mimeType: 'image/png', buffer: png(300, 300, [237, 94, 94]) },
-    ])
+    await kit.page
+      .locator('section input[type=file]')
+      .first()
+      .setInputFiles([
+        { name: 'a.png', mimeType: 'image/png', buffer: png(320, 200, [206, 23, 23]) },
+        { name: 'b.png', mimeType: 'image/png', buffer: png(200, 320, [42, 143, 203]) },
+        { name: 'c.png', mimeType: 'image/png', buffer: png(300, 300, [237, 94, 94]) },
+      ])
     // Three cards, labelled as one gallery; alt text goes on the second.
     await expect(kit.page.locator('.editor-post textarea')).toHaveCount(3)
     await expect(kit.page.getByText('Gallery of 3 images')).toBeVisible()
@@ -24,12 +27,19 @@ test.describe('images', () => {
     await expect(post.locator('.gallery img').nth(1)).toHaveAttribute('alt', 'A tall blue rectangle')
     // The pictures really are served: natural size once decoded, not a broken image.
     await expect
-      .poll(() => post.locator('.gallery img').first().evaluate((img: HTMLImageElement) => img.naturalWidth))
+      .poll(() =>
+        post
+          .locator('.gallery img')
+          .first()
+          .evaluate((img: HTMLImageElement) => img.naturalWidth),
+      )
       .toBe(320)
     await kit.context.close()
   })
 
-  test('a new profile picture shows on the feed and in the nav, for everyone, at once', async ({ browser }, testInfo) => {
+  test('a new profile picture shows on the feed and in the nav, for everyone, at once', async ({
+    browser,
+  }, testInfo) => {
     const kit = await member(browser, testInfo, 'kit')
     const mo = await member(browser, testInfo, 'mo')
     await open(kit.page)
@@ -43,8 +53,13 @@ test.describe('images', () => {
     expect(donut).not.toContain('/img/')
 
     await open(kit.page, '/settings')
-    await kit.page.locator('input[type=file]').first().setInputFiles({ name: 'me.png', mimeType: 'image/png', buffer: png(64, 64) })
-    await expect(kit.page.getByRole('navigation', { name: 'Main' }).getByRole('img', { name: kit.username })).toHaveAttribute('src', /\/img\//)
+    await kit.page
+      .locator('input[type=file]')
+      .first()
+      .setInputFiles({ name: 'me.png', mimeType: 'image/png', buffer: png(64, 64) })
+    await expect(
+      kit.page.getByRole('navigation', { name: 'Main' }).getByRole('img', { name: kit.username }),
+    ).toHaveAttribute('src', /\/img\//)
     // Mo's open feed follows without a reload.
     await expect(article(mo.page, text).getByRole('img', { name: kit.username })).toHaveAttribute('src', /\/img\//)
     await kit.context.close()

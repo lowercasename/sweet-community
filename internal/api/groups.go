@@ -486,7 +486,14 @@ func (s *Server) addMember(w http.ResponseWriter, r *http.Request) {
 			return nil, nil, http.StatusInternalServerError, err
 		}
 		m := wireMembership(g.ID, row)
-		return []events.Entry{{Kind: "membership", Payload: m}}, m, http.StatusCreated, nil
+		entries := []events.Entry{{Kind: "membership", Payload: m}}
+		// The one added hears about it (architecture.md, Notifications); the membership event alone makes no sound.
+		if told, err := notify(r, qtx, NotifyAdded, in.UserID, a.ID, g.ID, nil, now); err != nil {
+			return nil, nil, http.StatusInternalServerError, err
+		} else if told != nil {
+			entries = append(entries, *told)
+		}
+		return entries, m, http.StatusCreated, nil
 	})
 }
 
@@ -774,6 +781,12 @@ func filterEvent(viewer User, roles map[string]string, st *Settings, e events.Ev
 			*st = next
 		}
 		return e, true
+	case "notification", "marker":
+		// Mine alone: a notification is for its person, a marker is where they have read to.
+		var own struct {
+			UserID string `json:"user_id"`
+		}
+		return e, json.Unmarshal(e.Payload, &own) == nil && own.UserID == viewer.ID
 	default:
 		// user, and anything instance-wide: everyone on the instance sees it.
 		return e, true

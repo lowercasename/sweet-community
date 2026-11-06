@@ -8,6 +8,7 @@ import (
 	"github.com/google/uuid"
 
 	"sweet/internal/db"
+	"sweet/internal/events"
 	"sweet/internal/perm"
 	"sweet/internal/sanitize"
 	"sweet/internal/store"
@@ -85,22 +86,34 @@ func (s *Server) createComment(w http.ResponseWriter, r *http.Request) {
 	}
 	author, _ := userFrom(r.Context())
 	now := db.Now()
-	s.logged(w, r, "comment", now, func(qtx *store.Queries) (any, int, error) {
-		_, a, status, err := s.postActor(r, qtx, postID)
+	// The comment, then its notification to the post's author (architecture.md, Notifications), in one transaction.
+	s.loggedMany(w, r, now, func(qtx *store.Queries) ([]events.Entry, any, int, error) {
+		owners, a, status, err := s.postActor(r, qtx, postID)
 		if err != nil {
-			return nil, status, err
+			return nil, nil, status, err
 		}
 		if !perm.Write(a) {
-			return nil, http.StatusForbidden, errors.New("not allowed")
+			return nil, nil, http.StatusForbidden, errors.New("not allowed")
 		}
 		if err := qtx.CreateComment(r.Context(), store.CreateCommentParams{
 			ID: id.String(), PostID: postID, AuthorID: author.ID, BodyHtml: clean, BodyText: sanitize.Text(clean), CreatedAt: now,
 		}); err != nil {
-			return nil, http.StatusInternalServerError, err
+			return nil, nil, http.StatusInternalServerError, err
 		}
 		row, err := qtx.GetComment(r.Context(), id.String())
+		if err != nil {
+			return nil, nil, http.StatusInternalServerError, err
+		}
 		c := wireComment(row)
-		return &c, http.StatusCreated, err
+		entries := []events.Entry{{Kind: "comment", Payload: &c}}
+		told, err := notify(r, qtx, NotifyComment, owners.AuthorID, author.ID, owners.GroupID, &postID, now)
+		if err != nil {
+			return nil, nil, http.StatusInternalServerError, err
+		}
+		if told != nil {
+			entries = append(entries, *told)
+		}
+		return entries, &c, http.StatusCreated, nil
 	})
 }
 

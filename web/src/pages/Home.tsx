@@ -1,10 +1,10 @@
 import { useEffect, useState } from 'react'
 import { Redirect, Route, Switch, useLocation, useRoute, useSearch } from 'wouter'
 import type { User } from '../api'
-import { useGroups, usePost } from '../data/hooks'
+import { useGroups, usePost, useUnreadNotifications } from '../data/hooks'
 import { StreamProvider } from '../hooks/StreamContext'
 import { useLayout } from '../hooks/useLayout'
-import { MESSAGES, NEW_MESSAGE, NEW_ROOM, groupPath, membersPath } from '../routes'
+import { MESSAGES, NEW_MESSAGE, NEW_ROOM, NOTIFICATIONS, groupPath, membersPath } from '../routes'
 import { GroupBar } from '../components/GroupBar'
 import { GroupView } from '../components/GroupView'
 import { MembersPage } from '../components/MembersPage'
@@ -12,6 +12,7 @@ import { MenuPage } from '../components/MenuPage'
 import { MessagesPage } from '../components/MessagesPage'
 import { NewGroupPage } from '../components/NewGroupPage'
 import { NewMessagePage } from '../components/NewMessagePage'
+import { NotificationsPage } from '../components/NotificationsPage'
 import { PeoplePage } from '../components/PeoplePage'
 import { PostPage } from '../components/PostPage'
 import { SettingsPage } from '../components/SettingsPage'
@@ -34,6 +35,7 @@ interface HomeProps {
 export function Home({ me, onSignOut }: HomeProps) {
   const { layout, narrow, navExpanded, setLayout, toggleNav } = useLayout()
   const { groups, loading } = useGroups()
+  const unread = useUnreadNotifications()
   const root = groups.find((g) => g.kind === 'root')
   const [location, navigate] = useLocation()
   // New message starts from the people a conversation's page sends it (?with=ids).
@@ -53,7 +55,15 @@ export function Home({ me, onSignOut }: HomeProps) {
   }, [named])
   const current = groups.find((g) => g.id === (named ?? last)) ?? root
   const viewing = atRoot || atGroup
-  const tabActive = viewing ? (layout === 'posts' ? 'posts' : 'chat') : location === '/menu' ? 'menu' : undefined
+  const tabActive = viewing
+    ? layout === 'posts'
+      ? 'posts'
+      : 'chat'
+    : location === '/menu'
+      ? 'menu'
+      : location === NOTIFICATIONS
+        ? 'bell'
+        : undefined
 
   // A group the URL names that is not mine (or is gone) does not exist to me.
   if (!loading && named && !groups.some((g) => g.id === named)) return <Redirect to="/" replace />
@@ -87,6 +97,9 @@ export function Home({ me, onSignOut }: HomeProps) {
             {root && <PeoplePage me={me} root={root} onOpenGroup={(id) => navigate(groupPath(id, root.id))} />}
           </Route>
           <Route path="/settings">{root && <SettingsPage me={me} root={root} onSignOut={onSignOut} />}</Route>
+          <Route path={NOTIFICATIONS}>
+            <NotificationsPage groups={groups} onGo={navigate} />
+          </Route>
           <Route path="/messages">
             <MessagesPage me={me} onGo={navigate} />
           </Route>
@@ -126,7 +139,7 @@ export function Home({ me, onSignOut }: HomeProps) {
               { key: 'posts', icon: 'posts', label: 'Posts' },
               { key: 'chat', icon: 'chat', label: 'Chat' },
               { key: 'search', icon: 'search', label: 'Search' },
-              { key: 'bell', icon: 'bell', label: 'Notifications' },
+              { key: 'bell', icon: 'bell', label: 'Notifications', dot: unread },
               { key: 'menu', icon: 'menu', label: 'Menu' },
             ]}
             active={tabActive}
@@ -135,7 +148,8 @@ export function Home({ me, onSignOut }: HomeProps) {
                 if (current) navigate(groupPath(current.id, root?.id))
                 setLayout(key)
               } else if (key === 'menu') navigate('/menu')
-              // Search and alerts come with their features.
+              else if (key === 'bell') navigate(NOTIFICATIONS)
+              // Search comes with its feature.
             }}
           />
         )}

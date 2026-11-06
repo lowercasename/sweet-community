@@ -14,23 +14,41 @@ interface NavItemProps {
   current?: boolean
   /** `sm` inside a section: shorter and quieter, so the items read as a stack under their title. */
   size?: 'md' | 'sm'
+  /** Something unread behind it: a dot on the icon, never a count, and "unread" in its name (the name is then the aria-label, in both states). */
+  dot?: boolean
   onClick?: () => void
 }
 
+/** The dot on an icon's corner; the icon's wrapper is relative. Shared with the phone's tab bar. */
+export function UnreadDot() {
+  return (
+    <span aria-hidden className="absolute -top-0.5 -right-0.5 h-2.5 w-2.5 rounded-full bg-sweet ring-2 ring-card" />
+  )
+}
+
 /** One entry in the NavBar: an icon or a mark, plus its label when expanded. */
-export function NavItem({ icon, mark, label, expanded, current, size = 'md', onClick }: NavItemProps) {
+export function NavItem({ icon, mark, label, expanded, current, size = 'md', dot = false, onClick }: NavItemProps) {
   const tip = useTooltip(label, !expanded, 'right')
+  const name = dot ? `${label}, unread` : label
+  const glyph = mark ?? (icon && <Icon name={icon} size={20} />)
   return (
     <>
       <button
         ref={tip.ref}
         type="button"
         aria-current={current ? 'page' : undefined}
-        aria-label={expanded ? undefined : label}
+        aria-label={expanded && !dot ? undefined : name}
         className={`flex cursor-pointer items-center gap-3 rounded-[4px] text-mute transition-colors hover:bg-field hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-pink aria-[current=page]:bg-blush aria-[current=page]:text-sweet ${size === 'sm' ? 'h-8 text-sm' : 'h-10'} ${expanded ? 'px-3' : 'justify-center'}`}
         {...tip.props({ onClick })}
       >
-        {mark ?? (icon && <Icon name={icon} size={20} />)}
+        {dot ? (
+          <span className="relative flex flex-none">
+            {glyph}
+            <UnreadDot />
+          </span>
+        ) : (
+          glyph
+        )}
         {expanded && <span className="truncate font-medium">{label}</span>}
       </button>
       {tip.tooltip}

@@ -13,5 +13,7 @@ export const keys = {
   comments: (postId: string) => ['comments', postId] as const,
   messages: (groupId: string) => ['messages', groupId] as const,
   invites: ['invites'] as const,
+  notifications: ['notifications'] as const,
+  markers: ['markers'] as const,
   settings: ['settings'] as const,
 }

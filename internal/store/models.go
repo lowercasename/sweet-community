@@ -14,6 +14,12 @@ type Image struct {
 	CreatedAt   int64
 }
 
+type ReadMarker struct {
+	UserID string
+	Stream string
+	ReadAt int64
+}
+
 type Setting struct {
 	Key   string
 	Value string

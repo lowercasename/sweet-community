@@ -1,5 +1,19 @@
 import type { InfiniteData, QueryClient } from '@tanstack/react-query'
-import type { Comment, Group, Member, Membership, Message, MessagePage, Post, PostPage, Settings, User } from '../api'
+import type {
+  Comment,
+  Group,
+  Marker,
+  Member,
+  Membership,
+  Message,
+  MessagePage,
+  Notification,
+  NotificationPage,
+  Post,
+  PostPage,
+  Settings,
+  User,
+} from '../api'
 import { ROOT_ID, keys } from './keys'
 
 /**
@@ -45,6 +59,12 @@ export function applyEvent(qc: QueryClient, kind: string, data: unknown): void {
     case 'membership_delete':
       if (isMembershipRef(data)) deleteMembership(qc, data.group_id, data.user_id)
       break
+    case 'notification':
+      if (isNotification(data)) upsertNotification(qc, data)
+      break
+    case 'marker':
+      if (isMarker(data)) upsertMarker(qc, data)
+      break
     case 'settings':
       if (isSettings(data)) {
         qc.setQueryData<Settings>(keys.settings, data)
@@ -56,6 +76,8 @@ export function applyEvent(qc: QueryClient, kind: string, data: unknown): void {
 }
 
 type Posts = InfiniteData<PostPage>
+type Notifications = InfiniteData<NotificationPage>
+type Markers = { markers: Marker[] }
 type Messages = InfiniteData<MessagePage>
 type Thread = { comments: Comment[] }
 type Users = { users: Member[] }
@@ -190,6 +212,29 @@ function upsertUser(qc: QueryClient, u: User) {
         pages: old.pages.map((p) => ({ ...p, messages: p.messages.map((m) => ({ ...m, author: as(m.author) })) })),
       },
   )
+}
+
+/** Something done to me: at the top of my list, once. */
+function upsertNotification(qc: QueryClient, n: Notification) {
+  qc.setQueryData<Notifications>(keys.notifications, (old) => {
+    if (!old) return old
+    const known = old.pages.some((p) => p.notifications.some((x) => x.id === n.id))
+    const pages = known
+      ? old.pages.map((p) => ({ ...p, notifications: p.notifications.map((x) => (x.id === n.id ? n : x)) }))
+      : old.pages.map((p, i) => (i === 0 ? { ...p, notifications: [n, ...p.notifications] } : p))
+    return { ...old, pages }
+  })
+}
+
+/** Where I have read a stream to: forward only, as on the server, so a stale tab's word changes nothing. */
+function upsertMarker(qc: QueryClient, m: Marker) {
+  qc.setQueryData<Markers>(keys.markers, (old) => {
+    const markers = old?.markers ?? []
+    const known = markers.some((x) => x.stream === m.stream)
+    return {
+      markers: known ? markers.map((x) => (x.stream === m.stream && x.read_at < m.read_at ? m : x)) : [...markers, m],
+    }
+  })
 }
 
 function upsertGroup(qc: QueryClient, g: Group) {
@@ -335,6 +380,14 @@ function isMembership(data: unknown): data is Membership {
     typeof m.role === 'string' &&
     isUser(m.user)
   )
+}
+function isNotification(data: unknown): data is Notification {
+  const n = data as Notification
+  return hasId(data) && typeof n.kind === 'string' && typeof n.group_id === 'string' && isUser(n.actor)
+}
+function isMarker(data: unknown): data is Marker {
+  const m = data as Marker
+  return typeof m === 'object' && m !== null && typeof m.stream === 'string' && typeof m.read_at === 'number'
 }
 function isSettings(data: unknown): data is Settings {
   return typeof data === 'object' && data !== null && typeof (data as Settings).group_creation === 'string'

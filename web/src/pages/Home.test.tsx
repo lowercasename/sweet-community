@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, screen, within } from '@testing-library/react'
-import { FakeEventSource, ROOT, dm, group, member, post, renderWithQuery, user } from '../test-utils'
+import { FakeEventSource, ROOT, dm, group, member, notification, post, renderWithQuery, user } from '../test-utils'
 import { ApiError } from '../api'
 
 /**
@@ -25,6 +25,11 @@ vi.mock('../api', async (importOriginal) => ({
   listMembers: vi.fn(() => Promise.resolve({ members: [] })),
   listInvites: vi.fn(() => Promise.resolve({ invites: [] })),
   getSettings: vi.fn(() => Promise.resolve({ group_creation: 'anyone' })),
+  listNotifications: vi.fn(() => Promise.resolve({ notifications: [], next_before: null })),
+  listMarkers: vi.fn(() => Promise.resolve({ markers: [] })),
+  setMarker: vi.fn((stream: string, readAt: number) =>
+    Promise.resolve({ user_id: 'raphael', stream, read_at: readAt }),
+  ),
   setSettings: vi.fn(),
   logout: vi.fn(() => Promise.resolve()),
 }))
@@ -231,6 +236,21 @@ describe('Home', () => {
     await screen.findByText(/This post is gone/)
     fireEvent.click(screen.getAllByRole('button', { name: 'Home' }).find((b) => !b.closest('nav'))!)
     expect(window.location.pathname).toBe('/')
+  })
+
+  it('a notification on the stream lights the bell; the Notifications page puts it out', async () => {
+    const { setMarker } = await import('../api')
+    await home()
+    expect(nav().getByRole('button', { name: 'Notifications' })).toBeTruthy()
+    FakeEventSource.last!.emit('notification', notification('n5', 'comment', kit, { post_id: 'p1' }), 8)
+    const bell = await nav().findByRole('button', { name: 'Notifications, unread' })
+    fireEvent.click(bell)
+    expect(window.location.pathname).toBe('/notifications')
+    await screen.findByRole('heading', { name: 'Notifications' })
+    await screen.findByRole('button', { name: 'kit commented on your post, new' })
+    await vi.waitFor(() => expect(setMarker).toHaveBeenCalledWith('notifications', 5))
+    await nav().findByRole('button', { name: 'Notifications' })
+    expect(nav().getByRole('button', { name: 'Notifications' }).getAttribute('aria-current')).toBe('page')
   })
 
   it('hides New room when the root group says I may not', async () => {
