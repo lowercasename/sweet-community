@@ -52,14 +52,14 @@ describe('MessagesPage', () => {
     expect(onGo).toHaveBeenCalledWith('/r/d1')
   })
 
-  it('lists the conversations I have stepped out of below the others; opening one steps back in', async () => {
+  it('lists the conversations I have hidden below the others; opening one brings it back', async () => {
     const { listGroups, openDM } = await import('../api')
     vi.mocked(listGroups).mockResolvedValue({
-      groups: [group(ROOT, 'member'), dm('d1', [kit, raphael]), dm('d2', [mo, raphael], { left_at: 5 })],
+      groups: [group(ROOT, 'member'), dm('d1', [kit, raphael]), dm('d2', [mo, raphael], { hidden_at: 5 })],
     })
     vi.mocked(openDM).mockResolvedValue(dm('d2', [mo, raphael]))
     const onGo = await draw()
-    await screen.findByRole('heading', { name: 'Stepped out of' })
+    await screen.findByRole('heading', { name: 'Hidden' })
     const lists = screen.getAllByRole('list')
     expect(
       within(lists[0])

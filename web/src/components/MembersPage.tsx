@@ -26,8 +26,8 @@ interface MembersPageProps {
   me: User
   /** After I have left or deleted the group: there is nothing here to show any more. */
   onLeft: () => void
-  /** A conversation with these people and someone else has opened: show it. */
-  onOpen?: (group: Group) => void
+  /** Start a conversation with these people and others: New message, with them filled in. */
+  onStartWith?: (userIds: string[]) => void
 }
 
 const MODES: { value: GroupMode; label: string }[] = [
@@ -47,7 +47,7 @@ const ROLE_WORD: Record<Membership['role'], string> = {
  * add and remove people, set roles, hand the group over, rename it, set its
  * mode, delete it, leave it. Nothing here reasons about roles.
  */
-export function MembersPage({ group, me, onLeft, onOpen }: MembersPageProps) {
+export function MembersPage({ group, me, onLeft, onStartWith }: MembersPageProps) {
   const { members, loading, error } = useMembers(group.id)
   const { data: users } = useUsers()
   const actions = useGroupActions()
@@ -74,18 +74,11 @@ export function MembersPage({ group, me, onLeft, onOpen }: MembersPageProps) {
     }
   }
 
-  // To people a named group is a room and a DM a conversation.
-  const word = group.kind === 'dm' ? 'conversation' : 'room'
   const inGroup = new Set(members.map((m) => m.user.id))
   const candidates = [...(users?.values() ?? [])].filter((u) => !inGroup.has(u.id))
   // A conversation's people are fixed (architecture.md, Groups): a word with
-  // someone else is another conversation, of these people and them.
+  // someone else is another conversation, started on New message with these people filled in.
   const others = members.filter((m) => m.user.id !== me.id).map((m) => m.user.id)
-  const withSomeoneElse = async () => {
-    const g = await actions.openDM([...others, pick])
-    setPick('')
-    onOpen?.(g)
-  }
   const dirty = name.trim() !== group.name || mode !== group.mode
   const canEdit = group.can.rename || group.can.set_mode
 
@@ -138,7 +131,7 @@ export function MembersPage({ group, me, onLeft, onOpen }: MembersPageProps) {
             )}
             <Card>
               <Stack gap={2}>
-                <Heading level={2}>Members</Heading>
+                <Heading level={2}>{group.kind === 'dm' ? 'People' : 'Members'}</Heading>
                 {loading && <Text variant="secondary">Loading…</Text>}
                 {error && <Text variant="secondary">{error.message}</Text>}
                 {problem && <Text variant="secondary">{problem}</Text>}
@@ -165,22 +158,7 @@ export function MembersPage({ group, me, onLeft, onOpen }: MembersPageProps) {
                     </Button>
                   </Row>
                 )}
-                {group.kind === 'dm' && !loading && candidates.length > 0 && (
-                  <Row gap={2} align="center">
-                    <Select
-                      label="With someone else"
-                      value={pick}
-                      options={[
-                        { value: '', label: 'Choose a person…' },
-                        ...candidates.map((u) => ({ value: u.id, label: u.username })),
-                      ]}
-                      onChange={setPick}
-                    />
-                    <Button variant="secondary" disabled={busy || !pick} onClick={() => void run(withSomeoneElse)}>
-                      Open
-                    </Button>
-                  </Row>
-                )}
+
                 <List>
                   {members.map((m) => {
                     const self = m.user.id === me.id
@@ -190,7 +168,6 @@ export function MembersPage({ group, me, onLeft, onOpen }: MembersPageProps) {
                           <Row gap={2} align="center">
                             <PersonName user={m.user} avatar="md" />
                             <Text as="span" variant="small">
-                              {m.left_at != null && 'stepped out · '}
                               {ROLE_WORD[m.role] && `${ROLE_WORD[m.role]} · `}
                               joined <Time at={m.joined_at} />
                             </Text>
@@ -235,15 +212,20 @@ export function MembersPage({ group, me, onLeft, onOpen }: MembersPageProps) {
                   })}
                 </List>
                 {group.can.leave && (
-                  <Row>
+                  <Row gap={2}>
                     <Button
                       variant="secondary"
-                      icon="logout"
+                      icon={group.kind === 'dm' ? 'remove' : 'logout'}
                       disabled={busy}
                       onClick={() => setConfirm({ kind: 'leave' })}
                     >
-                      Leave {word}
+                      {group.kind === 'dm' ? 'Hide conversation' : 'Leave room'}
                     </Button>
+                    {group.kind === 'dm' && (
+                      <Button variant="secondary" icon="chat" disabled={busy} onClick={() => onStartWith?.(others)}>
+                        New conversation with these people and others
+                      </Button>
+                    )}
                   </Row>
                 )}
               </Stack>
@@ -265,13 +247,17 @@ export function MembersPage({ group, me, onLeft, onOpen }: MembersPageProps) {
       </ConfirmDialog>
       <ConfirmDialog
         open={confirm?.kind === 'leave'}
-        title={`Leave this ${word}?`}
-        confirmLabel="Leave"
+        title={group.kind === 'dm' ? 'Hide this conversation?' : 'Leave this room?'}
+        confirmLabel={group.kind === 'dm' ? 'Hide' : 'Leave'}
         busy={busy}
         onConfirm={() => void run(() => actions.leave(group.id, me.id).then(onLeft))}
         onClose={() => setConfirm(null)}
       >
-        <Text variant="secondary">Someone in it will have to add you again.</Text>
+        <Text variant="secondary">
+          {group.kind === 'dm'
+            ? 'It moves to Hidden at the foot of All messages. Opening it brings it back, with everything said meanwhile. Nobody else is told.'
+            : 'Someone in it will have to add you again.'}
+        </Text>
       </ConfirmDialog>
       <ConfirmDialog
         open={confirm?.kind === 'delete'}

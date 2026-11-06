@@ -175,7 +175,7 @@ test.describe('groups', () => {
     await mo.context.close()
   })
 
-  test('a conversation is its people: with someone else is another one; stepping out and back keeps it', async ({
+  test('a conversation is its people: one with others is another one; hiding and showing keeps it', async ({
     browser,
   }, testInfo) => {
     const kit = await member(browser, testInfo, 'kit')
@@ -193,12 +193,16 @@ test.describe('groups', () => {
     const between = uniq('between us ')
     await sendMessage(kit.page, between)
 
-    // Nobody is added. A word with jo too is another conversation, empty, and the pair stays what it was.
+    // Nobody is added. A word with jo too is another conversation, started on New message with the pair filled in: empty, and the pair stays what it was.
     await nav(mo.page).getByRole('button', { name: kit.username }).click()
-    await mo.page.getByRole('button', { name: 'Members', exact: true }).click()
+    await mo.page.getByRole('button', { name: /^\d+ people$/ }).click()
+    await expect(mo.page.getByRole('heading', { name: 'People' })).toBeVisible()
     await expect(mo.page.getByLabel('Add someone')).toHaveCount(0)
-    await mo.page.getByLabel('With someone else').selectOption({ label: jo.username })
-    await mo.page.getByRole('button', { name: 'Open', exact: true }).click()
+    await mo.page.getByRole('button', { name: 'New conversation with these people and others' }).click()
+    await expect(mo.page).toHaveURL(/\/messages\/new\?with=/)
+    await expect(mo.page.getByRole('button', { name: `Remove ${kit.username}` })).toBeVisible()
+    await mo.page.getByLabel('Add someone').selectOption({ label: jo.username })
+    await mo.page.getByRole('button', { name: 'Start' }).click()
     const names = (...people: string[]) => people.sort().join(', ')
     await expect(mo.page.getByRole('heading', { name: names(jo.username, kit.username) })).toBeVisible()
     await expect(article(mo.page, between)).toHaveCount(0)
@@ -208,25 +212,27 @@ test.describe('groups', () => {
     const all = uniq('all three ')
     await sendMessage(mo.page, all)
 
-    // Jo steps out: gone from jo's nav, still of the three to the others, who see jo stepped out.
+    // Jo hides it: gone from jo's nav, still of the three to the others, who are told nothing.
     await nav(jo.page)
       .getByRole('button', { name: names(kit.username, mo.username) })
       .click()
-    await jo.page.getByRole('button', { name: 'Members', exact: true }).click()
-    await jo.page.getByRole('button', { name: 'Leave conversation' }).click()
-    await confirm(jo.page, 'Leave')
+    await jo.page.getByRole('button', { name: /^\d+ people$/ }).click()
+    await jo.page.getByRole('button', { name: 'Hide conversation' }).click()
+    await confirm(jo.page, 'Hide')
     await expect(jo.page).toHaveURL(/\/messages$/)
     await expect(nav(jo.page).getByRole('button', { name: names(kit.username, mo.username) })).toHaveCount(0)
-    await mo.page.getByRole('button', { name: 'Members', exact: true }).click()
-    await expect(mo.page.getByRole('listitem').filter({ hasText: jo.username })).toContainText('stepped out')
+    await mo.page.getByRole('button', { name: /^\d+ people$/ }).click()
+    const joRow = mo.page.getByRole('listitem').filter({ hasText: jo.username })
+    await expect(joRow).toBeVisible()
+    await expect(joRow).not.toContainText(/hidden|stepped/)
     await expect(mo.page.getByRole('heading', { name: names(jo.username, kit.username) })).toBeVisible()
     // What is said meanwhile is said in jo's conversation too.
     await mo.page.getByRole('button', { name: /^Back to / }).click()
     const meanwhile = uniq('while jo is out ')
     await sendMessage(mo.page, meanwhile)
 
-    // Jo steps back in from All messages: the same conversation, everything said in it.
-    await expect(jo.page.getByRole('heading', { name: 'Stepped out of' })).toBeVisible()
+    // Jo brings it back from All messages: the same conversation, everything said in it.
+    await expect(jo.page.getByRole('heading', { name: 'Hidden' })).toBeVisible()
     await jo.page
       .getByRole('list')
       .last()

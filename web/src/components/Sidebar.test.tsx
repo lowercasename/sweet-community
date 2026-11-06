@@ -107,8 +107,8 @@ describe('Sidebar', () => {
     expect(within(messages()).getAllByRole('button').map(nameOf)).toEqual(['New message', 'All messages'])
   })
 
-  it('a conversation I have stepped out of is not in the nav', async () => {
-    await draw([root(true), withKit, dm('out', [mo, raphael], { last_message_at: 100, left_at: 5 })])
+  it('a conversation I have hidden is not in the nav', async () => {
+    await draw([root(true), withKit, dm('out', [mo, raphael], { last_message_at: 100, hidden_at: 5 })])
     expect(within(messages()).getAllByRole('button').map(nameOf)).toEqual(['New message', 'kit', 'All messages'])
   })
 

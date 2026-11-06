@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Redirect, Route, Switch, useLocation, useRoute } from 'wouter'
+import { Redirect, Route, Switch, useLocation, useRoute, useSearch } from 'wouter'
 import type { User } from '../api'
 import { useGroups } from '../data/hooks'
 import { StreamProvider } from '../hooks/StreamContext'
@@ -35,6 +35,8 @@ export function Home({ me, onSignOut }: HomeProps) {
   const { groups, loading } = useGroups()
   const root = groups.find((g) => g.kind === 'root')
   const [location, navigate] = useLocation()
+  // New message starts from the people a conversation's page sends it (?with=ids).
+  const withPeople = (new URLSearchParams(useSearch()).get('with') ?? '').split(',').filter(Boolean)
   const [atGroup, groupParams] = useRoute('/r/:id')
   const [atMembers, membersParams] = useRoute('/r/:id/members')
   const atRoot = location === '/'
@@ -85,7 +87,7 @@ export function Home({ me, onSignOut }: HomeProps) {
             <MessagesPage me={me} onGo={navigate} />
           </Route>
           <Route path={NEW_MESSAGE}>
-            <NewMessagePage me={me} onOpened={(g) => navigate(groupPath(g.id, root?.id))} />
+            <NewMessagePage me={me} initial={withPeople} onOpened={(g) => navigate(groupPath(g.id, root?.id))} />
           </Route>
           <Route path="/menu">
             <MenuPage me={me} groups={groups} onGo={navigate} onLogout={onSignOut} />
@@ -100,7 +102,7 @@ export function Home({ me, onSignOut }: HomeProps) {
                 group={current}
                 me={me}
                 onLeft={() => navigate(current.kind === 'dm' ? MESSAGES : '/')}
-                onOpen={(g) => navigate(groupPath(g.id, root?.id))}
+                onStartWith={(ids) => navigate(`${NEW_MESSAGE}?with=${ids.map(encodeURIComponent).join(',')}`)}
               />
             )}
           </Route>

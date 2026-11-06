@@ -59,8 +59,8 @@ export interface Group {
   can: GroupCan
   /** DMs only: a DM is named by its people, present or away. */
   members?: User[]
-  /** DMs only: set when I have stepped out of it. It is listed for me on All messages, and nothing else of it is. */
-  left_at?: number | null
+  /** DMs only: set while I have hidden it. It is listed for me under Hidden on All messages, and nothing else of it is. */
+  hidden_at?: number | null
 }
 
 export interface Membership {
@@ -68,8 +68,8 @@ export interface Membership {
   user: User
   role: Role
   joined_at: number
-  /** Set while this person has stepped out of a conversation. */
-  left_at?: number | null
+  /** Set while I have hidden a conversation; never carried for anyone else. */
+  hidden_at?: number | null
 }
 
 export interface UploadedImage {

@@ -94,30 +94,20 @@ describe('MembersPage', () => {
     expect(updateGroup).toHaveBeenCalledWith('club', { name: 'Knitting', mode: 'chat' })
   })
 
-  it('a conversation: nobody is added, a word with someone else is another one, and a person steps out of it', async () => {
-    const { listMembers, openDM } = await import('../api')
+  it('a conversation: its People, nobody added, a new one with them and others, and Hide', async () => {
     const { MembersPage } = await import('./MembersPage')
     const { dm } = await import('../test-utils')
-    vi.mocked(listMembers).mockResolvedValueOnce({
-      members: [
-        { group_id: 'club', user: kit, role: 'member', joined_at: 1, left_at: 7 },
-        { group_id: 'club', user: mo, role: 'member', joined_at: 1, left_at: null },
-      ],
-    })
-    vi.mocked(openDM).mockResolvedValue(dm('d2', [kit, mo, user('jo')]))
-    const onOpen = vi.fn()
-    renderWithQuery(<MembersPage group={dm('club', [kit, mo])} me={mo} onLeft={() => {}} onOpen={onOpen} />)
+    const onStartWith = vi.fn()
+    renderWithQuery(<MembersPage group={dm('club', [kit, mo])} me={mo} onLeft={() => {}} onStartWith={onStartWith} />)
     await screen.findByText('mo')
+    expect(screen.getByRole('heading', { name: 'People' })).toBeTruthy()
     expect(screen.queryByLabelText('Name')).toBeNull()
     expect(screen.queryByLabelText('Add someone')).toBeNull()
     expect(screen.queryByRole('button', { name: 'Remove' })).toBeNull()
-    expect(rowOf('kit').textContent).toContain('stepped out')
-    fireEvent.change(await screen.findByLabelText('With someone else'), { target: { value: 'jo' } })
-    fireEvent.click(screen.getByRole('button', { name: 'Open' }))
-    expect(openDM).toHaveBeenCalledWith(['kit', 'jo'])
-    await vi.waitFor(() => expect(onOpen).toHaveBeenCalledWith(expect.objectContaining({ id: 'd2' })))
-    fireEvent.click(screen.getByRole('button', { name: 'Leave conversation' }))
-    expect(within(screen.getByRole('dialog', { hidden: true })).getByText('Leave this conversation?')).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: 'New conversation with these people and others' }))
+    expect(onStartWith).toHaveBeenCalledWith(['kit'])
+    fireEvent.click(screen.getByRole('button', { name: 'Hide conversation' }))
+    expect(within(screen.getByRole('dialog', { hidden: true })).getByText('Hide this conversation?')).toBeTruthy()
   })
 
   it('shows a member the list and Leave, nothing else', async () => {

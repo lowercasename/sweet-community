@@ -10,11 +10,11 @@ export const activity = (g: Group) => g.last_message_at ?? g.created_at
 
 /** The conversations I am in, latest word first. */
 export const conversationsOf = (groups: Group[]) =>
-  groups.filter((g) => g.kind === 'dm' && g.left_at == null).sort((a, b) => activity(b) - activity(a))
+  groups.filter((g) => g.kind === 'dm' && g.hidden_at == null).sort((a, b) => activity(b) - activity(a))
 
-/** The conversations I have stepped out of, latest word first; opening one steps back in. */
-export const steppedOutOf = (groups: Group[]) =>
-  groups.filter((g) => g.kind === 'dm' && g.left_at != null).sort((a, b) => activity(b) - activity(a))
+/** The conversations I have hidden, latest word first; opening one shows it again. */
+export const hiddenOf = (groups: Group[]) =>
+  groups.filter((g) => g.kind === 'dm' && g.hidden_at != null).sort((a, b) => activity(b) - activity(a))
 
 /** My rooms, alphabetically with case aside: places keep a stable order. */
 export const roomsOf = (groups: Group[]) =>

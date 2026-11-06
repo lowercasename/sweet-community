@@ -62,7 +62,7 @@ func wireMessage(row store.GetMessageRow) Message {
 }
 
 func wireMembership(groupID string, row store.GetMemberRow) Membership {
-	return Membership{GroupID: groupID, User: wireUser(row.ID, row.Username, row.PictureID), Role: row.Role, JoinedAt: row.JoinedAt, LeftAt: nullInt(row.LeftAt)}
+	return Membership{GroupID: groupID, User: wireUser(row.ID, row.Username, row.PictureID), Role: row.Role, JoinedAt: row.JoinedAt, HiddenAt: nullInt(row.HiddenAt)}
 }
 
 // wireGroup builds a group from its row: a DM carries its people, every

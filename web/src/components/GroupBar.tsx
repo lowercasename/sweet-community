@@ -14,8 +14,8 @@ interface GroupBarProps {
 /**
  * The bar every page of a group sits under (architecture.md, Layout): its
  * name (a DM's people, as text: the bar is a title, not a place for cards),
- * a way to its members from the view (a DM has no settings, so the way is
- * called Members), a way back from anywhere else.
+ * a way to its members from the view (a conversation's says how many people
+ * are in it, and opens its People page), a way back from anywhere else.
  * The root group has no bar; it is Home.
  */
 export function GroupBar({ group, me, onBack, onMembers }: GroupBarProps) {
@@ -28,7 +28,7 @@ export function GroupBar({ group, me, onBack, onMembers }: GroupBarProps) {
       </Row>
       {onMembers && (
         <Button variant="ghost" icon="people" onClick={onMembers}>
-          {group.kind === 'dm' ? 'Members' : 'Members and settings'}
+          {group.kind === 'dm' ? `${(group.members ?? []).length} people` : 'Members and settings'}
         </Button>
       )}
     </Row>

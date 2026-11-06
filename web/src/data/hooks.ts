@@ -248,7 +248,7 @@ export function useGroupActions() {
       await removeMember(groupId, userId)
       applyEvent(qc, 'membership_delete', { group_id: groupId, user_id: userId })
     },
-    /** Leaving a room removes me; stepping out of a conversation is a membership, stepped out. */
+    /** Leaving a room removes me; hiding a conversation is a membership, hidden. */
     async leave(groupId: string, meId: string) {
       const m = await removeMember(groupId, meId)
       if (m) applyEvent(qc, 'membership', m)

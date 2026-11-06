@@ -42,7 +42,7 @@ test.describe('nav', () => {
     // The section's own control starts one: pick a person, land in the conversation.
     await conversations.getByRole('button', { name: 'New message' }).click()
     await expect(kit.page).toHaveURL(/\/messages\/new$/)
-    await kit.page.getByLabel('To').selectOption({ label: jo.username })
+    await kit.page.getByLabel('Add someone').selectOption({ label: jo.username })
     await kit.page.getByRole('button', { name: 'Start' }).click()
     await expect(kit.page).toHaveURL(/\/r\/[^/]+$/)
     await expect(kit.page.getByRole('heading', { name: jo.username })).toBeVisible()

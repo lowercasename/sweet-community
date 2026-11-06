@@ -174,12 +174,12 @@ function dropGroup(qc: QueryClient, id: string) {
 const ROOT_KIND = 'root'
 
 function upsertMembership(qc: QueryClient, m: Membership) {
-  // My stepping out of a conversation (architecture.md, Groups): it stays in my
-  // list, marked stepped out, and nothing else of it stays. Its people do not change.
+  // My hiding a conversation (architecture.md, Groups): it stays in my list,
+  // marked hidden, and nothing else of it stays. Its people do not change.
   const viewer = qc.getQueryData<User | null>(keys.me)
-  if (viewer && viewer.id === m.user.id && m.left_at != null) {
+  if (viewer && viewer.id === m.user.id && m.hidden_at != null) {
     qc.setQueryData<Groups>(keys.groups, (old) =>
-      old ? { groups: old.groups.map((g) => (g.id === m.group_id ? { ...g, left_at: m.left_at } : g)) } : old,
+      old ? { groups: old.groups.map((g) => (g.id === m.group_id ? { ...g, hidden_at: m.hidden_at } : g)) } : old,
     )
     qc.removeQueries({ queryKey: keys.posts(m.group_id) })
     qc.removeQueries({ queryKey: keys.messages(m.group_id) })

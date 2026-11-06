@@ -20,7 +20,7 @@ let qc: QueryClient
 const posts = (gid = ROOT) => (qc.getQueryData(keys.posts(gid)) as { pages: PostPage[] }).pages.flatMap((p) => p.posts)
 const groups = () => (qc.getQueryData(keys.groups) as { groups: Group[] }).groups
 const members = (gid: string) =>
-  (qc.getQueryData(keys.members(gid)) as { members: { user: User; role: string; left_at?: number | null }[] }).members
+  (qc.getQueryData(keys.members(gid)) as { members: { user: User; role: string; hidden_at?: number | null }[] }).members
 
 beforeEach(() => {
   qc = makeQueryClient()
@@ -181,7 +181,7 @@ describe('applyEvent', () => {
 })
 
 describe('latest activity', () => {
-  it('my stepping out of a conversation keeps it listed as stepped out and drops what it holds; another person stepping out shows among its people', () => {
+  it('my hiding a conversation keeps it listed as hidden and drops what it holds; its people do not change', () => {
     qc.setQueryData(keys.groups, { groups: [group(ROOT, 'member'), dm('d1', [kit, mo])] })
     qc.setQueryData(keys.messages('d1'), { pages: [], pageParams: [] })
     qc.setQueryData(keys.members('d1'), {
@@ -190,15 +190,13 @@ describe('latest activity', () => {
         { group_id: 'd1', user: mo, role: 'member', joined_at: 1 },
       ],
     })
-    applyEvent(qc, 'membership', { group_id: 'd1', user: mo, role: 'member', joined_at: 1, left_at: 9 })
-    expect(members('d1').find((m) => m.user.id === 'mo')?.left_at).toBe(9)
     expect(
       groups()
         .find((g) => g.id === 'd1')
         ?.members?.map((u) => u.id),
     ).toEqual(['kit', 'mo'])
-    applyEvent(qc, 'membership', { group_id: 'd1', user: kit, role: 'member', joined_at: 1, left_at: 10 })
-    expect(groups().find((g) => g.id === 'd1')?.left_at).toBe(10)
+    applyEvent(qc, 'membership', { group_id: 'd1', user: kit, role: 'member', joined_at: 1, hidden_at: 10 })
+    expect(groups().find((g) => g.id === 'd1')?.hidden_at).toBe(10)
     expect(qc.getQueryData(keys.messages('d1'))).toBeUndefined()
     expect(qc.getQueryData(keys.members('d1'))).toBeUndefined()
   })

@@ -17,7 +17,7 @@ import {
   Time,
 } from '../ui'
 import { groupPath } from '../routes'
-import { activity, conversationsOf, steppedOutOf } from '../data/groups'
+import { activity, conversationsOf, hiddenOf } from '../data/groups'
 import { ConversationFaces } from './ConversationsSection'
 import { groupLabel } from './GroupView'
 
@@ -29,16 +29,16 @@ interface MessagesPageProps {
 /**
  * All my conversations, latest word first (architecture.md, Layout): the
  * nav shows the latest five, this page every one, each opening at its own
- * URL under its bar like any room. Below them, the ones I have stepped out
- * of; opening one is stepping back in.
+ * URL under its bar like any room. Below them, the ones I have hidden;
+ * opening one shows it again.
  */
 export function MessagesPage({ me, onGo }: MessagesPageProps) {
   const { groups, loading } = useGroups()
   const { openDM } = useGroupActions()
   const [problem, setProblem] = useState<string | null>(null)
   const dms = conversationsOf(groups)
-  const out = steppedOutOf(groups)
-  const stepBackIn = async (g: Group) => {
+  const out = hiddenOf(groups)
+  const show = async (g: Group) => {
     try {
       const opened = await openDM((g.members ?? []).filter((u) => u.id !== me.id).map((u) => u.id))
       onGo(groupPath(opened.id))
@@ -84,10 +84,10 @@ export function MessagesPage({ me, onGo }: MessagesPageProps) {
               {dms.length > 0 && <List gap={1}>{dms.map((g) => row(g, () => onGo(groupPath(g.id))))}</List>}
               {out.length > 0 && (
                 <Stack gap={1}>
-                  <Heading level={3}>Stepped out of</Heading>
-                  <Text variant="small">Opening one steps back in.</Text>
+                  <Heading level={3}>Hidden</Heading>
+                  <Text variant="small">Opening one brings it back.</Text>
                   {problem && <Text variant="secondary">{problem}</Text>}
-                  <List gap={1}>{out.map((g) => row(g, () => void stepBackIn(g)))}</List>
+                  <List gap={1}>{out.map((g) => row(g, () => void show(g)))}</List>
                 </Stack>
               )}
             </Stack>

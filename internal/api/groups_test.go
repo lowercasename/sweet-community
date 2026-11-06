@@ -235,8 +235,8 @@ func TestDMFindOrCreate(t *testing.T) {
 
 // A conversation is its people (architecture.md, Groups): one per set,
 // nobody added, a word with someone else is another conversation. Each
-// person's presence is their own: stepping out hides it from them and
-// tells the others; opening it again steps back in, history and all.
+// person's presence is their own: hiding it takes it off their list and
+// tells nobody else; opening it again shows it, history and all.
 func TestConversationIsItsPeople(t *testing.T) {
 	ts, owner := newTestServer(t)
 	kit, kitID := registerMember(t, ts, owner, "kit")
@@ -273,42 +273,43 @@ func TestConversationIsItsPeople(t *testing.T) {
 	}
 	kit.mustStatus(201, "POST", tp+"/messages", map[string]string{"body_html": "<p>all three</p>"})
 
-	// Jo steps out: gone from jo's sight, still of the three to the others, who are told.
-	if out := jo.mustStatus(200, "DELETE", tp+"/members/"+joID, nil); out["left_at"] == nil || out["user"].(map[string]any)["id"] != joID {
-		t.Fatalf("stepping out replies with the membership: %v", out)
+	// Jo hides it: gone from jo's sight, still of the three to the others, who are not told.
+	if out := jo.mustStatus(200, "DELETE", tp+"/members/"+joID, nil); out["hidden_at"] == nil || out["user"].(map[string]any)["id"] != joID {
+		t.Fatalf("hiding replies with the membership: %v", out)
 	}
 	jo.mustStatus(404, "GET", tp+"/messages", nil)
-	if g := myGroups(jo)[tid]; g == nil || g["left_at"] == nil {
-		t.Fatalf("jo's list after stepping out: %v", g)
+	if g := myGroups(jo)[tid]; g == nil || g["hidden_at"] == nil {
+		t.Fatalf("jo's list after hiding: %v", g)
 	}
 	if got := memberNames(kit.mustStatus(200, "GET", tp, nil)); got != "jo,kit,mo" {
-		t.Fatalf("the three after jo stepped out: %q", got)
+		t.Fatalf("the three after jo hid it: %q", got)
 	}
-	away := false
 	for _, m := range kit.mustStatus(200, "GET", tp+"/members", nil)["members"].([]any) {
-		if mm := m.(map[string]any); mm["user"].(map[string]any)["id"] == joID && mm["left_at"] != nil {
-			away = true
+		if mm := m.(map[string]any); mm["hidden_at"] != nil {
+			t.Fatalf("kit is told who has hidden the conversation: %v", mm)
 		}
 	}
-	if !away {
-		t.Fatal("kit's members list does not show jo away")
+	for _, e := range kit.readEvents(80) {
+		if p, ok := e["payload"].(map[string]any); ok && e["kind"] == "membership" && p["hidden_at"] != nil {
+			t.Fatalf("kit's stream carries someone else's hiding: %v", p)
+		}
 	}
 	kit.mustStatus(201, "POST", tp+"/messages", map[string]string{"body_html": "<p>while jo is away</p>"})
-	// Even both the others stepping out deletes nothing.
+	// Even both the others hiding it deletes nothing.
 	kit.mustStatus(200, "DELETE", tp+"/members/"+kitID, nil)
 	mo.mustStatus(200, "DELETE", tp+"/members/"+moID, nil)
 	mo.mustStatus(404, "GET", tp, nil)
 
-	// Jo opens the conversation of the three again: the same one, back in, with everything said in it.
+	// Jo opens the conversation of the three again: the same one, shown again, with everything said in it.
 	back := jo.mustStatus(200, "POST", "/api/groups", map[string]any{"kind": "dm", "members": []string{kitID, moID}})
-	if back["id"] != tid || back["left_at"] != nil {
-		t.Fatalf("jo stepping back in: %v", back)
+	if back["id"] != tid || back["hidden_at"] != nil {
+		t.Fatalf("jo showing it again: %v", back)
 	}
 	if msgs := jo.mustStatus(200, "GET", tp+"/messages", nil)["messages"].([]any); len(msgs) != 2 {
-		t.Fatalf("jo back in sees %d messages, want 2", len(msgs))
+		t.Fatalf("jo sees %d messages, want 2", len(msgs))
 	}
-	if g := myGroups(jo)[tid]; g == nil || g["left_at"] != nil {
-		t.Fatalf("jo's list after stepping back in: %v", g)
+	if g := myGroups(jo)[tid]; g == nil || g["hidden_at"] != nil {
+		t.Fatalf("jo's list after showing it again: %v", g)
 	}
 }
 
@@ -471,21 +472,21 @@ func TestOwnershipNeverLapses(t *testing.T) {
 		t.Fatal("deleted group still listed")
 	}
 
-	// A conversation has no owner and is never deleted: everyone may step out, and it waits.
+	// A conversation has no owner and is never deleted: everyone may hide it, and it waits.
 	dm := kit.mustStatus(201, "POST", "/api/groups", map[string]any{"kind": "dm", "members": []string{moID}})
 	dp := "/api/groups/" + dm["id"].(string)
 	kit.mustStatus(200, "DELETE", dp+"/members/"+kitID, nil)
 	mo.mustStatus(200, "GET", dp, nil)
 	mo.mustStatus(200, "DELETE", dp+"/members/"+moID, nil)
 	mo.mustStatus(404, "GET", dp, nil)
-	// Nobody is left to receive it on the stream, so the log is the witness: a membership stepping out, no deletion.
+	// Nobody is left to receive it on the stream, so the log is the witness: a membership hidden, no deletion.
 	rows, err := srv.q().ListEventsSince(context.Background(), store.ListEventsSinceParams{After: 0, PageSize: 500})
 	if err != nil {
 		t.Fatal(err)
 	}
 	last := rows[len(rows)-1]
-	if last.Kind != "membership" || !strings.Contains(last.Payload, dm["id"].(string)) || !strings.Contains(last.Payload, `"left_at":1`) {
-		t.Fatalf("last event after everyone stepped out: %s %s", last.Kind, last.Payload)
+	if last.Kind != "membership" || !strings.Contains(last.Payload, dm["id"].(string)) || !strings.Contains(last.Payload, `"hidden_at":1`) {
+		t.Fatalf("last event after everyone hid it: %s %s", last.Kind, last.Payload)
 	}
 	if back := mo.mustStatus(200, "POST", "/api/groups", map[string]any{"kind": "dm", "members": []string{kitID}}); back["id"] != dm["id"] {
 		t.Fatalf("the pair opened again is %v, want %v", back["id"], dm["id"])

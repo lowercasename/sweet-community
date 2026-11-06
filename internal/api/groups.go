@@ -34,9 +34,9 @@ type Group struct {
 	Can           GroupCan `json:"can"`
 	// Members is set for a DM only: a DM is named by its people, present or away.
 	Members []User `json:"members,omitempty"`
-	// LeftAt is set when the viewer has stepped out of this conversation:
-	// it is listed for them (All messages), and nothing else of it is.
-	LeftAt *int64 `json:"left_at,omitempty"`
+	// HiddenAt is set while the viewer has hidden this conversation: it is
+	// listed for them under Hidden, and nothing else of it is.
+	HiddenAt *int64 `json:"hidden_at,omitempty"`
 }
 
 // GroupCan is what the viewer may do to a group. CreateGroups is meaningful
@@ -76,8 +76,8 @@ type Membership struct {
 	User     User   `json:"user"`
 	Role     string `json:"role"`
 	JoinedAt int64  `json:"joined_at"`
-	// LeftAt is set while this person has stepped out of a conversation.
-	LeftAt *int64 `json:"left_at"`
+	// HiddenAt is set while this person has hidden a conversation; sent to that person only.
+	HiddenAt *int64 `json:"hidden_at"`
 }
 
 func groupFor(a perm.Actor, g Group, st Settings) Group {
@@ -173,7 +173,7 @@ func (s *Server) listGroups(w http.ResponseWriter, r *http.Request) {
 			writeErr(w, http.StatusInternalServerError, err.Error())
 			return
 		}
-		g.LeftAt = nullInt(row.LeftAt)
+		g.HiddenAt = nullInt(row.HiddenAt)
 		out = append(out, groupFor(perm.Actor{ID: me.ID, Role: row.Role}, g, st))
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"groups": out})
@@ -252,8 +252,8 @@ func (s *Server) createGroup(w http.ResponseWriter, r *http.Request) {
 // openConversation is the conversation of exactly these people
 // (architecture.md, Groups): one per set, keyed by the sorted ids, found or
 // made inside one transaction so two openings cannot make two. The viewer
-// is one of them; having stepped out, they are present again, which is a
-// membership event. The reply is the group, 200 found or 201 made.
+// is one of them; having hidden it, it shows again, which is a membership
+// event. The reply is the group, 200 found or 201 made.
 func (s *Server) openConversation(w http.ResponseWriter, r *http.Request, me User, people []string, now int64) {
 	sort.Strings(people)
 	key := sql.NullString{String: strings.Join(people, ","), Valid: true}
@@ -276,8 +276,8 @@ func (s *Server) openConversation(w http.ResponseWriter, r *http.Request, me Use
 				return nil, nil, http.StatusInternalServerError, err
 			}
 			var entries []events.Entry
-			if m.LeftAt.Valid {
-				if err := qtx.SetMembershipPresent(ctx, store.SetMembershipPresentParams{GroupID: g.ID, UserID: me.ID}); err != nil {
+			if m.HiddenAt.Valid {
+				if err := qtx.ShowMembership(ctx, store.ShowMembershipParams{GroupID: g.ID, UserID: me.ID}); err != nil {
 					return nil, nil, http.StatusInternalServerError, err
 				}
 				if m, err = qtx.GetMember(ctx, store.GetMemberParams{GroupID: g.ID, UserID: me.ID}); err != nil {
@@ -441,9 +441,15 @@ func (s *Server) listMembers(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusInternalServerError, err.Error())
 		return
 	}
+	viewer, _ := userFrom(r.Context())
 	out := make([]Membership, 0, len(rows))
 	for _, row := range rows {
-		out = append(out, wireMembership(g.ID, store.GetMemberRow(row)))
+		m := wireMembership(g.ID, store.GetMemberRow(row))
+		// Whether someone has hidden a conversation is their business alone.
+		if m.User.ID != viewer.ID {
+			m.HiddenAt = nil
+		}
+		out = append(out, m)
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"members": out})
 }
@@ -575,16 +581,16 @@ func (s *Server) removeMember(w http.ResponseWriter, r *http.Request) {
 			return nil, nil, http.StatusForbidden, errors.New("not allowed")
 		}
 		if g.Kind == perm.KindDM {
-			// Stepping out of a conversation: the row stays, the person is away, and
-			// opening the conversation again is stepping back in (architecture.md, Groups).
-			if err := qtx.SetMembershipLeft(r.Context(), store.SetMembershipLeftParams{LeftAt: sql.NullInt64{Int64: db.Now(), Valid: true}, GroupID: g.ID, UserID: uid}); err != nil {
+			// Hiding a conversation: the row stays, hidden_at is set, and opening the
+			// conversation again shows it (architecture.md, Groups).
+			if err := qtx.HideMembership(r.Context(), store.HideMembershipParams{HiddenAt: sql.NullInt64{Int64: db.Now(), Valid: true}, GroupID: g.ID, UserID: uid}); err != nil {
 				return nil, nil, http.StatusInternalServerError, err
 			}
 			m, err := qtx.GetMember(r.Context(), store.GetMemberParams{GroupID: g.ID, UserID: uid})
 			if err != nil {
 				return nil, nil, http.StatusInternalServerError, err
 			}
-			// The reply is the membership too, so the leaver's own page lists the conversation as stepped out at once.
+			// The reply is the membership too, so the hider's own page lists the conversation under Hidden at once.
 			mm := wireMembership(g.ID, m)
 			return []events.Entry{{Kind: "membership", Payload: mm}}, mm, http.StatusOK, nil
 		}
@@ -619,7 +625,7 @@ func (s *Server) events(w http.ResponseWriter, r *http.Request) {
 	}
 	roles := map[string]string{}
 	for _, row := range rows {
-		if !row.LeftAt.Valid {
+		if !row.HiddenAt.Valid {
 			roles[row.ID] = row.Role
 		}
 	}
@@ -733,13 +739,17 @@ func filterEvent(viewer User, roles map[string]string, st *Settings, e events.Ev
 			return e, false
 		}
 		if m.User.ID == viewer.ID {
-			// My own: in, or stepped out of a conversation. Either way I hear it.
-			if m.LeftAt != nil {
+			// My own: in, or hidden. Either way I hear it.
+			if m.HiddenAt != nil {
 				delete(roles, m.GroupID)
 			} else {
 				roles[m.GroupID] = m.Role
 			}
 			return e, true
+		}
+		// Someone else hiding a conversation is their business alone.
+		if m.HiddenAt != nil {
+			return e, false
 		}
 		_, ok := roles[m.GroupID]
 		return e, ok

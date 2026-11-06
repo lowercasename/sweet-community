@@ -11,7 +11,7 @@ import (
 )
 
 const countMembers = `-- name: CountMembers :one
-SELECT COUNT(*) FROM memberships WHERE group_id = ?1 AND left_at IS NULL
+SELECT COUNT(*) FROM memberships WHERE group_id = ?1 AND hidden_at IS NULL
 `
 
 func (q *Queries) CountMembers(ctx context.Context, groupID string) (int64, error) {
@@ -162,7 +162,7 @@ func (q *Queries) GetGroup(ctx context.Context, id string) (GetGroupRow, error) 
 }
 
 const getMember = `-- name: GetMember :one
-SELECT u.id, u.username, u.picture_id, m.role, m.joined_at, m.left_at
+SELECT u.id, u.username, u.picture_id, m.role, m.joined_at, m.hidden_at
 FROM memberships m JOIN users u ON u.id = m.user_id
 WHERE m.group_id = ?1 AND m.user_id = ?2
 `
@@ -178,7 +178,7 @@ type GetMemberRow struct {
 	PictureID sql.NullString
 	Role      string
 	JoinedAt  int64
-	LeftAt    sql.NullInt64
+	HiddenAt  sql.NullInt64
 }
 
 func (q *Queries) GetMember(ctx context.Context, arg GetMemberParams) (GetMemberRow, error) {
@@ -190,13 +190,13 @@ func (q *Queries) GetMember(ctx context.Context, arg GetMemberParams) (GetMember
 		&i.PictureID,
 		&i.Role,
 		&i.JoinedAt,
-		&i.LeftAt,
+		&i.HiddenAt,
 	)
 	return i, err
 }
 
 const getMembership = `-- name: GetMembership :one
-SELECT role, joined_at FROM memberships WHERE group_id = ?1 AND user_id = ?2 AND left_at IS NULL
+SELECT role, joined_at FROM memberships WHERE group_id = ?1 AND user_id = ?2 AND hidden_at IS NULL
 `
 
 type GetMembershipParams struct {
@@ -217,8 +217,24 @@ func (q *Queries) GetMembership(ctx context.Context, arg GetMembershipParams) (G
 	return i, err
 }
 
+const hideMembership = `-- name: HideMembership :exec
+UPDATE memberships SET hidden_at = ?1 WHERE group_id = ?2 AND user_id = ?3
+`
+
+type HideMembershipParams struct {
+	HiddenAt sql.NullInt64
+	GroupID  string
+	UserID   string
+}
+
+// Hiding a conversation: the row stays, hidden_at is set.
+func (q *Queries) HideMembership(ctx context.Context, arg HideMembershipParams) error {
+	_, err := q.db.ExecContext(ctx, hideMembership, arg.HiddenAt, arg.GroupID, arg.UserID)
+	return err
+}
+
 const listMembers = `-- name: ListMembers :many
-SELECT u.id, u.username, u.picture_id, m.role, m.joined_at, m.left_at
+SELECT u.id, u.username, u.picture_id, m.role, m.joined_at, m.hidden_at
 FROM memberships m JOIN users u ON u.id = m.user_id
 WHERE m.group_id = ?1
 ORDER BY m.role = 'owner' DESC, m.role = 'moderator' DESC, m.joined_at
@@ -230,10 +246,10 @@ type ListMembersRow struct {
 	PictureID sql.NullString
 	Role      string
 	JoinedAt  int64
-	LeftAt    sql.NullInt64
+	HiddenAt  sql.NullInt64
 }
 
-// A group's people: a room's members, a conversation's whole set, away or present.
+// A group's people: a room's members, a conversation's whole set, hidden by some or not.
 func (q *Queries) ListMembers(ctx context.Context, groupID string) ([]ListMembersRow, error) {
 	rows, err := q.db.QueryContext(ctx, listMembers, groupID)
 	if err != nil {
@@ -249,7 +265,7 @@ func (q *Queries) ListMembers(ctx context.Context, groupID string) ([]ListMember
 			&i.PictureID,
 			&i.Role,
 			&i.JoinedAt,
-			&i.LeftAt,
+			&i.HiddenAt,
 		); err != nil {
 			return nil, err
 		}
@@ -266,7 +282,7 @@ func (q *Queries) ListMembers(ctx context.Context, groupID string) ([]ListMember
 
 const listMyGroupIDs = `-- name: ListMyGroupIDs :many
 SELECT m.group_id FROM memberships m JOIN groups g ON g.id = m.group_id
-WHERE m.user_id = ?1 AND m.left_at IS NULL AND g.deleted_at IS NULL
+WHERE m.user_id = ?1 AND m.hidden_at IS NULL AND g.deleted_at IS NULL
 `
 
 func (q *Queries) ListMyGroupIDs(ctx context.Context, userID string) ([]string, error) {
@@ -293,7 +309,7 @@ func (q *Queries) ListMyGroupIDs(ctx context.Context, userID string) ([]string, 
 }
 
 const listMyGroups = `-- name: ListMyGroups :many
-SELECT g.id, g.kind, g.name, g.mode, g.created_at, m.role, m.left_at,
+SELECT g.id, g.kind, g.name, g.mode, g.created_at, m.role, m.hidden_at,
        (SELECT MAX(created_at) FROM messages WHERE group_id = g.id AND deleted_at IS NULL) AS last_message_at
 FROM memberships m JOIN groups g ON g.id = m.group_id
 WHERE m.user_id = ?1 AND g.deleted_at IS NULL
@@ -307,12 +323,12 @@ type ListMyGroupsRow struct {
 	Mode          string
 	CreatedAt     int64
 	Role          string
-	LeftAt        sql.NullInt64
+	HiddenAt      sql.NullInt64
 	LastMessageAt interface{}
 }
 
 // Every group I have a row in, the conversations I have stepped out of
-// included, with my left_at so the client can tell them apart.
+// included, with my hidden_at so the client can tell them apart.
 func (q *Queries) ListMyGroups(ctx context.Context, userID string) ([]ListMyGroupsRow, error) {
 	rows, err := q.db.QueryContext(ctx, listMyGroups, userID)
 	if err != nil {
@@ -329,7 +345,7 @@ func (q *Queries) ListMyGroups(ctx context.Context, userID string) ([]ListMyGrou
 			&i.Mode,
 			&i.CreatedAt,
 			&i.Role,
-			&i.LeftAt,
+			&i.HiddenAt,
 			&i.LastMessageAt,
 		); err != nil {
 			return nil, err
@@ -345,36 +361,6 @@ func (q *Queries) ListMyGroups(ctx context.Context, userID string) ([]ListMyGrou
 	return items, nil
 }
 
-const setMembershipLeft = `-- name: SetMembershipLeft :exec
-UPDATE memberships SET left_at = ?1 WHERE group_id = ?2 AND user_id = ?3
-`
-
-type SetMembershipLeftParams struct {
-	LeftAt  sql.NullInt64
-	GroupID string
-	UserID  string
-}
-
-// Stepping out of a conversation: the row stays, the person is away.
-func (q *Queries) SetMembershipLeft(ctx context.Context, arg SetMembershipLeftParams) error {
-	_, err := q.db.ExecContext(ctx, setMembershipLeft, arg.LeftAt, arg.GroupID, arg.UserID)
-	return err
-}
-
-const setMembershipPresent = `-- name: SetMembershipPresent :exec
-UPDATE memberships SET left_at = NULL WHERE group_id = ?1 AND user_id = ?2
-`
-
-type SetMembershipPresentParams struct {
-	GroupID string
-	UserID  string
-}
-
-func (q *Queries) SetMembershipPresent(ctx context.Context, arg SetMembershipPresentParams) error {
-	_, err := q.db.ExecContext(ctx, setMembershipPresent, arg.GroupID, arg.UserID)
-	return err
-}
-
 const setMembershipRole = `-- name: SetMembershipRole :exec
 UPDATE memberships SET role = ?1 WHERE group_id = ?2 AND user_id = ?3
 `
@@ -387,6 +373,20 @@ type SetMembershipRoleParams struct {
 
 func (q *Queries) SetMembershipRole(ctx context.Context, arg SetMembershipRoleParams) error {
 	_, err := q.db.ExecContext(ctx, setMembershipRole, arg.Role, arg.GroupID, arg.UserID)
+	return err
+}
+
+const showMembership = `-- name: ShowMembership :exec
+UPDATE memberships SET hidden_at = NULL WHERE group_id = ?1 AND user_id = ?2
+`
+
+type ShowMembershipParams struct {
+	GroupID string
+	UserID  string
+}
+
+func (q *Queries) ShowMembership(ctx context.Context, arg ShowMembershipParams) error {
+	_, err := q.db.ExecContext(ctx, showMembership, arg.GroupID, arg.UserID)
 	return err
 }
 

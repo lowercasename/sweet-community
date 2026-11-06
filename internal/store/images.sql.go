@@ -68,12 +68,12 @@ func (q *Queries) GetImage(ctx context.Context, id string) (Image, error) {
 const imageVisibleTo = `-- name: ImageVisibleTo :one
 SELECT EXISTS (SELECT 1 FROM images i WHERE i.id = ?1 AND i.uploader_id = ?2)
     OR EXISTS (SELECT 1 FROM users u WHERE u.picture_id = ?1)
-    OR EXISTS (SELECT 1 FROM posts p JOIN memberships m ON m.group_id = p.group_id AND m.user_id = ?2 AND m.left_at IS NULL
+    OR EXISTS (SELECT 1 FROM posts p JOIN memberships m ON m.group_id = p.group_id AND m.user_id = ?2 AND m.hidden_at IS NULL
                WHERE p.deleted_at IS NULL AND instr(p.body_html, ?1) > 0)
     OR EXISTS (SELECT 1 FROM comments c JOIN posts p ON p.id = c.post_id AND p.deleted_at IS NULL
-               JOIN memberships m ON m.group_id = p.group_id AND m.user_id = ?2 AND m.left_at IS NULL
+               JOIN memberships m ON m.group_id = p.group_id AND m.user_id = ?2 AND m.hidden_at IS NULL
                WHERE c.deleted_at IS NULL AND instr(c.body_html, ?1) > 0)
-    OR EXISTS (SELECT 1 FROM messages x JOIN memberships m ON m.group_id = x.group_id AND m.user_id = ?2 AND m.left_at IS NULL
+    OR EXISTS (SELECT 1 FROM messages x JOIN memberships m ON m.group_id = x.group_id AND m.user_id = ?2 AND m.hidden_at IS NULL
                WHERE x.deleted_at IS NULL AND instr(x.body_html, ?1) > 0) AS visible
 `
 
