@@ -42,7 +42,7 @@ describe('SettingsPage', () => {
     await vi.waitFor(() => expect(qc.getQueryData(['me'])).toBeNull())
     cleanup()
     renderWithQuery(<SettingsPage me={user('raphael')} root={group(ROOT, 'owner')} onSignOut={() => {}} />)
-    await screen.findByText('You run this place. Hand it over to someone else first.')
+    await screen.findByText('You run this community. Hand it over to someone else first.')
     expect(screen.queryByRole('button', { name: 'Remove my account' })).toBeNull()
   })
 

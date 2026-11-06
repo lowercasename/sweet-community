@@ -32,7 +32,7 @@ export function unreadPlaces(markers: Marker[]): Map<string, UnreadPlace> {
   return out
 }
 
-/** Is anything in this place unread? */
+/** Is anything in this community unread? */
 export const anyUnread = (p: UnreadPlace | undefined) => p !== undefined && (p.chat || p.feed)
 
 /** What was done, in words after the actor's name. A room I am no longer in has no name to give. */

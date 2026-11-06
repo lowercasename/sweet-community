@@ -39,7 +39,7 @@ export function SettingsPage({ me, root, onSignOut }: SettingsPageProps) {
   const [removing, setRemoving] = useState(false)
   const [removeBusy, setRemoveBusy] = useState(false)
   const [removeError, setRemoveError] = useState<string | null>(null)
-  // Off this place for good (architecture.md, Admin tools); the instance owner hands over first.
+  // Off this community for good (architecture.md, Admin tools); the instance owner hands over first.
   const removeMe = async () => {
     setRemoveBusy(true)
     try {
@@ -159,13 +159,13 @@ export function SettingsPage({ me, root, onSignOut }: SettingsPageProps) {
             </Card>
             <Card>
               <Stack gap={2}>
-                <Heading level={2}>Leave this place</Heading>
+                <Heading level={2}>Leave this community</Heading>
                 <Text variant="secondary">
-                  Removing your account takes you off this place for good. Your posts, comments and messages stay, under
-                  a removed name. Rooms you own pass to their longest-serving moderator, or member.
+                  Removing your account takes you off this community for good. Your posts, comments and messages stay,
+                  under a removed name. Rooms you own pass to their longest-serving moderator, or member.
                 </Text>
                 {root.role === 'owner' ? (
-                  <Text variant="secondary">You run this place. Hand it over to someone else first.</Text>
+                  <Text variant="secondary">You run this community. Hand it over to someone else first.</Text>
                 ) : (
                   <Row>
                     <Button variant="secondary" icon="remove" disabled={removeBusy} onClick={() => setRemoving(true)}>

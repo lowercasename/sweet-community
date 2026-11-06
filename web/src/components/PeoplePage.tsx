@@ -182,7 +182,7 @@ export function PeoplePage({ me, root, onOpenGroup }: PeoplePageProps) {
       </ScrollArea>
       <ConfirmDialog
         open={removing !== null}
-        title={removing ? `Remove ${removing.username} from this place?` : ''}
+        title={removing ? `Remove ${removing.username} from this community?` : ''}
         confirmLabel={busy ? 'Removing…' : 'Remove'}
         busy={busy}
         onConfirm={() => void remove()}

@@ -15,7 +15,7 @@ interface PersonNameProps {
 }
 
 const ROLE_WORD: Record<Member['role'], string> = {
-  owner: 'runs this place',
+  owner: 'runs this community',
   moderator: 'moderator',
   member: '',
 }

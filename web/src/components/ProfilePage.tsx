@@ -29,7 +29,7 @@ interface ProfilePageProps {
 }
 
 const ROLE_WORD: Record<Profile['role'], string> = {
-  owner: 'Runs this place',
+  owner: 'Runs this community',
   moderator: 'Moderator',
   member: '',
 }

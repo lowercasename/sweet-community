@@ -80,7 +80,7 @@ describe('PeoplePage', () => {
     fireEvent.click(screen.getByRole('menuitem', { name: 'Remove' }))
     expect(removeUser).not.toHaveBeenCalled()
     const dialog = screen.getByRole('dialog', { hidden: true })
-    expect(within(dialog).getByText('Remove kit from this place?')).toBeTruthy()
+    expect(within(dialog).getByText('Remove kit from this community?')).toBeTruthy()
     fireEvent.click(within(dialog).getByRole('button', { name: 'Remove' }))
     expect(removeUser).toHaveBeenCalledWith('kit')
     // Gone from the list at once.
