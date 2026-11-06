@@ -194,9 +194,12 @@ export interface PostPage {
 
 export class ApiError extends Error {
   status: number
-  constructor(status: number, message: string) {
+  /** What else the server said, beyond `error`: a refused sign-in names the unverified address. */
+  body: Record<string, unknown>
+  constructor(status: number, message: string, body: Record<string, unknown> = {}) {
     super(message)
     this.status = status
+    this.body = body
   }
 }
 
@@ -209,21 +212,25 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const isJson = (res.headers.get('content-type') ?? '').includes('application/json')
   if (!res.ok) {
     let message = `${res.status} ${res.statusText}`
+    let body: Record<string, unknown> = {}
     if (isJson) {
       try {
-        const body = (await res.json()) as { error?: string }
-        if (body.error) message = body.error
+        body = (await res.json()) as Record<string, unknown>
+        if (typeof body.error === 'string') message = body.error
       } catch {
         // keep the status text
       }
     }
-    throw new ApiError(res.status, message)
+    throw new ApiError(res.status, message, body)
   }
+  const text = await res.text()
+  // An accepted request with nothing to say (a link is on its way) has no body.
+  if (text === '') return undefined as T
   if (!isJson) {
     // Usually a stale backend answering with the app page. Say so.
     throw new ApiError(res.status, `The server sent a page instead of data for ${path}. Is the backend up to date?`)
   }
-  return (await res.json()) as T
+  return JSON.parse(text) as T
 }
 
 const json = (method: string, body: unknown): RequestInit => ({
@@ -389,8 +396,50 @@ export function login(username: string, password: string): Promise<Session> {
   return request<Session>('/api/login', json('POST', { username, password }))
 }
 
-export function register(code: string, username: string, password: string): Promise<Session> {
-  return request<Session>('/api/register', json('POST', { code, username, password }))
+/** My own account (architecture.md, Accounts): the address, whether it is verified, and one waiting to be. */
+export interface Account {
+  email: string | null
+  email_verified: boolean
+  pending_email: string | null
+}
+
+/** Joining makes the account and sends a link to the address; the link signs in (verifyEmail). */
+export function register(code: string, username: string, password: string, email: string): Promise<{ email: string }> {
+  return request('/api/register', json('POST', { code, username, password, email }))
+}
+
+export function verifyEmail(token: string): Promise<Session> {
+  return request<Session>('/api/verify', json('POST', { token }))
+}
+
+/** A new link to an unverified address; the server answers the same whether or not it knows the address. */
+export async function resendVerification(email: string): Promise<void> {
+  await request('/api/verify/resend', json('POST', { email }))
+}
+
+/** The mistyped address of a never-verified account, replaced; the password stands in for a session. */
+export async function changeUnverifiedEmail(username: string, password: string, email: string): Promise<void> {
+  await request('/api/verify/change', json('POST', { username, password, email }))
+}
+
+export async function requestReset(email: string): Promise<void> {
+  await request('/api/reset', json('POST', { email }))
+}
+
+export function resetPassword(token: string, password: string): Promise<Session> {
+  return request<Session>(`/api/reset/${encodeURIComponent(token)}`, json('POST', { password }))
+}
+
+export function getAccount(): Promise<Account> {
+  return request('/api/me/account')
+}
+
+export function changeEmail(email: string, password: string): Promise<Account> {
+  return request<Account>('/api/me/email', json('PUT', { email, password }))
+}
+
+export async function changePassword(current: string, password: string): Promise<void> {
+  await request('/api/me/password', json('PUT', { current, password }))
 }
 
 export async function logout(): Promise<void> {

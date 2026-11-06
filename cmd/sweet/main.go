@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
@@ -18,6 +19,7 @@ import (
 	"sweet/internal/db"
 	"sweet/internal/events"
 	"sweet/internal/images"
+	"sweet/internal/mail"
 	"sweet/internal/web"
 )
 
@@ -41,6 +43,13 @@ func imageStore(dir string) (images.Store, error) {
 //go:embed migrations
 var migrationsFS embed.FS
 
+func envOr(key, fallback string) string {
+	if v := os.Getenv(key); v != "" {
+		return v
+	}
+	return fallback
+}
+
 func main() {
 	addr := flag.String("addr", ":8080", "listen address")
 	dbPath := flag.String("db", "data/sweet.db", "SQLite database path")
@@ -48,6 +57,8 @@ func main() {
 	ownerPassword := flag.String("owner-password", os.Getenv("SWEET_OWNER_PASSWORD"),
 		"owner's initial password (or SWEET_OWNER_PASSWORD); used only until the owner has one")
 	imagesDir := flag.String("images-dir", "data/images", "directory for uploaded images when SWEET_S3_* is not set")
+	mailDir := flag.String("mail-dir", "data/mail", "directory that receives email as files when SWEET_SMTP_HOST is not set")
+	baseURL := flag.String("base-url", envOr("SWEET_BASE_URL", "http://localhost:8080"), "the address links in email point at (or SWEET_BASE_URL)")
 	flag.Parse()
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
@@ -86,7 +97,7 @@ func main() {
 	go images.SweepEvery(ctx, d, imgStore, time.Hour, 24*time.Hour, log.Printf)
 
 	hub := events.NewHub(d)
-	srv := &api.Server{DB: d, Hub: hub, Images: imgStore}
+	srv := &api.Server{DB: d, Hub: hub, Images: imgStore, Mail: mail.FromEnv(*mailDir), BaseURL: strings.TrimRight(*baseURL, "/")}
 
 	mux := http.NewServeMux()
 	srv.Routes(mux)

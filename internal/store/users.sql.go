@@ -10,6 +10,48 @@ import (
 	"database/sql"
 )
 
+const countRecentEmailTokens = `-- name: CountRecentEmailTokens :one
+SELECT COUNT(*) FROM email_tokens WHERE user_id = ?1 AND kind = ?2 AND created_at > ?3
+`
+
+type CountRecentEmailTokensParams struct {
+	UserID string
+	Kind   string
+	Since  int64
+}
+
+func (q *Queries) CountRecentEmailTokens(ctx context.Context, arg CountRecentEmailTokensParams) (int64, error) {
+	row := q.db.QueryRowContext(ctx, countRecentEmailTokens, arg.UserID, arg.Kind, arg.Since)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
+const createEmailToken = `-- name: CreateEmailToken :exec
+INSERT INTO email_tokens (hash, user_id, kind, email, created_at, expires_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6)
+`
+
+type CreateEmailTokenParams struct {
+	Hash      string
+	UserID    string
+	Kind      string
+	Email     string
+	CreatedAt int64
+	ExpiresAt int64
+}
+
+func (q *Queries) CreateEmailToken(ctx context.Context, arg CreateEmailTokenParams) error {
+	_, err := q.db.ExecContext(ctx, createEmailToken,
+		arg.Hash,
+		arg.UserID,
+		arg.Kind,
+		arg.Email,
+		arg.CreatedAt,
+		arg.ExpiresAt,
+	)
+	return err
+}
+
 const createUser = `-- name: CreateUser :exec
 INSERT INTO users (id, username, password_hash, created_at) VALUES (?, ?, ?, ?)
 `
@@ -29,6 +71,85 @@ func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) error {
 		arg.CreatedAt,
 	)
 	return err
+}
+
+const createUserWithEmail = `-- name: CreateUserWithEmail :exec
+INSERT INTO users (id, username, password_hash, email, created_at) VALUES (?1, ?2, ?3, ?4, ?5)
+`
+
+type CreateUserWithEmailParams struct {
+	ID           string
+	Username     string
+	PasswordHash sql.NullString
+	Email        sql.NullString
+	CreatedAt    int64
+}
+
+func (q *Queries) CreateUserWithEmail(ctx context.Context, arg CreateUserWithEmailParams) error {
+	_, err := q.db.ExecContext(ctx, createUserWithEmail,
+		arg.ID,
+		arg.Username,
+		arg.PasswordHash,
+		arg.Email,
+		arg.CreatedAt,
+	)
+	return err
+}
+
+const getAccount = `-- name: GetAccount :one
+SELECT id, username, password_hash, email, email_verified_at, pending_email, removed_at FROM users WHERE id = ?1
+`
+
+type GetAccountRow struct {
+	ID              string
+	Username        string
+	PasswordHash    sql.NullString
+	Email           sql.NullString
+	EmailVerifiedAt sql.NullInt64
+	PendingEmail    sql.NullString
+	RemovedAt       sql.NullInt64
+}
+
+func (q *Queries) GetAccount(ctx context.Context, id string) (GetAccountRow, error) {
+	row := q.db.QueryRowContext(ctx, getAccount, id)
+	var i GetAccountRow
+	err := row.Scan(
+		&i.ID,
+		&i.Username,
+		&i.PasswordHash,
+		&i.Email,
+		&i.EmailVerifiedAt,
+		&i.PendingEmail,
+		&i.RemovedAt,
+	)
+	return i, err
+}
+
+const getEmailToken = `-- name: GetEmailToken :one
+SELECT hash, user_id, kind, email, expires_at, used_at FROM email_tokens WHERE hash = ?1
+`
+
+type GetEmailTokenRow struct {
+	Hash      string
+	UserID    string
+	Kind      string
+	Email     string
+	ExpiresAt int64
+	UsedAt    sql.NullInt64
+}
+
+func (q *Queries) GetEmailToken(ctx context.Context, hash string) (GetEmailTokenRow, error) {
+	row := q.db.QueryRowContext(ctx, getEmailToken, hash)
+	var i GetEmailTokenRow
+	err := row.Scan(
+		&i.Hash,
+		&i.UserID,
+		&i.Kind,
+		&i.Email,
+		&i.ExpiresAt,
+		&i.UsedAt,
+	)
+	return i, err
 }
 
 const getProfile = `-- name: GetProfile :one
@@ -114,15 +235,47 @@ func (q *Queries) GetUser(ctx context.Context, id string) (GetUserRow, error) {
 	return i, err
 }
 
+const getUserByEmail = `-- name: GetUserByEmail :one
+SELECT id, username, password_hash, picture_id, email, email_verified_at, removed_at FROM users WHERE lower(email) = lower(?1)
+`
+
+type GetUserByEmailRow struct {
+	ID              string
+	Username        string
+	PasswordHash    sql.NullString
+	PictureID       sql.NullString
+	Email           sql.NullString
+	EmailVerifiedAt sql.NullInt64
+	RemovedAt       sql.NullInt64
+}
+
+func (q *Queries) GetUserByEmail(ctx context.Context, email string) (GetUserByEmailRow, error) {
+	row := q.db.QueryRowContext(ctx, getUserByEmail, email)
+	var i GetUserByEmailRow
+	err := row.Scan(
+		&i.ID,
+		&i.Username,
+		&i.PasswordHash,
+		&i.PictureID,
+		&i.Email,
+		&i.EmailVerifiedAt,
+		&i.RemovedAt,
+	)
+	return i, err
+}
+
 const getUserByUsername = `-- name: GetUserByUsername :one
-SELECT id, username, password_hash, picture_id FROM users WHERE username = ?
+SELECT id, username, password_hash, picture_id, email, email_verified_at, removed_at FROM users WHERE username = ?
 `
 
 type GetUserByUsernameRow struct {
-	ID           string
-	Username     string
-	PasswordHash sql.NullString
-	PictureID    sql.NullString
+	ID              string
+	Username        string
+	PasswordHash    sql.NullString
+	PictureID       sql.NullString
+	Email           sql.NullString
+	EmailVerifiedAt sql.NullInt64
+	RemovedAt       sql.NullInt64
 }
 
 func (q *Queries) GetUserByUsername(ctx context.Context, username string) (GetUserByUsernameRow, error) {
@@ -133,6 +286,9 @@ func (q *Queries) GetUserByUsername(ctx context.Context, username string) (GetUs
 		&i.Username,
 		&i.PasswordHash,
 		&i.PictureID,
+		&i.Email,
+		&i.EmailVerifiedAt,
+		&i.RemovedAt,
 	)
 	return i, err
 }
@@ -171,6 +327,23 @@ func (q *Queries) RemoveUser(ctx context.Context, arg RemoveUserParams) error {
 	return err
 }
 
+const setUnverifiedEmail = `-- name: SetUnverifiedEmail :execrows
+UPDATE users SET email = ?1 WHERE id = ?2 AND email_verified_at IS NULL
+`
+
+type SetUnverifiedEmailParams struct {
+	Email sql.NullString
+	ID    string
+}
+
+func (q *Queries) SetUnverifiedEmail(ctx context.Context, arg SetUnverifiedEmailParams) (int64, error) {
+	result, err := q.db.ExecContext(ctx, setUnverifiedEmail, arg.Email, arg.ID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
+}
+
 const setUserBio = `-- name: SetUserBio :exec
 UPDATE users SET bio_html = ?1, bio_text = ?2 WHERE id = ?3
 `
@@ -186,6 +359,21 @@ func (q *Queries) SetUserBio(ctx context.Context, arg SetUserBioParams) error {
 	return err
 }
 
+const setUserEmailVerified = `-- name: SetUserEmailVerified :exec
+UPDATE users SET email = ?1, email_verified_at = ?2, pending_email = NULL WHERE id = ?3
+`
+
+type SetUserEmailVerifiedParams struct {
+	Email      sql.NullString
+	VerifiedAt sql.NullInt64
+	ID         string
+}
+
+func (q *Queries) SetUserEmailVerified(ctx context.Context, arg SetUserEmailVerifiedParams) error {
+	_, err := q.db.ExecContext(ctx, setUserEmailVerified, arg.Email, arg.VerifiedAt, arg.ID)
+	return err
+}
+
 const setUserPassword = `-- name: SetUserPassword :exec
 UPDATE users SET password_hash = ? WHERE id = ?
 `
@@ -198,4 +386,36 @@ type SetUserPasswordParams struct {
 func (q *Queries) SetUserPassword(ctx context.Context, arg SetUserPasswordParams) error {
 	_, err := q.db.ExecContext(ctx, setUserPassword, arg.PasswordHash, arg.ID)
 	return err
+}
+
+const setUserPendingEmail = `-- name: SetUserPendingEmail :exec
+UPDATE users SET pending_email = ?1 WHERE id = ?2
+`
+
+type SetUserPendingEmailParams struct {
+	PendingEmail sql.NullString
+	ID           string
+}
+
+func (q *Queries) SetUserPendingEmail(ctx context.Context, arg SetUserPendingEmailParams) error {
+	_, err := q.db.ExecContext(ctx, setUserPendingEmail, arg.PendingEmail, arg.ID)
+	return err
+}
+
+const useEmailToken = `-- name: UseEmailToken :execrows
+UPDATE email_tokens SET used_at = ?1 WHERE hash = ?2 AND used_at IS NULL AND expires_at > ?3
+`
+
+type UseEmailTokenParams struct {
+	UsedAt sql.NullInt64
+	Hash   string
+	Now    int64
+}
+
+func (q *Queries) UseEmailToken(ctx context.Context, arg UseEmailTokenParams) (int64, error) {
+	result, err := q.db.ExecContext(ctx, useEmailToken, arg.UsedAt, arg.Hash, arg.Now)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
 }

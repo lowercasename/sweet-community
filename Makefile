@@ -18,7 +18,7 @@ build: cmd/sweet/migrations frontend
 export
 
 dev-backend: cmd/sweet/migrations
-	go run ./cmd/sweet -db data/sweet.db -owner raphael
+	go run ./cmd/sweet -db data/sweet.db -owner raphael -base-url http://localhost:5173
 
 run: build
 	./bin/sweet -db data/sweet.db -owner raphael

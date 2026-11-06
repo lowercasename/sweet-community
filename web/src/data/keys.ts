@@ -19,4 +19,5 @@ export const keys = {
   search: (q: string) => ['search', q] as const,
   markers: ['markers'] as const,
   settings: ['settings'] as const,
+  account: ['account'] as const,
 }

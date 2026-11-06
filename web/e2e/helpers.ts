@@ -1,3 +1,5 @@
+import { readdirSync, readFileSync } from 'node:fs'
+import { join } from 'node:path'
 import { deflateSync } from 'node:zlib'
 import { expect, test as base, type Browser, type BrowserContext, type Page, type TestInfo } from '@playwright/test'
 
@@ -48,7 +50,30 @@ export async function owner(browser: Browser, info: TestInfo): Promise<Person> {
   return { context, page, username: 'raphael' }
 }
 
-/** A new member: the owner mints an invite, they register through it, and their context is signed in. */
+/** Where the test server puts the email it sends (serve.sh: one file per message). Playwright runs from `web/`. */
+const MAIL_DIR = join(process.cwd(), '..', 'data', 'e2e-mail')
+
+/** The email address a test person signs up with. */
+export const emailOf = (username: string) => `${username}@example.test`
+
+/**
+ * The path (`/verify/<token>` or `/reset/<token>`) in the newest message
+ * sent to an address. The server writes the file before it answers, so the
+ * message is there by the time the request that caused it returns.
+ */
+export function mailLink(to: string, kind: 'verify' | 'reset'): string {
+  const suffix = `-${to.replace('@', '_at_')}.txt`
+  const files = readdirSync(MAIL_DIR)
+    .filter((f) => f.endsWith(suffix))
+    .sort()
+  expect(files.length, `mail to ${to}`).toBeGreaterThan(0)
+  const text = readFileSync(join(MAIL_DIR, files[files.length - 1]), 'utf8')
+  const m = text.match(new RegExp(`https?://[^/\\s]+(/${kind}/\\S+)`))
+  expect(m, `a ${kind} link in the mail to ${to}`).toBeTruthy()
+  return m![1]
+}
+
+/** A new member: the owner mints an invite, they register through it, open the link they were sent, and their context is signed in. */
 export async function member(browser: Browser, info: TestInfo, prefix = 'kit'): Promise<Person> {
   const o = await owner(browser, info)
   const invite = await o.context.request.post('/api/invites')
@@ -58,8 +83,13 @@ export async function member(browser: Browser, info: TestInfo, prefix = 'kit'): 
 
   const context = await browser.newContext(options(info))
   const username = uniq(prefix)
-  const res = await context.request.post('/api/register', { data: { code, username, password: 'longenough' } })
+  const res = await context.request.post('/api/register', {
+    data: { code, username, password: 'longenough', email: emailOf(username) },
+  })
   expect(res.ok(), await res.text()).toBeTruthy()
+  const token = mailLink(emailOf(username), 'verify').split('/').pop()!
+  const verified = await context.request.post('/api/verify', { data: { token } })
+  expect(verified.ok(), await verified.text()).toBeTruthy()
   const page = await context.newPage()
   await prepare(page)
   return { context, page, username }

@@ -21,6 +21,9 @@ export const SEARCH = '/search'
 /** What was done to me (architecture.md, Notifications). */
 export const NOTIFICATIONS = '/notifications'
 
+/** Forgot the password (architecture.md, Accounts): `/reset` asks for a link, `/reset/<token>` is where it leads. */
+export const RESET = '/reset'
+
 /** A person's page (architecture.md, Accounts). */
 export const profilePath = (name: string) => `/u/${encodeURIComponent(name)}`
 

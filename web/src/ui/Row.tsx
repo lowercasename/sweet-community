@@ -11,7 +11,8 @@ const GAPS: Record<Gap, string> = {
 
 interface RowProps {
   gap?: Gap
-  justify?: 'start' | 'between'
+  /** `end`: a submit button alone at the foot of a form. */
+  justify?: 'start' | 'between' | 'end'
   /** `end` lines a control up with the foot of a labelled field beside it. */
   align?: 'baseline' | 'center' | 'start' | 'end'
   /** A bar across the top of a pane: padded, with a hairline under it. */
@@ -45,7 +46,7 @@ export function Row({
     wrap === 'narrow' ? 'flex-wrap @xl:flex-nowrap' : wrap === 'never' ? 'flex-nowrap' : 'flex-wrap',
     shrink ? '' : 'flex-none',
     GAPS[gap],
-    justify === 'between' ? 'justify-between' : 'justify-start',
+    justify === 'between' ? 'justify-between' : justify === 'end' ? 'justify-end' : 'justify-start',
     align === 'center'
       ? 'items-center'
       : align === 'start'

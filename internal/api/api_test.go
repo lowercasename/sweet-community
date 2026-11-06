@@ -16,13 +16,16 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"sort"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
 	"sweet/internal/db"
 	"sweet/internal/events"
 	"sweet/internal/images"
+	"sweet/internal/mail"
 	"sweet/internal/store"
 )
 
@@ -53,11 +56,13 @@ func newTestServerWith(t *testing.T) (*httptest.Server, *client, *Server) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	srv := &Server{DB: d, Hub: events.NewHub(d), Images: imgs}
+	mailDir := filepath.Join(t.TempDir(), "mail")
+	srv := &Server{DB: d, Hub: events.NewHub(d), Images: imgs, Mail: mail.Dir{Path: mailDir}, BaseURL: "http://sweet.test"}
 	mux := http.NewServeMux()
 	srv.Routes(mux)
 	ts := httptest.NewServer(Protect(mux))
 	t.Cleanup(ts.Close)
+	mailDirs.Store(ts.URL, mailDir)
 	owner := newClient(t, ts)
 	owner.login("raphael", "correct horse")
 	return ts, owner, srv
@@ -160,19 +165,20 @@ func TestInviteRegisterAndSessions(t *testing.T) {
 	anon.mustStatus(404, "GET", "/api/invites/nope", nil)
 
 	// Rules before the invite is spent.
-	anon.mustStatus(400, "POST", "/api/register", map[string]string{"code": code, "username": "a", "password": "longenough"})
-	anon.mustStatus(400, "POST", "/api/register", map[string]string{"code": code, "username": "admin", "password": "longenough"})
-	anon.mustStatus(400, "POST", "/api/register", map[string]string{"code": code, "username": "kit", "password": "short"})
-	anon.mustStatus(404, "POST", "/api/register", map[string]string{"code": "nope", "username": "kit", "password": "longenough"})
+	anon.mustStatus(400, "POST", "/api/register", map[string]string{"code": code, "username": "a", "password": "longenough", "email": "a@example.test"})
+	anon.mustStatus(400, "POST", "/api/register", map[string]string{"code": code, "username": "admin", "password": "longenough", "email": "admin@example.test"})
+	anon.mustStatus(400, "POST", "/api/register", map[string]string{"code": code, "username": "kit", "password": "short", "email": "kit@example.test"})
+	anon.mustStatus(404, "POST", "/api/register", map[string]string{"code": "nope", "username": "kit", "password": "longenough", "email": "kit@example.test"})
 	if n := len(owner.mustStatus(200, "GET", "/api/invites", nil)["invites"].([]any)); n != 1 {
 		t.Fatalf("failed registrations must not spend the invite; open invites = %d", n)
 	}
 
 	// A good registration signs the new member in.
 	kit := newClient(t, ts)
-	reg := kit.mustStatus(201, "POST", "/api/register", map[string]string{"code": code, "username": "kit", "password": "longenough"})
+	kit.mustStatus(202, "POST", "/api/register", map[string]string{"code": code, "username": "kit", "password": "longenough", "email": "kit@example.test"})
+	reg := kit.mustStatus(200, "POST", "/api/verify", map[string]string{"token": linkToken(mailed(t, ts, "kit@example.test", "verify")[0])})
 	if reg["user"].(map[string]any)["username"] != "kit" || reg["token"] == "" {
-		t.Fatalf("register: %v", reg)
+		t.Fatalf("verify: %v", reg)
 	}
 	me := kit.mustStatus(200, "GET", "/api/me", nil)
 	if me["username"] != "kit" {
@@ -180,7 +186,7 @@ func TestInviteRegisterAndSessions(t *testing.T) {
 	}
 
 	// The link is spent.
-	newClient(t, ts).mustStatus(404, "POST", "/api/register", map[string]string{"code": code, "username": "kit2", "password": "longenough"})
+	newClient(t, ts).mustStatus(404, "POST", "/api/register", map[string]string{"code": code, "username": "kit2", "password": "longenough", "email": "kit2@example.test"})
 	anon.mustStatus(404, "GET", "/api/invites/"+code, nil)
 	if n := len(owner.mustStatus(200, "GET", "/api/invites", nil)["invites"].([]any)); n != 0 {
 		t.Fatalf("open invites after use: %d", n)
@@ -188,7 +194,7 @@ func TestInviteRegisterAndSessions(t *testing.T) {
 
 	// Usernames are unique, case-insensitively.
 	inv2 := owner.mustStatus(201, "POST", "/api/invites", nil)
-	newClient(t, ts).mustStatus(409, "POST", "/api/register", map[string]string{"code": inv2["code"].(string), "username": "KIT", "password": "longenough"})
+	newClient(t, ts).mustStatus(409, "POST", "/api/register", map[string]string{"code": inv2["code"].(string), "username": "KIT", "password": "longenough", "email": "kit-again@example.test"})
 
 	// The bearer form of the token works without the cookie.
 	bare := newClient(t, ts)
@@ -221,9 +227,7 @@ func TestInviteRegisterAndSessions(t *testing.T) {
 
 func TestPostsAreAuthoredBySessionAndEditedOnlyByAuthor(t *testing.T) {
 	ts, owner := newTestServer(t)
-	inv := owner.mustStatus(201, "POST", "/api/invites", nil)
-	kit := newClient(t, ts)
-	kit.mustStatus(201, "POST", "/api/register", map[string]string{"code": inv["code"].(string), "username": "kit", "password": "longenough"})
+	kit, _ := registerMember(t, ts, owner, "kit")
 
 	post := owner.mustStatus(201, "POST", rootPath+"/posts", map[string]string{"body_html": "<p>mine</p>"})
 	if post["author"].(map[string]any)["username"] != "raphael" {
@@ -309,9 +313,7 @@ func TestUnknownAPIPathIsJSON404(t *testing.T) {
 
 func TestComments(t *testing.T) {
 	ts, owner := newTestServer(t)
-	inv := owner.mustStatus(201, "POST", "/api/invites", nil)
-	kit := newClient(t, ts)
-	kit.mustStatus(201, "POST", "/api/register", map[string]string{"code": inv["code"].(string), "username": "kit", "password": "longenough"})
+	kit, _ := registerMember(t, ts, owner, "kit")
 
 	post := owner.mustStatus(201, "POST", rootPath+"/posts", map[string]string{"body_html": "<p>a question</p>"})
 	id := post["id"].(string)
@@ -453,9 +455,7 @@ func TestImagesUploadServeAndPicture(t *testing.T) {
 
 func TestDeletePost(t *testing.T) {
 	ts, owner, srv := newTestServerWith(t)
-	inv := owner.mustStatus(201, "POST", "/api/invites", nil)
-	kit := newClient(t, ts)
-	kit.mustStatus(201, "POST", "/api/register", map[string]string{"code": inv["code"].(string), "username": "kit", "password": "longenough"})
+	kit, _ := registerMember(t, ts, owner, "kit")
 
 	post := owner.mustStatus(201, "POST", rootPath+"/posts", map[string]string{"body_html": "<p>going</p>"})
 	id := post["id"].(string)
@@ -544,9 +544,7 @@ func TestImageSweep(t *testing.T) {
 func TestDeleteComment(t *testing.T) {
 	ts, owner := newTestServer(t)
 	register := func(name string) *client {
-		inv := owner.mustStatus(201, "POST", "/api/invites", nil)
-		c := newClient(t, ts)
-		c.mustStatus(201, "POST", "/api/register", map[string]string{"code": inv["code"].(string), "username": name, "password": "longenough"})
+		c, _ := registerMember(t, ts, owner, name)
 		return c
 	}
 	kit, mo := register("kit"), register("mo")
@@ -616,12 +614,55 @@ func TestPictureChangeIsAnEvent(t *testing.T) {
 	}
 }
 
-// register makes a member and returns their client and id.
+// mailDirs is where each test server's mail lands, by server URL, so helpers
+// that only hold the server can read what it sent.
+var mailDirs sync.Map
+
+// mailed returns the links of a kind in the newest message sent to an address.
+func mailed(t *testing.T, ts *httptest.Server, to, kind string) []string {
+	t.Helper()
+	dir, _ := mailDirs.Load(ts.URL)
+	files, _ := filepath.Glob(filepath.Join(dir.(string), "*-"+strings.ReplaceAll(to, "@", "_at_")+".txt"))
+	if len(files) == 0 {
+		return nil
+	}
+	sort.Strings(files)
+	raw, err := os.ReadFile(files[len(files)-1])
+	if err != nil {
+		t.Fatal(err)
+	}
+	var links []string
+	for _, w := range strings.Fields(string(raw)) {
+		if strings.HasPrefix(w, "http://sweet.test/"+kind+"/") {
+			links = append(links, w)
+		}
+	}
+	return links
+}
+
+// mailCount is how many messages an address has had.
+func mailCount(ts *httptest.Server, to string) int {
+	dir, _ := mailDirs.Load(ts.URL)
+	files, _ := filepath.Glob(filepath.Join(dir.(string), "*-"+strings.ReplaceAll(to, "@", "_at_")+".txt"))
+	return len(files)
+}
+
+// linkToken is the token at the end of a link.
+func linkToken(link string) string { return link[strings.LastIndex(link, "/")+1:] }
+
+// registerMember makes a member, verified through the link they were sent,
+// and returns their client (signed in) and id.
 func registerMember(t *testing.T, ts *httptest.Server, owner *client, name string) (*client, string) {
 	t.Helper()
 	inv := owner.mustStatus(201, "POST", "/api/invites", nil)
 	c := newClient(t, ts)
-	res := c.mustStatus(201, "POST", "/api/register", map[string]string{"code": inv["code"].(string), "username": name, "password": "longenough"})
+	email := name + "@example.test"
+	c.mustStatus(202, "POST", "/api/register", map[string]string{"code": inv["code"].(string), "username": name, "password": "longenough", "email": email})
+	links := mailed(t, ts, email, "verify")
+	if len(links) != 1 {
+		t.Fatalf("verification mail to %s: %v", email, links)
+	}
+	res := c.mustStatus(200, "POST", "/api/verify", map[string]string{"token": linkToken(links[0])})
 	return c, res["user"].(map[string]any)["id"].(string)
 }
 

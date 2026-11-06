@@ -194,7 +194,7 @@ type loginLimiter struct {
 	m  map[string]*rate.Limiter
 }
 
-func (l *loginLimiter) allow(addr string) bool {
+func (l *loginLimiter) get(addr string) *rate.Limiter {
 	host, _, err := net.SplitHostPort(addr)
 	if err != nil {
 		host = addr
@@ -209,8 +209,17 @@ func (l *loginLimiter) allow(addr string) bool {
 		lim = rate.NewLimiter(rate.Every(12*time.Second), 5)
 		l.m[host] = lim
 	}
-	return lim.Allow()
+	return lim
 }
+
+// allow spends one attempt: five at once, then one every twelve seconds.
+func (l *loginLimiter) allow(addr string) bool { return l.get(addr).Allow() }
+
+// open says whether an attempt would be allowed, without spending one; spend
+// takes one. Sign-in pays only for failures: a wrong password is what the
+// limit is for, and a right one, or an unverified address, is no guess.
+func (l *loginLimiter) open(addr string) bool { return l.get(addr).Tokens() >= 1 }
+func (l *loginLimiter) spend(addr string)     { l.get(addr).Allow() }
 
 type credentials struct {
 	Username string `json:"username"`
@@ -218,7 +227,7 @@ type credentials struct {
 }
 
 func (s *Server) login(w http.ResponseWriter, r *http.Request) {
-	if !s.limiter.allow(r.RemoteAddr) {
+	if !s.limiter.open(r.RemoteAddr) {
 		writeErr(w, http.StatusTooManyRequests, "too many attempts; wait a moment")
 		return
 	}
@@ -228,13 +237,23 @@ func (s *Server) login(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusBadRequest, "bad request body")
 		return
 	}
-	row, err := s.q().GetUserByUsername(r.Context(), in.Username)
+	// The name field takes a username or an email address.
+	var row store.GetUserByUsernameRow
+	var err error
+	if strings.Contains(in.Username, "@") {
+		var e store.GetUserByEmailRow
+		e, err = s.q().GetUserByEmail(r.Context(), strings.TrimSpace(in.Username))
+		row = store.GetUserByUsernameRow(e)
+	} else {
+		row, err = s.q().GetUserByUsername(r.Context(), in.Username)
+	}
 	u := wireUser(row.ID, row.Username, row.PictureID)
 	hash := row.PasswordHash
-	// Same answer for unknown user and wrong password; bcrypt runs either way
-	// so timing does not reveal which.
+	// Same answer for unknown user and wrong password; the hash runs either
+	// way so timing does not reveal which.
 	if errors.Is(err, sql.ErrNoRows) || !hash.Valid {
-		auth.CheckPassword("$2a$12$000000000000000000000uuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuu", in.Password)
+		auth.CheckPassword(auth.DummyHash, in.Password)
+		s.limiter.spend(r.RemoteAddr)
 		writeErr(w, http.StatusUnauthorized, "wrong username or password")
 		return
 	}
@@ -243,7 +262,14 @@ func (s *Server) login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if !auth.CheckPassword(hash.String, in.Password) {
+		s.limiter.spend(r.RemoteAddr)
 		writeErr(w, http.StatusUnauthorized, "wrong username or password")
+		return
+	}
+	// An account with an address uses it only once the address is verified.
+	// (The owner made at the command line has none, and is let in.)
+	if row.Email.Valid && !row.EmailVerifiedAt.Valid {
+		writeJSON(w, http.StatusForbidden, map[string]any{"error": "unverified", "email": row.Email.String})
 		return
 	}
 	token, err := s.issueSession(w, r, u.ID)

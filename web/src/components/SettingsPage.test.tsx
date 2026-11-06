@@ -12,6 +12,11 @@ vi.mock('../api', () => ({
   uploadImage: vi.fn(),
   setPicture: vi.fn(),
   removeUser: vi.fn(() => Promise.resolve()),
+  getAccount: vi.fn(() => Promise.resolve({ email: 'kit@example.test', email_verified: true, pending_email: null })),
+  changeEmail: vi.fn((email: string) =>
+    Promise.resolve({ email: 'kit@example.test', email_verified: true, pending_email: email }),
+  ),
+  changePassword: vi.fn(() => Promise.resolve()),
 }))
 
 afterEach(cleanup)
@@ -44,6 +49,26 @@ describe('SettingsPage', () => {
     renderWithQuery(<SettingsPage me={user('raphael')} root={group(ROOT, 'owner')} onSignOut={() => {}} />)
     await screen.findByText('You run this community. Hand it over to someone else first.')
     expect(screen.queryByRole('button', { name: 'Remove my account' })).toBeNull()
+  })
+
+  it('shows my address; a new one waits as pending once its link is sent; a new password wants the old', async () => {
+    const { changeEmail, changePassword } = await import('../api')
+    const { SettingsPage } = await import('./SettingsPage')
+    renderWithQuery(<SettingsPage me={user('kit')} root={group(ROOT, 'member')} onSignOut={() => {}} />)
+    await screen.findByText('kit@example.test')
+    fireEvent.change(screen.getByLabelText('New email address'), { target: { value: 'new@example.test' } })
+    fireEvent.change(screen.getByLabelText('Your password'), { target: { value: 'longenough' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Send a link there' }))
+    expect(changeEmail).toHaveBeenCalledWith('new@example.test', 'longenough')
+    await screen.findByText(/A link is on its way to new@example.test/)
+    // The old address stands until then.
+    expect(screen.getByText('kit@example.test')).toBeTruthy()
+
+    fireEvent.change(screen.getByLabelText('Current password'), { target: { value: 'longenough' } })
+    fireEvent.change(screen.getByLabelText('New password'), { target: { value: 'anotherlongone' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Change password' }))
+    expect(changePassword).toHaveBeenCalledWith('longenough', 'anotherlongone')
+    await screen.findByText(/Password changed/)
   })
 
   it('shows nobody else the instance settings', async () => {

@@ -130,7 +130,7 @@ func TestRemoveFromInstance(t *testing.T) {
 	jo.mustStatus(204, "DELETE", "/api/users/"+joID, nil)
 	jo.mustStatus(401, "GET", "/api/me", nil)
 	code := owner.mustStatus(201, "POST", "/api/invites", nil)["code"].(string)
-	if status, body := newClient(t, ts).do("POST", "/api/register", map[string]string{"code": code, "username": "removed-anyone", "password": "longenough"}); status != 400 {
+	if status, body := newClient(t, ts).do("POST", "/api/register", map[string]string{"code": code, "username": "removed-anyone", "password": "longenough", "email": "anyone@example.test"}); status != 400 {
 		t.Fatalf("registering a removed name: %d %v", status, body)
 	}
 }

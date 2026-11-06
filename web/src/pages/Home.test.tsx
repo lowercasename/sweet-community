@@ -27,6 +27,7 @@ vi.mock('../api', async (importOriginal) => ({
   listMembers: vi.fn(() => Promise.resolve({ members: [] })),
   listInvites: vi.fn(() => Promise.resolve({ invites: [] })),
   getSettings: vi.fn(() => Promise.resolve({ group_creation: 'anyone' })),
+  getAccount: vi.fn(() => Promise.resolve({ email: null, email_verified: false, pending_email: null })),
   listNotifications: vi.fn(() => Promise.resolve({ notifications: [], next_before: null })),
   listMarkers: vi.fn(() =>
     Promise.resolve({ markers: [{ user_id: 'raphael', stream: 'notifications', read_at: 0, unread: 0 }] }),

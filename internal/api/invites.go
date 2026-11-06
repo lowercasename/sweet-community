@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -92,7 +93,8 @@ func (s *Server) getInvite(w http.ResponseWriter, r *http.Request) {
 // register (public) turns a valid invite into an account and signs it in.
 func (s *Server) register(w http.ResponseWriter, r *http.Request) {
 	var in struct {
-		Code string `json:"code"`
+		Code  string `json:"code"`
+		Email string `json:"email"`
 		credentials
 	}
 	r.Body = http.MaxBytesReader(w, r.Body, 4096)
@@ -101,6 +103,11 @@ func (s *Server) register(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err := auth.ValidateUsername(in.Username); err != nil {
+		writeErr(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	in.Email = strings.TrimSpace(in.Email)
+	if err := auth.ValidateEmail(in.Email); err != nil {
 		writeErr(w, http.StatusBadRequest, err.Error())
 		return
 	}
@@ -133,8 +140,12 @@ func (s *Server) register(w http.ResponseWriter, r *http.Request) {
 	// registrations: BEGIN IMMEDIATE serialises them and the second sees
 	// used_at set, rolls back, and the user it inserted goes with it.
 	qtx := store.New(tx)
-	if err := qtx.CreateUser(ctx, store.CreateUserParams{
-		ID: u.ID, Username: u.Username, PasswordHash: sql.NullString{String: hash, Valid: true}, CreatedAt: now,
+	if _, err := qtx.GetUserByEmail(ctx, in.Email); err == nil {
+		writeErr(w, http.StatusConflict, "that email address already has an account")
+		return
+	}
+	if err := qtx.CreateUserWithEmail(ctx, store.CreateUserWithEmailParams{
+		ID: u.ID, Username: u.Username, PasswordHash: sql.NullString{String: hash, Valid: true}, Email: sql.NullString{String: in.Email, Valid: true}, CreatedAt: now,
 	}); err != nil {
 		if db.IsUniqueViolation(err) {
 			writeErr(w, http.StatusConflict, "that username is taken")
@@ -175,10 +186,11 @@ func (s *Server) register(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s.Hub.Broadcast(ev)
-	token, err := s.issueSession(w, r, u.ID)
-	if err != nil {
+	// No session yet: the address is verified first, and the link that
+	// verifies it signs the person in.
+	if err := s.sendToken(ctx, s.q(), u.ID, TokenVerify, in.Email); err != nil {
 		writeErr(w, http.StatusInternalServerError, err.Error())
 		return
 	}
-	writeJSON(w, http.StatusCreated, map[string]any{"user": u, "token": token})
+	writeJSON(w, http.StatusAccepted, map[string]any{"email": in.Email})
 }

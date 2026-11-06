@@ -18,6 +18,7 @@ import (
 	"sweet/internal/db"
 	"sweet/internal/events"
 	"sweet/internal/images"
+	"sweet/internal/mail"
 	"sweet/internal/perm"
 	"sweet/internal/sanitize"
 	"sweet/internal/store"
@@ -100,8 +101,13 @@ type Server struct {
 	Hub *events.Hub
 	// Images is nil when no storage is configured; uploads then 501.
 	Images images.Store
+	// Mail sends verification and reset links; BaseURL is where they point.
+	Mail    mail.Sender
+	BaseURL string
 
 	limiter loginLimiter
+	// mailLimiter paces the endpoints that send a link to any address asked for.
+	mailLimiter loginLimiter
 }
 
 func (s *Server) q() *store.Queries { return store.New(s.DB) }
@@ -171,9 +177,17 @@ func (s *Server) Routes(mux *http.ServeMux) {
 	mux.HandleFunc("POST /api/login", s.login)
 	mux.HandleFunc("GET /api/invites/{code}", s.getInvite)
 	mux.HandleFunc("POST /api/register", s.register)
+	mux.HandleFunc("POST /api/verify", s.verify)
+	mux.HandleFunc("POST /api/verify/resend", s.resendVerification)
+	mux.HandleFunc("POST /api/verify/change", s.changeUnverifiedEmail)
+	mux.HandleFunc("POST /api/reset", s.requestReset)
+	mux.HandleFunc("POST /api/reset/{token}", s.resetPassword)
 
 	// Members.
 	mux.HandleFunc("GET /api/me", s.requireAuth(s.me))
+	mux.HandleFunc("GET /api/me/account", s.requireAuth(s.getAccount))
+	mux.HandleFunc("PUT /api/me/email", s.requireAuth(s.changeEmail))
+	mux.HandleFunc("PUT /api/me/password", s.requireAuth(s.changePassword))
 	mux.HandleFunc("POST /api/logout", s.requireAuth(s.logout))
 	mux.HandleFunc("POST /api/logout-all", s.requireAuth(s.logoutAll))
 	mux.HandleFunc("GET /api/users", s.requireAuth(s.listUsers))

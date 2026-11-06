@@ -1,5 +1,5 @@
 -- name: GetUserByUsername :one
-SELECT id, username, password_hash, picture_id FROM users WHERE username = ?;
+SELECT id, username, password_hash, picture_id, email, email_verified_at, removed_at FROM users WHERE username = ?;
 
 -- name: GetUserPasswordHash :one
 SELECT id, password_hash FROM users WHERE username = ?;
@@ -33,3 +33,33 @@ WHERE u.id = sqlc.arg(id) AND u.removed_at IS NULL;
 
 -- name: SetUserBio :exec
 UPDATE users SET bio_html = sqlc.arg(bio_html), bio_text = sqlc.arg(bio_text) WHERE id = sqlc.arg(id);
+
+-- name: GetUserByEmail :one
+SELECT id, username, password_hash, picture_id, email, email_verified_at, removed_at FROM users WHERE lower(email) = lower(sqlc.arg(email));
+
+-- name: GetAccount :one
+SELECT id, username, password_hash, email, email_verified_at, pending_email, removed_at FROM users WHERE id = sqlc.arg(id);
+
+-- name: CreateUserWithEmail :exec
+INSERT INTO users (id, username, password_hash, email, created_at) VALUES (sqlc.arg(id), sqlc.arg(username), sqlc.arg(password_hash), sqlc.arg(email), sqlc.arg(created_at));
+
+-- name: SetUserEmailVerified :exec
+UPDATE users SET email = sqlc.arg(email), email_verified_at = sqlc.arg(verified_at), pending_email = NULL WHERE id = sqlc.arg(id);
+
+-- name: SetUserPendingEmail :exec
+UPDATE users SET pending_email = sqlc.arg(pending_email) WHERE id = sqlc.arg(id);
+
+-- name: CreateEmailToken :exec
+INSERT INTO email_tokens (hash, user_id, kind, email, created_at, expires_at) VALUES (sqlc.arg(hash), sqlc.arg(user_id), sqlc.arg(kind), sqlc.arg(email), sqlc.arg(created_at), sqlc.arg(expires_at));
+
+-- name: GetEmailToken :one
+SELECT hash, user_id, kind, email, expires_at, used_at FROM email_tokens WHERE hash = sqlc.arg(hash);
+
+-- name: UseEmailToken :execrows
+UPDATE email_tokens SET used_at = sqlc.arg(used_at) WHERE hash = sqlc.arg(hash) AND used_at IS NULL AND expires_at > sqlc.arg(now);
+
+-- name: CountRecentEmailTokens :one
+SELECT COUNT(*) FROM email_tokens WHERE user_id = sqlc.arg(user_id) AND kind = sqlc.arg(kind) AND created_at > sqlc.arg(since);
+
+-- name: SetUnverifiedEmail :execrows
+UPDATE users SET email = sqlc.arg(email) WHERE id = sqlc.arg(id) AND email_verified_at IS NULL;

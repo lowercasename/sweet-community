@@ -13,13 +13,14 @@ make build                     # builds web/ into internal/web/dist, then bin/sw
 
 Open http://localhost:8080 and sign in as the owner.
 
-Settings come from the environment. Copy `.env.example` to `.env` (gitignored) and `make` targets load it; for a bare `./bin/sweet`, `set -a; . ./.env; set +a` first. Images go to `-images-dir` (default `data/images`) unless `SWEET_S3_ENDPOINT` and `SWEET_S3_BUCKET` are set. Flags: `-addr` (default `:8080`), `-db`, `-owner`, `-owner-password` (or `SWEET_OWNER_PASSWORD`; used only until the owner has a password). Everyone else joins through an invite link the owner makes on the People page.
+Settings come from the environment. Copy `.env.example` to `.env` (gitignored) and `make` targets load it; for a bare `./bin/sweet`, `set -a; . ./.env; set +a` first. Images go to `-images-dir` (default `data/images`) unless `SWEET_S3_ENDPOINT` and `SWEET_S3_BUCKET` are set. Email (verification links, password resets) goes by SMTP when `SWEET_SMTP_HOST` is set, else to files in `-mail-dir` (default `data/mail`); links point at `-base-url` (or `SWEET_BASE_URL`, default `http://localhost:8080`). Flags: `-addr` (default `:8080`), `-db`, `-owner`, `-owner-password` (or `SWEET_OWNER_PASSWORD`; used only until the owner has a password), `-images-dir`, `-mail-dir`, `-base-url`. Everyone else joins through an invite link the owner makes on the People page; the link they are then sent by email signs them in.
 
 ## Develop
 
 ```
 make dev-backend               # go run on :8080 (serves a placeholder page without a frontend build)
-                               # set SWEET_OWNER_PASSWORD the first time
+                               # set SWEET_OWNER_PASSWORD the first time; email lands in data/mail,
+                               # with links to :5173 so they open in the dev server
 cd web && pnpm install && pnpm dev   # Vite on :5173, proxies /api and /healthz to :8080
 ```
 

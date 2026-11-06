@@ -1,5 +1,5 @@
 interface InputProps {
-  type?: 'text' | 'password' | 'url'
+  type?: 'text' | 'password' | 'url' | 'email'
   name?: string
   value: string
   onChange?: (value: string) => void

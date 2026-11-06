@@ -3,6 +3,7 @@ import { logoutEverywhere, uploadImage, type Group, type Settings, type User } f
 import { useRemoveUser, useSession } from '../data/hooks'
 import { useAuthor, useSetPicture, useSetSettings, useSettings } from '../data/hooks'
 import { IMAGE_ACCEPT } from '../editor/images'
+import { AccountCard } from './AccountCard'
 import {
   Avatar,
   Button,
@@ -140,6 +141,7 @@ export function SettingsPage({ me, root, onSignOut }: SettingsPageProps) {
                 {pictureError && <Text variant="secondary">{pictureError}</Text>}
               </Stack>
             </Card>
+            <AccountCard />
             <Card>
               <Stack gap={2}>
                 <Heading level={2}>Sign out</Heading>

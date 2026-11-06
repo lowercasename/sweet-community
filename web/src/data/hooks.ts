@@ -2,6 +2,8 @@ import { useInfiniteQuery, useQuery, useQueryClient } from '@tanstack/react-quer
 import {
   ApiError,
   addMember,
+  changeEmail,
+  getAccount,
   clearNotifications,
   createComment,
   readNotification,
@@ -465,5 +467,18 @@ export function useSetPicture() {
   const qc = useQueryClient()
   return async (imageId: string | null) => {
     applyEvent(qc, 'user', await setPicture(imageId))
+  }
+}
+
+/** My account's address and its state, for Settings. */
+export function useAccount() {
+  return useQuery({ queryKey: keys.account, queryFn: getAccount })
+}
+
+/** A new address: pending until its link is opened; the server's answer is the account as it now stands. */
+export function useChangeEmail() {
+  const qc = useQueryClient()
+  return async (email: string, password: string) => {
+    qc.setQueryData(keys.account, await changeEmail(email, password))
   }
 }

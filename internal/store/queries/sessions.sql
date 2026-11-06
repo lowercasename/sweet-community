@@ -14,3 +14,6 @@ DELETE FROM sessions WHERE id = ?;
 
 -- name: DeleteUserSessions :exec
 DELETE FROM sessions WHERE user_id = ?;
+
+-- name: DeleteOtherSessions :exec
+DELETE FROM sessions WHERE user_id = sqlc.arg(user_id) AND id != sqlc.arg(id);

@@ -174,6 +174,8 @@ The shell will **not** share the web app's cookie session. Its iOS origin is `ca
 
 Login/registration: email/username/password with email verification. No identity enumeration. Password reset. Argon2id (OWASP minimums: m=19 MiB, t=2, p=1 or equivalent); verification and reset tokens expire and are single-use.
 
+**Built 2026-11-06.** Joining (`POST /api/register`, invite code, username, password, email) makes the account unverified and sends a link; it issues no session, and the join page says "check your email". The link's page (`/verify/<token>`) spends the token (`POST /api/verify`), marks the address verified and signs the person in: verifying is the sign-in, so there is no second step. Sign-in takes a username or an address in the one field; an account with an unverified address is refused with `403 {error: "unverified", email}` and the sign-in page shows the same check-your-email screen (resend: `POST /api/verify/resend {email}`, which answers 202 whatever the address; change the address: `POST /api/verify/change {username, password, email}`, where the password stands in for the session the person cannot yet have, and the old address simply goes, since it was never theirs for certain). The owner made at the command line has no address and is let in; Settings asks them to add one. Forgot the password: `/reset` asks for an address (`POST /api/reset`, 202 either way, a link only to a verified address), `/reset/<token>` takes the new password (`POST /api/reset/{token}`), ends every session and signs in here. In Settings: a new address (`PUT /api/me/email {email, password}`) waits as `pending_email` and gets a link, and the old one stands until the link is opened, which is the same verify page and works signed in; a new password (`PUT /api/me/password {current, password}`) ends every other session. `GET /api/me/account` is the address, whether it is verified, and the pending one. Tokens: 32 random bytes, stored as their SHA-256 in `email_tokens` with a kind, the address they went to, an expiry (a day to verify, an hour to reset) and `used_at`; a token of the wrong kind, used, expired or unknown gets one answer. At most five links of a kind an hour to one person, dropped quietly past that, and the endpoints that send mail are paced per client address like sign-in, on their own limiter so a reset cannot spend the sign-in allowance. Passwords are hashed with Argon2id at the parameters above; a hash that begins `$2a$`/`$2b$` (an account from before this change) still checks with bcrypt and is not rewritten, since nothing but the owner's existed. The address is unique per instance, case-insensitively, by a partial index on `lower(email)`.
+
 Uniqueness is per instance (each has its own database): username and email unique within an instance, compared case-insensitively, usernames Unicode-normalised. Usernames live under `/u/<name>`, so the reserved list is a handful (`admin`, `sweet`, `moderator`), not every route. Username changes allowed (mentions and authorship are by id). Email changes take effect only after the new address is verified.
 
 If the verification email doesn't arrive, the user gets a "didn't get it? resend, or change the address" screen. No bounce tracking.
@@ -182,7 +184,7 @@ Sessions, not JWTs: server-side sessions stored in the instance's SQLite, 180 da
 
 Revocation is a "log out everywhere" button: users have it for themselves, moderators have it for any user, and the orchestrator can call it through the instance admin API.
 
-Rate limits per user on posting, uploading, login attempts and password resets.
+Rate limits per user on posting, uploading, login attempts and password resets. Sign-in (built 2026-11-06, refined the same day): per client address, five wrong passwords at once and then one every twelve seconds, after which the door is shut for that address, right password or not; a right password, or a refusal for an unverified address, costs nothing, since the limit is against guessing and neither is a guess. First every attempt was charged, and the browser suite's handful of real sign-ins across two front ends tripped it. The endpoints that send mail are charged on every call, on their own limiter.
 
 ### Registration modes (per-instance setting)
 
@@ -244,6 +246,8 @@ For self-hosters Litestream is optional; the fallback is a nightly `VACUUM INTO`
 ## Email
 
 Plain SMTP in the code; host, port, credentials and from-address in config. Hosted instances use Mailgun's SMTP endpoint; self-hosters plug in anything. Not the Mailgun API.
+
+Built 2026-11-06 as `internal/mail`: a `Sender` with two implementations, SMTP (`SWEET_SMTP_HOST`, `_PORT`, `_USER`, `_PASSWORD`, `SWEET_MAIL_FROM`; `net/smtp`, PLAIN auth, STARTTLS when offered) and a directory (`-mail-dir`, default `data/mail`), which is what runs when no SMTP host is set: one file per message, `<unix ms>-<n>-<address>.txt`, the headers then the text. Development and the tests read the files; the Playwright helper that makes a member reads the verification link out of one, so every flow a test runs is the one a person runs. Links point at `-base-url` (`SWEET_BASE_URL`). Messages are plain text, one recipient, no templates: three of them exist.
 
 ## Search
 
@@ -412,6 +416,8 @@ Kept so the reasoning isn't lost when one of these comes back up.
 | Backups | Nightly `VACUUM INTO` from inside the binary, no Litestream | Litestream for hosted instances; `VACUUM INTO` as the no-setup fallback for self-hosters | Small tooling cost, high payoff from near-continuous restore |
 | Body format | TipTap JSON canonical, server never touches HTML, Go walker validates and extracts | TipTap HTML canonical, bluemonday sanitises, `x/net/html` extracts | The JSON design rested on "Go has no good sanitiser", which was false. HTML + bluemonday is one policy instead of a walker, a fixture harness and two renderers |
 | Event cursor | Integer sequence → monotonic UUIDv7 → integer sequence | Integer sequence on the event log | Removing it was an invented simplification; commit order is what matters |
+| Joining | Register and you are in, with a session, no address asked | Register with an address; the link sent to it is what signs you in | The first version had no email at all, so the join page could not ask; once it did, a session before verifying would make verifying optional, and the document says it is not |
+| Password hashing | bcrypt, cost 12 | Argon2id (m=19 MiB, t=2, p=1); old bcrypt hashes still check | bcrypt was what was to hand on day one; the document said Argon2id. Checked, not rewritten, because one hash existed |
 
 ### Corrections from the adversarial review (Nov 2026)
 
