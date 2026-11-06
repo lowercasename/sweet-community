@@ -42,6 +42,9 @@ export function useEventStream(onEvent: EventHandler): { status: StreamStatus; l
   const lastSeqRef = useRef(0)
   const statusRef = useRef<StreamStatus>('connecting')
   const sourceRef = useRef<EventSource | null>(null)
+  // The server's version as this tab first heard it. The frontend is
+  // embedded in the binary, so another version later is another app.
+  const versionRef = useRef<string | null>(null)
 
   useEffect(() => {
     let disposed = false
@@ -81,6 +84,17 @@ export function useEventStream(onEvent: EventHandler): { status: StreamStatus; l
           }, 3_000)
         }
       }
+
+      es.addEventListener('version', (ev: MessageEvent<string>) => {
+        let v = ev.data
+        try {
+          v = JSON.parse(ev.data) as string
+        } catch {
+          // leave as the raw string
+        }
+        if (versionRef.current === null) versionRef.current = v
+        else if (versionRef.current !== v) window.location.reload()
+      })
 
       for (const kind of EVENT_KINDS) {
         es.addEventListener(kind, (ev: MessageEvent<string>) => {

@@ -1,0 +1,12 @@
+# Litestream's view of the instance's bucket; the entrypoint fills the
+# variables from the same SWEET_S3_* settings the binary uses for images.
+dbs:
+  - path: ${SWEET_DATA}/sweet.db
+    replica:
+      type: s3
+      bucket: ${SWEET_S3_BUCKET}
+      path: db
+      endpoint: ${SWEET_S3_URL}
+      region: ${SWEET_S3_REGION}
+      access-key-id: ${SWEET_S3_ACCESS_KEY}
+      secret-access-key: ${SWEET_S3_SECRET_KEY}

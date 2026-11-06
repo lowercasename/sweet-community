@@ -1,0 +1,12 @@
+.git
+.env
+data
+bin
+web/node_modules
+web/test-results
+web/playwright-report
+web/e2e/.auth
+internal/web/dist
+cmd/sweet/migrations
+charts
+/sweet-retrospective.html

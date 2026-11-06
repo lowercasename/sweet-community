@@ -49,7 +49,7 @@ func NeedsSetup(ctx context.Context, d *sql.DB) (bool, error) {
 // setup is `POST /api/setup {token, username, email, password}`: the owner's
 // account, from the setup link, signed in. Once: the token goes with it.
 func (s *Server) setup(w http.ResponseWriter, r *http.Request) {
-	if !s.limiter.open(r.RemoteAddr) {
+	if !s.limiter.open(s.clientAddr(r)) {
 		writeErr(w, http.StatusTooManyRequests, "too many attempts; wait a moment")
 		return
 	}
@@ -91,7 +91,7 @@ func (s *Server) setup(w http.ResponseWriter, r *http.Request) {
 	qtx := store.New(tx)
 	want, err := qtx.GetSetting(ctx, setupTokenKey)
 	if errors.Is(err, sql.ErrNoRows) || (err == nil && want != auth.HashToken(in.Token)) {
-		s.limiter.spend(r.RemoteAddr)
+		s.limiter.spend(s.clientAddr(r))
 		writeErr(w, http.StatusNotFound, "that setup link does not work; the one in the server's newest log does")
 		return
 	}

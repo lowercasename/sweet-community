@@ -25,9 +25,12 @@ type Event struct {
 
 // Hub fans events out to connected SSE clients.
 type Hub struct {
-	db   *sql.DB
-	mu   sync.Mutex
-	subs map[chan Event]struct{}
+	db *sql.DB
+	// Version names the running binary; the stream announces it first, so
+	// a tab that loaded another version can reload (architecture.md, Updates).
+	Version string
+	mu      sync.Mutex
+	subs    map[chan Event]struct{}
 }
 
 func NewHub(db *sql.DB) *Hub {
@@ -134,6 +137,11 @@ func (h *Hub) Serve(w http.ResponseWriter, r *http.Request, filter func(Event) (
 	w.Header().Set("X-Accel-Buffering", "no")
 	w.WriteHeader(http.StatusOK)
 	fmt.Fprint(w, ": connected\n\n")
+	if h.Version != "" {
+		// No id: it is not part of the log, and must not move Last-Event-ID.
+		v, _ := json.Marshal(h.Version)
+		fmt.Fprintf(w, "event: version\ndata: %s\n\n", v)
+	}
 	flusher.Flush()
 
 	ctx := r.Context()

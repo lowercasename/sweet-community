@@ -104,6 +104,9 @@ type Server struct {
 	// Mail sends verification and reset links; BaseURL is where they point.
 	Mail    mail.Sender
 	BaseURL string
+	// TrustProxy: requests come through a reverse proxy that sets
+	// X-Forwarded-For, and its first address is the client's.
+	TrustProxy bool
 
 	limiter loginLimiter
 	// mailLimiter paces the endpoints that send a link to any address asked for.

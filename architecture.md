@@ -6,6 +6,8 @@ Backend: Golang. Frontend: React with Tailwind and Lucide, in old Sweet's colour
 
 Go was kept over TypeScript end to end (see record). Post bodies are TipTap's HTML, sanitised by bluemonday (see Posts and editor).
 
+**The stack built 2026-11-06, for a single instance that bootstraps itself.** One image (`Dockerfile`: the frontend built by Node, the binary by Go, both on Alpine with Litestream's binary copied from its image) and `deploy/`: `compose.yml` runs it with stock Caddy getting the domain's certificate by the HTTP challenge, and `compose.proxied.yml` runs it alone on a local port for a host that already has a proxy (coraline, where the trial runs under its Caddy). The xcaddy build with the Cloudflare DNS module stays with the orchestrator, which is what needs a wildcard (agreed with Raphael, 2026-11-06). The container's entrypoint is the glue: with a bucket configured it has Litestream restore the database when the disk has none and then run the binary under `litestream replicate -exec`; without one the binary runs alone. So a host with the compose file, the `.env` and an empty disk comes up as the instance that bucket holds, which is the self-bootstrap. Everything the operator sets is in one `.env` (`deploy/env.example`): the domain, SMTP, the bucket. The README is the install guide, written to be followed top to bottom by someone who has never seen the code.
+
 ## Licence
 
 AGPL-3.0-or-later for the server and the React app. No CLA; contributions under a DCO sign-off. The API client and shared types live in their own directory under MIT so alternative clients can exist. The binary ships a "Source code" footer link by default (configurable, like Mastodon's `source_url`), which satisfies the obligation to offer the frontend's source to the people it is served to; a self-hoster who modifies the software points the link at their fork.
@@ -233,17 +235,23 @@ Version one is a CLI on the hosting server: `sweet create <name>` writes a confi
 
 One TOML file per instance with env-var overrides. Secrets generated on first run. Migrations are embedded, forward-only, and run on start; a `VACUUM INTO` copy is taken first so a bad migration is recoverable. That copy is the upgrade backup; `sweet upgrade` does not take a second one.
 
+**As built (2026-11-06):** there is no TOML file. Everything is a flag with an environment variable behind it (`-help` lists them), and the compose stack's `.env` is the one file an operator edits; a TOML file would be a second place for the same settings, and the orchestrator, when it exists, can write env as easily. The copy before migrations is built: when a database that has been migrated before has migrations pending, `Migrate` writes `VACUUM INTO <db>.before-upgrade` beside it first, replacing the last copy, so there is always exactly one, from the last upgrade; a fresh database is not copied. `-trust-proxy` (`SWEET_TRUST_PROXY=1`) makes the first address in `X-Forwarded-For` the client for the sign-in and mail limiters, which behind a proxy would otherwise share one budget between everyone; it is off unless the operator says, since anyone can send the header. `-litestream` (`SWEET_LITESTREAM=1`) is the Backups section's `wal_autocheckpoint=0`.
+
 ## Updates
 
 - **Hosted:** `sweet upgrade <name|all>`: stop, swap the binary, start (migrations run, after their `VACUUM INTO` copy), check `/healthz`; on failure restore the copy and the old binary. Upgrade our own instance first, then everyone. Instances are pinned to versions, so a bad release stops at one.
 - **Self-hosted:** replace the binary and restart, or apt via the Debian package. The binary refuses to start against a database newer than itself.
 - **Clients:** the frontend is embedded, so API and UI can't drift except in already-open tabs. The SSE stream sends a `version` event on connect; a tab that loaded a different version reloads.
 
+**Built 2026-11-06.** The version is the binary: `internal/version` names it by a hash of its own bytes, so nothing is stamped in at build time, two builds of the same source agree, and any other build differs (`sweet -version` prints it). The stream writes `event: version` before anything else, with no id, so it never moves `Last-Event-ID`; the tab keeps the first version it hears and reloads on hearing another. A Go test reads the stream's first lines; a Vitest test drives the hook with a fake `EventSource`; the Playwright flow cannot start a second binary mid-test, so it answers the tab's first connection with a stand-in stream naming an older version and lets the real server's answer on reconnection be the upgrade. In the compose stack an upgrade is `git pull` and `docker compose up -d --build`: the old container stops, the new one takes the copy, migrates, and starts.
+
 ## Backups
 
 Litestream runs beside the binary, tails the SQLite WAL and streams every change to the instance's S3 bucket. Restore granularity: recent minutes exact, older points at roughly five-minute boundaries (L0 files are compacted away after the default 5 m retention); replication is async, so a crash loses about the last second. Operating rules that go in the self-host docs: the app sets `PRAGMA busy_timeout` and `synchronous=NORMAL`; Litestream owns checkpointing (`wal_autocheckpoint=0` in the app); the database must be on local disk on the same host, never a network filesystem or a Docker Desktop volume; one Litestream per replica path; R2 works via the generic S3 endpoint with an R2-scoped API token.
 
 For self-hosters Litestream is optional; the fallback is a nightly `VACUUM INTO` copy uploaded to S3 by a goroutine in the binary, which needs no setup. Media is already in S3, so the database is the whole backup problem.
+
+**Built 2026-11-06 in the compose stack.** Litestream runs in the binary's container, not beside it in another: `litestream replicate -exec` supervises the binary, so there is one container, one volume and one set of settings, and the two cannot be pointed at different files. One bucket per instance holds both images (`images/`, the `SWEET_S3_PREFIX` the entrypoint sets) and the database (`db/`): one bucket and one token to make, one thing to delete when the instance ends, and the bucket is private either way since images are served through the binary. The same `SWEET_S3_*` settings feed both; setting them turns both on, and without them images stay on disk and nothing is backed up, which the README says in those words. At start, `litestream restore -if-db-not-exists -if-replica-exists` brings the database back when the disk has none, which is how a new host becomes the old instance; `docker compose run --rm sweet restore [timestamp]` is the point-in-time restore. The nightly fallback is not built: with the bucket optional and a one-line setup, there was no one left who needs it.
 
 ## Email
 
@@ -427,6 +435,9 @@ Kept so the reasoning isn't lost when one of these comes back up.
 | Invite links | Spent by the first person through | Good for anyone who has it for seven days, counted, revocable | A group moves to an instance together; one link per person would not bring them (Raphael, 2026-11-06) |
 | The owner's first sign-in | `-owner-password` at start, the owner named by a flag | A setup link printed at first start; the flag stays for scripts | The document always had the link; the flag was day-one scaffolding. The setup page chooses the username too, so the flag's name is only for the scripted path |
 | Where the instance's settings live | A card on the owner's Settings page | A Community page in the nav, for the owner | Settings had moved behind the owner's own page; a page about the community there felt confusing (Raphael, 2026-11-06) |
+| Caddy in the stack | A custom xcaddy build with the Cloudflare DNS module | Stock Caddy for a single instance; the xcaddy build when the orchestrator needs a wildcard | One domain needs no DNS challenge, and a stock image is one fewer thing to build and keep up (Raphael, 2026-11-06) |
+| Litestream's place | A service beside the binary | In the binary's container, supervising it | One container, one volume, one `.env`; the two cannot disagree about which file |
+| Instance config | A TOML file with env overrides | Env only, one `.env` for the stack | A file would be a second place for the same settings |
 
 ### Corrections from the adversarial review (Nov 2026)
 

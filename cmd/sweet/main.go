@@ -6,6 +6,7 @@ import (
 	"embed"
 	"errors"
 	"flag"
+	"fmt"
 	"io/fs"
 	"log"
 	"net/http"
@@ -20,6 +21,7 @@ import (
 	"sweet/internal/events"
 	"sweet/internal/images"
 	"sweet/internal/mail"
+	"sweet/internal/version"
 	"sweet/internal/web"
 )
 
@@ -59,12 +61,25 @@ func main() {
 	imagesDir := flag.String("images-dir", "data/images", "directory for uploaded images when SWEET_S3_* is not set")
 	mailDir := flag.String("mail-dir", "data/mail", "directory that receives email as files when SWEET_SMTP_HOST is not set")
 	baseURL := flag.String("base-url", envOr("SWEET_BASE_URL", "http://localhost:8080"), "the address links in email point at (or SWEET_BASE_URL)")
+	trustProxy := flag.Bool("trust-proxy", os.Getenv("SWEET_TRUST_PROXY") == "1",
+		"requests come through a reverse proxy whose X-Forwarded-For names the client (or SWEET_TRUST_PROXY=1)")
+	litestream := flag.Bool("litestream", os.Getenv("SWEET_LITESTREAM") == "1",
+		"Litestream replicates the database and owns its checkpoints (or SWEET_LITESTREAM=1)")
+	showVersion := flag.Bool("version", false, "print the version of this binary and exit")
 	flag.Parse()
+	if *showVersion {
+		fmt.Println(version.Of())
+		return
+	}
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
-	d, err := db.Open(*dbPath)
+	var opts []db.Option
+	if *litestream {
+		opts = append(opts, db.LitestreamOwnsCheckpoints)
+	}
+	d, err := db.Open(*dbPath, opts...)
 	if err != nil {
 		log.Fatalf("open db: %v", err)
 	}
@@ -107,7 +122,8 @@ func main() {
 	go images.SweepEvery(ctx, d, imgStore, time.Hour, 24*time.Hour, log.Printf)
 
 	hub := events.NewHub(d)
-	srv := &api.Server{DB: d, Hub: hub, Images: imgStore, Mail: mail.FromEnv(*mailDir), BaseURL: base}
+	hub.Version = version.Of()
+	srv := &api.Server{DB: d, Hub: hub, Images: imgStore, Mail: mail.FromEnv(*mailDir), BaseURL: base, TrustProxy: *trustProxy}
 
 	mux := http.NewServeMux()
 	srv.Routes(mux)
@@ -127,7 +143,7 @@ func main() {
 		httpSrv.Shutdown(shutdownCtx)
 	}()
 
-	log.Printf("sweet listening on %s (db %s)", *addr, *dbPath)
+	log.Printf("sweet %s listening on %s (db %s)", version.Of(), *addr, *dbPath)
 	if err := httpSrv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 		log.Fatal(err)
 	}

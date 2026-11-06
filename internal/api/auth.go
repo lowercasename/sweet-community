@@ -221,13 +221,25 @@ func (l *loginLimiter) allow(addr string) bool { return l.get(addr).Allow() }
 func (l *loginLimiter) open(addr string) bool { return l.get(addr).Tokens() >= 1 }
 func (l *loginLimiter) spend(addr string)     { l.get(addr).Allow() }
 
+// clientAddr is who is asking, for the limiters: the socket's address, or,
+// behind a trusted proxy, the first address in X-Forwarded-For. Without
+// TrustProxy the header is ignored, since anyone can send one.
+func (s *Server) clientAddr(r *http.Request) string {
+	if s.TrustProxy {
+		if first, _, _ := strings.Cut(r.Header.Get("X-Forwarded-For"), ","); strings.TrimSpace(first) != "" {
+			return strings.TrimSpace(first)
+		}
+	}
+	return r.RemoteAddr
+}
+
 type credentials struct {
 	Username string `json:"username"`
 	Password string `json:"password"`
 }
 
 func (s *Server) login(w http.ResponseWriter, r *http.Request) {
-	if !s.limiter.open(r.RemoteAddr) {
+	if !s.limiter.open(s.clientAddr(r)) {
 		writeErr(w, http.StatusTooManyRequests, "too many attempts; wait a moment")
 		return
 	}
@@ -253,7 +265,7 @@ func (s *Server) login(w http.ResponseWriter, r *http.Request) {
 	// way so timing does not reveal which.
 	if errors.Is(err, sql.ErrNoRows) || !hash.Valid {
 		auth.CheckPassword(auth.DummyHash, in.Password)
-		s.limiter.spend(r.RemoteAddr)
+		s.limiter.spend(s.clientAddr(r))
 		writeErr(w, http.StatusUnauthorized, "wrong username or password")
 		return
 	}
@@ -262,7 +274,7 @@ func (s *Server) login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if !auth.CheckPassword(hash.String, in.Password) {
-		s.limiter.spend(r.RemoteAddr)
+		s.limiter.spend(s.clientAddr(r))
 		writeErr(w, http.StatusUnauthorized, "wrong username or password")
 		return
 	}

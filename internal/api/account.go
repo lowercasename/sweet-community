@@ -152,7 +152,7 @@ func (s *Server) verify(w http.ResponseWriter, r *http.Request) {
 // resendVerification is `POST /api/verify/resend {email}`: a new link to an
 // address that belongs to an unverified account; the same 202 either way.
 func (s *Server) resendVerification(w http.ResponseWriter, r *http.Request) {
-	if !s.mailLimiter.allow(r.RemoteAddr) {
+	if !s.mailLimiter.allow(s.clientAddr(r)) {
 		writeErr(w, http.StatusTooManyRequests, "too many attempts; wait a moment")
 		return
 	}
@@ -179,7 +179,7 @@ func (s *Server) resendVerification(w http.ResponseWriter, r *http.Request) {
 // never been verified. Their password stands in for a session. The old
 // address was never theirs for certain, so the new one simply replaces it.
 func (s *Server) changeUnverifiedEmail(w http.ResponseWriter, r *http.Request) {
-	if !s.mailLimiter.allow(r.RemoteAddr) {
+	if !s.mailLimiter.allow(s.clientAddr(r)) {
 		writeErr(w, http.StatusTooManyRequests, "too many attempts; wait a moment")
 		return
 	}
@@ -231,7 +231,7 @@ func (s *Server) changeUnverifiedEmail(w http.ResponseWriter, r *http.Request) {
 // requestReset is `POST /api/reset {email}`: a link to choose a new password,
 // if the address belongs to a verified account; the same 202 either way.
 func (s *Server) requestReset(w http.ResponseWriter, r *http.Request) {
-	if !s.mailLimiter.allow(r.RemoteAddr) {
+	if !s.mailLimiter.allow(s.clientAddr(r)) {
 		writeErr(w, http.StatusTooManyRequests, "too many attempts; wait a moment")
 		return
 	}
