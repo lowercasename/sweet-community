@@ -78,7 +78,7 @@ function Loaded({ profile, me, onGo }: { profile: Profile; me: User; onGo: (path
   const offline = status === 'offline'
   const placeOf = (p: PostData) => {
     const g = groups.find((x) => x.id === p.group_id)
-    return !g || g.kind === 'root' ? undefined : g.name
+    return !g || g.kind === 'root' ? undefined : { name: g.name, picture: g.picture }
   }
   const message = async () => {
     try {
@@ -172,7 +172,15 @@ function Loaded({ profile, me, onGo }: { profile: Profile; me: User; onGo: (path
 }
 
 /** One of the person's posts, with the actions for its own room. */
-function AuthorPost({ post, place, disabled }: { post: PostData; place?: string; disabled: boolean }) {
+function AuthorPost({
+  post,
+  place,
+  disabled,
+}: {
+  post: PostData
+  place?: { name: string; picture?: string | null }
+  disabled: boolean
+}) {
   const { edit, remove } = usePostActions(post.group_id)
   return (
     <Post

@@ -33,6 +33,7 @@ import {
   removeUser,
   revokeInvite,
   setBio,
+  setGroupPicture,
   setMarker,
   setMemberRole,
   setPicture,
@@ -281,6 +282,9 @@ export function useGroupActions() {
     },
     async update(groupId: string, patch: { name?: string; mode?: GroupMode }) {
       applyEvent(qc, 'group', await updateGroup(groupId, patch))
+    },
+    async setPicture(groupId: string, imageId: string | null) {
+      applyEvent(qc, 'group', await setGroupPicture(groupId, imageId))
     },
     async remove(groupId: string) {
       await deleteGroup(groupId)

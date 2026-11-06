@@ -100,7 +100,7 @@ func (q *Queries) DeleteMembership(ctx context.Context, arg DeleteMembershipPara
 }
 
 const getDMByPeople = `-- name: GetDMByPeople :one
-SELECT g.id, g.kind, g.name, g.mode, g.created_at,
+SELECT g.id, g.kind, g.name, g.mode, g.created_at, g.picture_id,
        (SELECT MAX(created_at) FROM messages WHERE group_id = g.id AND deleted_at IS NULL) AS last_message_at
 FROM groups g WHERE g.kind = 'dm' AND g.people_key = ?1 AND g.deleted_at IS NULL
 `
@@ -111,6 +111,7 @@ type GetDMByPeopleRow struct {
 	Name          string
 	Mode          string
 	CreatedAt     int64
+	PictureID     sql.NullString
 	LastMessageAt interface{}
 }
 
@@ -124,6 +125,7 @@ func (q *Queries) GetDMByPeople(ctx context.Context, peopleKey sql.NullString) (
 		&i.Name,
 		&i.Mode,
 		&i.CreatedAt,
+		&i.PictureID,
 		&i.LastMessageAt,
 	)
 	return i, err
@@ -131,7 +133,7 @@ func (q *Queries) GetDMByPeople(ctx context.Context, peopleKey sql.NullString) (
 
 const getGroup = `-- name: GetGroup :one
 
-SELECT g.id, g.kind, g.name, g.mode, g.created_at,
+SELECT g.id, g.kind, g.name, g.mode, g.created_at, g.picture_id,
        (SELECT MAX(created_at) FROM messages WHERE group_id = g.id AND deleted_at IS NULL) AS last_message_at
 FROM groups g WHERE g.id = ?1 AND g.deleted_at IS NULL
 `
@@ -142,6 +144,7 @@ type GetGroupRow struct {
 	Name          string
 	Mode          string
 	CreatedAt     int64
+	PictureID     sql.NullString
 	LastMessageAt interface{}
 }
 
@@ -156,6 +159,7 @@ func (q *Queries) GetGroup(ctx context.Context, id string) (GetGroupRow, error) 
 		&i.Name,
 		&i.Mode,
 		&i.CreatedAt,
+		&i.PictureID,
 		&i.LastMessageAt,
 	)
 	return i, err
@@ -309,7 +313,7 @@ func (q *Queries) ListMyGroupIDs(ctx context.Context, userID string) ([]string, 
 }
 
 const listMyGroups = `-- name: ListMyGroups :many
-SELECT g.id, g.kind, g.name, g.mode, g.created_at, m.role, m.hidden_at,
+SELECT g.id, g.kind, g.name, g.mode, g.created_at, g.picture_id, m.role, m.hidden_at,
        (SELECT MAX(created_at) FROM messages WHERE group_id = g.id AND deleted_at IS NULL) AS last_message_at
 FROM memberships m JOIN groups g ON g.id = m.group_id
 WHERE m.user_id = ?1 AND g.deleted_at IS NULL
@@ -322,6 +326,7 @@ type ListMyGroupsRow struct {
 	Name          string
 	Mode          string
 	CreatedAt     int64
+	PictureID     sql.NullString
 	Role          string
 	HiddenAt      sql.NullInt64
 	LastMessageAt interface{}
@@ -344,6 +349,7 @@ func (q *Queries) ListMyGroups(ctx context.Context, userID string) ([]ListMyGrou
 			&i.Name,
 			&i.Mode,
 			&i.CreatedAt,
+			&i.PictureID,
 			&i.Role,
 			&i.HiddenAt,
 			&i.LastMessageAt,
@@ -412,6 +418,20 @@ func (q *Queries) NextOwner(ctx context.Context, arg NextOwnerParams) (string, e
 	var user_id string
 	err := row.Scan(&user_id)
 	return user_id, err
+}
+
+const setGroupPicture = `-- name: SetGroupPicture :exec
+UPDATE groups SET picture_id = ?1 WHERE id = ?2 AND deleted_at IS NULL
+`
+
+type SetGroupPictureParams struct {
+	PictureID sql.NullString
+	ID        string
+}
+
+func (q *Queries) SetGroupPicture(ctx context.Context, arg SetGroupPictureParams) error {
+	_, err := q.db.ExecContext(ctx, setGroupPicture, arg.PictureID, arg.ID)
+	return err
 }
 
 const setMembershipRole = `-- name: SetMembershipRole :exec

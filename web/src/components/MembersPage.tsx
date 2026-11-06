@@ -1,5 +1,6 @@
 import { useState } from 'react'
-import type { Group, GroupMode, Membership, User } from '../api'
+import { uploadImage, type Group, type GroupMode, type Membership, type User } from '../api'
+import { IMAGE_ACCEPT } from '../editor/images'
 import { useGroupActions, useMembers, useSetRole, useUsers } from '../data/hooks'
 import {
   Alert,
@@ -7,6 +8,7 @@ import {
   Card,
   ConfirmDialog,
   Field,
+  FilePicker,
   Heading,
   Input,
   List,
@@ -20,6 +22,7 @@ import {
   Select,
   Stack,
   Text,
+  Tile,
   Time,
 } from '../ui'
 import { PersonName } from './PersonName'
@@ -75,6 +78,11 @@ export function MembersPage({ group, me, onLeft }: MembersPageProps) {
     }
   }
 
+  const choosePicture = async (file: File) => {
+    const img = await uploadImage(file)
+    await actions.setPicture(group.id, img.id)
+  }
+
   const inGroup = new Set(members.map((m) => m.user.id))
   const candidates = [...(users?.values() ?? [])].filter((u) => !inGroup.has(u.id))
   const dirty = name.trim() !== group.name || mode !== group.mode
@@ -107,6 +115,30 @@ export function MembersPage({ group, me, onLeft }: MembersPageProps) {
               <Card>
                 <Stack gap={2}>
                   <Heading level={2}>Room settings</Heading>
+                  {group.can.rename && (
+                    <Field label="Picture">
+                      <Row gap={3} align="center">
+                        <Tile name={group.name} picture={group.picture} size="lg" />
+                        <FilePicker
+                          accept={IMAGE_ACCEPT}
+                          variant="secondary"
+                          icon="image"
+                          label="Choose a picture"
+                          disabled={busy}
+                          onPick={(files) => void run(() => choosePicture(files[0]))}
+                        />
+                        {group.picture && (
+                          <Button
+                            variant="ghost"
+                            disabled={busy}
+                            onClick={() => void run(() => actions.setPicture(group.id, null))}
+                          >
+                            Remove picture
+                          </Button>
+                        )}
+                      </Row>
+                    </Field>
+                  )}
                   {group.can.rename && (
                     <Field label="Name">
                       <Input value={name} onChange={setName} />

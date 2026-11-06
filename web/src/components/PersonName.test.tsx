@@ -73,4 +73,12 @@ describe('PersonName', () => {
     fireEvent.click(screen.getByRole('button', { name: 'kit' }))
     expect(within(card('kit')).queryByRole('button', { name: 'Message' })).toBeNull()
   })
+
+  it('View profile goes to their page', async () => {
+    const { PersonName } = await import('./PersonName')
+    renderWithQuery(<PersonName user={user('mo')} />)
+    fireEvent.click(await screen.findByRole('button', { name: 'mo' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'View profile' }))
+    expect(window.location.pathname).toBe('/u/mo')
+  })
 })

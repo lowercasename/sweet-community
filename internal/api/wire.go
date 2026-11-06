@@ -95,7 +95,7 @@ func wireMembership(groupID string, row store.GetMemberRow) Membership {
 // group the time of its newest live message. It reads through q so that a
 // group made in a transaction is complete before that transaction commits.
 func wireGroup(ctx context.Context, q *store.Queries, row store.GetGroupRow) (Group, error) {
-	g := Group{ID: row.ID, Kind: row.Kind, Name: row.Name, Mode: row.Mode, CreatedAt: row.CreatedAt, LastMessageAt: lastAt(row.LastMessageAt)}
+	g := Group{ID: row.ID, Kind: row.Kind, Name: row.Name, Mode: row.Mode, CreatedAt: row.CreatedAt, Picture: pictureURL(row.PictureID), LastMessageAt: lastAt(row.LastMessageAt)}
 	if g.Kind != perm.KindDM {
 		return g, nil
 	}

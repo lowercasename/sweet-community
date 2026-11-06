@@ -6,6 +6,8 @@ import (
 	"strings"
 	"testing"
 
+	"sweet/internal/db"
+	"sweet/internal/images"
 	"sweet/internal/perm"
 	"sweet/internal/store"
 )
@@ -521,4 +523,61 @@ func TestGroupsCarryLastActivity(t *testing.T) {
 	if v := myGroups(kit)[id]["last_message_at"]; v != nil {
 		t.Fatalf("dm after deleting its only message: last_message_at %v, want null", v)
 	}
+}
+
+// A room's picture (architecture.md, Groups): the owner sets it from an
+// uploaded image, the group event carries it, its members may see the image
+// and nobody else may, the sweep keeps it, and a conversation has none.
+func TestGroupPicture(t *testing.T) {
+	ts, owner, srv := newTestServerWith(t)
+	kit, _ := registerMember(t, ts, owner, "kit")
+	mo, moID := registerMember(t, ts, owner, "mo")
+	room := kit.mustStatus(201, "POST", "/api/groups", map[string]any{"kind": "group", "name": "Knitting", "mode": "both"})
+	gid := room["id"].(string)
+	gp := "/api/groups/" + gid
+	kit.mustStatus(201, "POST", gp+"/members", map[string]string{"user_id": moID})
+	if room["picture"] != nil {
+		t.Fatalf("a new room has a picture: %v", room)
+	}
+
+	status, img := kit.upload(testPNG(8, 8))
+	if status != 201 {
+		t.Fatalf("upload: %d %v", status, img)
+	}
+	iid := img["id"].(string)
+	mo.mustStatus(403, "PUT", gp+"/picture", map[string]any{"image_id": iid})
+	set := kit.mustStatus(200, "PUT", gp+"/picture", map[string]any{"image_id": iid})
+	if set["picture"] != "/img/"+iid {
+		t.Fatalf("picture after setting: %v", set["picture"])
+	}
+	if got := mo.mustStatus(200, "GET", gp, nil); got["picture"] != "/img/"+iid {
+		t.Fatalf("mo's view of the room: %v", got["picture"])
+	}
+	var ev map[string]any
+	for _, e := range mo.readEvents(80) {
+		if e["kind"] == "group" {
+			ev = e["payload"].(map[string]any)
+		}
+	}
+	if ev["picture"] != "/img/"+iid {
+		t.Fatalf("the group event carries no picture: %v", ev)
+	}
+	// Mo, in the room, sees the image; the owner of the instance, not in it, does not.
+	if st, _ := mo.do("GET", "/img/"+iid, nil); st != 200 {
+		t.Fatalf("a member fetching the room's picture: %d", st)
+	}
+	if st, _ := owner.do("GET", "/img/"+iid, nil); st != 404 {
+		t.Fatalf("an outsider fetching the room's picture: %d", st)
+	}
+	// The sweep keeps a room's picture.
+	if n, err := images.Sweep(context.Background(), store.New(srv.DB), srv.Images, db.Now()+1); err != nil || n != 0 {
+		t.Fatalf("sweep took the room's picture: %d %v", n, err)
+	}
+	kit.mustStatus(404, "PUT", gp+"/picture", map[string]any{"image_id": "nothing"})
+	if back := kit.mustStatus(200, "PUT", gp+"/picture", map[string]any{"image_id": nil}); back["picture"] != nil {
+		t.Fatalf("a cleared picture: %v", back["picture"])
+	}
+	// A conversation has no picture.
+	dm := kit.mustStatus(201, "POST", "/api/groups", map[string]any{"kind": "dm", "members": []string{moID}})
+	kit.mustStatus(403, "PUT", "/api/groups/"+dm["id"].(string)+"/picture", map[string]any{"image_id": iid})
 }

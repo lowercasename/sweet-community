@@ -2,7 +2,7 @@
 -- on users. Who may do what is perm's call; the queries do not check.
 
 -- name: GetGroup :one
-SELECT g.id, g.kind, g.name, g.mode, g.created_at,
+SELECT g.id, g.kind, g.name, g.mode, g.created_at, g.picture_id,
        (SELECT MAX(created_at) FROM messages WHERE group_id = g.id AND deleted_at IS NULL) AS last_message_at
 FROM groups g WHERE g.id = sqlc.arg(id) AND g.deleted_at IS NULL;
 
@@ -13,7 +13,7 @@ SELECT role, joined_at FROM memberships WHERE group_id = sqlc.arg(group_id) AND 
 -- name: ListMyGroups :many
 -- Every group I have a row in, the conversations I have stepped out of
 -- included, with my hidden_at so the client can tell them apart.
-SELECT g.id, g.kind, g.name, g.mode, g.created_at, m.role, m.hidden_at,
+SELECT g.id, g.kind, g.name, g.mode, g.created_at, g.picture_id, m.role, m.hidden_at,
        (SELECT MAX(created_at) FROM messages WHERE group_id = g.id AND deleted_at IS NULL) AS last_message_at
 FROM memberships m JOIN groups g ON g.id = m.group_id
 WHERE m.user_id = sqlc.arg(user_id) AND g.deleted_at IS NULL
@@ -41,12 +41,15 @@ VALUES (sqlc.arg(id), sqlc.arg(kind), sqlc.arg(name), sqlc.arg(mode), sqlc.arg(c
 
 -- name: GetDMByPeople :one
 -- The conversation of exactly these people, by its key; the same columns as GetGroup.
-SELECT g.id, g.kind, g.name, g.mode, g.created_at,
+SELECT g.id, g.kind, g.name, g.mode, g.created_at, g.picture_id,
        (SELECT MAX(created_at) FROM messages WHERE group_id = g.id AND deleted_at IS NULL) AS last_message_at
 FROM groups g WHERE g.kind = 'dm' AND g.people_key = sqlc.arg(people_key) AND g.deleted_at IS NULL;
 
 -- name: UpdateGroup :exec
 UPDATE groups SET name = sqlc.arg(name), mode = sqlc.arg(mode) WHERE id = sqlc.arg(id) AND deleted_at IS NULL;
+
+-- name: SetGroupPicture :exec
+UPDATE groups SET picture_id = sqlc.arg(picture_id) WHERE id = sqlc.arg(id) AND deleted_at IS NULL;
 
 -- name: ListUserMemberships :many
 -- Every live group a person is in, with their role and the group's kind.

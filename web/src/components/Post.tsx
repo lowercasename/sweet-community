@@ -8,6 +8,7 @@ import {
   Button,
   Card,
   ConfirmDialog,
+  Hairline,
   HtmlContent,
   Link,
   Menu,
@@ -15,6 +16,7 @@ import {
   Row,
   Stack,
   Text,
+  Tile,
   Time,
 } from '../ui'
 import { BodyEditor } from './BodyEditor'
@@ -27,8 +29,8 @@ interface PostProps {
   linked?: boolean
   /** Start with the thread open (the post's page). */
   expanded?: boolean
-  /** The room it was said in, when the list mixes rooms (a person's page). */
-  place?: string
+  /** The room it was said in, when the list mixes rooms (a person's page, the post's page): drawn as a header, as old Sweet drew it. */
+  place?: { name: string; picture?: string | null }
   /** True while offline; disables saving. */
   disabled: boolean
   /** Resolves when the server has stored the new body. */
@@ -73,7 +75,9 @@ export function Post({ post, linked = true, expanded = false, place, disabled, o
       <Time at={post.created_at} />
       {post.edited_at != null && (
         <>
-          {' · edited '}
+          <Text as="span" variant="small">
+            {' · edited '}
+          </Text>
           <Time at={post.edited_at} />
         </>
       )}
@@ -83,13 +87,26 @@ export function Post({ post, linked = true, expanded = false, place, disabled, o
   return (
     <Card as="article">
       <Stack gap={3}>
+        {place && (
+          <Stack gap={2}>
+            <Row gap={2} align="center">
+              <Tile name={place.name} picture={place.picture} />
+              <Text as="span" variant="small">
+                Posted in{' '}
+                <Text as="span" variant="body" weight="bold">
+                  {place.name}
+                </Text>
+              </Text>
+            </Row>
+            <Hairline />
+          </Stack>
+        )}
         <Stack gap={2}>
           <Row justify="between" align="center">
             <Row gap={2} align="center">
               <PersonName user={author} avatar="md" />
               <Text as="span" variant="small">
                 {linked ? <Link href={postPath(post.id)}>{when}</Link> : when}
-                {place && ` · in ${place}`}
               </Text>
             </Row>
             {items.length > 0 && !editing && !disabled && <Menu label="Post options" items={items} reveal="post" />}

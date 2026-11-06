@@ -42,6 +42,7 @@ export const group = (id: string, role: Group['role'], extra: Partial<Group> = {
   name: id === ROOT ? '' : id,
   mode: 'both',
   created_at: 1,
+  picture: null,
   last_message_at: null,
   role,
   can: {
@@ -66,6 +67,7 @@ export const dm = (id: string, people: User[], extra: Partial<Group> = {}): Grou
   name: '',
   mode: 'chat',
   created_at: 1,
+  picture: null,
   last_message_at: null,
   role: 'member',
   can: {

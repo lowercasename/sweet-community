@@ -9,6 +9,8 @@ import { group, member, renderWithQuery, user } from '../test-utils'
  * a member sees the list and Leave. Nothing here reasons about roles.
  */
 vi.mock('../api', () => ({
+  setGroupPicture: vi.fn(),
+  uploadImage: vi.fn(),
   getMe: vi.fn(() => Promise.resolve({ id: 'kit', username: 'kit', picture: null })),
   openDM: vi.fn(),
   listUsers: vi.fn(),
@@ -91,6 +93,17 @@ describe('MembersPage', () => {
     const dialog = screen.getByRole('dialog', { hidden: true })
     fireEvent.click(within(dialog).getByRole('button', { name: 'Switch ownership' }))
     expect(setMemberRole).toHaveBeenCalledWith('club', 'mo', 'owner')
+  })
+
+  it('lets the owner set and remove the room picture; a member sees no such control', async () => {
+    const { setGroupPicture } = await import('../api')
+    vi.mocked(setGroupPicture).mockResolvedValue(group('club', 'owner', { name: 'Club', picture: '/img/x' }))
+    await page('owner')
+    expect(screen.getByLabelText('Choose a picture')).toBeTruthy()
+    expect(screen.queryByRole('button', { name: 'Remove picture' })).toBeNull()
+    cleanup()
+    await page('member')
+    expect(screen.queryByLabelText('Choose a picture')).toBeNull()
   })
 
   it('lets the owner rename the group and change its mode', async () => {

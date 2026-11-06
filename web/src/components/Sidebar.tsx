@@ -83,7 +83,7 @@ export function Sidebar({ me, groups, location, expanded, onGo, onToggle }: Side
           {mine.map((g) => (
             <NavItem
               key={g.id}
-              mark={<Tile name={g.name} />}
+              mark={<Tile name={g.name} picture={g.picture} />}
               label={g.name}
               expanded={expanded}
               size="sm"

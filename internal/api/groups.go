@@ -26,6 +26,8 @@ type Group struct {
 	// Mode is the group's one setting: posts, chat or both. A DM is chat.
 	Mode      string `json:"mode"`
 	CreatedAt int64  `json:"created_at"`
+	// Picture is the room's picture's url, or null for the tile with its initial.
+	Picture *string `json:"picture"`
 	// LastMessageAt is the time of the group's newest live message, or null:
 	// computed on the way out, never stored, so the Messages page can order
 	// DMs by latest activity (architecture.md, Layout).
@@ -168,7 +170,7 @@ func (s *Server) listGroups(w http.ResponseWriter, r *http.Request) {
 	out := make([]Group, 0, len(rows))
 	for _, row := range rows {
 		// The list's row is the group's row plus my role; TestRepliesAndEventsMatchTheRow holds list and fetch to the same shape.
-		g, err := wireGroup(r.Context(), s.q(), store.GetGroupRow{ID: row.ID, Kind: row.Kind, Name: row.Name, Mode: row.Mode, CreatedAt: row.CreatedAt, LastMessageAt: row.LastMessageAt})
+		g, err := wireGroup(r.Context(), s.q(), store.GetGroupRow{ID: row.ID, Kind: row.Kind, Name: row.Name, Mode: row.Mode, CreatedAt: row.CreatedAt, PictureID: row.PictureID, LastMessageAt: row.LastMessageAt})
 		if err != nil {
 			writeErr(w, http.StatusInternalServerError, err.Error())
 			return
@@ -366,6 +368,45 @@ func (s *Server) createGroupWith(w http.ResponseWriter, r *http.Request, kind, n
 			entries = append(entries, events.Entry{Kind: "membership", Payload: wireMembership(gid, m)})
 		}
 		return entries, &g, http.StatusCreated, nil
+	})
+}
+
+// setGroupPicture points a room's picture at an uploaded image, or back at
+// its initial with a null image_id. The owner's call, as renaming is
+// (perm.Rename); a conversation has no picture, it is its other person.
+func (s *Server) setGroupPicture(w http.ResponseWriter, r *http.Request) {
+	var in struct {
+		ImageID *string `json:"image_id"`
+	}
+	r.Body = http.MaxBytesReader(w, r.Body, 4096)
+	if err := json.NewDecoder(r.Body).Decode(&in); err != nil {
+		writeErr(w, http.StatusBadRequest, "bad request body")
+		return
+	}
+	g, a := groupFrom(r.Context())
+	if !perm.Rename(a, perm.Group{Kind: g.Kind}) {
+		writeErr(w, http.StatusForbidden, "not allowed")
+		return
+	}
+	s.logged(w, r, "group", db.Now(), func(qtx *store.Queries) (any, int, error) {
+		var pic sql.NullString
+		if in.ImageID != nil {
+			if _, err := qtx.GetImage(r.Context(), *in.ImageID); errors.Is(err, sql.ErrNoRows) {
+				return nil, http.StatusNotFound, errors.New("no such image")
+			} else if err != nil {
+				return nil, http.StatusInternalServerError, err
+			}
+			pic = sql.NullString{String: *in.ImageID, Valid: true}
+		}
+		if err := qtx.SetGroupPicture(r.Context(), store.SetGroupPictureParams{PictureID: pic, ID: g.ID}); err != nil {
+			return nil, http.StatusInternalServerError, err
+		}
+		row, err := qtx.GetGroup(r.Context(), g.ID)
+		if err != nil {
+			return nil, http.StatusInternalServerError, err
+		}
+		updated, err := wireGroup(r.Context(), qtx, row)
+		return &updated, http.StatusOK, err
 	})
 }
 

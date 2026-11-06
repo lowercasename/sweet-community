@@ -3,7 +3,7 @@ import { useLocation } from 'wouter'
 import type { Member, User } from '../api'
 import { useGroupActions, useMe, useUsers } from '../data/hooks'
 import { groupPath, profilePath } from '../routes'
-import { Alert, Avatar, Button, HoverCard, Link, Row, Stack, Text, Time } from '../ui'
+import { Alert, Avatar, Button, HoverCard, Row, Stack, Text, Time } from '../ui'
 
 interface PersonNameProps {
   /** The person as the content carried them; the card shows them as they are now. */
@@ -38,7 +38,9 @@ function PersonCard({ person, me }: { person: Member | User; me: User | null | u
       <Row gap={2} align="center">
         <Avatar name={person.username} picture={person.picture} size="lg" />
         <Stack gap={0}>
-          <Link href={profilePath(person.username)}>{person.username}</Link>
+          <Text as="span" variant="name">
+            {person.username}
+          </Text>
           {standing && (
             <Text as="span" variant="small">
               {ROLE_WORD[standing.role] && `${ROLE_WORD[standing.role]} · `}joined <Time at={standing.joined_at} />
@@ -47,11 +49,16 @@ function PersonCard({ person, me }: { person: Member | User; me: User | null | u
         </Stack>
       </Row>
       {error && <Alert tone="error">{error}</Alert>}
-      {me && me.id !== person.id && standing && (
-        <Row>
-          <Button variant="secondary" icon="chat" onClick={() => void message()}>
-            Message
+      {standing && (
+        <Row gap={2}>
+          <Button variant="secondary" icon="people" onClick={() => navigate(profilePath(person.username))}>
+            View profile
           </Button>
+          {me && me.id !== person.id && (
+            <Button variant="secondary" icon="chat" onClick={() => void message()}>
+              Message
+            </Button>
+          )}
         </Row>
       )}
     </Stack>

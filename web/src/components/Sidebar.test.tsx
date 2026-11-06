@@ -243,4 +243,11 @@ describe('Sidebar', () => {
     expect(onGo).toHaveBeenCalledWith('/u/raphael')
     expect(screen.queryByRole('button', { name: 'Settings' })).toBeNull()
   })
+
+  it('a room with a picture is marked by it; one without, by its initial', async () => {
+    await draw([root(false), knitting, group('wool', 'member', { name: 'Wool', picture: '/img/wool' })])
+    expect(screen.getByRole('button', { name: 'Wool' }).querySelector('img')!.getAttribute('src')).toBe('/img/wool')
+    expect(screen.getByRole('button', { name: 'Knitting' }).querySelector('img')).toBeNull()
+    expect(screen.getByRole('button', { name: 'Knitting' }).textContent).toContain('K')
+  })
 })

@@ -34,7 +34,7 @@ test.describe('profiles', () => {
     await nav.getByRole('button', { name: kit.username }).click()
     await expect(article(kit.page, shown)).toBeVisible()
     await expect(article(kit.page, secret)).toBeVisible()
-    await expect(article(kit.page, secret)).toContainText('in Wool')
+    await expect(article(kit.page, secret)).toContainText('Posted in Wool')
 
     await open(mo.page, `/u/${kit.username}`)
     await expect(mo.page.getByText('I knit things')).toBeVisible()
@@ -45,12 +45,12 @@ test.describe('profiles', () => {
     await expect(mo.page).toHaveURL(/\/r\/[^/]+$/)
     await expect(mo.page.getByRole('heading', { name: kit.username })).toBeVisible()
 
-    // A name on a card leads to the page.
+    // A card leads to the page.
     await open(mo.page)
     await article(mo.page, shown).getByRole('button', { name: kit.username }).hover()
     await mo.page
       .getByRole('dialog', { name: `About ${kit.username}` })
-      .getByRole('link', { name: kit.username })
+      .getByRole('button', { name: 'View profile' })
       .click()
     await expect(mo.page).toHaveURL(new RegExp(`/u/${kit.username}$`))
     await open(mo.page, '/u/nobody-here')

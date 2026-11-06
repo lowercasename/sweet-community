@@ -49,6 +49,8 @@ function Loaded({ post, groups, onGo }: { post: PostData; groups: Group[]; onGo:
   const actions = usePostActions(post.group_id)
   const root = groups.find((g) => g.kind === 'root')
   const back = groupPath(post.group_id, root?.id)
+  const room = groups.find((g) => g.id === post.group_id)
+  const place = room && room.kind !== 'root' ? { name: room.name, picture: room.picture } : undefined
   return (
     <>
       <Pane>
@@ -56,6 +58,7 @@ function Loaded({ post, groups, onGo }: { post: PostData; groups: Group[]; onGo:
           <Measure>
             <Post
               post={post}
+              place={place}
               linked={false}
               expanded
               disabled={status === 'offline'}

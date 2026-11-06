@@ -52,7 +52,7 @@ export function MenuPage({ me, groups, onGo, onLogout }: MenuPageProps) {
               {mine.map((g) => (
                 <NavItem
                   key={g.id}
-                  mark={<Tile name={g.name} />}
+                  mark={<Tile name={g.name} picture={g.picture} />}
                   label={g.name}
                   expanded
                   size="sm"
