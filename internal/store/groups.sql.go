@@ -361,6 +361,59 @@ func (q *Queries) ListMyGroups(ctx context.Context, userID string) ([]ListMyGrou
 	return items, nil
 }
 
+const listUserMemberships = `-- name: ListUserMemberships :many
+SELECT m.group_id, m.role, g.kind FROM memberships m JOIN groups g ON g.id = m.group_id
+WHERE m.user_id = ?1 AND g.deleted_at IS NULL
+`
+
+type ListUserMembershipsRow struct {
+	GroupID string
+	Role    string
+	Kind    string
+}
+
+// Every live group a person is in, with their role and the group's kind.
+func (q *Queries) ListUserMemberships(ctx context.Context, userID string) ([]ListUserMembershipsRow, error) {
+	rows, err := q.db.QueryContext(ctx, listUserMemberships, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListUserMembershipsRow{}
+	for rows.Next() {
+		var i ListUserMembershipsRow
+		if err := rows.Scan(&i.GroupID, &i.Role, &i.Kind); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const nextOwner = `-- name: NextOwner :one
+SELECT user_id FROM memberships WHERE group_id = ?1 AND user_id != ?2
+ORDER BY role = 'moderator' DESC, joined_at ASC LIMIT 1
+`
+
+type NextOwnerParams struct {
+	GroupID string
+	UserID  string
+}
+
+// Succession by seniority (architecture.md, Groups): the longest-serving moderator, else the longest-serving member.
+func (q *Queries) NextOwner(ctx context.Context, arg NextOwnerParams) (string, error) {
+	row := q.db.QueryRowContext(ctx, nextOwner, arg.GroupID, arg.UserID)
+	var user_id string
+	err := row.Scan(&user_id)
+	return user_id, err
+}
+
 const setMembershipRole = `-- name: SetMembershipRole :exec
 UPDATE memberships SET role = ?1 WHERE group_id = ?2 AND user_id = ?3
 `

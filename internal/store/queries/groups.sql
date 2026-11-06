@@ -48,6 +48,16 @@ FROM groups g WHERE g.kind = 'dm' AND g.people_key = sqlc.arg(people_key) AND g.
 -- name: UpdateGroup :exec
 UPDATE groups SET name = sqlc.arg(name), mode = sqlc.arg(mode) WHERE id = sqlc.arg(id) AND deleted_at IS NULL;
 
+-- name: ListUserMemberships :many
+-- Every live group a person is in, with their role and the group's kind.
+SELECT m.group_id, m.role, g.kind FROM memberships m JOIN groups g ON g.id = m.group_id
+WHERE m.user_id = sqlc.arg(user_id) AND g.deleted_at IS NULL;
+
+-- name: NextOwner :one
+-- Succession by seniority (architecture.md, Groups): the longest-serving moderator, else the longest-serving member.
+SELECT user_id FROM memberships WHERE group_id = sqlc.arg(group_id) AND user_id != sqlc.arg(user_id)
+ORDER BY role = 'moderator' DESC, joined_at ASC LIMIT 1;
+
 -- name: CountMembers :one
 SELECT COUNT(*) FROM memberships WHERE group_id = sqlc.arg(group_id) AND hidden_at IS NULL;
 

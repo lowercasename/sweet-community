@@ -146,6 +146,32 @@ describe('applyEvent', () => {
     expect(qc.getQueryData(keys.members(CLUB))).toBeUndefined()
   })
 
+  it("a user event renames the person's words in loaded feeds, threads and rooms, on the people list or not", () => {
+    qc.setQueryData(keys.comments('p2'), { comments: [comment('c1', 'p2', mo)] })
+    qc.setQueryData(keys.messages(ROOT), {
+      pages: [{ messages: [message('m1', mo)], next_before: null }],
+      pageParams: [null],
+    })
+    applyEvent(qc, 'user', { id: 'mo', username: 'removed-abc', picture: null })
+    expect(posts().find((p) => p.id === 'p2')?.author.username).toBe('removed-abc')
+    expect((qc.getQueryData(keys.comments('p2')) as { comments: { author: User }[] }).comments[0].author.username).toBe(
+      'removed-abc',
+    )
+    expect(
+      (qc.getQueryData(keys.messages(ROOT)) as { pages: { messages: { author: User }[] }[] }).pages[0].messages[0]
+        .author.username,
+    ).toBe('removed-abc')
+  })
+
+  it('leaving the root group is leaving the instance: off the people list; for me, signed out with nothing kept', () => {
+    qc.setQueryData(keys.users, { users: [member('kit'), member('mo')] })
+    applyEvent(qc, 'membership_delete', { group_id: ROOT, user_id: 'mo' })
+    expect((qc.getQueryData(keys.users) as { users: Member[] }).users.map((u) => u.id)).toEqual(['kit'])
+    applyEvent(qc, 'membership_delete', { group_id: ROOT, user_id: 'kit' })
+    expect(qc.getQueryData(keys.me)).toBeNull()
+    expect(qc.getQueryData(keys.posts(ROOT))).toBeUndefined()
+  })
+
   it('a group upserts into my list; a deleted group goes with everything in it', () => {
     applyEvent(qc, 'group', group(CLUB, 'member', { name: 'Renamed' }))
     expect(groups().find((g) => g.id === CLUB)?.name).toBe('Renamed')

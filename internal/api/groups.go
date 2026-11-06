@@ -293,7 +293,7 @@ func (s *Server) openConversation(w http.ResponseWriter, r *http.Request, me Use
 			return nil, nil, http.StatusInternalServerError, err
 		}
 		for _, uid := range people {
-			if _, err := qtx.GetUser(ctx, uid); errors.Is(err, sql.ErrNoRows) {
+			if u, err := qtx.GetUser(ctx, uid); errors.Is(err, sql.ErrNoRows) || (err == nil && u.RemovedAt.Valid) {
 				return nil, nil, http.StatusBadRequest, errors.New("no such person: " + uid)
 			} else if err != nil {
 				return nil, nil, http.StatusInternalServerError, err
@@ -470,7 +470,7 @@ func (s *Server) addMember(w http.ResponseWriter, r *http.Request) {
 	}
 	now := db.Now()
 	s.loggedMany(w, r, now, func(qtx *store.Queries) ([]events.Entry, any, int, error) {
-		if _, err := qtx.GetUser(r.Context(), in.UserID); errors.Is(err, sql.ErrNoRows) {
+		if u, err := qtx.GetUser(r.Context(), in.UserID); errors.Is(err, sql.ErrNoRows) || (err == nil && u.RemovedAt.Valid) {
 			return nil, nil, http.StatusNotFound, errors.New("no such person")
 		} else if err != nil {
 			return nil, nil, http.StatusInternalServerError, err

@@ -1,11 +1,13 @@
 import { useState } from 'react'
 import { logoutEverywhere, uploadImage, type Group, type Settings, type User } from '../api'
+import { useRemoveUser, useSession } from '../data/hooks'
 import { useAuthor, useSetPicture, useSetSettings, useSettings } from '../data/hooks'
 import { IMAGE_ACCEPT } from '../editor/images'
 import {
   Avatar,
   Button,
   Card,
+  ConfirmDialog,
   Field,
   FilePicker,
   Heading,
@@ -32,6 +34,23 @@ const CREATION: { value: Settings['group_creation']; label: string }[] = [
 ]
 
 export function SettingsPage({ me, root, onSignOut }: SettingsPageProps) {
+  const removeUser = useRemoveUser()
+  const { gone } = useSession()
+  const [removing, setRemoving] = useState(false)
+  const [removeBusy, setRemoveBusy] = useState(false)
+  const [removeError, setRemoveError] = useState<string | null>(null)
+  // Off this place for good (architecture.md, Admin tools); the instance owner hands over first.
+  const removeMe = async () => {
+    setRemoveBusy(true)
+    try {
+      await removeUser(me.id)
+      gone()
+    } catch (e) {
+      setRemoveError(e instanceof Error ? e.message : 'Could not remove your account')
+      setRemoveBusy(false)
+      setRemoving(false)
+    }
+  }
   const live = useAuthor(me)
   const setPicture = useSetPicture()
   const manages = root.can.manage_instance === true
@@ -138,9 +157,40 @@ export function SettingsPage({ me, root, onSignOut }: SettingsPageProps) {
                 </Row>
               </Stack>
             </Card>
+            <Card>
+              <Stack gap={2}>
+                <Heading level={2}>Leave this place</Heading>
+                <Text variant="secondary">
+                  Removing your account takes you off this place for good. Your posts, comments and messages stay, under
+                  a removed name. Rooms you own pass to their longest-serving moderator, or member.
+                </Text>
+                {root.role === 'owner' ? (
+                  <Text variant="secondary">You run this place. Hand it over to someone else first.</Text>
+                ) : (
+                  <Row>
+                    <Button variant="secondary" icon="remove" disabled={removeBusy} onClick={() => setRemoving(true)}>
+                      Remove my account
+                    </Button>
+                  </Row>
+                )}
+                {removeError && <Text variant="secondary">{removeError}</Text>}
+              </Stack>
+            </Card>
           </Stack>
         </Measure>
       </ScrollArea>
+      <ConfirmDialog
+        open={removing}
+        title="Remove your account?"
+        confirmLabel={removeBusy ? 'Removing…' : 'Remove'}
+        busy={removeBusy}
+        onConfirm={() => void removeMe()}
+        onClose={() => setRemoving(false)}
+      >
+        <Text variant="secondary">
+          You will be signed out everywhere and cannot sign in again. This cannot be undone.
+        </Text>
+      </ConfirmDialog>
     </Pane>
   )
 }

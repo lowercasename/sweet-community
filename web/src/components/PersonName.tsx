@@ -18,7 +18,7 @@ const ROLE_WORD: Record<Member['role'], string> = {
   member: '',
 }
 
-/** The card: who they are now, their standing here, and a way to message them (not myself). */
+/** The card: who they are now, their standing here, and a way to message them (not myself, nor someone no longer here). */
 function PersonCard({ person, me }: { person: Member | User; me: User | null | undefined }) {
   const { openDM } = useGroupActions()
   const [, navigate] = useLocation()
@@ -47,7 +47,7 @@ function PersonCard({ person, me }: { person: Member | User; me: User | null | u
         </Stack>
       </Row>
       {error && <Text variant="secondary">{error}</Text>}
-      {me && me.id !== person.id && (
+      {me && me.id !== person.id && standing && (
         <Row>
           <Button variant="secondary" icon="chat" onClick={() => void message()}>
             Message

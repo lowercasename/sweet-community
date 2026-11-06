@@ -37,7 +37,8 @@ func ValidateUsername(u string) error {
 	if !usernameRe.MatchString(u) {
 		return ErrUsernameInvalid
 	}
-	if reserved[strings.ToLower(u)] {
+	// removed-<id> is what a removed account is called (api.removedName).
+	if reserved[strings.ToLower(u)] || strings.HasPrefix(strings.ToLower(u), "removed-") {
 		return ErrUsernameReserved
 	}
 	return nil

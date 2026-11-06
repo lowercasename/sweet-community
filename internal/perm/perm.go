@@ -106,6 +106,19 @@ func Transfer(a, target Actor) bool { return a.Role == Owner && target.member() 
 func AddMembers(a Actor, g Group) bool { return g.Kind != KindDM && a.staff() }
 func RemoveMembers(a Actor) bool       { return a.staff() }
 
+// RemoveFromInstance (architecture.md, Admin tools): root staff remove those
+// below them, a moderator the members and the owner the moderators too;
+// anyone removes themselves; never the owner, who hands over first.
+func RemoveFromInstance(a, target Actor) bool {
+	if !target.member() || target.Role == Owner {
+		return false
+	}
+	if a.ID == target.ID {
+		return true
+	}
+	return a.Role == Owner || (a.Role == Moderator && target.Role == Member)
+}
+
 // Invite: adding to the root group, which is an invite link.
 func Invite(root Actor) bool { return AddMembers(root, Group{Kind: KindRoot}) }
 

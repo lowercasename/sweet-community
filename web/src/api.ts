@@ -19,6 +19,8 @@ export type Role = 'owner' | 'moderator' | 'member'
 export interface Member extends User {
   role: Role
   joined_at: number
+  /** Whether I may remove them from the instance: the server's call, per viewer. */
+  can: { remove: boolean }
 }
 
 /** What the signed-in person may do to a group. */
@@ -182,6 +184,11 @@ const json = (method: string, body: unknown): RequestInit => ({
 })
 
 const g = (groupId: string) => `/api/groups/${encodeURIComponent(groupId)}`
+
+/** Takes someone off the instance (architecture.md, Admin tools): their words stay under a removed name. */
+export async function removeUser(userId: string): Promise<void> {
+  await request(`/api/users/${encodeURIComponent(userId)}`, { method: 'DELETE' })
+}
 
 export function getMe(): Promise<User> {
   return request<User>('/api/me')

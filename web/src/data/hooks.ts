@@ -23,6 +23,7 @@ import {
   logout,
   openDM,
   removeMember,
+  removeUser,
   revokeInvite,
   setMemberRole,
   setPicture,
@@ -39,7 +40,7 @@ import {
   type User,
 } from '../api'
 import { applyEvent } from './apply'
-import { keys } from './keys'
+import { ROOT_ID, keys } from './keys'
 
 /*
  * Reads are queries; writes call the API and then feed the reply through
@@ -70,6 +71,20 @@ export function useSession() {
       qc.setQueryData<User | null>(keys.me, null)
       qc.removeQueries({ predicate: (q) => q.queryKey[0] !== 'me' })
     },
+    /** Off the instance (my account removed): the session is already gone on the server; nothing of mine stays here. */
+    gone() {
+      qc.setQueryData<User | null>(keys.me, null)
+      qc.removeQueries({ predicate: (q) => q.queryKey[0] !== 'me' })
+    },
+  }
+}
+
+/** Removing someone from the instance (architecture.md, Admin tools): staff from People, anyone themselves from Settings. */
+export function useRemoveUser() {
+  const qc = useQueryClient()
+  return async (userId: string) => {
+    await removeUser(userId)
+    applyEvent(qc, 'membership_delete', { group_id: ROOT_ID, user_id: userId })
   }
 }
 

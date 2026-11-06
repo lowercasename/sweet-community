@@ -32,19 +32,25 @@ func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) error {
 }
 
 const getUser = `-- name: GetUser :one
-SELECT id, username, picture_id FROM users WHERE id = ?
+SELECT id, username, picture_id, removed_at FROM users WHERE id = ?
 `
 
 type GetUserRow struct {
 	ID        string
 	Username  string
 	PictureID sql.NullString
+	RemovedAt sql.NullInt64
 }
 
 func (q *Queries) GetUser(ctx context.Context, id string) (GetUserRow, error) {
 	row := q.db.QueryRowContext(ctx, getUser, id)
 	var i GetUserRow
-	err := row.Scan(&i.ID, &i.Username, &i.PictureID)
+	err := row.Scan(
+		&i.ID,
+		&i.Username,
+		&i.PictureID,
+		&i.RemovedAt,
+	)
 	return i, err
 }
 
@@ -85,6 +91,24 @@ func (q *Queries) GetUserPasswordHash(ctx context.Context, username string) (Get
 	var i GetUserPasswordHashRow
 	err := row.Scan(&i.ID, &i.PasswordHash)
 	return i, err
+}
+
+const removeUser = `-- name: RemoveUser :exec
+UPDATE users SET username = ?1, password_hash = NULL, picture_id = NULL, removed_at = ?2
+WHERE id = ?3
+`
+
+type RemoveUserParams struct {
+	Username  string
+	RemovedAt sql.NullInt64
+	ID        string
+}
+
+// Anonymise (architecture.md, Admin tools): the name becomes removed-<id prefix>,
+// the password and picture go, the row and the id stay for their content.
+func (q *Queries) RemoveUser(ctx context.Context, arg RemoveUserParams) error {
+	_, err := q.db.ExecContext(ctx, removeUser, arg.Username, arg.RemovedAt, arg.ID)
+	return err
 }
 
 const setUserPassword = `-- name: SetUserPassword :exec

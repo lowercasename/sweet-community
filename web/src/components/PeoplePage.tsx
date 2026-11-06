@@ -1,7 +1,22 @@
 import { useState } from 'react'
 import type { Group, Invite, Member, User } from '../api'
-import { useGroupActions, useInviteActions, useInvites, useSetRole, useUsers } from '../data/hooks'
-import { Button, Card, Heading, Input, List, ListItem, Measure, Pane, Row, ScrollArea, Stack, Text, Time } from '../ui'
+import { useGroupActions, useInviteActions, useInvites, useRemoveUser, useSetRole, useUsers } from '../data/hooks'
+import {
+  Button,
+  Card,
+  ConfirmDialog,
+  Heading,
+  Input,
+  List,
+  ListItem,
+  Measure,
+  Pane,
+  Row,
+  ScrollArea,
+  Stack,
+  Text,
+  Time,
+} from '../ui'
 import { PersonName } from './PersonName'
 
 interface PeoplePageProps {
@@ -58,7 +73,10 @@ export function PeoplePage({ me, root, onOpenGroup }: PeoplePageProps) {
   const { invites, error: inviteError } = useInvites(root.can.add_members)
   const { create, revoke } = useInviteActions()
   const setRole = useSetRole(root.id)
+  const removeUser = useRemoveUser()
   const [error, setError] = useState<string | null>(null)
+  const [removing, setRemoving] = useState<Member | null>(null)
+  const [busy, setBusy] = useState(false)
 
   const invite = async () => {
     try {
@@ -72,6 +90,19 @@ export function PeoplePage({ me, root, onOpenGroup }: PeoplePageProps) {
       await setRole(u.id, u.role === 'moderator' ? 'member' : 'moderator')
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Could not change the role')
+    }
+  }
+  // Who may be removed is the server's call, on each person (architecture.md, Admin tools).
+  const remove = async () => {
+    if (!removing) return
+    setBusy(true)
+    try {
+      await removeUser(removing.id)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Could not remove them')
+    } finally {
+      setBusy(false)
+      setRemoving(null)
     }
   }
   const message = async (u: Member) => {
@@ -127,6 +158,11 @@ export function PeoplePage({ me, root, onOpenGroup }: PeoplePageProps) {
                               {u.role === 'moderator' ? 'Make member' : 'Make moderator'}
                             </Button>
                           )}
+                          {u.can.remove && u.id !== me.id && (
+                            <Button variant="ghost" icon="remove" onClick={() => setRemoving(u)}>
+                              Remove
+                            </Button>
+                          )}
                         </Row>
                       </Row>
                     </ListItem>
@@ -137,6 +173,19 @@ export function PeoplePage({ me, root, onOpenGroup }: PeoplePageProps) {
           </Stack>
         </Measure>
       </ScrollArea>
+      <ConfirmDialog
+        open={removing !== null}
+        title={removing ? `Remove ${removing.username} from this place?` : ''}
+        confirmLabel={busy ? 'Removing…' : 'Remove'}
+        busy={busy}
+        onConfirm={() => void remove()}
+        onClose={() => setRemoving(null)}
+      >
+        <Text variant="secondary">
+          Their posts, comments and messages stay, under a removed name. Rooms they own pass to their longest-serving
+          moderator, or member. They cannot sign in again. This cannot be undone.
+        </Text>
+      </ConfirmDialog>
     </Pane>
   )
 }

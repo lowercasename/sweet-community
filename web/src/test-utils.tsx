@@ -28,7 +28,12 @@ export const ROOT = '00000000-0000-7000-8000-000000000000'
 
 export const user = (id: string, picture: string | null = null): User => ({ id, username: id, picture })
 
-export const member = (id: string, role: Member['role'] = 'member'): Member => ({ ...user(id), role, joined_at: 1 })
+export const member = (id: string, role: Member['role'] = 'member', remove = false): Member => ({
+  ...user(id),
+  role,
+  joined_at: 1,
+  can: { remove },
+})
 
 /** A group as its viewer sees it: with their role and what they may do. */
 export const group = (id: string, role: Group['role'], extra: Partial<Group> = {}): Group => ({

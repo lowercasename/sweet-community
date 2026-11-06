@@ -1,6 +1,6 @@
 import type { InfiniteData, QueryClient } from '@tanstack/react-query'
 import type { Comment, Group, Member, Membership, Message, MessagePage, Post, PostPage, Settings, User } from '../api'
-import { keys } from './keys'
+import { ROOT_ID, keys } from './keys'
 
 /**
  * The cache's one write path. Every event from the stream, and every reply
@@ -153,6 +153,30 @@ function upsertUser(qc: QueryClient, u: User) {
   )
   const me = qc.getQueryData<User | null>(keys.me)
   if (me && me.id === u.id) qc.setQueryData<User>(keys.me, { ...me, ...u })
+  // Their words everywhere: the author snapshots in loaded feeds, threads and
+  // rooms follow too, so a renamed (or removed) person reads right at once,
+  // whether or not they are still on the people list.
+  const as = (a: User) => (a.id === u.id ? { ...a, ...u } : a)
+  qc.setQueriesData<Posts>(
+    { queryKey: ['posts'] },
+    (old) =>
+      old && {
+        ...old,
+        pages: old.pages.map((p) => ({ ...p, posts: p.posts.map((x) => ({ ...x, author: as(x.author) })) })),
+      },
+  )
+  qc.setQueriesData<Thread>(
+    { queryKey: ['comments'] },
+    (old) => old && { comments: old.comments.map((c) => ({ ...c, author: as(c.author) })) },
+  )
+  qc.setQueriesData<Messages>(
+    { queryKey: ['messages'] },
+    (old) =>
+      old && {
+        ...old,
+        pages: old.pages.map((p) => ({ ...p, messages: p.messages.map((m) => ({ ...m, author: as(m.author) })) })),
+      },
+  )
 }
 
 function upsertGroup(qc: QueryClient, g: Group) {
@@ -198,13 +222,15 @@ function upsertMembership(qc: QueryClient, m: Membership) {
     qc.setQueryData<Users>(keys.users, (old) => {
       if (!old) return old
       const known = old.users.some((x) => x.id === m.user.id)
-      const asMember: Member = { ...m.user, role: m.role, joined_at: m.joined_at }
+      const asMember: Member = { ...m.user, role: m.role, joined_at: m.joined_at, can: { remove: false } }
       return {
         users: known
-          ? old.users.map((x) => (x.id === m.user.id ? { ...x, ...asMember } : x))
+          ? old.users.map((x) => (x.id === m.user.id ? { ...x, ...m.user, role: m.role, joined_at: m.joined_at } : x))
           : [...old.users, asMember],
       }
     })
+    // Who may remove whom is the server's call per viewer, and a role change moves it: refetch.
+    void qc.invalidateQueries({ queryKey: keys.users })
   }
   // My own role in a group moved every can flag in it; the server recomputes them on refetch.
   const me = qc.getQueryData<User | null>(keys.me)
@@ -221,13 +247,23 @@ function upsertMembership(qc: QueryClient, m: Membership) {
 
 function deleteMembership(qc: QueryClient, groupId: string, userId: string) {
   const me = qc.getQueryData<User | null>(keys.me)
+  const root = isRootID(groupId)
   if (me && me.id === userId) {
+    if (root) {
+      // Off the instance, removed by staff or by me: signed out, nothing of mine kept here.
+      qc.setQueryData<User | null>(keys.me, null)
+      qc.removeQueries({ predicate: (q) => q.queryKey[0] !== 'me' })
+      return
+    }
     dropGroup(qc, groupId)
     return
   }
   qc.setQueryData<Members>(keys.members(groupId), (old) =>
     old ? { members: old.members.filter((x) => x.user.id !== userId) } : old,
   )
+  // The root group's membership is the instance's people list.
+  if (root)
+    qc.setQueryData<Users>(keys.users, (old) => (old ? { users: old.users.filter((x) => x.id !== userId) } : old))
 }
 
 /** Does this thread's post live in this group, as far as the cache knows? */
@@ -238,7 +274,7 @@ function inGroup(qc: QueryClient, postId: unknown, groupId: string): boolean {
 
 /** The root group's fixed id, for when the groups list is not loaded yet. */
 function isRootID(id: string): boolean {
-  return id === '00000000-0000-7000-8000-000000000000'
+  return id === ROOT_ID
 }
 
 function hasId(data: unknown): data is { id: string; post_id?: unknown; group_id?: unknown } {

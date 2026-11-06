@@ -174,6 +174,7 @@ func (s *Server) Routes(mux *http.ServeMux) {
 	mux.HandleFunc("POST /api/logout", s.requireAuth(s.logout))
 	mux.HandleFunc("POST /api/logout-all", s.requireAuth(s.logoutAll))
 	mux.HandleFunc("GET /api/users", s.requireAuth(s.listUsers))
+	mux.HandleFunc("DELETE /api/users/{id}", s.requireAuth(s.removeUser))
 	mux.HandleFunc("GET /api/groups", s.requireAuth(s.listGroups))
 	mux.HandleFunc("POST /api/groups", s.requireAuth(s.createGroup))
 	mux.HandleFunc("GET /api/groups/{gid}", s.requireGroup(s.getGroup))

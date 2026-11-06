@@ -48,7 +48,8 @@ describe('PersonName', () => {
     const { openDM } = await import('../api')
     await draw('mo')
     fireEvent.click(screen.getByRole('button', { name: 'mo' }))
-    fireEvent.click(within(card('mo')).getByRole('button', { name: 'Message' }))
+    // Message waits for their standing: only someone on the instance can be messaged.
+    fireEvent.click(await within(card('mo')).findByRole('button', { name: 'Message' }))
     expect(openDM).toHaveBeenCalledWith(['mo'])
     await vi.waitFor(() => expect(window.location.pathname).toBe('/r/d1'))
   })
@@ -59,6 +60,12 @@ describe('PersonName', () => {
     const trigger = await screen.findByRole('button', { name: 'mo' })
     fireEvent.click(within(trigger).getByRole('img', { name: 'mo' }))
     expect(card('mo')).toBeTruthy()
+  })
+
+  it('someone no longer on the instance has a card with their name and no Message', async () => {
+    await draw('gone')
+    fireEvent.click(screen.getByRole('button', { name: 'gone' }))
+    expect(within(card('gone')).queryByRole('button', { name: 'Message' })).toBeNull()
   })
 
   it('my own card has no Message', async () => {
