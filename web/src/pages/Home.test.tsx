@@ -18,6 +18,8 @@ vi.mock('../api', async (importOriginal) => ({
   getMe: vi.fn(() => Promise.resolve({ id: 'raphael', username: 'raphael', picture: null })),
   getPosts: vi.fn(),
   getPost: vi.fn(),
+  getProfile: vi.fn(),
+  getUserPosts: vi.fn(() => Promise.resolve({ posts: [], next_before: null })),
   getComments: vi.fn(() => Promise.resolve({ comments: [] })),
   getMessages: vi.fn(() => Promise.resolve({ messages: [], next_before: null })),
   listUsers: vi.fn(),
@@ -44,7 +46,16 @@ const kit = user('kit')
 afterEach(cleanup)
 
 beforeEach(async () => {
-  const { getPosts, listUsers, listGroups } = await import('../api')
+  const { getPosts, listUsers, listGroups, getProfile } = await import('../api')
+  vi.mocked(getProfile).mockImplementation((name) =>
+    Promise.resolve({
+      ...user(name),
+      role: 'owner' as const,
+      joined_at: 1,
+      bio_html: '',
+      can: { edit: name === 'raphael' },
+    }),
+  )
   vi.mocked(getPosts).mockImplementation((gid) =>
     Promise.resolve({
       posts: gid === ROOT ? [post('p1', raphael)] : [post('g1', kit, { group_id: gid })],
@@ -104,7 +115,8 @@ describe('Home', () => {
     fireEvent.keyDown(screen.getByRole('separator'), { key: 'Home' })
     fireEvent.click(screen.getByRole('button', { name: 'Show posts' }))
 
-    fireEvent.click(nav().getByRole('button', { name: 'Settings' }))
+    fireEvent.click(nav().getByRole('button', { name: 'raphael' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Settings' }))
     await screen.findByText('Profile picture')
     expect(window.location.pathname).toBe('/settings')
     expect(editors()).toBe(2)
@@ -123,7 +135,8 @@ describe('Home', () => {
     await home()
     const article = screen.getByText('p1').closest('article')!
     const postAvatar = () => within(article).getByRole('img', { name: 'raphael' }).getAttribute('src')
-    const navAvatar = () => nav().getByRole('img', { name: 'raphael' }).getAttribute('src')
+    // The nav's face is decorative (the row's name says who); its picture is the thing to check.
+    const navAvatar = () => nav().getByRole('button', { name: 'raphael' }).querySelector('img')!.getAttribute('src')
     expect(postAvatar()).not.toContain('/img/')
     expect(navAvatar()).not.toContain('/img/')
 

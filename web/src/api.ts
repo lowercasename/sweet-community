@@ -65,6 +65,14 @@ export interface Group {
   hidden_at?: number | null
 }
 
+/** A person as their page shows them (architecture.md, Accounts): standing, joined, a bio they alone edit. */
+export interface Profile extends User {
+  role: Role
+  joined_at: number
+  bio_html: string
+  can: { edit: boolean }
+}
+
 export interface Membership {
   group_id: string
   user: User
@@ -388,6 +396,23 @@ export async function revokeInvite(code: string): Promise<void> {
 /** Everyone on the instance: the root group's members with their roles. */
 export function listUsers(): Promise<{ users: Member[] }> {
   return request('/api/users')
+}
+
+/** One person by name; 404 when there is nobody of that name, or they have been removed. */
+export function getProfile(name: string): Promise<Profile> {
+  return request<Profile>(`/api/users/${encodeURIComponent(name)}`)
+}
+
+/** My bio, a body like any other; empty clears it. The reply is my profile. */
+export function setBio(bodyHtml: string): Promise<Profile> {
+  return request<Profile>('/api/me/bio', json('PUT', { body_html: bodyHtml }))
+}
+
+/** One person's posts, newest first, from the rooms I am in. */
+export function getUserPosts(name: string, before?: number | null, limit = 20): Promise<PostPage> {
+  const params = new URLSearchParams({ limit: String(limit) })
+  if (before != null) params.set('before', String(before))
+  return request<PostPage>(`/api/users/${encodeURIComponent(name)}/posts?${params}`)
 }
 
 export async function uploadImage(file: File): Promise<UploadedImage> {

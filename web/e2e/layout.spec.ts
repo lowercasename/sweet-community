@@ -26,7 +26,9 @@ test.describe('layout', () => {
     await expect(kit.page.locator('.editor-post .ProseMirror').first()).toHaveText(draft)
 
     // Settings and back, by the nav and by the back button.
-    await kit.page.getByRole('navigation', { name: 'Main' }).getByRole('button', { name: 'Settings' }).click()
+    // Settings is reached in the app, from my own page, so the draft stays mounted behind it.
+    await kit.page.getByRole('navigation', { name: 'Main' }).getByRole('button', { name: kit.username }).click()
+    await kit.page.getByRole('button', { name: 'Settings' }).click()
     await expect(kit.page.getByRole('heading', { name: 'Profile picture' })).toBeVisible()
     await expect(kit.page.locator('.editor-post .ProseMirror').first()).toBeHidden()
     await kit.page.goBack()
@@ -73,7 +75,7 @@ test.describe('layout', () => {
     const n = (await nav.boundingBox())!
     expect(n.height).toBeLessThanOrEqual(420)
     // Settings is below the fold of the middle; scrolling the middle brings it up, the foot does not move.
-    const settings = nav.getByRole('button', { name: 'Settings' })
+    const settings = nav.getByRole('button', { name: 'People' })
     await settings.scrollIntoViewIfNeeded()
     await expect(settings).toBeInViewport()
     expect((await collapse.boundingBox())!.y).toBe(c.y)

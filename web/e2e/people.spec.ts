@@ -67,9 +67,10 @@ test.describe('people', () => {
     await name.hover()
     const card = kit.page.getByRole('dialog', { name: `About ${mo.username}` })
     await expect(card).toBeVisible()
-    const n = (await name.boundingBox())!
+    // The card never covers the editor under the pane: it flips above its name when it must.
+    const editor = (await kit.page.locator('form', { has: kit.page.locator('.editor-line') }).boundingBox())!
     const c = (await card.boundingBox())!
-    expect(c.y + c.height).toBeLessThanOrEqual(n.y + 1)
+    expect(c.y + c.height).toBeLessThanOrEqual(editor.y + 1)
     await kit.context.close()
     await mo.context.close()
   })

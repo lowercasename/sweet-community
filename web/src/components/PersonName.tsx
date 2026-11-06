@@ -2,8 +2,8 @@ import { useState } from 'react'
 import { useLocation } from 'wouter'
 import type { Member, User } from '../api'
 import { useGroupActions, useMe, useUsers } from '../data/hooks'
-import { groupPath } from '../routes'
-import { Alert, Avatar, Button, HoverCard, Row, Stack, Text, Time } from '../ui'
+import { groupPath, profilePath } from '../routes'
+import { Alert, Avatar, Button, HoverCard, Link, Row, Stack, Text, Time } from '../ui'
 
 interface PersonNameProps {
   /** The person as the content carried them; the card shows them as they are now. */
@@ -38,9 +38,7 @@ function PersonCard({ person, me }: { person: Member | User; me: User | null | u
       <Row gap={2} align="center">
         <Avatar name={person.username} picture={person.picture} size="lg" />
         <Stack gap={0}>
-          <Text as="span" variant="name">
-            {person.username}
-          </Text>
+          <Link href={profilePath(person.username)}>{person.username}</Link>
           {standing && (
             <Text as="span" variant="small">
               {ROLE_WORD[standing.role] && `${ROLE_WORD[standing.role]} · `}joined <Time at={standing.joined_at} />

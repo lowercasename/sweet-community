@@ -31,6 +31,66 @@ func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) error {
 	return err
 }
 
+const getProfile = `-- name: GetProfile :one
+SELECT u.id, u.username, u.picture_id, u.bio_html, m.role, m.joined_at
+FROM users u JOIN memberships m ON m.user_id = u.id AND m.group_id = '00000000-0000-7000-8000-000000000000'
+WHERE u.id = ?1 AND u.removed_at IS NULL
+`
+
+type GetProfileRow struct {
+	ID        string
+	Username  string
+	PictureID sql.NullString
+	BioHtml   string
+	Role      string
+	JoinedAt  int64
+}
+
+func (q *Queries) GetProfile(ctx context.Context, id string) (GetProfileRow, error) {
+	row := q.db.QueryRowContext(ctx, getProfile, id)
+	var i GetProfileRow
+	err := row.Scan(
+		&i.ID,
+		&i.Username,
+		&i.PictureID,
+		&i.BioHtml,
+		&i.Role,
+		&i.JoinedAt,
+	)
+	return i, err
+}
+
+const getProfileByUsername = `-- name: GetProfileByUsername :one
+SELECT u.id, u.username, u.picture_id, u.bio_html, m.role, m.joined_at
+FROM users u JOIN memberships m ON m.user_id = u.id AND m.group_id = '00000000-0000-7000-8000-000000000000'
+WHERE u.username = ?1 AND u.removed_at IS NULL
+`
+
+type GetProfileByUsernameRow struct {
+	ID        string
+	Username  string
+	PictureID sql.NullString
+	BioHtml   string
+	Role      string
+	JoinedAt  int64
+}
+
+// A person as their profile shows them: who they are, their standing in the
+// root group, and their bio. A removed account has no profile.
+func (q *Queries) GetProfileByUsername(ctx context.Context, username string) (GetProfileByUsernameRow, error) {
+	row := q.db.QueryRowContext(ctx, getProfileByUsername, username)
+	var i GetProfileByUsernameRow
+	err := row.Scan(
+		&i.ID,
+		&i.Username,
+		&i.PictureID,
+		&i.BioHtml,
+		&i.Role,
+		&i.JoinedAt,
+	)
+	return i, err
+}
+
 const getUser = `-- name: GetUser :one
 SELECT id, username, picture_id, removed_at FROM users WHERE id = ?
 `
@@ -108,6 +168,21 @@ type RemoveUserParams struct {
 // the password and picture go, the row and the id stay for their content.
 func (q *Queries) RemoveUser(ctx context.Context, arg RemoveUserParams) error {
 	_, err := q.db.ExecContext(ctx, removeUser, arg.Username, arg.RemovedAt, arg.ID)
+	return err
+}
+
+const setUserBio = `-- name: SetUserBio :exec
+UPDATE users SET bio_html = ?1, bio_text = ?2 WHERE id = ?3
+`
+
+type SetUserBioParams struct {
+	BioHtml string
+	BioText string
+	ID      string
+}
+
+func (q *Queries) SetUserBio(ctx context.Context, arg SetUserBioParams) error {
+	_, err := q.db.ExecContext(ctx, setUserBio, arg.BioHtml, arg.BioText, arg.ID)
 	return err
 }
 

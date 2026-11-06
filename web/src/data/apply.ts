@@ -11,6 +11,7 @@ import type {
   NotificationPage,
   Post,
   PostPage,
+  Profile,
   Settings,
   User,
 } from '../api'
@@ -68,6 +69,9 @@ export function applyEvent(qc: QueryClient, kind: string, data: unknown): void {
     case 'marker':
       if (isMarker(data)) upsertMarker(qc, data)
       break
+    case 'profile':
+      if (isProfile(data)) qc.setQueryData<Profile>(keys.profile(data.username), data)
+      break
     case 'settings':
       if (isSettings(data)) {
         qc.setQueryData<Settings>(keys.settings, data)
@@ -96,7 +100,20 @@ export function findPost(qc: QueryClient, id: string): Post | undefined {
   return undefined
 }
 
+/** A post on its author's page, if that page is loaded. */
+function upsertUserPost(qc: QueryClient, post: Post) {
+  qc.setQueryData<Posts>(keys.userPosts(post.author.username), (old) => {
+    if (!old) return old
+    const known = old.pages.some((p) => p.posts.some((x) => x.id === post.id))
+    const pages = known
+      ? old.pages.map((p) => ({ ...p, posts: p.posts.map((x) => (x.id === post.id ? post : x)) }))
+      : old.pages.map((p, i) => (i === 0 ? { ...p, posts: [post, ...p.posts] } : p))
+    return { ...old, pages }
+  })
+}
+
 function upsertPost(qc: QueryClient, post: Post) {
+  upsertUserPost(qc, post)
   // Someone else's new post I have not read counts on the room's feed; an edit is not new.
   const me = qc.getQueryData<User | null>(keys.me)
   if (post.edited_at == null && (!me || me.id !== post.author.id))
@@ -119,11 +136,23 @@ function deletePost(qc: QueryClient, id: string, groupId: string) {
   )
   qc.removeQueries({ queryKey: keys.comments(id) })
   qc.removeQueries({ queryKey: keys.post(id) })
+  qc.setQueriesData<Posts>(
+    { queryKey: ['userPosts'] },
+    (old) => old && { ...old, pages: old.pages.map((p) => ({ ...p, posts: p.posts.filter((x) => x.id !== id) })) },
+  )
 }
 
 function countComments(qc: QueryClient, postId: string, groupId: string, by: number) {
   const counted = (x: Post) => ({ ...x, comment_count: Math.max(0, x.comment_count + by) })
   qc.setQueryData<Post>(keys.post(postId), (old) => (old ? counted(old) : old))
+  qc.setQueriesData<Posts>(
+    { queryKey: ['userPosts'] },
+    (old) =>
+      old && {
+        ...old,
+        pages: old.pages.map((p) => ({ ...p, posts: p.posts.map((x) => (x.id === postId ? counted(x) : x)) })),
+      },
+  )
   qc.setQueryData<Posts>(keys.posts(groupId), (old) =>
     old
       ? {
@@ -210,6 +239,16 @@ function upsertUser(qc: QueryClient, u: User) {
       },
   )
   qc.setQueriesData<Post>({ queryKey: ['post'] }, (old) => old && { ...old, author: as(old.author) })
+  qc.setQueriesData<Posts>(
+    { queryKey: ['userPosts'] },
+    (old) =>
+      old && {
+        ...old,
+        pages: old.pages.map((p) => ({ ...p, posts: p.posts.map((x) => ({ ...x, author: as(x.author) })) })),
+      },
+  )
+  // Their page says who they are now; a renamed person's page is at a new address, so fetch afresh.
+  void qc.invalidateQueries({ queryKey: ['profile'] })
   qc.setQueriesData<Thread>(
     { queryKey: ['comments'] },
     (old) => old && { comments: old.comments.map((c) => ({ ...c, author: as(c.author) })) },
@@ -458,6 +497,10 @@ function isNotification(data: unknown): data is Notification {
 }
 function isCleared(data: unknown): data is { before: number } {
   return typeof data === 'object' && data !== null && typeof (data as { before?: unknown }).before === 'number'
+}
+function isProfile(data: unknown): data is Profile {
+  const p = data as Profile
+  return isUser(data) && typeof p.role === 'string' && typeof p.bio_html === 'string'
 }
 function isMarker(data: unknown): data is Marker {
   const m = data as Marker

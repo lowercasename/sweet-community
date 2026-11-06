@@ -8,7 +8,7 @@ import { ROOT, dm, group, marker, nameOf, notification, renderWithQuery, user } 
  * The nav column's three blocks (architecture.md, Layout): places (Home,
  * the Rooms section with its own New room control, the Messages section
  * of my five latest conversations with All messages at its foot), tools
- * (Search, Notifications), the house (People, Settings).
+ * (Search, Notifications), the house (People, and me).
  */
 vi.mock('../api', () => ({
   listUsers: vi.fn(() => Promise.resolve({ users: [] })),
@@ -57,7 +57,7 @@ describe('Sidebar', () => {
       'Search',
       'Notifications',
       'People',
-      'Settings',
+      'raphael',
       'Collapse',
     ])
     expect(within(groupsSection()).getByRole('button', { name: 'Knitting' })).toBeTruthy()
@@ -182,7 +182,7 @@ describe('Sidebar', () => {
       'Search',
       'Notifications',
       'People',
-      'Settings',
+      'raphael',
       'Expand',
     ])
     expect(screen.queryByText('Rooms')).toBeNull()
@@ -233,5 +233,14 @@ describe('Sidebar', () => {
     cleanup()
     await draw([root(false), knitting, withKit], '/', false)
     await screen.findByRole('button', { name: 'Home, unread' })
+  })
+
+  it('the account row at the foot is me: it opens my own page, and is current there', async () => {
+    const onGo = await draw([root(false)], '/u/raphael')
+    const me = screen.getByRole('button', { name: 'raphael' })
+    expect(me.getAttribute('aria-current')).toBe('page')
+    fireEvent.click(me)
+    expect(onGo).toHaveBeenCalledWith('/u/raphael')
+    expect(screen.queryByRole('button', { name: 'Settings' })).toBeNull()
   })
 })

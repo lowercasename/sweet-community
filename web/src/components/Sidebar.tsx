@@ -2,8 +2,8 @@ import type { Group, User } from '../api'
 import { roomsOf } from '../data/groups'
 import { useAuthor, useUnreadPlaces, useUnreadNotifications } from '../data/hooks'
 import { anyUnread } from '../data/notifications'
-import { NEW_ROOM, NOTIFICATIONS, groupPath } from '../routes'
-import { Hairline, NavAccount, NavBar, NavItem, NavSection, Tile, Wordmark } from '../ui'
+import { NEW_ROOM, NOTIFICATIONS, groupPath, profilePath } from '../routes'
+import { Avatar, Hairline, NavBar, NavItem, NavSection, Tile, Wordmark } from '../ui'
 import { ConversationsSection } from './ConversationsSection'
 
 interface SidebarProps {
@@ -26,7 +26,7 @@ function at(location: string, path: string): boolean {
  * (Home, then the rooms I am in, with New room as that section's own
  * control, then my latest conversations with All messages at their foot),
  * the tools that reach across every place (Search, Notifications), and the house
- * (People, Settings, me).
+ * (People, and me: my own page, where Settings is).
  */
 export function Sidebar({ me, groups, location, expanded, onGo, onToggle }: SidebarProps) {
   const live = useAuthor(me)
@@ -41,7 +41,13 @@ export function Sidebar({ me, groups, location, expanded, onGo, onToggle }: Side
       head={<Wordmark expanded={expanded} />}
       foot={
         <>
-          <NavAccount username={live.username} picture={live.picture} expanded={expanded} />
+          <NavItem
+            mark={<Avatar name={live.username} picture={live.picture} size="sm" decorative />}
+            label={live.username}
+            expanded={expanded}
+            current={at(location, profilePath(live.username))}
+            onClick={() => onGo(profilePath(live.username))}
+          />
           <NavItem
             icon={expanded ? 'collapse' : 'expand'}
             label={expanded ? 'Collapse' : 'Expand'}
@@ -113,13 +119,6 @@ export function Sidebar({ me, groups, location, expanded, onGo, onToggle }: Side
         expanded={expanded}
         current={at(location, '/people')}
         onClick={() => onGo('/people')}
-      />
-      <NavItem
-        icon="settings"
-        label="Settings"
-        expanded={expanded}
-        current={at(location, '/settings')}
-        onClick={() => onGo('/settings')}
       />
     </NavBar>
   )

@@ -14,6 +14,8 @@ export const keys = {
   messages: (groupId: string) => ['messages', groupId] as const,
   invites: ['invites'] as const,
   notifications: ['notifications'] as const,
+  profile: (name: string) => ['profile', name] as const,
+  userPosts: (name: string) => ['userPosts', name] as const,
   markers: ['markers'] as const,
   settings: ['settings'] as const,
 }

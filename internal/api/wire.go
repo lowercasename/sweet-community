@@ -83,6 +83,10 @@ func wireMarker(row store.ListMarkersRow) Marker {
 	return Marker{UserID: row.UserID, Stream: row.Stream, ReadAt: row.ReadAt, Unread: row.Unread}
 }
 
+func wireProfile(row store.GetProfileByUsernameRow) Profile {
+	return Profile{User: wireUser(row.ID, row.Username, row.PictureID), Role: row.Role, JoinedAt: row.JoinedAt, BioHTML: row.BioHtml}
+}
+
 func wireMembership(groupID string, row store.GetMemberRow) Membership {
 	return Membership{GroupID: groupID, User: wireUser(row.ID, row.Username, row.PictureID), Role: row.Role, JoinedAt: row.JoinedAt, HiddenAt: nullInt(row.HiddenAt)}
 }

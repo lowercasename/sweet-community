@@ -59,6 +59,9 @@ func forViewer(a perm.Actor, v any, st Settings) any {
 	case *Group:
 		g := groupFor(a, *x, st)
 		return &g
+	case *Profile:
+		p := profileFor(User{ID: a.ID}, *x)
+		return &p
 	case *Post:
 		p := *x
 		p.Can = Can{Edit: perm.EditPost(a, perm.Post{AuthorID: p.Author.ID}), Delete: perm.DeletePost(a, perm.Post{AuthorID: p.Author.ID})}
@@ -175,6 +178,9 @@ func (s *Server) Routes(mux *http.ServeMux) {
 	mux.HandleFunc("POST /api/logout-all", s.requireAuth(s.logoutAll))
 	mux.HandleFunc("GET /api/users", s.requireAuth(s.listUsers))
 	mux.HandleFunc("DELETE /api/users/{id}", s.requireAuth(s.removeUser))
+	mux.HandleFunc("GET /api/users/{name}", s.requireAuth(s.getProfile))
+	mux.HandleFunc("GET /api/users/{name}/posts", s.requireAuth(s.listUserPosts))
+	mux.HandleFunc("PUT /api/me/bio", s.requireAuth(s.setBio))
 	mux.HandleFunc("GET /api/groups", s.requireAuth(s.listGroups))
 	mux.HandleFunc("POST /api/groups", s.requireAuth(s.createGroup))
 	mux.HandleFunc("GET /api/groups/{gid}", s.requireGroup(s.getGroup))

@@ -58,7 +58,8 @@ test.describe('images', () => {
       .first()
       .setInputFiles({ name: 'me.png', mimeType: 'image/png', buffer: png(64, 64) })
     await expect(
-      kit.page.getByRole('navigation', { name: 'Main' }).getByRole('img', { name: kit.username }),
+      // The nav's face is decorative: the account row's name says who; its picture is what changes.
+      kit.page.getByRole('navigation', { name: 'Main' }).getByRole('button', { name: kit.username }).locator('img'),
     ).toHaveAttribute('src', /\/img\//)
     // Mo's open feed follows without a reload.
     await expect(article(mo.page, text).getByRole('img', { name: kit.username })).toHaveAttribute('src', /\/img\//)

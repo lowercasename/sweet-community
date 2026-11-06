@@ -18,6 +18,9 @@ export const NEW_MESSAGE = '/messages/new'
 /** What was done to me (architecture.md, Notifications). */
 export const NOTIFICATIONS = '/notifications'
 
+/** A person's page (architecture.md, Accounts). */
+export const profilePath = (name: string) => `/u/${encodeURIComponent(name)}`
+
 /** A post's own address (architecture.md, Posts). */
 export const postPath = (id: string) => `/p/${encodeURIComponent(id)}`
 

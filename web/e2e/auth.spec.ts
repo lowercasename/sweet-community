@@ -31,7 +31,7 @@ test.describe('signing in and joining', () => {
     await page.getByRole('button', { name: 'Join' }).click()
     await expect(page.getByRole('navigation', { name: 'Main' })).toBeVisible()
     await expect(page).toHaveURL(/\/$/)
-    await expect(page.getByRole('navigation', { name: 'Main' }).getByRole('img', { name })).toBeVisible()
+    await expect(page.getByRole('navigation', { name: 'Main' }).getByRole('button', { name })).toBeVisible()
 
     // The link is spent.
     const again = await browser.newContext({ baseURL: testInfo.project.use.baseURL as string })

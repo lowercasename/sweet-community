@@ -27,6 +27,8 @@ interface PostProps {
   linked?: boolean
   /** Start with the thread open (the post's page). */
   expanded?: boolean
+  /** The room it was said in, when the list mixes rooms (a person's page). */
+  place?: string
   /** True while offline; disables saving. */
   disabled: boolean
   /** Resolves when the server has stored the new body. */
@@ -35,7 +37,7 @@ interface PostProps {
   onDelete: () => Promise<void>
 }
 
-export function Post({ post, linked = true, expanded = false, disabled, onEdit, onDelete }: PostProps) {
+export function Post({ post, linked = true, expanded = false, place, disabled, onEdit, onDelete }: PostProps) {
   const author = useAuthor(post.author)
   const [editing, setEditing] = useState(false)
   const [open, setOpen] = useState(expanded)
@@ -87,6 +89,7 @@ export function Post({ post, linked = true, expanded = false, disabled, onEdit, 
               <PersonName user={author} avatar="md" />
               <Text as="span" variant="small">
                 {linked ? <Link href={postPath(post.id)}>{when}</Link> : when}
+                {place && ` · in ${place}`}
               </Text>
             </Row>
             {items.length > 0 && !editing && !disabled && <Menu label="Post options" items={items} reveal="post" />}

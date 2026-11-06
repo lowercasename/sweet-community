@@ -32,6 +32,8 @@ interface BodyEditorProps {
   initialHtml?: string
   /** Edit mode only: shown as a Cancel button and bound to Escape. */
   onCancel?: () => void
+  /** An empty body may be submitted (a bio, cleared). */
+  allowEmpty?: boolean
 }
 
 /** The one editor: posts, chat and comments differ only in schema, size, submit key and where images go. */
@@ -47,6 +49,7 @@ export function BodyEditor({
   onSubmit,
   initialHtml,
   onCancel,
+  allowEmpty = false,
 }: BodyEditorProps) {
   const editing = initialHtml !== undefined
   const [busy, setBusy] = useState(false)
@@ -118,7 +121,9 @@ export function BodyEditor({
   const remove = (id: string) => setAttached((prev) => prev.filter((i) => i.id !== id))
 
   const isEmpty = useEditorState({ editor, selector: ({ editor }) => (editor ? editor.isEmpty : true) })
-  const canSubmit = !!editor && (!isEmpty || attached.length > 0) && !disabled && !busy
+  const canSubmit = allowEmpty
+    ? !busy && !disabled
+    : !!editor && (!isEmpty || attached.length > 0) && !disabled && !busy
 
   const submit = async () => {
     if (!editor || !canSubmit) return

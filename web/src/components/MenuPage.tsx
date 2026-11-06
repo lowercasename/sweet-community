@@ -2,8 +2,8 @@ import type { Group, User } from '../api'
 import { roomsOf } from '../data/groups'
 import { useAuthor, useUnreadPlaces } from '../data/hooks'
 import { anyUnread } from '../data/notifications'
-import { NEW_ROOM, groupPath } from '../routes'
-import { Card, Hairline, NavAccount, NavItem, NavSection, Pane, Stack, Tile } from '../ui'
+import { NEW_ROOM, groupPath, profilePath } from '../routes'
+import { Avatar, Card, Hairline, NavItem, NavSection, Pane, Stack, Tile } from '../ui'
 import { ConversationsSection } from './ConversationsSection'
 
 interface MenuPageProps {
@@ -29,7 +29,12 @@ export function MenuPage({ me, groups, onGo, onLogout }: MenuPageProps) {
     <Pane flush>
       <Card flush>
         <Stack gap={1}>
-          <NavAccount username={live.username} picture={live.picture} expanded />
+          <NavItem
+            mark={<Avatar name={live.username} picture={live.picture} size="sm" decorative />}
+            label={live.username}
+            expanded
+            onClick={() => onGo(profilePath(live.username))}
+          />
           <Hairline />
           <NavItem
             icon="home"
@@ -60,7 +65,6 @@ export function MenuPage({ me, groups, onGo, onLogout }: MenuPageProps) {
           <ConversationsSection groups={groups} me={me} places={places} expanded onGo={onGo} />
           <Hairline />
           <NavItem icon="people" label="People" expanded onClick={() => onGo('/people')} />
-          <NavItem icon="settings" label="Settings" expanded onClick={() => onGo('/settings')} />
           <Hairline />
           <NavItem icon="logout" label="Sign out" expanded onClick={onLogout} />
         </Stack>

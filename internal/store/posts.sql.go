@@ -194,3 +194,75 @@ func (q *Queries) ListPosts(ctx context.Context, arg ListPostsParams) ([]ListPos
 	}
 	return items, nil
 }
+
+const listPostsByAuthor = `-- name: ListPostsByAuthor :many
+SELECT p.id, p.group_id, p.body_html, p.body_text, p.created_at, p.edited_at,
+       u.id AS author_id, u.username AS author_username, u.picture_id AS author_picture_id,
+       (SELECT COUNT(*) FROM comments c WHERE c.post_id = p.id AND c.deleted_at IS NULL) AS comment_count
+FROM posts p JOIN users u ON u.id = p.author_id
+JOIN memberships v ON v.group_id = p.group_id AND v.user_id = ?1 AND v.hidden_at IS NULL
+JOIN groups g ON g.id = p.group_id AND g.deleted_at IS NULL
+WHERE p.author_id = ?2 AND p.deleted_at IS NULL AND p.created_at < ?3
+ORDER BY p.created_at DESC, p.id DESC
+LIMIT ?4
+`
+
+type ListPostsByAuthorParams struct {
+	ViewerID string
+	AuthorID string
+	Before   int64
+	PageSize int64
+}
+
+type ListPostsByAuthorRow struct {
+	ID              string
+	GroupID         string
+	BodyHtml        string
+	BodyText        string
+	CreatedAt       int64
+	EditedAt        sql.NullInt64
+	AuthorID        string
+	AuthorUsername  string
+	AuthorPictureID sql.NullString
+	CommentCount    int64
+}
+
+// One person's posts, as a viewer may see them: only from groups the viewer is present in.
+func (q *Queries) ListPostsByAuthor(ctx context.Context, arg ListPostsByAuthorParams) ([]ListPostsByAuthorRow, error) {
+	rows, err := q.db.QueryContext(ctx, listPostsByAuthor,
+		arg.ViewerID,
+		arg.AuthorID,
+		arg.Before,
+		arg.PageSize,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListPostsByAuthorRow{}
+	for rows.Next() {
+		var i ListPostsByAuthorRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.GroupID,
+			&i.BodyHtml,
+			&i.BodyText,
+			&i.CreatedAt,
+			&i.EditedAt,
+			&i.AuthorID,
+			&i.AuthorUsername,
+			&i.AuthorPictureID,
+			&i.CommentCount,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}

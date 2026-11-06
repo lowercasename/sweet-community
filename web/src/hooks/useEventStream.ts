@@ -21,6 +21,7 @@ const EVENT_KINDS = [
   'notification',
   'notification_delete',
   'marker',
+  'profile',
 ] as const
 const HEALTH_INTERVAL_MS = 30_000
 const HEALTH_TIMEOUT_MS = 10_000

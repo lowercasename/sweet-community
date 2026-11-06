@@ -18,6 +18,8 @@ import {
   getMessages,
   getPost,
   getPosts,
+  getProfile,
+  getUserPosts,
   getSettings,
   listGroups,
   listInvites,
@@ -30,6 +32,7 @@ import {
   removeMember,
   removeUser,
   revokeInvite,
+  setBio,
   setMarker,
   setMemberRole,
   setPicture,
@@ -391,6 +394,46 @@ export function useMarkRead() {
     if (waiting) clearTimeout(waiting)
     if (debounceMs <= 0) send()
     else pendingMarks.set(stream, setTimeout(send, debounceMs))
+  }
+}
+
+/** A person's page: who they are, their standing, their bio. */
+export function useProfile(name: string) {
+  const q = useQuery({
+    queryKey: keys.profile(name),
+    queryFn: () => getProfile(name),
+    retry: (n, e) => n < 1 && !(e instanceof ApiError && e.status === 404),
+  })
+  return { profile: q.data, loading: q.isPending, error: q.error }
+}
+
+/** A person's posts, newest first, from the rooms I am in; applyEvent keeps the list current. */
+export function useUserPosts(name: string) {
+  const q = useInfiniteQuery({
+    queryKey: keys.userPosts(name),
+    queryFn: ({ pageParam }) => getUserPosts(name, pageParam),
+    initialPageParam: null as number | null,
+    getNextPageParam: (last) => last.next_before,
+  })
+  const seen = new Set<string>()
+  const posts = (q.data?.pages ?? [])
+    .flatMap((p) => p.posts)
+    .filter((p) => !seen.has(p.id) && seen.add(p.id))
+    .sort((a, b) => b.created_at - a.created_at)
+  return {
+    posts,
+    loading: q.isPending || q.isFetchingNextPage,
+    error: q.error,
+    hasMore: q.hasNextPage,
+    loadMore: () => void q.fetchNextPage(),
+  }
+}
+
+/** My bio: the reply is my profile, applied as the stream would apply it. */
+export function useSetBio() {
+  const qc = useQueryClient()
+  return async (html: string) => {
+    applyEvent(qc, 'profile', await setBio(html))
   }
 }
 

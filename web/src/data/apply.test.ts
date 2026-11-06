@@ -134,6 +134,23 @@ describe('applyEvent', () => {
     expect(page()).toBeUndefined()
   })
 
+  it("keeps a person's page in step: their new post joins it, an edit replaces, a deletion leaves", () => {
+    qc.setQueryData(keys.userPosts('mo'), {
+      pages: [{ posts: [post('p2', mo)], next_before: null }],
+      pageParams: [null],
+    })
+    const page = () => (qc.getQueryData(keys.userPosts('mo')) as { pages: PostPage[] }).pages.flatMap((p) => p.posts)
+    applyEvent(qc, 'post', post('p5', mo, { group_id: CLUB }))
+    expect(page().map((p) => p.id)).toEqual(['p5', 'p2'])
+    applyEvent(qc, 'post', post('p2', mo, { body_html: '<p>new</p>', edited_at: 9 }))
+    expect(page().find((p) => p.id === 'p2')!.body_html).toBe('<p>new</p>')
+    applyEvent(qc, 'post_delete', { id: 'p2', group_id: ROOT })
+    expect(page().map((p) => p.id)).toEqual(['p5'])
+    // A profile event is the page's whole answer.
+    applyEvent(qc, 'profile', { ...mo, role: 'member', joined_at: 1, bio_html: '<p>hi</p>', can: { edit: false } })
+    expect((qc.getQueryData(keys.profile('mo')) as { bio_html: string }).bio_html).toBe('<p>hi</p>')
+  })
+
   it('prepends a new post to its own group and replaces an existing one in place', () => {
     applyEvent(qc, 'post', post('p4', mo))
     expect(posts().map((p) => p.id)).toEqual(['p4', 'p3', 'p2', 'p1'])

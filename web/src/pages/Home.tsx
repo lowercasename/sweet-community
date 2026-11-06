@@ -5,7 +5,7 @@ import { useAuthor, useGroupActions, useGroups, usePost, useUnreadNotifications,
 import { anyUnread } from '../data/notifications'
 import { StreamProvider } from '../hooks/StreamContext'
 import { useLayout } from '../hooks/useLayout'
-import { MESSAGES, NEW_MESSAGE, NEW_ROOM, NOTIFICATIONS, groupPath, membersPath } from '../routes'
+import { MESSAGES, NEW_MESSAGE, NEW_ROOM, NOTIFICATIONS, groupPath, membersPath, profilePath } from '../routes'
 import { GroupView, groupLabel } from '../components/GroupView'
 import { MembersPage } from '../components/MembersPage'
 import { MenuPage } from '../components/MenuPage'
@@ -16,6 +16,7 @@ import { NotificationsPage } from '../components/NotificationsPage'
 import { PageBar } from '../components/PageBar'
 import { PeoplePage } from '../components/PeoplePage'
 import { PostPage } from '../components/PostPage'
+import { ProfilePage } from '../components/ProfilePage'
 import { SettingsPage } from '../components/SettingsPage'
 import { Sidebar } from '../components/Sidebar'
 import { Button, ConfirmDialog, Menu, Segmented, Shell, TabBar, Text } from '../ui'
@@ -54,6 +55,7 @@ export function Home({ me, onSignOut }: HomeProps) {
   const [atGroup, groupParams] = useRoute('/r/:id')
   const [atMembers, membersParams] = useRoute('/r/:id/members')
   const [atPost, postParams] = useRoute('/p/:id')
+  const [atProfile, profileParams] = useRoute('/u/:name')
   const atRoot = location === '/'
   // A post's page sits over the room the post is in, once the post is known.
   const { post: openPost } = usePost(postParams?.id ?? '', atPost)
@@ -98,7 +100,14 @@ export function Home({ me, onSignOut }: HomeProps) {
           ? openPost
             ? { title: `Post by ${postAuthor.username}`, back: { label: `Back to ${place}`, onClick: toPlace } }
             : { title: 'Post' }
-          : { title: PAGE_TITLES[location] ?? 'Home' }
+          : atProfile
+            ? { title: decodeURIComponent(profileParams.name) }
+            : location === '/settings'
+              ? {
+                  title: 'Settings',
+                  back: { label: `Back to ${me.username}`, onClick: () => navigate(profilePath(me.username)) },
+                }
+              : { title: PAGE_TITLES[location] ?? 'Home' }
 
   // A group the URL names that is not mine (or is gone) does not exist to me.
   if (!loading && named && !groups.some((g) => g.id === named)) return <Redirect to="/" replace />
@@ -187,6 +196,16 @@ export function Home({ me, onSignOut }: HomeProps) {
           <Route path="/r/:id/members">
             {atMembers && current && current.id === membersParams.id && (
               <MembersPage key={current.id} group={current} me={me} onLeft={() => navigate('/')} />
+            )}
+          </Route>
+          <Route path="/u/:name">
+            {atProfile && (
+              <ProfilePage
+                key={profileParams.name}
+                name={decodeURIComponent(profileParams.name)}
+                me={me}
+                onGo={navigate}
+              />
             )}
           </Route>
           <Route path="/p/:id">

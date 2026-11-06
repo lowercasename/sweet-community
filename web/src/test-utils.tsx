@@ -82,6 +82,9 @@ export const dm = (id: string, people: User[], extra: Partial<Group> = {}): Grou
   ...extra,
 })
 
+/** A one-paragraph body, for fixtures: the markup lives here, where the atomic check allows it. */
+export const paragraph = (text: string) => `<p>${text}</p>`
+
 export const post = (id: string, author: User, extra: Partial<Post> = {}): Post => ({
   id,
   group_id: ROOT,
