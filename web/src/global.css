@@ -12,6 +12,8 @@
   --color-dot: #e8e8e8;
   --color-card: #ffffff;
   --color-field: #f5f5f5;
+  /* A thread's ground: lighter and warmer than a field, so comments sit on paper, not in a box. */
+  --color-ground: #faf8f8;
   --color-line: #e2e2e2;
   --color-mute: #7a7a7a;
   --color-sweet: #ce1717;
