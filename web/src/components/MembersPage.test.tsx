@@ -99,11 +99,11 @@ describe('MembersPage', () => {
     const { setGroupPicture } = await import('../api')
     vi.mocked(setGroupPicture).mockResolvedValue(group('club', 'owner', { name: 'Club', picture: '/img/x' }))
     await page('owner')
-    expect(screen.getByLabelText('Choose a picture')).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Choose a picture' })).toBeTruthy()
     expect(screen.queryByRole('button', { name: 'Remove picture' })).toBeNull()
     cleanup()
     await page('member')
-    expect(screen.queryByLabelText('Choose a picture')).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Choose a picture' })).toBeNull()
   })
 
   it('lets the owner rename the group and change its mode', async () => {

@@ -65,7 +65,7 @@ describe('ProfilePage', () => {
     await screen.findByText('p2')
     expect(screen.getAllByRole('article')).toHaveLength(2)
     await screen.findByText('Posted in')
-    expect(screen.getByText('Knitting')).toBeTruthy()
+    expect(screen.getByRole('link', { name: 'Knitting' }).getAttribute('href')).toBe('/r/knit')
     fireEvent.click(screen.getByRole('button', { name: 'Message' }))
     expect(openDM).toHaveBeenCalledWith('kit')
     await vi.waitFor(() => expect(onGo).toHaveBeenCalledWith('/r/d1'))

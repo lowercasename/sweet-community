@@ -2,13 +2,12 @@ import { useState } from 'react'
 import type { Post as PostData } from '../api'
 import { useAuthor } from '../data/hooks'
 import { postExtensions } from '../editor/extensions'
-import { postPath } from '../routes'
+import { groupPath, postPath } from '../routes'
 import {
   Alert,
   Button,
   Card,
   ConfirmDialog,
-  Hairline,
   HtmlContent,
   Link,
   Menu,
@@ -30,7 +29,7 @@ interface PostProps {
   /** Start with the thread open (the post's page). */
   expanded?: boolean
   /** The room it was said in, when the list mixes rooms (a person's page, the post's page): drawn as a header, as old Sweet drew it. */
-  place?: { name: string; picture?: string | null }
+  place?: { id: string; name: string; picture?: string | null }
   /** True while offline; disables saving. */
   disabled: boolean
   /** Resolves when the server has stored the new body. */
@@ -85,22 +84,25 @@ export function Post({ post, linked = true, expanded = false, place, disabled, o
   )
 
   return (
-    <Card as="article">
-      <Stack gap={3}>
-        {place && (
-          <Stack gap={2}>
-            <Row gap={2} align="center">
-              <Tile name={place.name} picture={place.picture} />
-              <Text as="span" variant="small">
-                Posted in{' '}
+    <Card
+      as="article"
+      head={
+        place && (
+          <Row gap={2} align="center">
+            <Tile name={place.name} picture={place.picture} />
+            <Text as="span" variant="small">
+              Posted in{' '}
+              <Link href={groupPath(place.id)}>
                 <Text as="span" variant="body" weight="bold">
                   {place.name}
                 </Text>
-              </Text>
-            </Row>
-            <Hairline />
-          </Stack>
-        )}
+              </Link>
+            </Text>
+          </Row>
+        )
+      }
+    >
+      <Stack gap={3}>
         <Stack gap={2}>
           <Row justify="between" align="center">
             <Row gap={2} align="center">

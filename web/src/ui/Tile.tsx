@@ -3,8 +3,8 @@ interface TileProps {
   name: string
   /** The place's picture, when it has one. */
   picture?: string | null
-  /** `lg` on the room's own settings, beside the control that sets it. */
-  size?: 'sm' | 'lg'
+  /** `md` matches a person's picture, on the room's own settings beside the control that sets it. */
+  size?: 'sm' | 'md'
 }
 
 /**
@@ -14,7 +14,7 @@ interface TileProps {
  */
 export function Tile({ name, picture, size = 'sm' }: TileProps) {
   const initial = [...name.trim()][0]?.toLocaleUpperCase() ?? '?'
-  const box = size === 'lg' ? 'h-14 w-14 rounded-[10px] text-xl' : 'h-6 w-6 rounded-[6px] text-xs'
+  const box = size === 'md' ? 'h-8 w-8 rounded-[8px] text-sm' : 'h-6 w-6 rounded-[6px] text-xs'
   if (picture) {
     return (
       <img

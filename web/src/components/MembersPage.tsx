@@ -116,28 +116,28 @@ export function MembersPage({ group, me, onLeft }: MembersPageProps) {
                 <Stack gap={2}>
                   <Heading level={2}>Room settings</Heading>
                   {group.can.rename && (
-                    <Field label="Picture">
-                      <Row gap={3} align="center">
-                        <Tile name={group.name} picture={group.picture} size="lg" />
-                        <FilePicker
-                          accept={IMAGE_ACCEPT}
-                          variant="secondary"
-                          icon="image"
-                          label="Choose a picture"
+                    <Row gap={3} align="center">
+                      <Tile name={group.name} picture={group.picture} size="md" />
+                      <FilePicker
+                        accept={IMAGE_ACCEPT}
+                        variant="secondary"
+                        icon="image"
+                        label="Choose a picture"
+                        disabled={busy}
+                        onPick={(files) => void run(() => choosePicture(files[0]))}
+                      >
+                        {busy ? 'Uploading…' : 'Choose a picture'}
+                      </FilePicker>
+                      {group.picture && (
+                        <Button
+                          variant="ghost"
                           disabled={busy}
-                          onPick={(files) => void run(() => choosePicture(files[0]))}
-                        />
-                        {group.picture && (
-                          <Button
-                            variant="ghost"
-                            disabled={busy}
-                            onClick={() => void run(() => actions.setPicture(group.id, null))}
-                          >
-                            Remove picture
-                          </Button>
-                        )}
-                      </Row>
-                    </Field>
+                          onClick={() => void run(() => actions.setPicture(group.id, null))}
+                        >
+                          Remove picture
+                        </Button>
+                      )}
+                    </Row>
                   )}
                   {group.can.rename && (
                     <Field label="Name">

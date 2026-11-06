@@ -171,14 +171,12 @@ describe('Sidebar', () => {
 
   it('collapsed, keeps every name, drops the section title, and shows a group by its initial', async () => {
     await draw([root(true), knitting, withKit], '/', false)
-    // Collapsed, there is no title row: the control closes the block.
+    // Collapsed, there is no title row and no section control: a plus among the tiles took the room of a place.
     expect(names()).toEqual([
       'Home',
       'Knitting',
-      'New room',
       'kit',
       'All messages',
-      'New message',
       'Search',
       'Notifications',
       'People',

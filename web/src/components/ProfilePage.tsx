@@ -78,7 +78,7 @@ function Loaded({ profile, me, onGo }: { profile: Profile; me: User; onGo: (path
   const offline = status === 'offline'
   const placeOf = (p: PostData) => {
     const g = groups.find((x) => x.id === p.group_id)
-    return !g || g.kind === 'root' ? undefined : { name: g.name, picture: g.picture }
+    return !g || g.kind === 'root' ? undefined : { id: g.id, name: g.name, picture: g.picture }
   }
   const message = async () => {
     try {
@@ -178,7 +178,7 @@ function AuthorPost({
   disabled,
 }: {
   post: PostData
-  place?: { name: string; picture?: string | null }
+  place?: { id: string; name: string; picture?: string | null }
   disabled: boolean
 }) {
   const { edit, remove } = usePostActions(post.group_id)

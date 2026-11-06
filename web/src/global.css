@@ -16,6 +16,8 @@
   --color-ground: #faf8f8;
   --color-line: #e2e2e2;
   --color-mute: #7a7a7a;
+  /* A section's title in the nav: darker than mute, quieter than ink. */
+  --color-dim: #5c5757;
   --color-sweet: #ce1717;
   --color-pink: #ed5e5e;
   --color-blush: #fffafc;

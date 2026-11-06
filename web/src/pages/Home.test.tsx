@@ -76,6 +76,7 @@ beforeEach(async () => {
     vi.fn(() => Promise.resolve(new Response('ok'))),
   )
   localStorage.setItem('sweet.layout', 'both')
+  localStorage.setItem('sweet.nav', 'expanded')
 })
 
 async function home(path = '/') {
