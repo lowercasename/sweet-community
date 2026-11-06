@@ -25,7 +25,8 @@ interface NavSectionProps {
  */
 export function NavSection({ title, expanded, action, children }: NavSectionProps) {
   return (
-    <div role="group" aria-label={title} className="flex flex-col gap-0">
+    // pb-1.5: a section's small items carry 4px of air inside them where a full-size item carries 10, so the section ends 6px early to leave the same air before what follows (a rule, another section).
+    <div role="group" aria-label={title} className="flex flex-col gap-0 pb-1.5">
       {expanded && (
         <div className="mt-1 flex h-7 items-center justify-between pr-1 pl-3">
           <span className="text-sm font-medium text-dim">{title}</span>

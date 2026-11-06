@@ -126,4 +126,24 @@ test.describe('nav', () => {
     await kit.context.close()
     await mo.context.close()
   })
+
+  test('a rule in the nav has the same air above it as below it, after a section of small items', async ({
+    browser,
+  }, testInfo) => {
+    const kit = await member(browser, testInfo, 'kit')
+    const mo = await member(browser, testInfo, 'mo')
+    await open(kit.page)
+    await messageFromPeople(kit, mo.username)
+    for (const expanded of [true, false]) {
+      if (!expanded) await nav(kit).getByRole('button', { name: 'Collapse' }).click()
+      const face = (await nav(kit).getByRole('button', { name: mo.username }).locator('img').boundingBox())!
+      const rule = (await nav(kit).locator('hr').first().boundingBox())!
+      const search = (await nav(kit).getByRole('button', { name: 'Search' }).locator('svg').boundingBox())!
+      const above = rule.y - (face.y + face.height)
+      const below = search.y - (rule.y + rule.height)
+      expect(Math.abs(above - below)).toBeLessThanOrEqual(2)
+    }
+    await kit.context.close()
+    await mo.context.close()
+  })
 })
