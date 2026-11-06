@@ -50,7 +50,7 @@ If your proxy is itself a container, it cannot reach `127.0.0.1`. Set `SWEET_BIN
 
 ### Email
 
-Fill in `SWEET_SMTP_HOST`, `SWEET_SMTP_PORT`, `SWEET_SMTP_USER`, `SWEET_SMTP_PASSWORD` and `SWEET_MAIL_FROM` in `.env`, then `docker compose up -d`. SendGrid, for one, is host `smtp.sendgrid.net`, port `587`, user `apikey` and your API key as the password; the from-address must be one the service lets you send from.
+Fill in `SWEET_SMTP_HOST`, `SWEET_SMTP_PORT`, `SWEET_SMTP_USER`, `SWEET_SMTP_PASSWORD` and `SWEET_MAIL_FROM` in `.env`, then `docker compose up -d`. Mailgun, for one, is host `smtp.mailgun.org` (`smtp.eu.mailgun.org` for an EU domain), port `587`, and the user and password from the domain's SMTP credentials in Mailgun (the user looks like `postmaster@mg.example.org`); the from-address must be on a domain the service lets you send from.
 
 Until then, every message Sweet would have sent is a file in the data volume: `docker compose exec sweet ls /data/mail` lists them and `docker compose exec sweet cat /data/mail/<file>` shows one, link included.
 
