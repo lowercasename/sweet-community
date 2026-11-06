@@ -78,7 +78,6 @@ test.describe('chat unread', () => {
     await mo.context.request.post(`/api/groups/${ROOT}/messages`, { data: { body_html: `<p>${word}</p>` } })
     await expect(view(kit.page, 'Chat, unread')).toBeVisible()
     await tabs.getByRole('button', { name: 'Menu' }).click()
-    await expect(kit.page.getByRole('heading', { name: 'Menu' })).toBeVisible()
     await expect(tabs.getByRole('button', { name: 'Home, unread' })).toBeVisible()
     await expect(kit.page.getByRole('button', { name: 'Home, unread' }).first()).toBeVisible()
     await tabs.getByRole('button', { name: 'Home, unread' }).click()

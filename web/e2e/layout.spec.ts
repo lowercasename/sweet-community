@@ -58,6 +58,15 @@ test.describe('layout', () => {
     await expect(kit.page.getByRole('heading', { name: 'Home' })).toBeVisible()
     const tabs = kit.page.locator('nav').last()
     await expect(tabs.getByRole('button')).toHaveText(['Home', 'Search', 'Notifications', 'Menu'])
+    // The menu is the whole screen: no bar above it, no card edges around it.
+    await tabs.getByRole('button', { name: 'Menu' }).click()
+    await expect(kit.page.getByRole('heading', { name: 'Menu' })).toHaveCount(0)
+    const menuCard = await kit.page
+      .getByRole('button', { name: 'Sign out' })
+      .locator('xpath=ancestor::section[1]')
+      .boundingBox()
+    expect(menuCard && menuCard.x === 0 && menuCard.width === kit.page.viewportSize()!.width).toBeTruthy()
+    await tabs.getByRole('button', { name: 'Home' }).click()
     await expect(view(kit.page, 'Chat')).toBeVisible()
     await view(kit.page, 'Chat').click()
     const chat = kit.page.locator('.editor-line').first()

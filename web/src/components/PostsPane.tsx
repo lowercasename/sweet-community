@@ -3,7 +3,7 @@ import { useMarkRead, useMarkers, usePostActions, usePosts } from '../data/hooks
 import { feedStream, markerOf } from '../data/notifications'
 import { usePageVisible } from '../hooks/usePageVisible'
 import { useStreamStatus } from '../hooks/StreamContext'
-import { Button, Card, Measure, Pane, Row, ScrollArea, Stack, Text } from '../ui'
+import { Alert, Button, Card, Measure, Pane, Row, ScrollArea, Stack, Text } from '../ui'
 import { postExtensions } from '../editor/extensions'
 import { BodyEditor } from './BodyEditor'
 import { ConnectionStatus } from './ConnectionStatus'
@@ -63,7 +63,7 @@ export function PostsPane({ groupId, side = 'full', watching }: PostsPaneProps) 
               ) : (
                 <PostList posts={posts} disabled={offline} onEdit={edit} onDelete={remove} />
               )}
-              {error && <Text variant="secondary">{error.message}</Text>}
+              {error && <Alert tone="error">{error.message}</Alert>}
               {hasMore && (
                 <Row>
                   <Button variant="secondary" disabled={loading} onClick={loadMore}>

@@ -1,6 +1,6 @@
 import { useRef, useState } from 'react'
 import { useEditor, useEditorState, type Extensions } from '@tiptap/react'
-import { Button, EditorSurface, Form, ImageCard, Row, Stack, Text } from '../ui'
+import { Alert, Button, EditorSurface, Form, ImageCard, Row, Stack } from '../ui'
 import { imageFiles, imagesHtml, insertImages, uploadImages, type AttachedImage } from '../editor/images'
 import { EditorToolbar, promptLink } from './EditorToolbar'
 
@@ -169,7 +169,7 @@ export function BodyEditor({
             </Button>
           </Row>
         </Row>
-        {error && <Text variant="secondary">{error}</Text>}
+        {error && <Alert tone="error">{error}</Alert>}
       </Stack>
     </Form>
   )

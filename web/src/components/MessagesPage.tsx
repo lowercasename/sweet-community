@@ -2,6 +2,7 @@ import { useState } from 'react'
 import type { Group, User } from '../api'
 import { useGroupActions, useGroups, useUnreadPlaces } from '../data/hooks'
 import {
+  Alert,
   Button,
   Card,
   Dotted,
@@ -91,7 +92,7 @@ export function MessagesPage({ me, onGo }: MessagesPageProps) {
                 <Stack gap={1}>
                   <Heading level={3}>Hidden</Heading>
                   <Text variant="small">Opening one brings it back.</Text>
-                  {problem && <Text variant="secondary">{problem}</Text>}
+                  {problem && <Alert tone="error">{problem}</Alert>}
                   <List gap={1}>{out.map((g) => row(g, () => void show(g)))}</List>
                 </Stack>
               )}

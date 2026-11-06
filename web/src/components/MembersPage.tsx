@@ -2,6 +2,7 @@ import { useState } from 'react'
 import type { Group, GroupMode, Membership, User } from '../api'
 import { useGroupActions, useMembers, useSetRole, useUsers } from '../data/hooks'
 import {
+  Alert,
   Button,
   Card,
   ConfirmDialog,
@@ -148,8 +149,8 @@ export function MembersPage({ group, me, onLeft }: MembersPageProps) {
               <Stack gap={2}>
                 <Heading level={2}>Members</Heading>
                 {loading && <Text variant="secondary">Loading…</Text>}
-                {error && <Text variant="secondary">{error.message}</Text>}
-                {problem && <Text variant="secondary">{problem}</Text>}
+                {error && <Alert tone="error">{error.message}</Alert>}
+                {problem && <Alert tone="error">{problem}</Alert>}
                 {group.can.add_members && !loading && candidates.length > 0 && (
                   <Row gap={2} align="center">
                     <Select

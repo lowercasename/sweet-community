@@ -4,7 +4,7 @@ import { useMarkRead, useMarkers, useMessageActions, useMessages } from '../data
 import { chatStream, markerOf } from '../data/notifications'
 import { usePageVisible } from '../hooks/usePageVisible'
 import { useStreamStatus } from '../hooks/StreamContext'
-import { Bar, Button, Card, Pane, Row, ScrollArea, Stack, Text } from '../ui'
+import { Alert, Bar, Button, Card, Pane, Row, ScrollArea, Stack, Text } from '../ui'
 import { chatExtensions } from '../editor/extensions'
 import { BodyEditor } from './BodyEditor'
 import { ConnectionStatus } from './ConnectionStatus'
@@ -117,7 +117,7 @@ export function ChatPane({ groupId, side = 'full', watching }: ChatPaneProps) {
                 </Button>
               </Row>
             )}
-            {error && <Text variant="secondary">{error.message}</Text>}
+            {error && <Alert tone="error">{error.message}</Alert>}
             {!loading && messages.length === 0 && (
               <Text variant="secondary">Nobody has said anything yet. Say hello.</Text>
             )}

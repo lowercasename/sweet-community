@@ -1,5 +1,5 @@
 import type { StreamStatus } from '../hooks/useEventStream'
-import { Text } from '../ui'
+import { Alert } from '../ui'
 
 interface ConnectionStatusProps {
   status: StreamStatus
@@ -8,11 +8,11 @@ interface ConnectionStatusProps {
 const LABELS: Record<Exclude<StreamStatus, 'live'>, string> = {
   connecting: 'Connecting…',
   reconnecting: 'Reconnecting…',
-  offline: 'Offline - you can read but not post',
+  offline: 'Offline: you can read but not post',
 }
 
-/** Quiet status line. Renders nothing while live. */
+/** The stream's state as a notice above the editor. Renders nothing while live. */
 export function ConnectionStatus({ status }: ConnectionStatusProps) {
   if (status === 'live') return null
-  return <Text variant="secondary">{LABELS[status]}</Text>
+  return <Alert tone={status === 'offline' ? 'warning' : 'notice'}>{LABELS[status]}</Alert>
 }

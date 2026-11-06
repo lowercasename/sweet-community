@@ -3,6 +3,7 @@ import type { Group, Notification } from '../api'
 import { useAuthor, useClearNotifications, useMarkRead, useMarkers, useNotifications } from '../data/hooks'
 import { NOTIFICATIONS, describe, markerOf, targetOf, unreadOf } from '../data/notifications'
 import {
+  Alert,
   Avatar,
   Button,
   Card,
@@ -92,7 +93,7 @@ export function NotificationsPage({ groups, onGo }: NotificationsPageProps) {
         <Measure>
           <Card>
             <Stack gap={2}>
-              {error && <Text variant="secondary">{error.message}</Text>}
+              {error && <Alert tone="error">{error.message}</Alert>}
               {!loading && notifications.length === 0 && <Text variant="secondary">Nice and quiet in here.</Text>}
               {recent.length > 0 && (
                 <Stack gap={1}>
@@ -108,7 +109,7 @@ export function NotificationsPage({ groups, onGo }: NotificationsPageProps) {
                       {clearing ? 'Clearing…' : 'Clear'}
                     </Button>
                   </Row>
-                  {problem && <Text variant="secondary">{problem}</Text>}
+                  {problem && <Alert tone="error">{problem}</Alert>}
                   {rows(earlier)}
                 </Stack>
               )}

@@ -2,6 +2,7 @@ import { useState } from 'react'
 import type { Group, Invite, Member, User } from '../api'
 import { useGroupActions, useInviteActions, useInvites, useRemoveUser, useSetRole, useUsers } from '../data/hooks'
 import {
+  Alert,
   Button,
   Card,
   ConfirmDialog,
@@ -149,7 +150,7 @@ export function PeoplePage({ me, root, onOpenGroup }: PeoplePageProps) {
             )}
             <Card>
               <Stack gap={2}>
-                {error && <Text variant="secondary">{error}</Text>}
+                {error && <Alert tone="error">{error}</Alert>}
                 <List>
                   {[...(users?.values() ?? [])].map((u) => (
                     <ListItem key={u.id}>

@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import type { Group, User } from '../api'
 import { useGroupActions, useUsers } from '../data/hooks'
-import { Button, Card, Field, Form, Measure, Pane, Row, ScrollArea, Select, Stack, Text } from '../ui'
+import { Alert, Button, Card, Field, Form, Measure, Pane, Row, ScrollArea, Select, Stack, Text } from '../ui'
 
 interface NewMessagePageProps {
   me: User
@@ -57,7 +57,7 @@ export function NewMessagePage({ me, onOpened }: NewMessagePageProps) {
                     onChange={setTo}
                   />
                 </Field>
-                {error && <Text variant="secondary">{error}</Text>}
+                {error && <Alert tone="error">{error}</Alert>}
                 <Row>
                   <Button type="submit" disabled={busy || !to}>
                     {busy ? 'Opening…' : 'Start'}

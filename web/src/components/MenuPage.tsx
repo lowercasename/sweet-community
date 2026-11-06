@@ -16,7 +16,8 @@ interface MenuPageProps {
 /**
  * The phone's menu: what the nav column holds, in the same blocks, with
  * the account first and Sign out last. Search and Notifications are tabs, so they
- * are not repeated here.
+ * are not repeated here. It is the whole screen, flush, under no bar: a menu
+ * is not a view to be named (Raphael, 2026-11-06).
  */
 export function MenuPage({ me, groups, onGo, onLogout }: MenuPageProps) {
   const live = useAuthor(me)
@@ -25,8 +26,8 @@ export function MenuPage({ me, groups, onGo, onLogout }: MenuPageProps) {
   const mine = roomsOf(groups)
   const canCreate = root?.can.create_groups === true
   return (
-    <Pane>
-      <Card>
+    <Pane flush>
+      <Card flush>
         <Stack gap={1}>
           <NavAccount username={live.username} picture={live.picture} expanded />
           <Hairline />

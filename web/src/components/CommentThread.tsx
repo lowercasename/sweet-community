@@ -2,7 +2,7 @@ import { useState } from 'react'
 import type { Comment as CommentData } from '../api'
 import { useAuthor, useCommentActions, useComments } from '../data/hooks'
 import { commentExtensions } from '../editor/extensions'
-import { Box, ConfirmDialog, Hairline, HtmlContent, Menu, Row, Stack, Text, Time, type MenuItem } from '../ui'
+import { Alert, Box, ConfirmDialog, Hairline, HtmlContent, Menu, type MenuItem, Row, Stack, Text, Time } from '../ui'
 import { BodyEditor } from './BodyEditor'
 import { PersonName } from './PersonName'
 
@@ -79,7 +79,7 @@ function CommentItem({ comment, disabled, onEdit, onDelete }: CommentItemProps) 
         ) : (
           <HtmlContent html={comment.body_html} />
         )}
-        {error && <Text variant="secondary">{error}</Text>}
+        {error && <Alert tone="error">{error}</Alert>}
       </Stack>
       <ConfirmDialog
         open={confirming}
@@ -104,7 +104,7 @@ export function CommentThread({ postId, groupId, disabled }: CommentThreadProps)
     <Stack gap={2}>
       <Hairline />
       {loading && <Text variant="secondary">Loading comments…</Text>}
-      {error && <Text variant="secondary">{error.message}</Text>}
+      {error && <Alert tone="error">{error.message}</Alert>}
       {comments.map((c) => (
         <CommentItem
           key={c.id}

@@ -3,7 +3,7 @@ import { useLocation } from 'wouter'
 import type { Member, User } from '../api'
 import { useGroupActions, useMe, useUsers } from '../data/hooks'
 import { groupPath } from '../routes'
-import { Avatar, Button, HoverCard, Row, Stack, Text, Time } from '../ui'
+import { Alert, Avatar, Button, HoverCard, Row, Stack, Text, Time } from '../ui'
 
 interface PersonNameProps {
   /** The person as the content carried them; the card shows them as they are now. */
@@ -46,7 +46,7 @@ function PersonCard({ person, me }: { person: Member | User; me: User | null | u
           )}
         </Stack>
       </Row>
-      {error && <Text variant="secondary">{error}</Text>}
+      {error && <Alert tone="error">{error}</Alert>}
       {me && me.id !== person.id && standing && (
         <Row>
           <Button variant="secondary" icon="chat" onClick={() => void message()}>

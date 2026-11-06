@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import type { Group, GroupMode } from '../api'
 import { useGroupActions } from '../data/hooks'
-import { Button, Card, Field, Form, Input, Measure, Pane, Row, ScrollArea, Select, Stack, Text } from '../ui'
+import { Alert, Button, Card, Field, Form, Input, Measure, Pane, Row, ScrollArea, Select, Stack, Text } from '../ui'
 
 interface NewGroupPageProps {
   onCreated: (group: Group) => void
@@ -50,7 +50,7 @@ export function NewGroupPage({ onCreated }: NewGroupPageProps) {
                 <Field label="Mode">
                   <Select value={mode} options={MODES} onChange={setMode} />
                 </Field>
-                {error && <Text variant="secondary">{error}</Text>}
+                {error && <Alert tone="error">{error}</Alert>}
                 <Row>
                   <Button type="submit" disabled={busy || !name.trim()}>
                     {busy ? 'Creating…' : 'Create room'}

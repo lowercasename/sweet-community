@@ -28,7 +28,6 @@ const PAGE_TITLES: Record<string, string> = {
   [NOTIFICATIONS]: 'Notifications',
   '/people': 'People',
   '/settings': 'Settings',
-  '/menu': 'Menu',
 }
 
 interface HomeProps {
@@ -122,46 +121,49 @@ export function Home({ me, onSignOut }: HomeProps) {
           )
         }
       >
-        <PageBar title={bar.title} back={bar.back}>
-          {narrow && viewing && current?.mode === 'both' && (
-            <Segmented
-              label="View"
-              segments={[
-                {
-                  key: 'posts',
-                  icon: 'posts',
-                  label: 'Posts',
-                  dot: layout !== 'posts' && places.get(current.id)?.feed === true,
-                },
-                {
-                  key: 'chat',
-                  icon: 'chat',
-                  label: 'Chat',
-                  dot: layout !== 'chat' && places.get(current.id)?.chat === true,
-                },
-              ]}
-              value={layout === 'posts' ? 'posts' : 'chat'}
-              compact
-              onChange={setLayout}
-            />
-          )}
-          {viewing && current && current.kind === 'group' && (
-            <Button
-              variant="ghost"
-              icon="people"
-              label="Members and settings"
-              onClick={() => navigate(membersPath(current))}
-            >
-              {narrow ? undefined : 'Members and settings'}
-            </Button>
-          )}
-          {viewing && current && current.kind === 'dm' && (
-            <Menu
-              label="Conversation options"
-              items={[{ label: 'Hide conversation', icon: 'remove', onSelect: () => setHiding(true) }]}
-            />
-          )}
-        </PageBar>
+        {/* The phone's menu is the one view under no bar: it is not a place to be named. */}
+        {location !== '/menu' && (
+          <PageBar title={bar.title} back={bar.back}>
+            {narrow && viewing && current?.mode === 'both' && (
+              <Segmented
+                label="View"
+                segments={[
+                  {
+                    key: 'posts',
+                    icon: 'posts',
+                    label: 'Posts',
+                    dot: layout !== 'posts' && places.get(current.id)?.feed === true,
+                  },
+                  {
+                    key: 'chat',
+                    icon: 'chat',
+                    label: 'Chat',
+                    dot: layout !== 'chat' && places.get(current.id)?.chat === true,
+                  },
+                ]}
+                value={layout === 'posts' ? 'posts' : 'chat'}
+                compact
+                onChange={setLayout}
+              />
+            )}
+            {viewing && current && current.kind === 'group' && (
+              <Button
+                variant="ghost"
+                icon="people"
+                label="Members and settings"
+                onClick={() => navigate(membersPath(current))}
+              >
+                {narrow ? undefined : 'Members and settings'}
+              </Button>
+            )}
+            {viewing && current && current.kind === 'dm' && (
+              <Menu
+                label="Conversation options"
+                items={[{ label: 'Hide conversation', icon: 'remove', onSelect: () => setHiding(true) }]}
+              />
+            )}
+          </PageBar>
+        )}
         <Switch>
           <Route path="/people">
             {root && <PeoplePage me={me} root={root} onOpenGroup={(id) => navigate(groupPath(id, root.id))} />}
