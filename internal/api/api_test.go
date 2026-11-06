@@ -883,3 +883,39 @@ func TestRepliesAndEventsMatchTheRow(t *testing.T) {
 	same("found dm", found, kit.mustStatus(200, "GET", "/api/groups/"+did, nil), lastEvent(kit, "group", isID(did)))
 	same("dm as mo", mo.mustStatus(200, "GET", "/api/groups/"+did, nil), byID(mo.mustStatus(200, "GET", "/api/groups", nil), "groups", did), lastEvent(mo, "group", isID(did)))
 }
+
+// A post has an address of its own (architecture.md, Posts): GET
+// /api/posts/{id} is the same post the feed lists, with the viewer's flags;
+// a post in a group the viewer is not in, or a deleted one, does not exist to them.
+func TestGetPost(t *testing.T) {
+	ts, owner := newTestServer(t)
+	kit, _ := registerMember(t, ts, owner, "kit")
+	mo, _ := registerMember(t, ts, owner, "mo")
+
+	post := kit.mustStatus(201, "POST", rootPath+"/posts", map[string]string{"body_html": "<p>hello</p>"})
+	pid := post["id"].(string)
+	kit.mustStatus(201, "POST", "/api/posts/"+pid+"/comments", map[string]string{"body_html": "<p>c</p>"})
+	got := mo.mustStatus(200, "GET", "/api/posts/"+pid, nil)
+	var listed map[string]any
+	for _, x := range mo.mustStatus(200, "GET", rootPath+"/posts", nil)["posts"].([]any) {
+		if m := x.(map[string]any); m["id"] == pid {
+			listed = m
+		}
+	}
+	if !reflect.DeepEqual(got, listed) {
+		t.Fatalf("fetched post differs from the listed one\nfetched: %v\nlisted:  %v", got, listed)
+	}
+	if got["comment_count"] != float64(1) {
+		t.Fatalf("comment_count: %v", got["comment_count"])
+	}
+
+	// In a room mo is not in, the post does not exist to mo.
+	room := kit.mustStatus(201, "POST", "/api/groups", map[string]any{"kind": "group", "name": "Knitting", "mode": "both"})
+	private := kit.mustStatus(201, "POST", "/api/groups/"+room["id"].(string)+"/posts", map[string]string{"body_html": "<p>wool</p>"})
+	mo.mustStatus(404, "GET", "/api/posts/"+private["id"].(string), nil)
+	kit.mustStatus(200, "GET", "/api/posts/"+private["id"].(string), nil)
+
+	kit.mustStatus(200, "DELETE", "/api/posts/"+pid, nil)
+	kit.mustStatus(404, "GET", "/api/posts/"+pid, nil)
+	kit.mustStatus(404, "GET", "/api/posts/nothing", nil)
+}

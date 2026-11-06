@@ -1,4 +1,4 @@
-/** Query keys. People and groups are instance-wide; feeds, rooms and member lists are per group; comments per post. */
+/** Query keys. People and groups are instance-wide; feeds, rooms and member lists are per group; comments per post; a post page per post. */
 /** The root group's fixed id (perm.Root on the server): the instance itself. */
 export const ROOT_ID = '00000000-0000-7000-8000-000000000000'
 
@@ -8,6 +8,8 @@ export const keys = {
   groups: ['groups'] as const,
   members: (groupId: string) => ['members', groupId] as const,
   posts: (groupId: string) => ['posts', groupId] as const,
+  /** One post, for its page; applyEvent keeps it in step with the feed that holds it. */
+  post: (id: string) => ['post', id] as const,
   comments: (postId: string) => ['comments', postId] as const,
   messages: (groupId: string) => ['messages', groupId] as const,
   invites: ['invites'] as const,

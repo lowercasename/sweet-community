@@ -5,7 +5,7 @@ import { makeQueryClient } from './client'
 import { keys } from './keys'
 import { applyEvent } from './apply'
 import { ROOT, comment, dm, group, member, message, mine, post, user } from '../test-utils'
-import type { Group, Member, PostPage, User } from '../api'
+import type { Group, Member, Post, PostPage, User } from '../api'
 
 /**
  * The event stream is the cache's write path: one upsert and one delete per
@@ -52,6 +52,25 @@ beforeEach(() => {
 })
 
 describe('applyEvent', () => {
+  it('keeps a post page in step with its feed: edits, comment counts, authors and deletion reach the post query', () => {
+    qc.setQueryData(keys.post('p2'), post('p2', mo))
+    const page = () => qc.getQueryData(keys.post('p2')) as Post | undefined
+    applyEvent(qc, 'post', post('p2', mo, { body_html: '<p>new</p>', edited_at: 5 }))
+    expect(page()!.body_html).toBe('<p>new</p>')
+    applyEvent(qc, 'comment', comment('c2', 'p2', kit))
+    expect(page()!.comment_count).toBe(1)
+    expect(posts().find((p) => p.id === 'p2')!.comment_count).toBe(1)
+    applyEvent(qc, 'comment_delete', { id: 'c2', post_id: 'p2', group_id: ROOT })
+    expect(page()!.comment_count).toBe(0)
+    applyEvent(qc, 'user', user('mo', '/img/mo'))
+    expect(page()!.author.picture).toBe('/img/mo')
+    // A post page the feed does not hold is left to fetch itself.
+    applyEvent(qc, 'post', post('p9', mo))
+    expect(qc.getQueryData(keys.post('p9'))).toBeUndefined()
+    applyEvent(qc, 'post_delete', { id: 'p2', group_id: ROOT })
+    expect(page()).toBeUndefined()
+  })
+
   it('prepends a new post to its own group and replaces an existing one in place', () => {
     applyEvent(qc, 'post', post('p4', mo))
     expect(posts().map((p) => p.id)).toEqual(['p4', 'p3', 'p2', 'p1'])

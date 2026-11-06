@@ -2,6 +2,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, screen, within } from '@testing-library/react'
 import { FakeEventSource, ROOT, dm, group, member, post, renderWithQuery, user } from '../test-utils'
+import { ApiError } from '../api'
 
 /**
  * Guards on the signed-in page. The draft bug: closing and reopening a
@@ -12,9 +13,12 @@ import { FakeEventSource, ROOT, dm, group, member, post, renderWithQuery, user }
  * groups: the nav lists mine, a group opens with the panes its mode says,
  * a DM is named by its people, and New room follows the root's flag.
  */
-vi.mock('../api', () => ({
+vi.mock('../api', async (importOriginal) => ({
+  ApiError: (await importOriginal<typeof import('../api')>()).ApiError,
   getMe: vi.fn(() => Promise.resolve({ id: 'raphael', username: 'raphael', picture: null })),
   getPosts: vi.fn(),
+  getPost: vi.fn(),
+  getComments: vi.fn(() => Promise.resolve({ comments: [] })),
   getMessages: vi.fn(() => Promise.resolve({ messages: [], next_before: null })),
   listUsers: vi.fn(),
   listGroups: vi.fn(),
@@ -189,6 +193,43 @@ describe('Home', () => {
   it('shows the root group for a path it does not know', async () => {
     await home('/nowhere')
     await screen.findByText('p1')
+    expect(window.location.pathname).toBe('/')
+  })
+
+  it('a post has a page of its own: its time links there, the thread is open, Back returns to its room', async () => {
+    const { getPost } = await import('../api')
+    vi.mocked(getPost).mockResolvedValue(post('p1', raphael))
+    await home()
+    fireEvent.click(within(screen.getByText('p1').closest('article')!).getByRole('link'))
+    expect(window.location.pathname).toBe('/p/p1')
+    await screen.findByRole('heading', { name: 'Post by raphael' })
+    // The feed stays mounted behind; the page's own copy of the post shows, with its reply editor.
+    const shown = screen.getAllByRole('article').filter((a) => !a.closest('.hidden'))
+    expect(shown).toHaveLength(1)
+    expect(shown[0].querySelector('.editor-line')).not.toBeNull()
+    expect(within(shown[0]).queryByRole('link')).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: 'Back to Home' }))
+    expect(window.location.pathname).toBe('/')
+    expect(screen.getByRole('separator')).toBeTruthy()
+  })
+
+  it('opens a post by its address, with its room behind it', async () => {
+    const { getPost, getMessages } = await import('../api')
+    vi.mocked(getPost).mockResolvedValue(post('g1', kit, { group_id: 'knit' }))
+    await home('/p/g1')
+    await screen.findByRole('heading', { name: 'Post by kit' })
+    expect(getPost).toHaveBeenCalledWith('g1')
+    await vi.waitFor(() => expect(getMessages).toHaveBeenCalledWith('knit', null))
+    fireEvent.click(screen.getByRole('button', { name: 'Back to Knitting' }))
+    expect(window.location.pathname).toBe('/r/knit')
+  })
+
+  it('says so when a post is gone or not mine to see', async () => {
+    const { getPost } = await import('../api')
+    vi.mocked(getPost).mockRejectedValue(new ApiError(404, 'no such post'))
+    await home('/p/nothing')
+    await screen.findByText(/This post is gone/)
+    fireEvent.click(screen.getAllByRole('button', { name: 'Home' }).find((b) => !b.closest('nav'))!)
     expect(window.location.pathname).toBe('/')
   })
 

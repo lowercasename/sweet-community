@@ -188,6 +188,7 @@ func (s *Server) Routes(mux *http.ServeMux) {
 	mux.HandleFunc("POST /api/groups/{gid}/posts", s.requireGroup(s.createPost))
 	mux.HandleFunc("GET /api/groups/{gid}/messages", s.requireGroup(s.listMessages))
 	mux.HandleFunc("POST /api/groups/{gid}/messages", s.requireGroup(s.createMessage))
+	mux.HandleFunc("GET /api/posts/{id}", s.requireAuth(s.getPost))
 	mux.HandleFunc("PUT /api/posts/{id}", s.requireAuth(s.editPost))
 	mux.HandleFunc("DELETE /api/posts/{id}", s.requireAuth(s.deletePost))
 	mux.HandleFunc("GET /api/posts/{id}/comments", s.requireAuth(s.listComments))
@@ -256,6 +257,25 @@ func (s *Server) listPosts(w http.ResponseWriter, r *http.Request) {
 		next = &n
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"posts": posts, "next_before": next})
+}
+
+// getPost is one post by its address (architecture.md, Posts): the post page
+// fetches it when the feed it belongs to is not loaded. 404 when the viewer
+// is not in its group, as everywhere.
+func (s *Server) getPost(w http.ResponseWriter, r *http.Request) {
+	id := r.PathValue("id")
+	_, a, status, err := s.postActor(r, s.q(), id)
+	if err != nil {
+		writeErr(w, status, err.Error())
+		return
+	}
+	row, err := s.q().GetPost(r.Context(), id)
+	if err != nil {
+		writeErr(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	p := wirePost(row)
+	writeJSON(w, http.StatusOK, forViewer(a, &p, Settings{}))
 }
 
 // readBody decodes {body_html}, sanitises it, and writes the 400 itself when

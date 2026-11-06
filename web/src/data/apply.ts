@@ -62,7 +62,18 @@ type Users = { users: Member[] }
 type Groups = { groups: Group[] }
 type Members = { members: Membership[] }
 
+/** A post as a loaded feed holds it, for a post page to start from. */
+export function findPost(qc: QueryClient, id: string): Post | undefined {
+  for (const [, data] of qc.getQueriesData<Posts>({ queryKey: ['posts'] })) {
+    const found = data?.pages.flatMap((p) => p.posts).find((p) => p.id === id)
+    if (found) return found
+  }
+  return undefined
+}
+
 function upsertPost(qc: QueryClient, post: Post) {
+  // Its page, if open, shows the same post.
+  qc.setQueryData<Post>(keys.post(post.id), (old) => (old ? post : old))
   qc.setQueryData<Posts>(keys.posts(post.group_id), (old) => {
     if (!old) return old
     const known = old.pages.some((p) => p.posts.some((x) => x.id === post.id))
@@ -78,18 +89,19 @@ function deletePost(qc: QueryClient, id: string, groupId: string) {
     old ? { ...old, pages: old.pages.map((p) => ({ ...p, posts: p.posts.filter((x) => x.id !== id) })) } : old,
   )
   qc.removeQueries({ queryKey: keys.comments(id) })
+  qc.removeQueries({ queryKey: keys.post(id) })
 }
 
 function countComments(qc: QueryClient, postId: string, groupId: string, by: number) {
+  const counted = (x: Post) => ({ ...x, comment_count: Math.max(0, x.comment_count + by) })
+  qc.setQueryData<Post>(keys.post(postId), (old) => (old ? counted(old) : old))
   qc.setQueryData<Posts>(keys.posts(groupId), (old) =>
     old
       ? {
           ...old,
           pages: old.pages.map((p) => ({
             ...p,
-            posts: p.posts.map((x) =>
-              x.id === postId ? { ...x, comment_count: Math.max(0, x.comment_count + by) } : x,
-            ),
+            posts: p.posts.map((x) => (x.id === postId ? counted(x) : x)),
           })),
         }
       : old,
@@ -165,6 +177,7 @@ function upsertUser(qc: QueryClient, u: User) {
         pages: old.pages.map((p) => ({ ...p, posts: p.posts.map((x) => ({ ...x, author: as(x.author) })) })),
       },
   )
+  qc.setQueriesData<Post>({ queryKey: ['post'] }, (old) => old && { ...old, author: as(old.author) })
   qc.setQueriesData<Thread>(
     { queryKey: ['comments'] },
     (old) => old && { comments: old.comments.map((c) => ({ ...c, author: as(c.author) })) },
@@ -193,6 +206,9 @@ function dropGroup(qc: QueryClient, id: string) {
   qc.removeQueries({ queryKey: keys.posts(id) })
   qc.removeQueries({ queryKey: keys.messages(id) })
   qc.removeQueries({ queryKey: keys.members(id) })
+  qc.removeQueries({
+    predicate: (q) => q.queryKey[0] === 'post' && (q.state.data as Post | undefined)?.group_id === id,
+  })
 }
 
 const ROOT_KIND = 'root'

@@ -15,5 +15,8 @@ export const NEW_ROOM = '/rooms/new'
 export const MESSAGES = '/messages'
 export const NEW_MESSAGE = '/messages/new'
 
+/** A post's own address (architecture.md, Posts). */
+export const postPath = (id: string) => `/p/${encodeURIComponent(id)}`
+
 /** A room's members page. */
 export const membersPath = (g: Group) => `${groupPath(g.id)}/members`

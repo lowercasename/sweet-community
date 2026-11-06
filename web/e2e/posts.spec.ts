@@ -69,3 +69,67 @@ test.describe('posts and comments', () => {
     await kit.context.close()
   })
 })
+
+test.describe('post page', () => {
+  test('a post has a page of its own: from its time, with the thread open; Back returns to its room', async ({
+    browser,
+  }, testInfo) => {
+    const kit = await member(browser, testInfo, 'kit')
+    const mo = await member(browser, testInfo, 'mo')
+    await open(kit.page)
+    const text = uniq('A post with an address ')
+    await writePost(kit.page, text)
+    await article(kit.page, text).getByRole('link').click()
+    await expect(kit.page).toHaveURL(/\/p\/[0-9a-f-]+$/)
+    const path = new URL(kit.page.url()).pathname
+    await expect(kit.page.getByRole('heading', { name: `Post by ${kit.username}` })).toBeVisible()
+
+    // The thread is open: a reply from here counts on the feed behind.
+    const shown = kit.page.locator('article:visible').filter({ hasText: text })
+    await shown.locator('.editor-line .ProseMirror').click()
+    await kit.page.keyboard.type('From the page')
+    await kit.page.getByRole('button', { name: 'Reply' }).click()
+    await expect(shown).toContainText('From the page')
+
+    // The address holds: a reload, and another person.
+    await kit.page.reload()
+    await expect(kit.page.getByRole('heading', { name: `Post by ${kit.username}` })).toBeVisible()
+    await open(mo.page, path)
+    await expect(mo.page.getByRole('heading', { name: `Post by ${kit.username}` })).toBeVisible()
+    await expect(mo.page.locator('article:visible').filter({ hasText: text })).toContainText('From the page')
+
+    await kit.page.getByRole('button', { name: 'Back to Home' }).click()
+    await expect(kit.page).toHaveURL(/\/$/)
+    await expect(article(kit.page, text).getByRole('button', { name: 'Show comments' })).toContainText('1')
+
+    // A post in a room mo is not in has no page for mo.
+    const room = await kit.context.request.post('/api/groups', {
+      data: { kind: 'group', name: uniq('Wool'), mode: 'both' },
+    })
+    const gid = ((await room.json()) as { id: string }).id
+    const secret = await kit.context.request.post(`/api/groups/${gid}/posts`, { data: { body_html: '<p>secret</p>' } })
+    const pid = ((await secret.json()) as { id: string }).id
+    await mo.page.goto(`/p/${pid}`)
+    await expect(mo.page.getByText(/This post is gone/)).toBeVisible()
+    await expect(mo.page.getByText('secret')).toHaveCount(0)
+    await kit.context.close()
+    await mo.context.close()
+  })
+
+  test('@phone the post page fills the screen, and Back returns to the feed', async ({ browser }, testInfo) => {
+    const kit = await member(browser, testInfo)
+    await open(kit.page)
+    await kit.page.locator('nav').last().getByRole('button', { name: 'Posts' }).click()
+    const text = uniq('Phone post ')
+    await writePost(kit.page, text)
+    await article(kit.page, text).getByRole('link').click()
+    await expect(kit.page.getByRole('heading', { name: `Post by ${kit.username}` })).toBeVisible()
+    const shown = kit.page.locator('article:visible').filter({ hasText: text })
+    await expect(shown).toBeVisible()
+    await expect(shown.locator('.editor-line')).toBeVisible()
+    await kit.page.getByRole('button', { name: 'Back to Home' }).click()
+    await expect(kit.page).toHaveURL(/\/$/)
+    await expect(article(kit.page, text)).toBeVisible()
+    await kit.context.close()
+  })
+})

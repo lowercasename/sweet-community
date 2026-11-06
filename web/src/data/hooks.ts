@@ -14,6 +14,7 @@ import {
   getComments,
   getMe,
   getMessages,
+  getPost,
   getPosts,
   getSettings,
   listGroups,
@@ -39,7 +40,7 @@ import {
   type Settings,
   type User,
 } from '../api'
-import { applyEvent } from './apply'
+import { applyEvent, findPost } from './apply'
 import { ROOT_ID, keys } from './keys'
 
 /*
@@ -131,6 +132,25 @@ export function usePosts(groupId: string) {
     hasMore: q.hasNextPage,
     loadMore: () => void q.fetchNextPage(),
   }
+}
+
+/**
+ * One post, for its page. A loaded feed's copy is the starting point, so a
+ * post opened from the feed draws at once; the server's is fetched behind
+ * it. applyEvent keeps this query in step with the feed from then on.
+ */
+export function usePost(id: string, enabled = true) {
+  const qc = useQueryClient()
+  const q = useQuery({
+    queryKey: keys.post(id),
+    queryFn: () => getPost(id),
+    initialData: () => findPost(qc, id),
+    initialDataUpdatedAt: 0,
+    enabled,
+    // Not here is an answer, not a hiccup: no second try.
+    retry: (n, e) => n < 1 && !(e instanceof ApiError && e.status === 404),
+  })
+  return { post: q.data, loading: q.isPending, error: q.error }
 }
 
 export function usePostActions(groupId: string) {

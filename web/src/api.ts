@@ -248,6 +248,11 @@ export function getPosts(groupId: string, before?: number | null, limit = 20): P
   return request<PostPage>(`${g(groupId)}/posts?${params}`)
 }
 
+/** One post by its address: for its page, when the feed it is in is not loaded. 404 when gone or not mine to see. */
+export function getPost(id: string): Promise<Post> {
+  return request<Post>(`/api/posts/${encodeURIComponent(id)}`)
+}
+
 export function createPost(groupId: string, bodyHtml: string): Promise<Post> {
   return request<Post>(`${g(groupId)}/posts`, json('POST', { body_html: bodyHtml }))
 }

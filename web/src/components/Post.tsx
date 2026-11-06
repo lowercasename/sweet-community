@@ -2,13 +2,18 @@ import { useState } from 'react'
 import type { Post as PostData } from '../api'
 import { useAuthor } from '../data/hooks'
 import { postExtensions } from '../editor/extensions'
-import { Button, Card, ConfirmDialog, HtmlContent, Menu, Row, Stack, Text, Time, type MenuItem } from '../ui'
+import { postPath } from '../routes'
+import { Button, Card, ConfirmDialog, HtmlContent, Link, Menu, Row, Stack, Text, Time, type MenuItem } from '../ui'
 import { BodyEditor } from './BodyEditor'
 import { CommentThread } from './CommentThread'
 import { PersonName } from './PersonName'
 
 interface PostProps {
   post: PostData
+  /** The time links to the post's own page; false on that page. */
+  linked?: boolean
+  /** Start with the thread open (the post's page). */
+  expanded?: boolean
   /** True while offline; disables saving. */
   disabled: boolean
   /** Resolves when the server has stored the new body. */
@@ -17,10 +22,10 @@ interface PostProps {
   onDelete: () => Promise<void>
 }
 
-export function Post({ post, disabled, onEdit, onDelete }: PostProps) {
+export function Post({ post, linked = true, expanded = false, disabled, onEdit, onDelete }: PostProps) {
   const author = useAuthor(post.author)
   const [editing, setEditing] = useState(false)
-  const [open, setOpen] = useState(false)
+  const [open, setOpen] = useState(expanded)
   const [confirming, setConfirming] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const [deleteError, setDeleteError] = useState<string | null>(null)
@@ -48,6 +53,18 @@ export function Post({ post, disabled, onEdit, onDelete }: PostProps) {
   if (post.can.edit) items.push({ label: 'Edit', icon: 'pencil', onSelect: () => setEditing(true) })
   if (post.can.delete) items.push({ label: 'Delete', icon: 'trash', onSelect: () => setConfirming(true) })
 
+  const when = (
+    <>
+      <Time at={post.created_at} />
+      {post.edited_at != null && (
+        <>
+          {' · edited '}
+          <Time at={post.edited_at} />
+        </>
+      )}
+    </>
+  )
+
   return (
     <Card as="article">
       <Stack gap={2}>
@@ -55,13 +72,7 @@ export function Post({ post, disabled, onEdit, onDelete }: PostProps) {
           <Row gap={2} align="center">
             <PersonName user={author} avatar="md" />
             <Text as="span" variant="small">
-              <Time at={post.created_at} />
-              {post.edited_at != null && (
-                <>
-                  {' · edited '}
-                  <Time at={post.edited_at} />
-                </>
-              )}
+              {linked ? <Link href={postPath(post.id)}>{when}</Link> : when}
             </Text>
           </Row>
           {items.length > 0 && !editing && !disabled && <Menu label="Post options" items={items} />}

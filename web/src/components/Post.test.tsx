@@ -23,6 +23,27 @@ async function render(flags: { edit: boolean; delete: boolean }) {
   )
 }
 
+describe('Post page link', () => {
+  it("links its time to the post's own page, unless told it is already there", async () => {
+    const { Post } = await import('./Post')
+    const draw = (linked?: boolean) =>
+      renderWithQuery(
+        <Post
+          post={post('p1', user('kit'))}
+          linked={linked}
+          disabled={false}
+          onEdit={() => Promise.resolve()}
+          onDelete={() => Promise.resolve()}
+        />,
+      )
+    draw()
+    expect(screen.getByRole('link').getAttribute('href')).toBe('/p/p1')
+    cleanup()
+    draw(false)
+    expect(screen.queryByRole('link')).toBeNull()
+  })
+})
+
 describe('Post menu', () => {
   it('offers both actions when both are allowed', async () => {
     await render(mine)

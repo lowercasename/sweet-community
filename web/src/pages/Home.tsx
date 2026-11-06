@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Redirect, Route, Switch, useLocation, useRoute, useSearch } from 'wouter'
 import type { User } from '../api'
-import { useGroups } from '../data/hooks'
+import { useGroups, usePost } from '../data/hooks'
 import { StreamProvider } from '../hooks/StreamContext'
 import { useLayout } from '../hooks/useLayout'
 import { MESSAGES, NEW_MESSAGE, NEW_ROOM, groupPath, membersPath } from '../routes'
@@ -13,6 +13,7 @@ import { MessagesPage } from '../components/MessagesPage'
 import { NewGroupPage } from '../components/NewGroupPage'
 import { NewMessagePage } from '../components/NewMessagePage'
 import { PeoplePage } from '../components/PeoplePage'
+import { PostPage } from '../components/PostPage'
 import { SettingsPage } from '../components/SettingsPage'
 import { Sidebar } from '../components/Sidebar'
 import { Shell, TabBar } from '../ui'
@@ -26,7 +27,7 @@ interface HomeProps {
 /**
  * The signed-in app: a nav column on the left, then the page the URL names
  * (architecture.md, Layout). `/` and `/r/<id>` are a group's view (a DM's
- * too); the other pages show over it. The last group the URL named stays mounted behind
+ * too); the other pages show over it, a post's page over its room. The last group the URL named stays mounted behind
  * them, so a half-written post or message survives a visit to Settings or
  * Members; naming another group swaps it.
  */
@@ -39,10 +40,13 @@ export function Home({ me, onSignOut }: HomeProps) {
   const withPeople = (new URLSearchParams(useSearch()).get('with') ?? '').split(',').filter(Boolean)
   const [atGroup, groupParams] = useRoute('/r/:id')
   const [atMembers, membersParams] = useRoute('/r/:id/members')
+  const [atPost, postParams] = useRoute('/p/:id')
   const atRoot = location === '/'
+  // A post's page sits over the room the post is in, once the post is known.
+  const { post: openPost } = usePost(postParams?.id ?? '', atPost)
 
   // The group the URL names, if any; else the last one it named, so its panes stay put.
-  const named = atRoot ? root?.id : (groupParams?.id ?? membersParams?.id)
+  const named = atRoot ? root?.id : (groupParams?.id ?? membersParams?.id ?? (atPost ? openPost?.group_id : undefined))
   const [last, setLast] = useState<string | undefined>()
   useEffect(() => {
     if (named) setLast(named)
@@ -105,6 +109,9 @@ export function Home({ me, onSignOut }: HomeProps) {
                 onStartWith={(ids) => navigate(`${NEW_MESSAGE}?with=${ids.map(encodeURIComponent).join(',')}`)}
               />
             )}
+          </Route>
+          <Route path="/p/:id">
+            {atPost && <PostPage key={postParams.id} postId={postParams.id} groups={groups} onGo={navigate} />}
           </Route>
           <Route path="/" />
           <Route path="/r/:id" />
