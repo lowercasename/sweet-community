@@ -64,8 +64,9 @@ describe('applyEvent', () => {
     applyEvent(qc, 'notification', notification('n2', 'added', mo))
     applyEvent(qc, 'notification', notification('n2', 'added', mo))
     expect(list().map((n) => n.id)).toEqual(['n2', 'n1'])
-    // Clearing names a time: everything up to it is gone.
-    applyEvent(qc, 'notification_delete', { user_id: 'raphael', before: 1 })
+    // Clearing names a time: the opened ones up to it are gone; an unopened one stays.
+    applyEvent(qc, 'notification', notification('n1', 'comment', mo, { read_at: 3 }))
+    applyEvent(qc, 'notification_delete', { user_id: 'raphael', before: 5 })
     expect(list().map((n) => n.id)).toEqual(['n2'])
 
     qc.setQueryData(keys.markers, { markers: [marker('notifications', 5, 2)] })
@@ -99,9 +100,13 @@ describe('applyEvent', () => {
     applyEvent(qc, 'post', post('p7', mo, { group_id: CLUB, created_at: 11, edited_at: 12 }))
     applyEvent(qc, 'post', post('p8', kit, { group_id: CLUB, created_at: 13 }))
     expect(unread(`feed:${CLUB}`)).toBe(1)
+    // Notifications count while unopened; opening one (the same event, with read_at) uncounts it.
+    qc.setQueryData(keys.notifications, { pages: [{ notifications: [], next_before: null }], pageParams: [null] })
     applyEvent(qc, 'notification', notification('n6', 'comment', mo))
-    applyEvent(qc, 'notification', notification('n4', 'comment', mo))
+    applyEvent(qc, 'notification', notification('n4', 'comment', mo, { read_at: 8 }))
     expect(unread('notifications')).toBe(1)
+    applyEvent(qc, 'notification', notification('n6', 'comment', mo, { read_at: 9 }))
+    expect(unread('notifications')).toBe(0)
     // Leaving a room, or hiding a conversation, takes its marker with it.
     applyEvent(qc, 'membership_delete', { group_id: CLUB, user_id: 'kit' })
     expect((qc.getQueryData(keys.markers) as { markers: Marker[] }).markers.map((m) => m.stream)).toEqual([

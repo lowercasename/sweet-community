@@ -122,6 +122,7 @@ export const notification = (
   group_id: ROOT,
   post_id: kind === 'comment' ? `p-${id}` : null,
   created_at: Number.parseInt(id.replace(/\D/g, ''), 10) || 1,
+  read_at: null,
   ...extra,
 })
 

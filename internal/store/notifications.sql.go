@@ -42,8 +42,7 @@ func (q *Queries) CreateNotification(ctx context.Context, arg CreateNotification
 }
 
 const deleteReadNotifications = `-- name: DeleteReadNotifications :exec
-DELETE FROM notifications WHERE notifications.user_id = ?1 AND notifications.created_at <= ?2
-  AND notifications.created_at <= COALESCE((SELECT r.read_at FROM read_markers r WHERE r.user_id = ?1 AND r.stream = 'notifications'), 0)
+DELETE FROM notifications WHERE user_id = ?1 AND read_at IS NOT NULL AND created_at <= ?2
 `
 
 type DeleteReadNotificationsParams struct {
@@ -51,13 +50,14 @@ type DeleteReadNotificationsParams struct {
 	Before int64
 }
 
-// The ones I have seen, up to a time, and never past my marker.
+// The ones I have opened, up to a time; an unread one is never cleared.
 func (q *Queries) DeleteReadNotifications(ctx context.Context, arg DeleteReadNotificationsParams) error {
 	_, err := q.db.ExecContext(ctx, deleteReadNotifications, arg.UserID, arg.Before)
 	return err
 }
 
 const getChatMarker = `-- name: GetChatMarker :one
+
 SELECT m.user_id, CAST('chat:' || m.group_id AS TEXT) AS stream, CAST(COALESCE(r.read_at, m.joined_at) AS INTEGER) AS read_at,
        (SELECT COUNT(*) FROM messages x WHERE x.group_id = m.group_id AND x.deleted_at IS NULL AND x.author_id != m.user_id
           AND x.created_at > COALESCE(r.read_at, m.joined_at)) AS unread
@@ -77,6 +77,11 @@ type GetChatMarkerRow struct {
 	Unread int64
 }
 
+// A marker row exists for every stream of mine whether or not I have read
+// anything: the notifications stream (unread only: a notification is read by
+// opening it), and the chat and the feed of every group I am present in. Unread is what is newer than where I
+// have read to: others' live messages or posts since my marker, or since I
+// joined if I never read.
 func (q *Queries) GetChatMarker(ctx context.Context, arg GetChatMarkerParams) (GetChatMarkerRow, error) {
 	row := q.db.QueryRowContext(ctx, getChatMarker, arg.UserID, arg.GroupID)
 	var i GetChatMarkerRow
@@ -122,7 +127,7 @@ func (q *Queries) GetFeedMarker(ctx context.Context, arg GetFeedMarkerParams) (G
 }
 
 const getNotification = `-- name: GetNotification :one
-SELECT n.id, n.user_id, n.kind, n.group_id, n.post_id, n.created_at,
+SELECT n.id, n.user_id, n.kind, n.group_id, n.post_id, n.created_at, n.read_at,
        u.id AS actor_id, u.username AS actor_username, u.picture_id AS actor_picture_id
 FROM notifications n JOIN users u ON u.id = n.actor_id
 WHERE n.id = ?1
@@ -135,6 +140,7 @@ type GetNotificationRow struct {
 	GroupID        string
 	PostID         sql.NullString
 	CreatedAt      int64
+	ReadAt         sql.NullInt64
 	ActorID        string
 	ActorUsername  string
 	ActorPictureID sql.NullString
@@ -150,6 +156,7 @@ func (q *Queries) GetNotification(ctx context.Context, id string) (GetNotificati
 		&i.GroupID,
 		&i.PostID,
 		&i.CreatedAt,
+		&i.ReadAt,
 		&i.ActorID,
 		&i.ActorUsername,
 		&i.ActorPictureID,
@@ -157,42 +164,10 @@ func (q *Queries) GetNotification(ctx context.Context, id string) (GetNotificati
 	return i, err
 }
 
-const getNotificationsMarker = `-- name: GetNotificationsMarker :one
-
-SELECT u.id AS user_id, CAST('notifications' AS TEXT) AS stream, CAST(COALESCE(r.read_at, 0) AS INTEGER) AS read_at,
-       (SELECT COUNT(*) FROM notifications n WHERE n.user_id = u.id AND n.created_at > COALESCE(r.read_at, 0)) AS unread
-FROM users u LEFT JOIN read_markers r ON r.user_id = u.id AND r.stream = 'notifications'
-WHERE u.id = ?1
-`
-
-type GetNotificationsMarkerRow struct {
-	UserID string
-	Stream string
-	ReadAt int64
-	Unread int64
-}
-
-// A marker row exists for every stream of mine whether or not I have read
-// anything: the notifications stream, and the chat of every group I am
-// present in, its chat and its feed. Unread is what is newer than where I
-// have read to: others' live messages or posts since my marker, or since I
-// joined if I never read.
-func (q *Queries) GetNotificationsMarker(ctx context.Context, userID string) (GetNotificationsMarkerRow, error) {
-	row := q.db.QueryRowContext(ctx, getNotificationsMarker, userID)
-	var i GetNotificationsMarkerRow
-	err := row.Scan(
-		&i.UserID,
-		&i.Stream,
-		&i.ReadAt,
-		&i.Unread,
-	)
-	return i, err
-}
-
 const listMarkers = `-- name: ListMarkers :many
-SELECT u.id AS user_id, CAST('notifications' AS TEXT) AS stream, CAST(COALESCE(r.read_at, 0) AS INTEGER) AS read_at,
-       (SELECT COUNT(*) FROM notifications n WHERE n.user_id = u.id AND n.created_at > COALESCE(r.read_at, 0)) AS unread
-FROM users u LEFT JOIN read_markers r ON r.user_id = u.id AND r.stream = 'notifications'
+SELECT u.id AS user_id, CAST('notifications' AS TEXT) AS stream, CAST(0 AS INTEGER) AS read_at,
+       (SELECT COUNT(*) FROM notifications n WHERE n.user_id = u.id AND n.read_at IS NULL) AS unread
+FROM users u
 WHERE u.id = ?1
 UNION ALL
 SELECT m.user_id, CAST('chat:' || m.group_id AS TEXT) AS stream, CAST(COALESCE(r.read_at, m.joined_at) AS INTEGER) AS read_at,
@@ -217,6 +192,7 @@ type ListMarkersRow struct {
 	Unread int64
 }
 
+// The notifications row has no marker time: its unread is the rows not yet opened.
 func (q *Queries) ListMarkers(ctx context.Context, userID string) ([]ListMarkersRow, error) {
 	rows, err := q.db.QueryContext(ctx, listMarkers, userID)
 	if err != nil {
@@ -246,7 +222,7 @@ func (q *Queries) ListMarkers(ctx context.Context, userID string) ([]ListMarkers
 }
 
 const listNotifications = `-- name: ListNotifications :many
-SELECT n.id, n.user_id, n.kind, n.group_id, n.post_id, n.created_at,
+SELECT n.id, n.user_id, n.kind, n.group_id, n.post_id, n.created_at, n.read_at,
        u.id AS actor_id, u.username AS actor_username, u.picture_id AS actor_picture_id
 FROM notifications n JOIN users u ON u.id = n.actor_id
 WHERE n.user_id = ?1 AND n.created_at < ?2
@@ -267,6 +243,7 @@ type ListNotificationsRow struct {
 	GroupID        string
 	PostID         sql.NullString
 	CreatedAt      int64
+	ReadAt         sql.NullInt64
 	ActorID        string
 	ActorUsername  string
 	ActorPictureID sql.NullString
@@ -288,6 +265,7 @@ func (q *Queries) ListNotifications(ctx context.Context, arg ListNotificationsPa
 			&i.GroupID,
 			&i.PostID,
 			&i.CreatedAt,
+			&i.ReadAt,
 			&i.ActorID,
 			&i.ActorUsername,
 			&i.ActorPictureID,
@@ -303,6 +281,22 @@ func (q *Queries) ListNotifications(ctx context.Context, arg ListNotificationsPa
 		return nil, err
 	}
 	return items, nil
+}
+
+const readNotification = `-- name: ReadNotification :exec
+UPDATE notifications SET read_at = ?1 WHERE id = ?2 AND user_id = ?3 AND read_at IS NULL
+`
+
+type ReadNotificationParams struct {
+	ReadAt sql.NullInt64
+	ID     string
+	UserID string
+}
+
+// Opening it reads it, once; a second opening keeps the first time.
+func (q *Queries) ReadNotification(ctx context.Context, arg ReadNotificationParams) error {
+	_, err := q.db.ExecContext(ctx, readNotification, arg.ReadAt, arg.ID, arg.UserID)
+	return err
 }
 
 const setMarker = `-- name: SetMarker :exec

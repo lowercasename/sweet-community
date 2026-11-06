@@ -1,18 +1,18 @@
 // @vitest-environment happy-dom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, screen, within } from '@testing-library/react'
-import { ROOT, group, marker, notification, renderWithQuery, user } from '../test-utils'
+import { ROOT, group, notification, renderWithQuery, user } from '../test-utils'
 
 /**
  * The Notifications page (architecture.md, Notifications): mine, newest
- * first, each a sentence about who did what, opening the thing. The ones
- * newer than my marker when I arrived are marked new; looking at the page
- * moves the marker to the newest, so the bell's dot goes.
+ * first, in two sections: New, the ones not yet opened, and Earlier, the
+ * opened ones, which Clear deletes. Looking at the page reads nothing;
+ * opening a notification does.
  */
 vi.mock('../api', () => ({
   listNotifications: vi.fn(),
-  listMarkers: vi.fn(),
-  setMarker: vi.fn(),
+  listMarkers: vi.fn(() => Promise.resolve({ markers: [] })),
+  readNotification: vi.fn(),
   clearNotifications: vi.fn(),
   listUsers: vi.fn(() => Promise.resolve({ users: [] })),
 }))
@@ -23,16 +23,18 @@ const knitting = group('knit', 'member', { name: 'Knitting' })
 afterEach(cleanup)
 
 beforeEach(async () => {
-  const { listNotifications, listMarkers, setMarker } = await import('../api')
+  const { listNotifications, readNotification, clearNotifications } = await import('../api')
   vi.mocked(listNotifications).mockResolvedValue({
     notifications: [
       notification('n20', 'added', mo, { group_id: 'knit' }),
-      notification('n10', 'comment', mo, { post_id: 'p1' }),
+      notification('n10', 'comment', mo, { post_id: 'p1', read_at: 12 }),
     ],
     next_before: null,
   })
-  vi.mocked(listMarkers).mockResolvedValue({ markers: [marker('notifications', 10)] })
-  vi.mocked(setMarker).mockImplementation((stream, readAt) => Promise.resolve(marker(stream, readAt)))
+  vi.mocked(readNotification).mockImplementation((id) =>
+    Promise.resolve(notification(id, 'added', mo, { group_id: 'knit', read_at: 30 })),
+  )
+  vi.mocked(clearNotifications).mockResolvedValue({ user_id: 'raphael', before: 40 })
 })
 
 async function draw() {
@@ -43,9 +45,9 @@ async function draw() {
 }
 
 describe('NotificationsPage', () => {
-  it('lists what was done to me in two sections, New and Earlier, and marks them read by being looked at', async () => {
-    const { setMarker } = await import('../api')
-    const onGo = await draw()
+  it('lists the unopened under New and the opened under Earlier; looking reads nothing', async () => {
+    const { readNotification } = await import('../api')
+    await draw()
     await screen.findByRole('heading', { name: 'New' })
     const lists = screen.getAllByRole('list')
     expect(
@@ -59,32 +61,29 @@ describe('NotificationsPage', () => {
         .getAllByRole('button')
         .map((b) => b.getAttribute('aria-label')),
     ).toEqual(['mo commented on your post'])
-    await vi.waitFor(() => expect(setMarker).toHaveBeenCalledWith('notifications', 20))
-    // Still marked new while I look, though the marker has moved on.
-    expect(screen.getByRole('button', { name: 'mo added you to Knitting, new' })).toBeTruthy()
+    await new Promise((r) => setTimeout(r, 20))
+    expect(readNotification).not.toHaveBeenCalled()
+  })
+
+  it('opening one reads it and goes to its thing; it moves to Earlier', async () => {
+    const { readNotification } = await import('../api')
+    const onGo = await draw()
+    fireEvent.click(await screen.findByRole('button', { name: 'mo added you to Knitting, new' }))
+    expect(readNotification).toHaveBeenCalledWith('n20')
+    expect(onGo).toHaveBeenCalledWith('/r/knit')
+    await screen.findByRole('button', { name: 'mo added you to Knitting' })
+    expect(screen.queryByRole('heading', { name: 'New' })).toBeNull()
     fireEvent.click(screen.getByRole('button', { name: 'mo commented on your post' }))
     expect(onGo).toHaveBeenCalledWith('/p/p1')
-    fireEvent.click(screen.getByRole('button', { name: 'mo added you to Knitting, new' }))
-    expect(onGo).toHaveBeenCalledWith('/r/knit')
+    expect(readNotification).toHaveBeenCalledTimes(1)
   })
 
-  it('leaves the marker alone when nothing is newer than it', async () => {
-    const { listMarkers, setMarker } = await import('../api')
-    vi.mocked(listMarkers).mockResolvedValue({ markers: [marker('notifications', 20)] })
-    await draw()
-    await screen.findByRole('list')
-    await new Promise((r) => setTimeout(r, 20))
-    expect(setMarker).not.toHaveBeenCalled()
-    expect(screen.queryByRole('button', { name: /new$/ })).toBeNull()
-  })
-
-  it('clears the earlier ones for good, up to where I had read when I arrived; the new ones stay', async () => {
+  it('clears the opened ones for good; the unopened stay', async () => {
     const { clearNotifications } = await import('../api')
-    vi.mocked(clearNotifications).mockImplementation((before) => Promise.resolve({ user_id: 'raphael', before }))
     await draw()
     await screen.findByRole('heading', { name: 'Earlier' })
     fireEvent.click(screen.getByRole('button', { name: 'Clear' }))
-    expect(clearNotifications).toHaveBeenCalledWith(10)
+    expect(clearNotifications).toHaveBeenCalled()
     await vi.waitFor(() => expect(screen.queryByRole('heading', { name: 'Earlier' })).toBeNull())
     expect(screen.getByRole('button', { name: 'mo added you to Knitting, new' })).toBeTruthy()
   })

@@ -224,6 +224,15 @@ function upsertUser(qc: QueryClient, u: User) {
   )
 }
 
+/** The notifications stream's unread moves by how many were opened or arrived. */
+function countUnread(qc: QueryClient, stream: string, by: number) {
+  qc.setQueryData<Markers>(keys.markers, (old) =>
+    old
+      ? { markers: old.markers.map((x) => (x.stream === stream ? { ...x, unread: Math.max(0, x.unread + by) } : x)) }
+      : old,
+  )
+}
+
 /** One more thing on a stream, newer than where I have read to: it counts. A replay after a reconnect refetches the markers anyway. */
 function bumpMarker(qc: QueryClient, stream: string, at: number) {
   qc.setQueryData<Markers>(keys.markers, (old) => {
@@ -236,9 +245,18 @@ function bumpMarker(qc: QueryClient, stream: string, at: number) {
   })
 }
 
-/** Something done to me: at the top of my list, once; and one more unread on the notifications stream. */
+/**
+ * Something done to me: at the top of my list, once, and one more unread on
+ * the notifications stream while it is unopened. Opened (the same event,
+ * with read_at), it is one fewer. The count follows what the list knows;
+ * for a list not loaded, a new unopened one counts and a reconnect refetches.
+ */
 function upsertNotification(qc: QueryClient, n: Notification) {
-  bumpMarker(qc, 'notifications', n.created_at)
+  const list = qc.getQueryData<Notifications>(keys.notifications)
+  const was = list?.pages.flatMap((p) => p.notifications).find((x) => x.id === n.id)
+  const unread = (x: Notification | undefined) => x !== undefined && x.read_at == null
+  const by = (unread(n) ? 1 : 0) - (was ? (unread(was) ? 1 : 0) : 0)
+  if (by !== 0) countUnread(qc, 'notifications', by)
   qc.setQueryData<Notifications>(keys.notifications, (old) => {
     if (!old) return old
     const known = old.pages.some((p) => p.notifications.some((x) => x.id === n.id))
@@ -249,13 +267,16 @@ function upsertNotification(qc: QueryClient, n: Notification) {
   })
 }
 
-/** The ones up to a time are gone, for good. */
+/** The opened ones up to a time are gone, for good; an unopened one stays. */
 function clearNotifications(qc: QueryClient, before: number) {
   qc.setQueryData<Notifications>(keys.notifications, (old) =>
     old
       ? {
           ...old,
-          pages: old.pages.map((p) => ({ ...p, notifications: p.notifications.filter((n) => n.created_at > before) })),
+          pages: old.pages.map((p) => ({
+            ...p,
+            notifications: p.notifications.filter((n) => n.read_at == null || n.created_at > before),
+          })),
         }
       : old,
   )

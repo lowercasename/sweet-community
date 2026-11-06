@@ -2,7 +2,6 @@ package api
 
 import (
 	"reflect"
-	"strconv"
 	"testing"
 	"time"
 
@@ -80,15 +79,43 @@ func TestNotifications(t *testing.T) {
 		t.Fatalf("first page: %v", page)
 	}
 
-	// Clearing: the ones I have seen go for good, told to me alone; what is newer than my marker, or than
-	// the time I name, stays. The marker is where it was.
-	kit.mustStatus(200, "PUT", "/api/markers/notifications", map[string]any{"read_at": int64(n["created_at"].(float64))})
-	cleared := kit.mustStatus(200, "DELETE", "/api/notifications?before="+strconv.FormatInt(int64(n["created_at"].(float64)), 10), nil)
-	if cleared["user_id"] != kitID || int64(cleared["before"].(float64)) != int64(n["created_at"].(float64)) {
+	// Reading is by opening, one at a time: the row gets read_at, the event is the row, mo cannot read kit's.
+	if n["read_at"] != nil || added["read_at"] != nil {
+		t.Fatalf("new notifications are unread: %v %v", n, added)
+	}
+	mo.mustStatus(404, "PUT", "/api/notifications/"+n["id"].(string)+"/read", nil)
+	read := kit.mustStatus(200, "PUT", "/api/notifications/"+n["id"].(string)+"/read", nil)
+	if read["read_at"] == nil || read["id"] != n["id"] {
+		t.Fatalf("read reply: %v", read)
+	}
+	again := kit.mustStatus(200, "PUT", "/api/notifications/"+n["id"].(string)+"/read", nil)
+	if !reflect.DeepEqual(again, read) {
+		t.Fatalf("a second opening moved read_at: %v vs %v", again, read)
+	}
+	if evs := events(kit, "notification"); len(evs) == 0 || !reflect.DeepEqual(evs[len(evs)-1], read) {
+		t.Fatalf("the read event is not the row: %v", evs)
+	}
+	markers := func(c *client) map[string]map[string]any {
+		out := map[string]map[string]any{}
+		for _, x := range c.mustStatus(200, "GET", "/api/markers", nil)["markers"].([]any) {
+			m := x.(map[string]any)
+			out[m["stream"].(string)] = m
+		}
+		return out
+	}
+	if u := markers(kit)["notifications"]["unread"]; u != float64(1) {
+		t.Fatalf("unread after opening one of two: %v", u)
+	}
+	// The notifications stream takes no marker; the page alone reads nothing.
+	kit.mustStatus(400, "PUT", "/api/markers/notifications", map[string]any{"read_at": int64(n["created_at"].(float64))})
+
+	// Clearing: the opened ones go for good, told to me alone; the unread one stays.
+	cleared := kit.mustStatus(200, "DELETE", "/api/notifications", nil)
+	if cleared["user_id"] != kitID || cleared["before"] == nil {
 		t.Fatalf("cleared: %v", cleared)
 	}
 	if left := list(kit); len(left) != 1 || left[0].(map[string]any)["id"] != added["id"] {
-		t.Fatalf("after clearing the seen one: %v", left)
+		t.Fatalf("after clearing the opened one: %v", left)
 	}
 	if evs := events(kit, "notification_delete"); len(evs) != 1 || !reflect.DeepEqual(evs[0], cleared) {
 		t.Fatalf("kit's clear events: %v", evs)
@@ -96,35 +123,23 @@ func TestNotifications(t *testing.T) {
 	if evs := events(mo, "notification_delete"); len(evs) != 0 {
 		t.Fatalf("mo hears kit's clearing: %v", evs)
 	}
-	// Naming a time past my marker clears only up to the marker: the unread one stays.
-	kit.mustStatus(200, "DELETE", "/api/notifications?before="+strconv.FormatInt(int64(added["created_at"].(float64))+1, 10), nil)
-	if left := list(kit); len(left) != 1 {
-		t.Fatalf("an unread notification was cleared: %v", left)
-	}
-	kit.mustStatus(400, "DELETE", "/api/notifications", nil)
 
-	// Read markers: a row per stream of mine from the start (notifications, the root's chat, Knitting's chat),
-	// unread counted; reading moves one forward, never backwards; told to me alone.
+	// Read markers: a row per stream of mine from the start (notifications with its unread, the root's chat and
+	// feed, Knitting's chat and feed); a chat marker moves forward, never backwards; told to me alone.
 	if m := kit.mustStatus(200, "GET", "/api/markers", nil)["markers"].([]any); len(m) != 5 {
-		t.Fatalf("markers before reading: %v", m)
+		t.Fatalf("markers: %v", m)
 	}
 	readAt := int64(added["created_at"].(float64))
-	marker := kit.mustStatus(200, "PUT", "/api/markers/notifications", map[string]any{"read_at": readAt})
-	if marker["stream"] != "notifications" || marker["user_id"] != kitID || int64(marker["read_at"].(float64)) != readAt || marker["unread"] != float64(0) {
+	marker := kit.mustStatus(200, "PUT", "/api/markers/chat:"+perm.Root, map[string]any{"read_at": readAt})
+	if marker["stream"] != "chat:"+perm.Root || marker["user_id"] != kitID || int64(marker["read_at"].(float64)) != readAt || marker["unread"] != float64(0) {
 		t.Fatalf("marker: %v", marker)
 	}
-	back := kit.mustStatus(200, "PUT", "/api/markers/notifications", map[string]any{"read_at": readAt - 1000})
+	back := kit.mustStatus(200, "PUT", "/api/markers/chat:"+perm.Root, map[string]any{"read_at": readAt - 1000})
 	if int64(back["read_at"].(float64)) != readAt {
 		t.Fatalf("marker moved backwards: %v", back)
 	}
-	var listed any
-	for _, x := range kit.mustStatus(200, "GET", "/api/markers", nil)["markers"].([]any) {
-		if x.(map[string]any)["stream"] == "notifications" {
-			listed = x
-		}
-	}
-	if !reflect.DeepEqual(listed, marker) {
-		t.Fatalf("listed marker: %v, reply: %v", listed, marker)
+	if !reflect.DeepEqual(markers(kit)["chat:"+perm.Root], marker) {
+		t.Fatalf("listed marker: %v, reply: %v", markers(kit)["chat:"+perm.Root], marker)
 	}
 	if evs := events(kit, "marker"); len(evs) == 0 || !reflect.DeepEqual(evs[len(evs)-1], marker) {
 		t.Fatalf("kit's marker events: %v", evs)
@@ -136,14 +151,11 @@ func TestNotifications(t *testing.T) {
 	// A chat stream is a group I am in; one I am not in does not exist to me; anything else is nonsense.
 	kit.mustStatus(200, "PUT", "/api/markers/chat:"+gid, map[string]any{"read_at": readAt})
 	mo.mustStatus(404, "PUT", "/api/markers/chat:"+gid, map[string]any{"read_at": readAt})
-	kit.mustStatus(400, "PUT", "/api/markers/feed", map[string]any{"read_at": readAt})
-	kit.mustStatus(400, "PUT", "/api/markers/notifications", map[string]any{"read_at": 0})
-	if m := kit.mustStatus(200, "GET", "/api/markers", nil)["markers"].([]any); len(m) != 5 {
-		t.Fatalf("markers after chat: %v", m)
-	}
+	kit.mustStatus(400, "PUT", "/api/markers/nonsense", map[string]any{"read_at": readAt})
+	kit.mustStatus(400, "PUT", "/api/markers/chat:"+gid, map[string]any{"read_at": 0})
 
 	// The future is not read: a marker ahead of now is held to now.
-	ahead := kit.mustStatus(200, "PUT", "/api/markers/notifications", map[string]any{"read_at": readAt + 1e12})
+	ahead := kit.mustStatus(200, "PUT", "/api/markers/chat:"+gid, map[string]any{"read_at": readAt + 1e12})
 	if ahead["read_at"].(float64) >= float64(readAt)+1e12 {
 		t.Fatalf("marker in the future: %v", ahead)
 	}

@@ -34,6 +34,7 @@ vi.mock('../api', async (importOriginal) => ({
   ),
   setSettings: vi.fn(),
   logout: vi.fn(() => Promise.resolve()),
+  readNotification: vi.fn(),
   removeMember: vi.fn(),
 }))
 
@@ -265,22 +266,25 @@ describe('Home', () => {
     expect(window.location.pathname).toBe('/')
   })
 
-  it('a notification on the stream lights the bell; the Notifications page puts it out', async () => {
-    const { setMarker, listNotifications } = await import('../api')
+  it('a notification on the stream lights the bell; the page leaves it lit; opening the notification puts it out', async () => {
+    const { readNotification, listNotifications } = await import('../api')
     await home()
     expect(nav().getByRole('button', { name: 'Notifications' })).toBeTruthy()
     // The list is not loaded until the page asks for it; the stream counts it on my marker meanwhile.
     const fresh = notification('n5', 'comment', kit, { post_id: 'p1' })
     vi.mocked(listNotifications).mockResolvedValue({ notifications: [fresh], next_before: null })
+    vi.mocked(readNotification).mockResolvedValue({ ...fresh, read_at: 9 })
     FakeEventSource.last!.emit('notification', fresh, 8)
     const bell = await nav().findByRole('button', { name: 'Notifications, unread' })
     fireEvent.click(bell)
     expect(window.location.pathname).toBe('/notifications')
     await screen.findByRole('heading', { name: 'Notifications' })
-    await screen.findByRole('button', { name: 'kit commented on your post, new' })
-    await vi.waitFor(() => expect(setMarker).toHaveBeenCalledWith('notifications', 5))
+    const row = await screen.findByRole('button', { name: 'kit commented on your post, new' })
+    expect(nav().getByRole('button', { name: 'Notifications, unread' }).getAttribute('aria-current')).toBe('page')
+    fireEvent.click(row)
+    expect(readNotification).toHaveBeenCalledWith('n5')
+    expect(window.location.pathname).toBe('/p/p1')
     await nav().findByRole('button', { name: 'Notifications' })
-    expect(nav().getByRole('button', { name: 'Notifications' }).getAttribute('aria-current')).toBe('page')
   })
 
   it("a folded pane's rail carries its own stream's dot; opening the pane reads it at once", async () => {

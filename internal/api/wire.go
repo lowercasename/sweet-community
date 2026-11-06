@@ -75,6 +75,7 @@ func wireNotification(row store.GetNotificationRow) Notification {
 		GroupID:   row.GroupID,
 		PostID:    pid,
 		CreatedAt: row.CreatedAt,
+		ReadAt:    nullInt(row.ReadAt),
 	}
 }
 

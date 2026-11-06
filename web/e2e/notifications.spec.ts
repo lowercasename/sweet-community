@@ -25,29 +25,28 @@ test.describe('notifications', () => {
       mo.page.getByRole('navigation', { name: 'Main' }).getByRole('button', { name: 'Notifications', exact: true }),
     ).toBeVisible()
 
-    // Looking puts it out, and that holds across a reload.
+    // Looking at the page reads nothing: the dot stays, and so does New, across a reload.
     await nav.getByRole('button', { name: 'Notifications, unread' }).click()
     await expect(kit.page).toHaveURL(/\/notifications$/)
     await expect(kit.page.getByRole('heading', { name: 'Notifications' })).toBeVisible()
     const row = kit.page.getByRole('button', { name: `${mo.username} commented on your post, new` })
     await expect(row).toBeVisible()
-    await expect(nav.getByRole('button', { name: 'Notifications', exact: true })).toBeVisible()
+    await expect(nav.getByRole('button', { name: 'Notifications, unread' })).toBeVisible()
     await kit.page.reload()
-    await expect(kit.page.getByRole('heading', { name: 'Notifications' })).toBeVisible()
+    await expect(kit.page.getByRole('heading', { name: 'New' })).toBeVisible()
+    await expect(nav.getByRole('button', { name: 'Notifications, unread' })).toBeVisible()
+
+    // Opening the notification reads it: the post opens, the dot goes, and back on the page it is under Earlier.
+    await row.click()
+    await expect(kit.page).toHaveURL(/\/p\/[0-9a-f-]+$/)
+    await expect(kit.page.getByRole('heading', { name: `Post by ${kit.username}` })).toBeVisible()
     await expect(nav.getByRole('button', { name: 'Notifications', exact: true })).toBeVisible()
-    // Seen before this visit: under Earlier now.
+    await kit.page.goBack()
     await expect(kit.page.getByRole('heading', { name: 'Earlier' })).toBeVisible()
     await expect(kit.page.getByRole('heading', { name: 'New' })).toHaveCount(0)
     await expect(kit.page.getByRole('button', { name: `${mo.username} commented on your post` })).toBeVisible()
 
-    // The comment opens its post; coming back, the page is a fresh visit.
-    await kit.page.getByRole('button', { name: `${mo.username} commented on your post` }).click()
-    await expect(kit.page).toHaveURL(/\/p\/[0-9a-f-]+$/)
-    await expect(kit.page.getByRole('heading', { name: `Post by ${kit.username}` })).toBeVisible()
-    await kit.page.goBack()
-    await expect(kit.page.getByRole('heading', { name: 'Earlier' })).toBeVisible()
-
-    // Being added to a room arrives while I am looking: under New, read as it lands, so the bell stays quiet.
+    // Being added to a room arrives while I am looking: under New, unread, so the bell lights even here.
     const name = uniq('Wool')
     const room = await boss.context.request.post('/api/groups', { data: { kind: 'group', name, mode: 'both' } })
     const gid = ((await room.json()) as { id: string }).id
@@ -56,18 +55,19 @@ test.describe('notifications', () => {
     const added = kit.page.getByRole('button', { name: `raphael added you to ${name}, new` })
     await expect(added).toBeVisible()
     await expect(kit.page.getByRole('heading', { name: 'New' })).toBeVisible()
-    await expect(nav.getByRole('button', { name: 'Notifications', exact: true })).toBeVisible()
+    await expect(nav.getByRole('button', { name: 'Notifications, unread' })).toBeVisible()
 
-    // Clearing takes the earlier ones for good; the new one stays, and a reload agrees (it is Earlier by then).
+    // Clearing takes the opened ones for good; the unopened one stays, and a reload agrees.
     await kit.page.getByRole('button', { name: 'Clear' }).click()
     await expect(kit.page.getByRole('heading', { name: 'Earlier' })).toHaveCount(0)
     await expect(kit.page.getByRole('button', { name: `${mo.username} commented on your post` })).toHaveCount(0)
     await expect(added).toBeVisible()
     await kit.page.reload()
-    await expect(kit.page.getByRole('heading', { name: 'Earlier' })).toBeVisible()
-    await expect(kit.page.getByRole('button', { name: `raphael added you to ${name}` })).toBeVisible()
+    await expect(kit.page.getByRole('heading', { name: 'New' })).toBeVisible()
+    await expect(kit.page.getByRole('button', { name: `raphael added you to ${name}, new` })).toBeVisible()
     await expect(kit.page.getByRole('button', { name: `${mo.username} commented on your post` })).toHaveCount(0)
-    await kit.page.getByRole('button', { name: `raphael added you to ${name}` }).click()
+    await kit.page.getByRole('button', { name: `raphael added you to ${name}, new` }).click()
+    await expect(nav.getByRole('button', { name: 'Notifications', exact: true })).toBeVisible()
     await expect(kit.page).toHaveURL(new RegExp(`/r/${gid}$`))
     await expect(kit.page.getByRole('heading', { name })).toBeVisible()
     await kit.context.close()
@@ -89,10 +89,8 @@ test.describe('notifications', () => {
     await expect(kit.page).toHaveURL(/\/notifications$/)
     await expect(kit.page.getByRole('heading', { name: 'Notifications' })).toBeVisible()
     await expect(kit.page.getByRole('button', { name: `${mo.username} commented on your post, new` })).toBeVisible()
-    await expect(tabs.getByRole('button', { name: 'Notifications', exact: true })).toHaveAttribute(
-      'aria-current',
-      'page',
-    )
+    // The page alone reads nothing: the tab keeps its dot until the notification is opened.
+    await expect(tabs.getByRole('button', { name: 'Notifications, unread' })).toHaveAttribute('aria-current', 'page')
     await kit.context.close()
     await mo.context.close()
   })

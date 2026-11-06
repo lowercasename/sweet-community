@@ -133,7 +133,7 @@ export interface Message {
   can: Can
 }
 
-/** One thing done to me (architecture.md, Notifications): who, what kind, where; a comment's post. Read is my marker, not a flag here. */
+/** One thing done to me (architecture.md, Notifications): who, what kind, where; a comment's post. Read by opening it. */
 export interface Notification {
   id: string
   user_id: string
@@ -142,6 +142,8 @@ export interface Notification {
   group_id: string
   post_id: string | null
   created_at: number
+  /** When I opened it; null until I do. */
+  read_at: number | null
 }
 
 export interface NotificationPage {
@@ -310,15 +312,20 @@ export function listNotifications(before?: number | null, limit = 30): Promise<N
   return request<NotificationPage>(`/api/notifications?${params}`)
 }
 
-/** What clearing removed: every notification of mine up to a time. */
+/** What clearing removed: every opened notification of mine up to a time. */
 export interface Cleared {
   user_id: string
   before: number
 }
 
-/** Clears the notifications I have seen, up to a time (never past my marker), for good. */
-export function clearNotifications(before: number): Promise<Cleared> {
-  return request<Cleared>(`/api/notifications?before=${before}`, { method: 'DELETE' })
+/** Opening a notification reads it; the reply is the row, read. */
+export function readNotification(id: string): Promise<Notification> {
+  return request<Notification>(`/api/notifications/${encodeURIComponent(id)}/read`, { method: 'PUT' })
+}
+
+/** Clears the notifications I have opened, for good. */
+export function clearNotifications(): Promise<Cleared> {
+  return request<Cleared>('/api/notifications', { method: 'DELETE' })
 }
 
 export function listMarkers(): Promise<{ markers: Marker[] }> {

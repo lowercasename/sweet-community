@@ -199,6 +199,7 @@ func (s *Server) Routes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/events", s.requireAuth(s.events))
 	mux.HandleFunc("GET /api/notifications", s.requireAuth(s.listNotifications))
 	mux.HandleFunc("DELETE /api/notifications", s.requireAuth(s.clearNotifications))
+	mux.HandleFunc("PUT /api/notifications/{id}/read", s.requireAuth(s.readNotification))
 	mux.HandleFunc("GET /api/markers", s.requireAuth(s.listMarkers))
 	mux.HandleFunc("PUT /api/markers/{stream}", s.requireAuth(s.setMarker))
 	mux.HandleFunc("GET /api/settings", s.requireRoot(perm.ManageInstance, s.getSettings))

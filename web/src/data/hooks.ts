@@ -4,6 +4,7 @@ import {
   addMember,
   clearNotifications,
   createComment,
+  readNotification,
   createGroup,
   createInvite,
   createMessage,
@@ -40,6 +41,7 @@ import {
   type GroupMode,
   type Invite,
   type Member,
+  type Notification,
   type Role,
   type Settings,
   type User,
@@ -325,11 +327,24 @@ export function useNotifications() {
   }
 }
 
-/** Clearing the ones I have seen, up to a time: the reply goes through the cache's one write path. */
+/** Opening a notification reads it: the cache moves at once, the server's row follows through the same path. */
+export function useReadNotification() {
+  const qc = useQueryClient()
+  return (n: Notification) => {
+    if (n.read_at != null) return
+    applyEvent(qc, 'notification', { ...n, read_at: Date.now() })
+    readNotification(n.id).then(
+      (read) => applyEvent(qc, 'notification', read),
+      (e: unknown) => console.error('could not mark as read', e),
+    )
+  }
+}
+
+/** Clearing the ones I have opened: the reply goes through the cache's one write path. */
 export function useClearNotifications() {
   const qc = useQueryClient()
-  return async (before: number) => {
-    applyEvent(qc, 'notification_delete', await clearNotifications(before))
+  return async () => {
+    applyEvent(qc, 'notification_delete', await clearNotifications())
   }
 }
 

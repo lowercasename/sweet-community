@@ -35,11 +35,6 @@ export function unreadPlaces(markers: Marker[]): Map<string, UnreadPlace> {
 /** Is anything in this place unread? */
 export const anyUnread = (p: UnreadPlace | undefined) => p !== undefined && (p.chat || p.feed)
 
-/** The ones newer than my marker. */
-export function unreadOf(notifications: Notification[], readAt: number | undefined): Notification[] {
-  return notifications.filter((n) => n.created_at > (readAt ?? 0))
-}
-
 /** What was done, in words after the actor's name. A room I am no longer in has no name to give. */
 export function describe(n: Notification, groups: Group[]): string {
   switch (n.kind) {

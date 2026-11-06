@@ -6,13 +6,17 @@ INSERT INTO notifications (id, user_id, kind, actor_id, group_id, post_id, creat
 VALUES (sqlc.arg(id), sqlc.arg(user_id), sqlc.arg(kind), sqlc.arg(actor_id), sqlc.arg(group_id), sqlc.arg(post_id), sqlc.arg(created_at));
 
 -- name: GetNotification :one
-SELECT n.id, n.user_id, n.kind, n.group_id, n.post_id, n.created_at,
+SELECT n.id, n.user_id, n.kind, n.group_id, n.post_id, n.created_at, n.read_at,
        u.id AS actor_id, u.username AS actor_username, u.picture_id AS actor_picture_id
 FROM notifications n JOIN users u ON u.id = n.actor_id
 WHERE n.id = sqlc.arg(id);
 
+-- name: ReadNotification :exec
+-- Opening it reads it, once; a second opening keeps the first time.
+UPDATE notifications SET read_at = sqlc.arg(read_at) WHERE id = sqlc.arg(id) AND user_id = sqlc.arg(user_id) AND read_at IS NULL;
+
 -- name: ListNotifications :many
-SELECT n.id, n.user_id, n.kind, n.group_id, n.post_id, n.created_at,
+SELECT n.id, n.user_id, n.kind, n.group_id, n.post_id, n.created_at, n.read_at,
        u.id AS actor_id, u.username AS actor_username, u.picture_id AS actor_picture_id
 FROM notifications n JOIN users u ON u.id = n.actor_id
 WHERE n.user_id = sqlc.arg(user_id) AND n.created_at < sqlc.arg(before)
@@ -20,9 +24,8 @@ ORDER BY n.created_at DESC, n.id DESC
 LIMIT sqlc.arg(page_size);
 
 -- name: DeleteReadNotifications :exec
--- The ones I have seen, up to a time, and never past my marker.
-DELETE FROM notifications WHERE notifications.user_id = sqlc.arg(user_id) AND notifications.created_at <= sqlc.arg(before)
-  AND notifications.created_at <= COALESCE((SELECT r.read_at FROM read_markers r WHERE r.user_id = sqlc.arg(user_id) AND r.stream = 'notifications'), 0);
+-- The ones I have opened, up to a time; an unread one is never cleared.
+DELETE FROM notifications WHERE user_id = sqlc.arg(user_id) AND read_at IS NOT NULL AND created_at <= sqlc.arg(before);
 
 -- name: SetMarker :exec
 -- Forward only: a stale tab cannot unread what another has read.
@@ -30,16 +33,10 @@ INSERT INTO read_markers (user_id, stream, read_at) VALUES (sqlc.arg(user_id), s
 ON CONFLICT (user_id, stream) DO UPDATE SET read_at = MAX(read_at, excluded.read_at);
 
 -- A marker row exists for every stream of mine whether or not I have read
--- anything: the notifications stream, and the chat of every group I am
--- present in, its chat and its feed. Unread is what is newer than where I
+-- anything: the notifications stream (unread only: a notification is read by
+-- opening it), and the chat and the feed of every group I am present in. Unread is what is newer than where I
 -- have read to: others' live messages or posts since my marker, or since I
 -- joined if I never read.
-
--- name: GetNotificationsMarker :one
-SELECT u.id AS user_id, CAST('notifications' AS TEXT) AS stream, CAST(COALESCE(r.read_at, 0) AS INTEGER) AS read_at,
-       (SELECT COUNT(*) FROM notifications n WHERE n.user_id = u.id AND n.created_at > COALESCE(r.read_at, 0)) AS unread
-FROM users u LEFT JOIN read_markers r ON r.user_id = u.id AND r.stream = 'notifications'
-WHERE u.id = sqlc.arg(user_id);
 
 -- name: GetChatMarker :one
 SELECT m.user_id, CAST('chat:' || m.group_id AS TEXT) AS stream, CAST(COALESCE(r.read_at, m.joined_at) AS INTEGER) AS read_at,
@@ -56,9 +53,10 @@ FROM memberships m LEFT JOIN read_markers r ON r.user_id = m.user_id AND r.strea
 WHERE m.user_id = sqlc.arg(user_id) AND m.group_id = sqlc.arg(group_id) AND m.hidden_at IS NULL;
 
 -- name: ListMarkers :many
-SELECT u.id AS user_id, CAST('notifications' AS TEXT) AS stream, CAST(COALESCE(r.read_at, 0) AS INTEGER) AS read_at,
-       (SELECT COUNT(*) FROM notifications n WHERE n.user_id = u.id AND n.created_at > COALESCE(r.read_at, 0)) AS unread
-FROM users u LEFT JOIN read_markers r ON r.user_id = u.id AND r.stream = 'notifications'
+-- The notifications row has no marker time: its unread is the rows not yet opened.
+SELECT u.id AS user_id, CAST('notifications' AS TEXT) AS stream, CAST(0 AS INTEGER) AS read_at,
+       (SELECT COUNT(*) FROM notifications n WHERE n.user_id = u.id AND n.read_at IS NULL) AS unread
+FROM users u
 WHERE u.id = sqlc.arg(user_id)
 UNION ALL
 SELECT m.user_id, CAST('chat:' || m.group_id AS TEXT) AS stream, CAST(COALESCE(r.read_at, m.joined_at) AS INTEGER) AS read_at,
