@@ -164,12 +164,6 @@ func EnsureOwner(ctx context.Context, d *sql.DB, username, password string) (Use
 	return u, nil
 }
 
-// OwnerHasPassword reports whether the owner can sign in at all.
-func OwnerHasPassword(ctx context.Context, d *sql.DB, username string) bool {
-	row, err := store.New(d).GetUserPasswordHash(ctx, username)
-	return err == nil && row.PasswordHash.Valid
-}
-
 func (s *Server) Routes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, r *http.Request) { io.WriteString(w, "ok") })
 
@@ -224,7 +218,8 @@ func (s *Server) Routes(mux *http.ServeMux) {
 	mux.HandleFunc("PUT /api/notifications/{id}/read", s.requireAuth(s.readNotification))
 	mux.HandleFunc("GET /api/markers", s.requireAuth(s.listMarkers))
 	mux.HandleFunc("PUT /api/markers/{stream}", s.requireAuth(s.setMarker))
-	mux.HandleFunc("GET /api/settings", s.requireRoot(perm.ManageInstance, s.getSettings))
+	mux.HandleFunc("GET /api/settings", s.getSettings) // public: the sign-in page wears the name
+	mux.HandleFunc("POST /api/setup", s.setup)
 	mux.HandleFunc("PUT /api/settings", s.requireRoot(perm.ManageInstance, s.setSettings))
 	mux.HandleFunc("POST /api/images", s.requireAuth(s.uploadImage))
 	mux.HandleFunc("GET /img/{id}", s.requireAuth(s.serveImage))

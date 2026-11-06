@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"sort"
 	"strings"
+	"unicode/utf8"
 
 	"github.com/google/uuid"
 
@@ -57,19 +58,61 @@ type GroupCan struct {
 	ManageInstance bool `json:"manage_instance,omitempty"`
 }
 
-// Settings is the instance's settings on the wire (architecture.md, Feature flags).
+// Settings is the instance's settings on the wire (architecture.md, Feature
+// flags; Admin tools): what the owner sets about the community, read by
+// everyone, signed in or not, since the sign-in and join pages wear its name.
+// OwnerSet is state, not a setting: false until the setup link has been used.
 type Settings struct {
 	GroupCreation string `json:"group_creation"`
+	// Name is the community's; empty until the owner has named it, which is onboarding.
+	Name        string `json:"name"`
+	Description string `json:"description"`
+	OwnerSet    bool   `json:"owner_set"`
 }
 
+const (
+	maxNameLen        = 60
+	maxDescriptionLen = 500
+)
+
 func (s *Server) settings(ctx context.Context) (Settings, error) {
-	v, err := s.q().GetSetting(ctx, "group_creation")
-	if errors.Is(err, sql.ErrNoRows) {
-		v = perm.CreationAnyone
-	} else if err != nil {
-		return Settings{}, err
+	return settingsOf(ctx, s.q())
+}
+
+func settingsOf(ctx context.Context, q *store.Queries) (Settings, error) {
+	get := func(key, fallback string) (string, error) {
+		v, err := q.GetSetting(ctx, key)
+		if errors.Is(err, sql.ErrNoRows) {
+			return fallback, nil
+		}
+		return v, err
 	}
-	return Settings{GroupCreation: v}, nil
+	var st Settings
+	var err error
+	if st.GroupCreation, err = get("group_creation", perm.CreationAnyone); err != nil {
+		return st, err
+	}
+	if st.Name, err = get("name", ""); err != nil {
+		return st, err
+	}
+	if st.Description, err = get("description", ""); err != nil {
+		return st, err
+	}
+	ownerID, err := q.GetGroupOwnerID(ctx, perm.Root)
+	if err == nil {
+		row, err := q.GetUser(ctx, ownerID)
+		if err != nil {
+			return st, err
+		}
+		hash, err := q.GetUserPasswordHash(ctx, row.Username)
+		if err != nil {
+			return st, err
+		}
+		st.OwnerSet = hash.PasswordHash.Valid
+	} else if !errors.Is(err, sql.ErrNoRows) {
+		return st, err
+	}
+	return st, nil
 }
 
 // Membership is one person's place in a group.
@@ -709,9 +752,29 @@ func (s *Server) setSettings(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusBadRequest, "group_creation must be anyone or staff")
 		return
 	}
+	in.Name = strings.TrimSpace(in.Name)
+	in.Description = strings.TrimSpace(in.Description)
+	if in.Name == "" {
+		writeErr(w, http.StatusBadRequest, "the community needs a name")
+		return
+	}
+	if utf8.RuneCountInString(in.Name) > maxNameLen {
+		writeErr(w, http.StatusBadRequest, "the name is too long")
+		return
+	}
+	if utf8.RuneCountInString(in.Description) > maxDescriptionLen {
+		writeErr(w, http.StatusBadRequest, "the description is too long")
+		return
+	}
 	s.logged(w, r, "settings", db.Now(), func(qtx *store.Queries) (any, int, error) {
-		err := qtx.SetSetting(r.Context(), store.SetSettingParams{Key: "group_creation", Value: in.GroupCreation})
-		return in, http.StatusOK, err
+		for key, value := range map[string]string{"group_creation": in.GroupCreation, "name": in.Name, "description": in.Description} {
+			if err := qtx.SetSetting(r.Context(), store.SetSettingParams{Key: key, Value: value}); err != nil {
+				return nil, http.StatusInternalServerError, err
+			}
+		}
+		// What the row says, which is what everyone else receives.
+		st, err := settingsOf(r.Context(), qtx)
+		return st, http.StatusOK, err
 	})
 }
 

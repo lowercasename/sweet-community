@@ -1,18 +1,21 @@
 import { useEffect, useState } from 'react'
-import { changeUnverifiedEmail, getInvite, register } from '../api'
+import { changeUnverifiedEmail, getInvite, register, type Settings } from '../api'
+import { AuthFrame } from '../components/AuthFrame'
 import { CheckEmail } from '../components/CheckEmail'
-import { Alert, Button, Card, Centered, Field, Form, Input, Row, Stack, Text, Wordmark } from '../ui'
+import { Alert, Button, Field, Form, Input, Row, Text } from '../ui'
 
 interface JoinProps {
   code: string
+  /** The community, as anyone may read it; undefined while it loads. */
+  community?: Settings
 }
 
 /**
- * The page an invite link opens: who invited you, pick a name, a password and
- * an address, and a link goes to the address; opening it is what signs you in
- * (architecture.md, Accounts).
+ * The page an invite link opens: who invited you, to what; pick a name, a
+ * password and an address, and a link goes to the address; opening it is
+ * what signs you in (architecture.md, Accounts).
  */
-export function Join({ code }: JoinProps) {
+export function Join({ code, community }: JoinProps) {
   const [invitedBy, setInvitedBy] = useState<string | null>(null)
   const [invalid, setInvalid] = useState<string | null>(null)
   const [username, setUsername] = useState('')
@@ -50,61 +53,48 @@ export function Join({ code }: JoinProps) {
     }
   }
 
+  const name = community?.name || 'this community'
   return (
-    <Centered>
-      <Card>
-        <Stack gap={3}>
-          <Wordmark expanded />
-          {invalid ? (
-            <Text variant="secondary">{invalid}</Text>
-          ) : sentTo ? (
-            <CheckEmail
-              email={sentTo}
-              onChangeAddress={(to) => changeUnverifiedEmail(username.trim(), password, to)}
-              backLabel="Back to the start"
-              onBack={() => setSentTo(null)}
+    <AuthFrame name={community?.name}>
+      {invalid ? (
+        <Text variant="secondary">{invalid}</Text>
+      ) : sentTo ? (
+        <CheckEmail
+          email={sentTo}
+          onChangeAddress={(to) => changeUnverifiedEmail(username.trim(), password, to)}
+          backLabel="Back to the start"
+          onBack={() => setSentTo(null)}
+        />
+      ) : (
+        <Form onSubmit={() => void submit()}>
+          <Text>{invitedBy ? `${invitedBy} invited you to ${name}.` : 'Checking your invite…'}</Text>
+          {community?.description && <Text variant="secondary">{community.description}</Text>}
+          <Text variant="small">Choose a username and a password, and say where to send your sign-in link.</Text>
+          <Field label="Username">
+            <Input name="username" value={username} onChange={setUsername} autoComplete="username" autoFocus required />
+          </Field>
+          <Field label="Email address">
+            <Input type="email" name="email" value={email} onChange={setEmail} autoComplete="email" required />
+          </Field>
+          <Field label="Password">
+            <Input
+              type="password"
+              name="password"
+              value={password}
+              onChange={setPassword}
+              autoComplete="new-password"
+              required
             />
-          ) : (
-            <Form onSubmit={() => void submit()}>
-              <Text>
-                {invitedBy
-                  ? `${invitedBy} invited you. Choose a username and a password, and say where to send your sign-in link.`
-                  : 'Checking your invite…'}
-              </Text>
-              <Field label="Username">
-                <Input
-                  name="username"
-                  value={username}
-                  onChange={setUsername}
-                  autoComplete="username"
-                  autoFocus
-                  required
-                />
-              </Field>
-              <Field label="Email address">
-                <Input type="email" name="email" value={email} onChange={setEmail} autoComplete="email" required />
-              </Field>
-              <Field label="Password">
-                <Input
-                  type="password"
-                  name="password"
-                  value={password}
-                  onChange={setPassword}
-                  autoComplete="new-password"
-                  required
-                />
-              </Field>
-              <Text variant="small">Letters, digits and underscores; a password of at least 8 characters.</Text>
-              {error && <Alert tone="error">{error}</Alert>}
-              <Row justify="end" align="center">
-                <Button type="submit" disabled={busy || !invitedBy || !username || !email || !password}>
-                  {busy ? 'Joining…' : 'Join'}
-                </Button>
-              </Row>
-            </Form>
-          )}
-        </Stack>
-      </Card>
-    </Centered>
+          </Field>
+          <Text variant="small">Letters, digits and underscores; a password of at least 8 characters.</Text>
+          {error && <Alert tone="error">{error}</Alert>}
+          <Row justify="end" align="center">
+            <Button type="submit" disabled={busy || !invitedBy || !username || !email || !password}>
+              {busy ? 'Joining…' : `Join ${name}`}
+            </Button>
+          </Row>
+        </Form>
+      )}
+    </AuthFrame>
   )
 }

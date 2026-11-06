@@ -11,9 +11,9 @@ make build                     # builds web/ into internal/web/dist, then bin/sw
 ./bin/sweet -db data/sweet.db -owner raphael -owner-password 'something long'
 ```
 
-Open http://localhost:8080 and sign in as the owner.
+Open http://localhost:8080. With no `-owner-password`, the first start prints a setup link (`SETUP: …`) to its log: open it to become the owner, then the welcome page names the community and hands you an invite link. With the flag, the owner is made at start and the welcome page follows the first sign-in.
 
-Settings come from the environment. Copy `.env.example` to `.env` (gitignored) and `make` targets load it; for a bare `./bin/sweet`, `set -a; . ./.env; set +a` first. Images go to `-images-dir` (default `data/images`) unless `SWEET_S3_ENDPOINT` and `SWEET_S3_BUCKET` are set. Email (verification links, password resets) goes by SMTP when `SWEET_SMTP_HOST` is set, else to files in `-mail-dir` (default `data/mail`); links point at `-base-url` (or `SWEET_BASE_URL`, default `http://localhost:8080`). Flags: `-addr` (default `:8080`), `-db`, `-owner`, `-owner-password` (or `SWEET_OWNER_PASSWORD`; used only until the owner has a password), `-images-dir`, `-mail-dir`, `-base-url`. Everyone else joins through an invite link the owner makes on the People page; the link they are then sent by email signs them in.
+Settings come from the environment. Copy `.env.example` to `.env` (gitignored) and `make` targets load it; for a bare `./bin/sweet`, `set -a; . ./.env; set +a` first. Images go to `-images-dir` (default `data/images`) unless `SWEET_S3_ENDPOINT` and `SWEET_S3_BUCKET` are set. Email (verification links, password resets) goes by SMTP when `SWEET_SMTP_HOST` is set, else to files in `-mail-dir` (default `data/mail`); links point at `-base-url` (or `SWEET_BASE_URL`, default `http://localhost:8080`). Flags: `-addr` (default `:8080`), `-db`, `-owner`, `-owner-password` (or `SWEET_OWNER_PASSWORD`; used only until the owner has a password), `-images-dir`, `-mail-dir`, `-base-url`. Everyone else joins through an invite link the owner makes on the People page or the welcome page, good for anyone who has it for seven days; the link each is then sent by email signs them in. The community's name and description are on the owner's Community page.
 
 ## Develop
 

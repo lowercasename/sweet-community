@@ -1,9 +1,12 @@
 import { useEffect, useRef, useState } from 'react'
 import { resendVerification, verifyEmail, type User } from '../api'
-import { Alert, Button, Card, Centered, Field, Form, Heading, Input, Link, Row, Stack, Text, Wordmark } from '../ui'
+import { AuthFrame } from '../components/AuthFrame'
+import { Alert, Button, Field, Form, Heading, Input, Link, Row, Text } from '../ui'
 
 interface VerifyProps {
   token: string
+  /** The community's name, for the frame. */
+  name?: string
   /** The address is verified and the session issued: hand over who I am. */
   onVerified: (me: User) => void
 }
@@ -13,7 +16,7 @@ interface VerifyProps {
  * is spent on arrival, once: a used, expired or made-up link says so and
  * offers a new one.
  */
-export function Verify({ token, onVerified }: VerifyProps) {
+export function Verify({ token, name, onVerified }: VerifyProps) {
   const [error, setError] = useState<string | null>(null)
   const [email, setEmail] = useState('')
   const [busy, setBusy] = useState(false)
@@ -40,37 +43,32 @@ export function Verify({ token, onVerified }: VerifyProps) {
   }
 
   return (
-    <Centered>
-      <Card>
-        <Stack gap={3}>
-          <Wordmark expanded />
-          {error ? (
-            <>
-              <Heading level={2}>This link does not work</Heading>
-              <Alert tone="error">{error}</Alert>
-              {asked ? (
-                <Text>If that address has an account waiting to be verified, a new link is on its way.</Text>
-              ) : (
-                <Form onSubmit={() => void resend()}>
-                  <Field label="Send a new link to">
-                    <Input type="email" name="email" value={email} onChange={setEmail} autoComplete="email" required />
-                  </Field>
-                  <Row justify="between" align="center">
-                    <Text as="span" variant="small">
-                      <Link href="/">Sign in</Link>
-                    </Text>
-                    <Button type="submit" disabled={busy || !email.trim()}>
-                      {busy ? 'Sending…' : 'Send a new link'}
-                    </Button>
-                  </Row>
-                </Form>
-              )}
-            </>
+    <AuthFrame name={name}>
+      {error ? (
+        <>
+          <Heading level={2}>This link does not work</Heading>
+          <Alert tone="error">{error}</Alert>
+          {asked ? (
+            <Text>If that address has an account waiting to be verified, a new link is on its way.</Text>
           ) : (
-            <Text>Verifying your address…</Text>
+            <Form onSubmit={() => void resend()}>
+              <Field label="Send a new link to">
+                <Input type="email" name="email" value={email} onChange={setEmail} autoComplete="email" required />
+              </Field>
+              <Row justify="between" align="center">
+                <Text as="span" variant="small">
+                  <Link href="/">Sign in</Link>
+                </Text>
+                <Button type="submit" disabled={busy || !email.trim()}>
+                  {busy ? 'Sending…' : 'Send a new link'}
+                </Button>
+              </Row>
+            </Form>
           )}
-        </Stack>
-      </Card>
-    </Centered>
+        </>
+      ) : (
+        <Text>Verifying your address…</Text>
+      )}
+    </AuthFrame>
   )
 }

@@ -42,8 +42,18 @@ export interface GroupCan {
 export type GroupMode = 'posts' | 'chat' | 'both'
 
 /** The instance's settings (architecture.md, Feature flags). */
+/**
+ * The instance's settings (architecture.md, Admin tools): what the owner
+ * sets about the community, readable by anyone, signed in or not, since the
+ * sign-in and join pages wear its name. `owner_set` is state: false until
+ * the setup link has been used. The name is empty until the owner names
+ * the community, which is onboarding.
+ */
 export interface Settings {
   group_creation: 'anyone' | 'staff'
+  name: string
+  description: string
+  owner_set: boolean
 }
 
 /** A group as its viewer sees it (architecture.md, Groups). The instance is the one of kind root. */
@@ -98,6 +108,8 @@ export interface Invite {
   created_by: User
   created_at: number
   expires_at: number
+  /** How many people have joined through it: a link is good for anyone who has it, for its week. */
+  uses: number
 }
 
 export interface Session {
@@ -147,7 +159,7 @@ export interface Message {
 export interface Notification {
   id: string
   user_id: string
-  kind: 'comment' | 'added' | 'mention'
+  kind: 'comment' | 'added' | 'mention' | 'joined'
   actor: User
   group_id: string
   post_id: string | null
@@ -271,8 +283,13 @@ export function getSettings(): Promise<Settings> {
   return request<Settings>('/api/settings')
 }
 
-export function setSettings(s: Settings): Promise<Settings> {
+export function setSettings(s: Pick<Settings, 'group_creation' | 'name' | 'description'>): Promise<Settings> {
   return request<Settings>('/api/settings', json('PUT', s))
+}
+
+/** The setup link's page: the owner's account, from a fresh instance's one-time token; signed in. */
+export function setup(token: string, username: string, email: string, password: string): Promise<Session> {
+  return request<Session>('/api/setup', json('POST', { token, username, email, password }))
 }
 
 /** The conversation with one person: the existing one if there is one, else a new one. */

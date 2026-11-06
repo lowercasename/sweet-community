@@ -213,6 +213,8 @@ Three stages with a clean boundary between the orchestrator and the instance:
 
 Stages 2 and 3 live in the binary, so self-hosters get the same onboarding and the orchestrator stays dumb.
 
+**Stages 2 and 3 built 2026-11-06.** Each instance is its own process of the one binary on its own database; `sweet create` (stage 1, not built) will start one and carry its link. Started with no owner able to sign in, the binary mints a setup token (its hash in the settings table), prints `SETUP: … <base-url>/setup/<token>` to its log, and the sign-in page says the community has not been set up yet. The setup page (`POST /api/setup {token, username, email, password}`) makes the owner's account, with the address taken as verified, since holding the link is holding the box and a fresh box may have no mail yet (Raphael, 2026-11-06), signs them in and spends the token; an owner made by `-owner-password` without a password is taken over rather than duplicated. `-owner-password` stays as the scripted way (the tests, a self-hoster's script), and with it no link is printed. Onboarding is the welcome page, which the client shows the owner while the community has no name: name and what it is for and who may create rooms (the same form as the Community page, so the two cannot disagree), then an invite link to copy, then "Go to <name>", which is Home. A member cannot exist before the name, since invites are the owner's to make.
+
 ### Domains
 
 v0: `theirgroup.sweet.community`, one wildcard certificate via Caddy's DNS challenge. The Cloudflare DNS module is not in stock Caddy: the compose stack ships a Caddy image built with xcaddy, and upgrades must preserve it. Custom domains later with on-demand TLS, which requires an `ask` endpoint answering "is this domain ours?"; the orchestrator provides it.
@@ -292,6 +294,10 @@ Minimum shipped:
 - Log out everywhere, for any user
 - Unanswered posts: posts with no reply yet, oldest first. (Sweet data: a reply within a week was the clearest difference between people who stayed and people who left.)
 - Instance settings: name, description, welcome message, rules, feature flags, topics, registration mode, source-code link
+
+**The community's name (built 2026-11-06).** `name` and `description` are settings rows beside `group_creation`; `GET /api/settings` is public, since the sign-in, join, verify and reset pages wear the name before any session exists, and it carries `owner_set`, which is state, not a setting. `PUT` is the owner's, wants a name (sixty characters at most, the description five hundred) and broadcasts the whole settings row as the existing `settings` event, which everyone gets, so a rename reaches every corner at once. The name replaces "Sweet" in the nav's head and the tab's title; Sweet's mark, the S in the red circle, stays as the product's, and the pages a stranger sees say "Made with Sweet" small under the card (Raphael, 2026-11-06). The join page says who invited you to what, and what it is for. The owner's page for all this is **Community**, in the nav after People, for the owner alone: a page about the community does not belong behind the owner's own page, where Settings is (Raphael, 2026-11-06: "that feels confusing"). Settings keeps what is mine: picture, account, sign out, leaving.
+
+**Invite links are many-use** (Raphael, 2026-11-06: a group moves together, and one link per person would not get them here). A link is good for anyone who has it for its seven days, counts who came through (`uses`, shown on People as "N joined through it"), and is revoked by its maker; `used_at` stays null and is no longer read. The owner gets a `joined` notification for each arrival, leading to the person's page; nobody else does, moderators included. Reversed from the first version, where a link was spent by its first use.
 
 Nothing fancier until a real instance asks.
 
@@ -418,6 +424,9 @@ Kept so the reasoning isn't lost when one of these comes back up.
 | Event cursor | Integer sequence → monotonic UUIDv7 → integer sequence | Integer sequence on the event log | Removing it was an invented simplification; commit order is what matters |
 | Joining | Register and you are in, with a session, no address asked | Register with an address; the link sent to it is what signs you in | The first version had no email at all, so the join page could not ask; once it did, a session before verifying would make verifying optional, and the document says it is not |
 | Password hashing | bcrypt, cost 12 | Argon2id (m=19 MiB, t=2, p=1); old bcrypt hashes still check | bcrypt was what was to hand on day one; the document said Argon2id. Checked, not rewritten, because one hash existed |
+| Invite links | Spent by the first person through | Good for anyone who has it for seven days, counted, revocable | A group moves to an instance together; one link per person would not bring them (Raphael, 2026-11-06) |
+| The owner's first sign-in | `-owner-password` at start, the owner named by a flag | A setup link printed at first start; the flag stays for scripts | The document always had the link; the flag was day-one scaffolding. The setup page chooses the username too, so the flag's name is only for the scripted path |
+| Where the instance's settings live | A card on the owner's Settings page | A Community page in the nav, for the owner | Settings had moved behind the owner's own page; a page about the community there felt confusing (Raphael, 2026-11-06) |
 
 ### Corrections from the adversarial review (Nov 2026)
 

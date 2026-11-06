@@ -383,17 +383,16 @@ func TestGroupModeAndInstanceSetting(t *testing.T) {
 	kit.mustStatus(400, "PUT", "/api/groups/"+dm["id"].(string), map[string]string{"mode": "both"})
 	kit.mustStatus(403, "POST", "/api/groups/"+dm["id"].(string)+"/posts", map[string]string{"body_html": "<p>x</p>"})
 
-	// The instance's first setting: who may create groups. Owner-only to read and write.
-	kit.mustStatus(403, "GET", "/api/settings", nil)
-	kit.mustStatus(403, "PUT", "/api/settings", map[string]string{"group_creation": "staff"})
-	if s := owner.mustStatus(200, "GET", "/api/settings", nil); s["group_creation"] != "anyone" {
-		t.Fatalf("default setting: %v", s)
+	// The instance's first setting: who may create groups. Anyone reads the settings (the sign-in page wears the name); the owner writes.
+	kit.mustStatus(403, "PUT", "/api/settings", map[string]string{"group_creation": "staff", "name": "Knitting"})
+	if s := kit.mustStatus(200, "GET", "/api/settings", nil); s["group_creation"] != "anyone" || s["name"] != "" || s["owner_set"] != true {
+		t.Fatalf("default settings: %v", s)
 	}
 	if !groupCan(myGroups(mo)[perm.Root], "create_groups") {
 		t.Fatal("member cannot create groups by default")
 	}
-	owner.mustStatus(400, "PUT", "/api/settings", map[string]string{"group_creation": "nobody"})
-	owner.mustStatus(200, "PUT", "/api/settings", map[string]string{"group_creation": "staff"})
+	owner.mustStatus(400, "PUT", "/api/settings", map[string]string{"group_creation": "nobody", "name": "Knitting"})
+	owner.mustStatus(200, "PUT", "/api/settings", map[string]string{"group_creation": "staff", "name": "Knitting"})
 	if groupCan(myGroups(mo)[perm.Root], "create_groups") {
 		t.Fatal("member can still create groups after the setting changed")
 	}

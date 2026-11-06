@@ -26,7 +26,7 @@ test.describe('signing in and joining', () => {
     const stranger = await browser.newContext({ baseURL: testInfo.project.use.baseURL as string })
     const page = await stranger.newPage()
     await page.goto(path)
-    await expect(page.getByText('raphael invited you')).toBeVisible()
+    await expect(page.getByText('raphael invited you to Sweet e2e.')).toBeVisible()
     const name = uniq('jo')
     await page.getByLabel('Username').fill(name)
     await page.getByLabel('Email address').fill(emailOf(name))
@@ -46,11 +46,18 @@ test.describe('signing in and joining', () => {
     await expect(p3.getByText('This link does not work')).toBeVisible()
     await twice.close()
 
-    // The link is spent.
+    // The link is good for the next person too, for its week; and the owner hears of each arrival.
     const again = await browser.newContext({ baseURL: testInfo.project.use.baseURL as string })
     const p2 = await again.newPage()
     await p2.goto(path)
-    await expect(p2.getByText(/used or has expired/)).toBeVisible()
+    await expect(p2.getByText('raphael invited you to Sweet e2e.')).toBeVisible()
+    await open(o.page, '/notifications')
+    await expect(o.page.getByText(`${name} joined the community`)).toBeVisible()
+    // Revoked (here by its code: People lists every open link, the helpers' too), it is good for nobody.
+    const revoked = await o.context.request.delete(`/api/invites/${path.split('/').pop()}`)
+    expect(revoked.ok()).toBeTruthy()
+    await p2.reload()
+    await expect(p2.getByText(/revoked or has expired/)).toBeVisible()
     await stranger.close()
     await again.close()
     await o.context.close()

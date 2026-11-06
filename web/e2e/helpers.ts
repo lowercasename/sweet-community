@@ -15,7 +15,7 @@ export interface Person {
 }
 
 /** Fix the layout so tests see the same thing every time: both panes, nav expanded. */
-async function prepare(page: Page) {
+export async function prepare(page: Page) {
   // A script error on the page is the first thing to know about when a flow fails.
   page.on('pageerror', (e) => console.log(`PAGEERROR ${page.url()}: ${e.message}`))
   page.on('console', (m) => {
@@ -52,6 +52,8 @@ export async function owner(browser: Browser, info: TestInfo): Promise<Person> {
 
 /** Where the test server puts the email it sends (serve.sh: one file per message). Playwright runs from `web/`. */
 const MAIL_DIR = join(process.cwd(), '..', 'data', 'e2e-mail')
+/** The fresh instance's (serve-fresh.sh). */
+export const FRESH_MAIL_DIR = join(process.cwd(), '..', 'data', 'e2e-fresh-mail')
 
 /** The email address a test person signs up with. */
 export const emailOf = (username: string) => `${username}@example.test`
@@ -61,13 +63,13 @@ export const emailOf = (username: string) => `${username}@example.test`
  * sent to an address. The server writes the file before it answers, so the
  * message is there by the time the request that caused it returns.
  */
-export function mailLink(to: string, kind: 'verify' | 'reset'): string {
+export function mailLink(to: string, kind: 'verify' | 'reset', dir = MAIL_DIR): string {
   const suffix = `-${to.replace('@', '_at_')}.txt`
-  const files = readdirSync(MAIL_DIR)
+  const files = readdirSync(dir)
     .filter((f) => f.endsWith(suffix))
     .sort()
   expect(files.length, `mail to ${to}`).toBeGreaterThan(0)
-  const text = readFileSync(join(MAIL_DIR, files[files.length - 1]), 'utf8')
+  const text = readFileSync(join(dir, files[files.length - 1]), 'utf8')
   const m = text.match(new RegExp(`https?://[^/\\s]+(/${kind}/\\S+)`))
   expect(m, `a ${kind} link in the mail to ${to}`).toBeTruthy()
   return m![1]

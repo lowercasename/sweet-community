@@ -24,6 +24,9 @@ export const NOTIFICATIONS = '/notifications'
 /** Forgot the password (architecture.md, Accounts): `/reset` asks for a link, `/reset/<token>` is where it leads. */
 export const RESET = '/reset'
 
+/** The owner's page for the community itself (architecture.md, Admin tools): name, description, who may create rooms. */
+export const COMMUNITY = '/community'
+
 /** A person's page (architecture.md, Accounts). */
 export const profilePath = (name: string) => `/u/${encodeURIComponent(name)}`
 

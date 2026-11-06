@@ -327,6 +327,20 @@ func (q *Queries) RemoveUser(ctx context.Context, arg RemoveUserParams) error {
 	return err
 }
 
+const renameUser = `-- name: RenameUser :exec
+UPDATE users SET username = ?1 WHERE id = ?2
+`
+
+type RenameUserParams struct {
+	Username string
+	ID       string
+}
+
+func (q *Queries) RenameUser(ctx context.Context, arg RenameUserParams) error {
+	_, err := q.db.ExecContext(ctx, renameUser, arg.Username, arg.ID)
+	return err
+}
+
 const setUnverifiedEmail = `-- name: SetUnverifiedEmail :execrows
 UPDATE users SET email = ?1 WHERE id = ?2 AND email_verified_at IS NULL
 `

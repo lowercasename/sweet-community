@@ -1,8 +1,8 @@
 import type { Group, User } from '../api'
 import { roomsOf } from '../data/groups'
-import { useAuthor, useUnreadPlaces, useUnreadNotifications } from '../data/hooks'
+import { useAuthor, useSettings, useUnreadPlaces, useUnreadNotifications } from '../data/hooks'
 import { anyUnread } from '../data/notifications'
-import { NEW_ROOM, NOTIFICATIONS, SEARCH, groupPath, profilePath } from '../routes'
+import { COMMUNITY, NEW_ROOM, NOTIFICATIONS, SEARCH, groupPath, profilePath } from '../routes'
 import { Avatar, Hairline, NavBar, NavItem, NavSection, Tile, Wordmark } from '../ui'
 import { ConversationsSection } from './ConversationsSection'
 
@@ -26,7 +26,9 @@ function at(location: string, path: string): boolean {
  * (Home, then the rooms I am in, with New room as that section's own
  * control, then my latest conversations with All messages at their foot),
  * the tools that reach across every place (Search, Notifications), and the house
- * (People, and me: my own page, where Settings is).
+ * (People; Community, for the owner, since a page about the community does
+ * not belong behind my own: Raphael, 2026-11-06; and me: my own page, where
+ * Settings is). The head wears the community's name.
  */
 export function Sidebar({ me, groups, location, expanded, onGo, onToggle }: SidebarProps) {
   const live = useAuthor(me)
@@ -35,10 +37,11 @@ export function Sidebar({ me, groups, location, expanded, onGo, onToggle }: Side
   const root = groups.find((g) => g.kind === 'root')
   const mine = roomsOf(groups)
   const canCreate = root?.can.create_groups === true
+  const { settings } = useSettings()
   return (
     <NavBar
       expanded={expanded}
-      head={<Wordmark expanded={expanded} />}
+      head={<Wordmark expanded={expanded} name={settings?.name} />}
       foot={
         <>
           <NavItem
@@ -126,6 +129,15 @@ export function Sidebar({ me, groups, location, expanded, onGo, onToggle }: Side
         current={at(location, '/people')}
         onClick={() => onGo('/people')}
       />
+      {root?.can.manage_instance && (
+        <NavItem
+          icon="settings"
+          label="Community"
+          expanded={expanded}
+          current={at(location, COMMUNITY)}
+          onClick={() => onGo(COMMUNITY)}
+        />
+      )}
     </NavBar>
   )
 }

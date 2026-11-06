@@ -45,6 +45,18 @@ describe('Login', () => {
     expect(screen.getByLabelText('Username or email')).toBeTruthy()
   })
 
+  it('a community with no owner yet has no sign-in form, only a word about the setup link', async () => {
+    const { Login } = await import('./Login')
+    render(
+      <Login
+        community={{ group_creation: 'anyone', name: '', description: '', owner_set: false }}
+        onSignedIn={() => {}}
+      />,
+    )
+    expect(screen.getByText(/has not been set up yet/)).toBeTruthy()
+    expect(screen.queryByLabelText('Username or email')).toBeNull()
+  })
+
   it('any other refusal is shown as it came', async () => {
     const { ApiError, login } = await import('../api')
     const { Login } = await import('./Login')

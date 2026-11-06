@@ -165,6 +165,19 @@ func (q *Queries) GetGroup(ctx context.Context, id string) (GetGroupRow, error) 
 	return i, err
 }
 
+const getGroupOwnerID = `-- name: GetGroupOwnerID :one
+
+SELECT user_id FROM memberships WHERE group_id = ?1 AND role = 'owner'
+`
+
+// The viewer's DMs with their member ids, for find-or-create in Go.
+func (q *Queries) GetGroupOwnerID(ctx context.Context, groupID string) (string, error) {
+	row := q.db.QueryRowContext(ctx, getGroupOwnerID, groupID)
+	var user_id string
+	err := row.Scan(&user_id)
+	return user_id, err
+}
+
 const getMember = `-- name: GetMember :one
 SELECT u.id, u.username, u.picture_id, m.role, m.joined_at, m.hidden_at
 FROM memberships m JOIN users u ON u.id = m.user_id

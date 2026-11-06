@@ -44,8 +44,8 @@ func TestRegisterNeedsAVerifiedAddress(t *testing.T) {
 	if status != 403 || body["error"] != "unverified" || body["email"] != "kit@example.test" {
 		t.Fatalf("login before verifying: %d %v", status, body)
 	}
-	// The invite is spent all the same.
-	kit.mustStatus(404, "POST", "/api/register", map[string]string{"code": code, "username": "kit2", "password": "longenough", "email": "kit2@example.test"})
+	// The invite is used all the same, and stays good for the next person.
+	kit.mustStatus(202, "POST", "/api/register", map[string]string{"code": code, "username": "kit2", "password": "longenough", "email": "kit2@example.test"})
 
 	// The link signs them in; it works once.
 	links := mailed(t, ts, "kit@example.test", "verify")

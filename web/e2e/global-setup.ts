@@ -15,6 +15,11 @@ export default async function globalSetup(config: FullConfig) {
   const ctx = await request.newContext({ baseURL })
   const res = await ctx.post('/api/login', { data: { username: 'raphael', password: 'correct horse' } })
   if (!res.ok()) throw new Error(`owner login at ${baseURL}: ${res.status()} ${await res.text()}`)
+  // The community is named, as onboarding would have; an unnamed one keeps its owner on the welcome page.
+  const named = await ctx.put('/api/settings', {
+    data: { name: 'Sweet e2e', description: '', group_creation: 'anyone' },
+  })
+  if (!named.ok()) throw new Error(`naming the community: ${named.status()} ${await named.text()}`)
   for (const project of config.projects) {
     await ctx.storageState({ path: `e2e/.auth/owner-${project.name}.json` })
   }

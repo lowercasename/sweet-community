@@ -45,7 +45,8 @@ func TestNotifications(t *testing.T) {
 	if n["kind"] != "comment" || n["post_id"] != pid || n["group_id"] != perm.Root || n["user_id"] != kitID || n["actor"].(map[string]any)["id"] != moID {
 		t.Fatalf("comment notification: %v", n)
 	}
-	if len(list(mo)) != 0 || len(list(owner)) != 0 {
+	// The owner's two are the arrivals of kit and mo (TestOwnerHearsOfEachArrival), nothing of the comment.
+	if len(list(mo)) != 0 || len(list(owner)) != 2 || list(owner)[0].(map[string]any)["kind"] != NotifyJoined {
 		t.Fatalf("others notified: mo %v owner %v", list(mo), list(owner))
 	}
 
@@ -61,8 +62,8 @@ func TestNotifications(t *testing.T) {
 	if added["kind"] != "added" || added["group_id"] != gid || added["actor"].(map[string]any)["username"] != "raphael" || added["post_id"] != nil {
 		t.Fatalf("added notification: %v", added)
 	}
-	if len(list(owner)) != 0 {
-		t.Fatalf("the adder was notified: %v", list(owner))
+	if l := list(owner); len(l) != 2 || l[0].(map[string]any)["kind"] != NotifyJoined {
+		t.Fatalf("the adder was notified of adding (beyond the two arrivals): %v", l)
 	}
 
 	// The stream carries each to its person only, and what it carries is the row.

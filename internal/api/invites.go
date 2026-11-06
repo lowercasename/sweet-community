@@ -26,9 +26,11 @@ type Invite struct {
 	CreatedBy User   `json:"created_by"`
 	CreatedAt int64  `json:"created_at"`
 	ExpiresAt int64  `json:"expires_at"`
+	// Uses is how many people have joined through it.
+	Uses int64 `json:"uses"`
 }
 
-// createInvite (owner) mints a single-use link, good for InviteTTL.
+// createInvite (owner) mints a link, good for anyone who has it for InviteTTL.
 func (s *Server) createInvite(w http.ResponseWriter, r *http.Request) {
 	u, _ := userFrom(r.Context())
 	code, err := auth.NewCode()
@@ -55,7 +57,7 @@ func (s *Server) listInvites(w http.ResponseWriter, r *http.Request) {
 	out := make([]Invite, 0, len(rows))
 	for _, row := range rows {
 		out = append(out, Invite{
-			Code: row.Code, URL: "/join/" + row.Code, CreatedAt: row.CreatedAt, ExpiresAt: row.ExpiresAt,
+			Code: row.Code, URL: "/join/" + row.Code, CreatedAt: row.CreatedAt, ExpiresAt: row.ExpiresAt, Uses: row.Uses,
 			CreatedBy: wireUser(row.CreatorID, row.CreatorUsername, row.CreatorPictureID),
 		})
 	}
@@ -80,7 +82,7 @@ func (s *Server) deleteInvite(w http.ResponseWriter, r *http.Request) {
 func (s *Server) getInvite(w http.ResponseWriter, r *http.Request) {
 	by, err := s.q().GetOpenInviteCreator(r.Context(), store.GetOpenInviteCreatorParams{Code: r.PathValue("code"), Now: db.Now()})
 	if errors.Is(err, sql.ErrNoRows) {
-		writeErr(w, http.StatusNotFound, "this invite link has been used or has expired")
+		writeErr(w, http.StatusNotFound, "this invite link has been revoked or has expired")
 		return
 	}
 	if err != nil {
@@ -154,13 +156,13 @@ func (s *Server) register(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusInternalServerError, err.Error())
 		return
 	}
-	n, err := qtx.ClaimInvite(ctx, store.ClaimInviteParams{UsedBy: sql.NullString{String: u.ID, Valid: true}, UsedAt: sql.NullInt64{Int64: now, Valid: true}, Code: in.Code, Now: now})
+	n, err := qtx.UseInvite(ctx, store.UseInviteParams{Code: in.Code, Now: now})
 	if err != nil {
 		writeErr(w, http.StatusInternalServerError, err.Error())
 		return
 	}
 	if n == 0 {
-		writeErr(w, http.StatusNotFound, "this invite link has been used or has expired")
+		writeErr(w, http.StatusNotFound, "this invite link has been revoked or has expired")
 		return
 	}
 	// A new account is a membership of the root group, and that is an event:
@@ -181,11 +183,31 @@ func (s *Server) register(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusInternalServerError, err.Error())
 		return
 	}
+	// The owner hears of each arrival (Raphael, 2026-11-06).
+	var told *events.Event
+	if ownerID, err := qtx.GetGroupOwnerID(ctx, perm.Root); err == nil {
+		entry, err := notify(r, qtx, NotifyJoined, ownerID, u.ID, perm.Root, nil, now)
+		if err != nil {
+			writeErr(w, http.StatusInternalServerError, err.Error())
+			return
+		}
+		if entry != nil {
+			tev, err := events.Log(ctx, tx, entry.Kind, entry.Payload, now)
+			if err != nil {
+				writeErr(w, http.StatusInternalServerError, err.Error())
+				return
+			}
+			told = &tev
+		}
+	}
 	if err := tx.Commit(); err != nil {
 		writeErr(w, http.StatusInternalServerError, err.Error())
 		return
 	}
 	s.Hub.Broadcast(ev)
+	if told != nil {
+		s.Hub.Broadcast(*told)
+	}
 	// No session yet: the address is verified first, and the link that
 	// verifies it signs the person in.
 	if err := s.sendToken(ctx, s.q(), u.ID, TokenVerify, in.Email); err != nil {

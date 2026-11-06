@@ -63,3 +63,6 @@ SELECT COUNT(*) FROM email_tokens WHERE user_id = sqlc.arg(user_id) AND kind = s
 
 -- name: SetUnverifiedEmail :execrows
 UPDATE users SET email = sqlc.arg(email) WHERE id = sqlc.arg(id) AND email_verified_at IS NULL;
+
+-- name: RenameUser :exec
+UPDATE users SET username = sqlc.arg(username) WHERE id = sqlc.arg(id);

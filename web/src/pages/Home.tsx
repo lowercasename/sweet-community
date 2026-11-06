@@ -5,7 +5,18 @@ import { useAuthor, useGroupActions, useGroups, usePost, useUnreadNotifications,
 import { anyUnread } from '../data/notifications'
 import { StreamProvider } from '../hooks/StreamContext'
 import { useLayout } from '../hooks/useLayout'
-import { MESSAGES, NEW_MESSAGE, NEW_ROOM, NOTIFICATIONS, SEARCH, groupPath, membersPath, profilePath } from '../routes'
+import {
+  COMMUNITY,
+  MESSAGES,
+  NEW_MESSAGE,
+  NEW_ROOM,
+  NOTIFICATIONS,
+  SEARCH,
+  groupPath,
+  membersPath,
+  profilePath,
+} from '../routes'
+import { CommunityPage } from '../components/CommunityPage'
 import { GroupView, groupLabel } from '../components/GroupView'
 import { MembersPage } from '../components/MembersPage'
 import { MenuPage } from '../components/MenuPage'
@@ -31,6 +42,7 @@ const PAGE_TITLES: Record<string, string> = {
   [SEARCH]: 'Search',
   '/people': 'People',
   '/settings': 'Settings',
+  [COMMUNITY]: 'Community',
 }
 
 interface HomeProps {
@@ -190,6 +202,9 @@ export function Home({ me, onSignOut }: HomeProps) {
             {root && <PeoplePage me={me} root={root} onOpenGroup={(id) => navigate(groupPath(id, root.id))} />}
           </Route>
           <Route path="/settings">{root && <SettingsPage me={me} root={root} onSignOut={onSignOut} />}</Route>
+          <Route path={COMMUNITY}>
+            {root && (root.can.manage_instance ? <CommunityPage /> : <Redirect to="/" replace />)}
+          </Route>
           <Route path={SEARCH}>
             <SearchPage key={searched} query={searched} groups={groups} onGo={navigate} />
           </Route>

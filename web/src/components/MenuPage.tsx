@@ -2,7 +2,7 @@ import type { Group, User } from '../api'
 import { roomsOf } from '../data/groups'
 import { useAuthor, useUnreadPlaces } from '../data/hooks'
 import { anyUnread } from '../data/notifications'
-import { NEW_ROOM, groupPath, profilePath } from '../routes'
+import { NEW_ROOM, groupPath, profilePath, COMMUNITY } from '../routes'
 import { Avatar, Card, Hairline, NavItem, NavSection, Pane, Stack, Tile } from '../ui'
 import { ConversationsSection } from './ConversationsSection'
 
@@ -65,6 +65,9 @@ export function MenuPage({ me, groups, onGo, onLogout }: MenuPageProps) {
           <ConversationsSection groups={groups} me={me} places={places} expanded onGo={onGo} />
           <Hairline />
           <NavItem icon="people" label="People" expanded onClick={() => onGo('/people')} />
+          {root?.can.manage_instance && (
+            <NavItem icon="settings" label="Community" expanded onClick={() => onGo(COMMUNITY)} />
+          )}
           <Hairline />
           <NavItem icon="logout" label="Sign out" expanded onClick={onLogout} />
         </Stack>

@@ -1,5 +1,5 @@
 import type { Group, Marker, Notification } from '../api'
-import { groupPath, postPath } from '../routes'
+import { groupPath, postPath, profilePath } from '../routes'
 
 /** The notifications stream's marker name; a room's chat and feed each have their own. */
 export const NOTIFICATIONS = 'notifications'
@@ -49,11 +49,14 @@ export function describe(n: Notification, groups: Group[]): string {
       const room = groups.find((g) => g.id === n.group_id)
       return `mentioned you in ${room ? (room.kind === 'root' ? 'the chat' : room.name) : 'a room'}`
     }
+    case 'joined':
+      return 'joined the community'
   }
 }
 
-/** Where a notification leads: anything about a post to the post's page, else to the room. */
+/** Where a notification leads: anything about a post to the post's page, an arrival to the person, else to the room. */
 export function targetOf(n: Notification, rootId?: string): string {
   if (n.post_id) return postPath(n.post_id)
+  if (n.kind === 'joined') return profilePath(n.actor.username)
   return groupPath(n.group_id, rootId)
 }

@@ -2,7 +2,7 @@
 INSERT INTO invites (code, created_by, created_at, expires_at) VALUES (?, ?, ?, ?);
 
 -- name: ListOpenInvites :many
-SELECT i.code, i.created_at, i.expires_at,
+SELECT i.code, i.created_at, i.expires_at, i.uses,
        u.id AS creator_id, u.username AS creator_username, u.picture_id AS creator_picture_id
 FROM invites i JOIN users u ON u.id = i.created_by
 WHERE i.used_at IS NULL AND i.expires_at > sqlc.arg(now)
@@ -17,6 +17,7 @@ WHERE i.code = sqlc.arg(code) AND i.used_at IS NULL AND i.expires_at > sqlc.arg(
 
 -- Never mix bare ? with sqlc.arg() in one query: SQLite numbers a bare ?
 -- as (highest index so far + 1), so a ? after a named ?3 becomes ?4.
--- name: ClaimInvite :execrows
-UPDATE invites SET used_by = sqlc.arg(used_by), used_at = sqlc.arg(used_at)
+-- name: UseInvite :execrows
+-- A link is good for its seven days however many come through it; used_at stays NULL.
+UPDATE invites SET uses = uses + 1
 WHERE code = sqlc.arg(code) AND used_at IS NULL AND expires_at > sqlc.arg(now);

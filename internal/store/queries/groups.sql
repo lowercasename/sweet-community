@@ -84,3 +84,6 @@ UPDATE memberships SET hidden_at = sqlc.arg(hidden_at) WHERE group_id = sqlc.arg
 UPDATE memberships SET hidden_at = NULL WHERE group_id = sqlc.arg(group_id) AND user_id = sqlc.arg(user_id);
 
 -- The viewer's DMs with their member ids, for find-or-create in Go.
+
+-- name: GetGroupOwnerID :one
+SELECT user_id FROM memberships WHERE group_id = sqlc.arg(group_id) AND role = 'owner';

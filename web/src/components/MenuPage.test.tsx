@@ -13,6 +13,7 @@ vi.mock('../api', () => ({
   listMarkers: vi.fn(() =>
     Promise.resolve({ markers: [{ user_id: 'raphael', stream: 'chat:knit', read_at: 0, unread: 2 }] }),
   ),
+  getSettings: vi.fn(() => Promise.resolve({ group_creation: 'anyone', name: '', description: '', owner_set: true })),
 }))
 
 const raphael = user('raphael')
@@ -42,6 +43,7 @@ describe('MenuPage', () => {
       'New message',
       'kit',
       'People',
+      'Community',
       'Sign out',
     ])
     expect(

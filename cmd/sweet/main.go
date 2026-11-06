@@ -53,9 +53,9 @@ func envOr(key, fallback string) string {
 func main() {
 	addr := flag.String("addr", ":8080", "listen address")
 	dbPath := flag.String("db", "data/sweet.db", "SQLite database path")
-	owner := flag.String("owner", "owner", "username of the instance owner")
+	owner := flag.String("owner", "owner", "username of the instance owner, when -owner-password makes one without the setup link")
 	ownerPassword := flag.String("owner-password", os.Getenv("SWEET_OWNER_PASSWORD"),
-		"owner's initial password (or SWEET_OWNER_PASSWORD); used only until the owner has one")
+		"the owner's password (or SWEET_OWNER_PASSWORD) for a scripted setup; without it a fresh instance prints a setup link")
 	imagesDir := flag.String("images-dir", "data/images", "directory for uploaded images when SWEET_S3_* is not set")
 	mailDir := flag.String("mail-dir", "data/mail", "directory that receives email as files when SWEET_SMTP_HOST is not set")
 	baseURL := flag.String("base-url", envOr("SWEET_BASE_URL", "http://localhost:8080"), "the address links in email point at (or SWEET_BASE_URL)")
@@ -80,12 +80,22 @@ func main() {
 		log.Fatalf("migrate: %v", err)
 	}
 
-	me, err := api.EnsureOwner(ctx, d, *owner, *ownerPassword)
-	if err != nil {
-		log.Fatalf("owner: %v", err)
+	base := strings.TrimRight(*baseURL, "/")
+	// The owner: scripted with a password, or, on a fresh instance, whoever
+	// opens the setup link (architecture.md, New-instance lifecycle).
+	if *ownerPassword != "" {
+		if _, err := api.EnsureOwner(ctx, d, *owner, *ownerPassword); err != nil {
+			log.Fatalf("owner: %v", err)
+		}
 	}
-	if !api.OwnerHasPassword(ctx, d, *owner) {
-		log.Printf("WARNING: owner %q has no password and cannot sign in; restart with -owner-password or SWEET_OWNER_PASSWORD", *owner)
+	if needs, err := api.NeedsSetup(ctx, d); err != nil {
+		log.Fatalf("owner: %v", err)
+	} else if needs {
+		link, err := api.SetupLink(ctx, d, base)
+		if err != nil {
+			log.Fatalf("setup link: %v", err)
+		}
+		log.Printf("SETUP: this community has no owner yet. Open %s to become its owner.", link)
 	}
 
 	imgStore, err := imageStore(*imagesDir)
@@ -97,7 +107,7 @@ func main() {
 	go images.SweepEvery(ctx, d, imgStore, time.Hour, 24*time.Hour, log.Printf)
 
 	hub := events.NewHub(d)
-	srv := &api.Server{DB: d, Hub: hub, Images: imgStore, Mail: mail.FromEnv(*mailDir), BaseURL: strings.TrimRight(*baseURL, "/")}
+	srv := &api.Server{DB: d, Hub: hub, Images: imgStore, Mail: mail.FromEnv(*mailDir), BaseURL: base}
 
 	mux := http.NewServeMux()
 	srv.Routes(mux)
@@ -117,7 +127,7 @@ func main() {
 		httpSrv.Shutdown(shutdownCtx)
 	}()
 
-	log.Printf("sweet listening on %s (db %s, owner %s)", *addr, *dbPath, me.Username)
+	log.Printf("sweet listening on %s (db %s)", *addr, *dbPath)
 	if err := httpSrv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 		log.Fatal(err)
 	}

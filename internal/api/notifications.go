@@ -36,6 +36,8 @@ type Notification struct {
 const (
 	NotifyComment = "comment"
 	NotifyAdded   = "added"
+	// NotifyJoined tells the owner someone came in through an invite link.
+	NotifyJoined = "joined"
 )
 
 // Marker is how far along a stream a person has read: the newest time they

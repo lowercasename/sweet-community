@@ -10,33 +10,6 @@ import (
 	"database/sql"
 )
 
-const claimInvite = `-- name: ClaimInvite :execrows
-UPDATE invites SET used_by = ?1, used_at = ?2
-WHERE code = ?3 AND used_at IS NULL AND expires_at > ?4
-`
-
-type ClaimInviteParams struct {
-	UsedBy sql.NullString
-	UsedAt sql.NullInt64
-	Code   string
-	Now    int64
-}
-
-// Never mix bare ? with sqlc.arg() in one query: SQLite numbers a bare ?
-// as (highest index so far + 1), so a ? after a named ?3 becomes ?4.
-func (q *Queries) ClaimInvite(ctx context.Context, arg ClaimInviteParams) (int64, error) {
-	result, err := q.db.ExecContext(ctx, claimInvite,
-		arg.UsedBy,
-		arg.UsedAt,
-		arg.Code,
-		arg.Now,
-	)
-	if err != nil {
-		return 0, err
-	}
-	return result.RowsAffected()
-}
-
 const createInvite = `-- name: CreateInvite :exec
 INSERT INTO invites (code, created_by, created_at, expires_at) VALUES (?, ?, ?, ?)
 `
@@ -88,7 +61,7 @@ func (q *Queries) GetOpenInviteCreator(ctx context.Context, arg GetOpenInviteCre
 }
 
 const listOpenInvites = `-- name: ListOpenInvites :many
-SELECT i.code, i.created_at, i.expires_at,
+SELECT i.code, i.created_at, i.expires_at, i.uses,
        u.id AS creator_id, u.username AS creator_username, u.picture_id AS creator_picture_id
 FROM invites i JOIN users u ON u.id = i.created_by
 WHERE i.used_at IS NULL AND i.expires_at > ?1
@@ -99,6 +72,7 @@ type ListOpenInvitesRow struct {
 	Code             string
 	CreatedAt        int64
 	ExpiresAt        int64
+	Uses             int64
 	CreatorID        string
 	CreatorUsername  string
 	CreatorPictureID sql.NullString
@@ -117,6 +91,7 @@ func (q *Queries) ListOpenInvites(ctx context.Context, now int64) ([]ListOpenInv
 			&i.Code,
 			&i.CreatedAt,
 			&i.ExpiresAt,
+			&i.Uses,
 			&i.CreatorID,
 			&i.CreatorUsername,
 			&i.CreatorPictureID,
@@ -132,4 +107,25 @@ func (q *Queries) ListOpenInvites(ctx context.Context, now int64) ([]ListOpenInv
 		return nil, err
 	}
 	return items, nil
+}
+
+const useInvite = `-- name: UseInvite :execrows
+UPDATE invites SET uses = uses + 1
+WHERE code = ?1 AND used_at IS NULL AND expires_at > ?2
+`
+
+type UseInviteParams struct {
+	Code string
+	Now  int64
+}
+
+// Never mix bare ? with sqlc.arg() in one query: SQLite numbers a bare ?
+// as (highest index so far + 1), so a ? after a named ?3 becomes ?4.
+// A link is good for its seven days however many come through it; used_at stays NULL.
+func (q *Queries) UseInvite(ctx context.Context, arg UseInviteParams) (int64, error) {
+	result, err := q.db.ExecContext(ctx, useInvite, arg.Code, arg.Now)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
 }

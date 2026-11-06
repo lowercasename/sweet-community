@@ -1,0 +1,68 @@
+import { useState } from 'react'
+import { setup, type User } from '../api'
+import { AuthFrame } from '../components/AuthFrame'
+import { Alert, Button, Field, Form, Heading, Input, Row, Text } from '../ui'
+
+interface SetupProps {
+  token: string
+  onSetUp: (me: User) => void
+}
+
+/**
+ * The setup link's page (architecture.md, New-instance lifecycle): a fresh
+ * instance has no owner until whoever holds the link makes their account
+ * here. The address is taken as verified: holding the link is holding the box.
+ */
+export function Setup({ token, onSetUp }: SetupProps) {
+  const [username, setUsername] = useState('')
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  const submit = async () => {
+    if (busy) return
+    setBusy(true)
+    setError(null)
+    try {
+      const session = await setup(token, username.trim(), email.trim(), password)
+      onSetUp(session.user)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Could not set up the community')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <AuthFrame>
+      <Heading level={2}>Set up your community</Heading>
+      <Text>You will be its owner. Choose how you appear here, and a password.</Text>
+      <Form onSubmit={() => void submit()}>
+        <Field label="Username">
+          <Input name="username" value={username} onChange={setUsername} autoComplete="username" autoFocus required />
+        </Field>
+        <Field label="Email address">
+          <Input type="email" name="email" value={email} onChange={setEmail} autoComplete="email" required />
+        </Field>
+        <Field label="Password">
+          <Input
+            type="password"
+            name="password"
+            value={password}
+            onChange={setPassword}
+            autoComplete="new-password"
+            required
+          />
+        </Field>
+        <Text variant="small">Letters, digits and underscores; a password of at least 8 characters.</Text>
+        {error && <Alert tone="error">{error}</Alert>}
+        <Row justify="end" align="center">
+          <Button type="submit" disabled={busy || !username || !email || !password}>
+            {busy ? 'Setting up…' : 'Set up'}
+          </Button>
+        </Row>
+      </Form>
+    </AuthFrame>
+  )
+}

@@ -14,6 +14,9 @@ vi.mock('../api', () => ({
   listUsers: vi.fn(() => Promise.resolve({ users: [] })),
   listNotifications: vi.fn(() => Promise.resolve({ notifications: [], next_before: null })),
   listMarkers: vi.fn(() => Promise.resolve({ markers: [] })),
+  getSettings: vi.fn(() =>
+    Promise.resolve({ group_creation: 'anyone', name: 'Knitting Circle', description: '', owner_set: true }),
+  ),
 }))
 
 const raphael = user('raphael')
@@ -56,6 +59,7 @@ describe('Sidebar', () => {
       'Search',
       'Notifications',
       'People',
+      'Community',
       'raphael',
       'Collapse',
     ])
@@ -170,7 +174,17 @@ describe('Sidebar', () => {
   it('collapsed, keeps every name, drops the section title, and shows a group by its initial', async () => {
     await draw([root(true), knitting, withKit], '/', false)
     // Collapsed, there is no title row and no section control: a plus among the tiles took the room of a place.
-    expect(names()).toEqual(['Home', 'Knitting', 'kit', 'Search', 'Notifications', 'People', 'raphael', 'Expand'])
+    expect(names()).toEqual([
+      'Home',
+      'Knitting',
+      'kit',
+      'Search',
+      'Notifications',
+      'People',
+      'Community',
+      'raphael',
+      'Expand',
+    ])
     expect(screen.queryByText('Rooms')).toBeNull()
     expect(screen.queryByText('Messages')).toBeNull()
     expect(screen.getByRole('button', { name: 'Knitting' }).textContent).toBe('K')

@@ -185,12 +185,15 @@ func TestInviteRegisterAndSessions(t *testing.T) {
 		t.Fatalf("me: %v", me)
 	}
 
-	// The link is spent.
-	newClient(t, ts).mustStatus(404, "POST", "/api/register", map[string]string{"code": code, "username": "kit2", "password": "longenough", "email": "kit2@example.test"})
-	anon.mustStatus(404, "GET", "/api/invites/"+code, nil)
-	if n := len(owner.mustStatus(200, "GET", "/api/invites", nil)["invites"].([]any)); n != 0 {
-		t.Fatalf("open invites after use: %d", n)
+	// The link is good for the next person too (a group moves together), and counts them.
+	newClient(t, ts).mustStatus(202, "POST", "/api/register", map[string]string{"code": code, "username": "kit2", "password": "longenough", "email": "kit2@example.test"})
+	anon.mustStatus(200, "GET", "/api/invites/"+code, nil)
+	if invs := owner.mustStatus(200, "GET", "/api/invites", nil)["invites"].([]any); len(invs) != 1 || invs[0].(map[string]any)["uses"] != 2.0 {
+		t.Fatalf("open invites after two joins: %v", invs)
 	}
+	// Revoked, it is good for nobody.
+	owner.mustStatus(204, "DELETE", "/api/invites/"+code, nil)
+	newClient(t, ts).mustStatus(404, "POST", "/api/register", map[string]string{"code": code, "username": "kit3", "password": "longenough", "email": "kit3@example.test"})
 
 	// Usernames are unique, case-insensitively.
 	inv2 := owner.mustStatus(201, "POST", "/api/invites", nil)
@@ -219,8 +222,8 @@ func TestInviteRegisterAndSessions(t *testing.T) {
 	kit3 := newClient(t, ts)
 	kit3.login("kit", "longenough")
 	users := kit3.mustStatus(200, "GET", "/api/users", nil)
-	if n := len(users["users"].([]any)); n != 2 {
-		t.Fatalf("users: want 2, got %d", n)
+	if n := len(users["users"].([]any)); n != 3 {
+		t.Fatalf("users (the owner, kit, kit2): want 3, got %d", n)
 	}
 	kit3.mustStatus(403, "POST", "/api/invites", nil)
 }
@@ -286,8 +289,8 @@ func TestOwnerPasswordIsSetOnceOnly(t *testing.T) {
 	if _, err := EnsureOwner(ctx, d, "o", ""); err != nil {
 		t.Fatal(err)
 	}
-	if OwnerHasPassword(ctx, d, "o") {
-		t.Fatal("no password yet")
+	if needs, err := NeedsSetup(ctx, d); err != nil || !needs {
+		t.Fatalf("an owner without a password needs setup: %v %v", needs, err)
 	}
 	EnsureOwner(ctx, d, "o", "first one")
 	EnsureOwner(ctx, d, "o", "second one must not replace")

@@ -451,14 +451,15 @@ export function useSetBio() {
 }
 
 /** The instance's settings; only the root owner may ask. */
-export function useSettings(enabled: boolean) {
-  const q = useQuery({ queryKey: keys.settings, queryFn: getSettings, enabled })
+/** The community's settings: its name above all, which every page wears. Public, so the sign-in page reads them too. */
+export function useSettings() {
+  const q = useQuery({ queryKey: keys.settings, queryFn: getSettings })
   return { settings: q.data, error: q.error }
 }
 
 export function useSetSettings() {
   const qc = useQueryClient()
-  return async (s: Settings) => {
+  return async (s: Pick<Settings, 'group_creation' | 'name' | 'description'>) => {
     applyEvent(qc, 'settings', await setSettings(s))
   }
 }
