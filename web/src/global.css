@@ -86,6 +86,12 @@
     color: var(--color-sky);
     text-decoration: none;
   }
+  /* A mention, in a body or in the editor: the person's name in Sweet red. */
+  :is(.content, .editor .ProseMirror) :is(a[data-mention-id], span[data-mention-id]) {
+    color: var(--color-sweet);
+    font-weight: 500;
+    text-decoration: none;
+  }
   :is(.content, .editor .ProseMirror) a:hover {
     color: var(--color-sweet);
     text-decoration: underline;

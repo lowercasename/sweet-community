@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { useMemo, type MouseEvent } from 'react'
 import { wrapGalleries } from '../content/galleries'
 
 interface HtmlContentProps {
@@ -6,6 +6,8 @@ interface HtmlContentProps {
   html: string
   /** `small` is a comment: a size under the post it answers. */
   size?: 'body' | 'small'
+  /** A click anywhere in the body: Body routes the anchors it made (mentions) without a page load. */
+  onClick?: (e: MouseEvent<HTMLDivElement>) => void
 }
 
 /**
@@ -17,11 +19,12 @@ interface HtmlContentProps {
  * before storage; nothing client-generated may be passed here unsanitised.
  * `pnpm check:atomic` fails if dangerouslySetInnerHTML appears anywhere else.
  */
-export function HtmlContent({ html, size = 'body' }: HtmlContentProps) {
+export function HtmlContent({ html, size = 'body', onClick }: HtmlContentProps) {
   const rendered = useMemo(() => wrapGalleries(html), [html])
   return (
     <div
       className={size === 'small' ? 'content text-[15px]' : 'content'}
+      onClick={onClick}
       dangerouslySetInnerHTML={{ __html: rendered }}
     />
   )

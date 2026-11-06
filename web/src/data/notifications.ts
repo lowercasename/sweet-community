@@ -44,11 +44,16 @@ export function describe(n: Notification, groups: Group[]): string {
       const room = groups.find((g) => g.id === n.group_id)
       return `added you to ${room ? room.name : 'a room'}`
     }
+    case 'mention': {
+      if (n.post_id) return 'mentioned you in a post'
+      const room = groups.find((g) => g.id === n.group_id)
+      return `mentioned you in ${room ? (room.kind === 'root' ? 'the chat' : room.name) : 'a room'}`
+    }
   }
 }
 
-/** Where a notification leads: a comment to its post's page, a room to the room. */
+/** Where a notification leads: anything about a post to the post's page, else to the room. */
 export function targetOf(n: Notification, rootId?: string): string {
-  if (n.kind === 'comment' && n.post_id) return postPath(n.post_id)
+  if (n.post_id) return postPath(n.post_id)
   return groupPath(n.group_id, rootId)
 }

@@ -1,7 +1,8 @@
 import { useState } from 'react'
 import type { Message } from '../api'
 import { useAuthor } from '../data/hooks'
-import { Box, ConfirmDialog, HtmlContent, Menu, MessageBlock, Row, Stack, Text, Time } from '../ui'
+import { Box, ConfirmDialog, Menu, MessageBlock, Row, Stack, Text, Time } from '../ui'
+import { Body } from './Body'
 import { PersonName } from './PersonName'
 
 interface MessageGroupProps {
@@ -56,7 +57,7 @@ export function MessageGroup({ messages, onDelete }: MessageGroupProps) {
               ) : undefined
             }
           >
-            <HtmlContent html={m.body_html} />
+            <Body html={m.body_html} />
           </MessageBlock>
         ))}
       </Stack>

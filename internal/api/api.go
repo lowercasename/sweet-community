@@ -399,13 +399,23 @@ func (s *Server) createPost(w http.ResponseWriter, r *http.Request) {
 	}
 	author, _ := userFrom(r.Context())
 	now := db.Now()
-	s.logged(w, r, "post", now, func(qtx *store.Queries) (any, int, error) {
-		if err := qtx.CreatePost(r.Context(), store.CreatePostParams{ID: id.String(), GroupID: g.ID, AuthorID: author.ID, BodyHtml: clean, BodyText: sanitize.Text(clean), CreatedAt: now}); err != nil {
-			return nil, http.StatusInternalServerError, err
+	// The post and a notification to each person it mentions, in one transaction.
+	s.loggedMany(w, r, now, func(qtx *store.Queries) ([]events.Entry, any, int, error) {
+		text := sanitize.Text(clean)
+		if err := qtx.CreatePost(r.Context(), store.CreatePostParams{ID: id.String(), GroupID: g.ID, AuthorID: author.ID, BodyHtml: clean, BodyText: text, CreatedAt: now}); err != nil {
+			return nil, nil, http.StatusInternalServerError, err
 		}
 		row, err := qtx.GetPost(r.Context(), id.String())
+		if err != nil {
+			return nil, nil, http.StatusInternalServerError, err
+		}
 		p := wirePost(row)
-		return &p, http.StatusCreated, err
+		pid := p.ID
+		told, err := mentionEvents(r, qtx, clean, author.ID, g.ID, &pid, now, "")
+		if err != nil {
+			return nil, nil, http.StatusInternalServerError, err
+		}
+		return append([]events.Entry{{Kind: "post", Payload: &p}}, told...), &p, http.StatusCreated, nil
 	})
 }
 
@@ -435,11 +445,13 @@ func (s *Server) editPost(w http.ResponseWriter, r *http.Request) {
 		if !perm.EditPost(a, perm.Post{AuthorID: owners.AuthorID}) {
 			return nil, http.StatusForbidden, errors.New("not your post")
 		}
+		text := sanitize.Text(clean)
 		if err := qtx.EditPost(r.Context(), store.EditPostParams{
-			BodyHtml: clean, BodyText: sanitize.Text(clean), EditedAt: sql.NullInt64{Int64: now, Valid: true}, ID: id,
+			BodyHtml: clean, BodyText: text, EditedAt: sql.NullInt64{Int64: now, Valid: true}, ID: id,
 		}); err != nil {
 			return nil, http.StatusInternalServerError, err
 		}
+		// An edit mentions nobody anew.
 		row, err := qtx.GetPost(r.Context(), id)
 		p := wirePost(row)
 		return &p, http.StatusOK, err

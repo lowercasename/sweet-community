@@ -113,7 +113,16 @@ func (s *Server) createComment(w http.ResponseWriter, r *http.Request) {
 		if told != nil {
 			entries = append(entries, *told)
 		}
-		return entries, &c, http.StatusCreated, nil
+		// Mentions in the comment reach their people too; the post's author, already told of the comment, once only.
+		skip := ""
+		if told != nil {
+			skip = owners.AuthorID
+		}
+		mentioned, err := mentionEvents(r, qtx, clean, author.ID, owners.GroupID, &postID, now, skip)
+		if err != nil {
+			return nil, nil, http.StatusInternalServerError, err
+		}
+		return append(entries, mentioned...), &c, http.StatusCreated, nil
 	})
 }
 

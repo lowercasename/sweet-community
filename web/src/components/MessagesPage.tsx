@@ -91,7 +91,7 @@ export function MessagesPage({ me, onGo }: MessagesPageProps) {
               {out.length > 0 && (
                 <Stack gap={1}>
                   <Heading level={3}>Hidden</Heading>
-                  <Text variant="small">Opening one brings it back.</Text>
+                  <Text variant="small">Opening a hidden conversation brings it back.</Text>
                   {problem && <Alert tone="error">{problem}</Alert>}
                   <List gap={1}>{out.map((g) => row(g, () => void show(g)))}</List>
                 </Stack>

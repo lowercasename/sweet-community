@@ -88,6 +88,30 @@ describe('NotificationsPage', () => {
     expect(screen.getByRole('button', { name: 'mo added you to Knitting, new' })).toBeTruthy()
   })
 
+  it("words a mention by where it was: a post, or the room's chat", async () => {
+    const { listNotifications } = await import('../api')
+    vi.mocked(listNotifications).mockResolvedValue({
+      notifications: [
+        notification('n30', 'mention', mo, { post_id: 'p1' }),
+        notification('n20', 'mention', mo, { group_id: 'knit', post_id: null }),
+        notification('n10', 'mention', mo, { group_id: ROOT, post_id: null }),
+      ],
+      next_before: null,
+    })
+    const onGo = await draw()
+    const rows = within(await screen.findByRole('list')).getAllByRole('button')
+    expect(rows.map((b) => b.getAttribute('aria-label'))).toEqual([
+      'mo mentioned you in a post, new',
+      'mo mentioned you in Knitting, new',
+      'mo mentioned you in the chat, new',
+    ])
+    // A mention in a post opens the post; one in a chat opens the room.
+    fireEvent.click(rows[0])
+    expect(onGo).toHaveBeenCalledWith('/p/p1')
+    fireEvent.click(rows[1])
+    expect(onGo).toHaveBeenCalledWith('/r/knit')
+  })
+
   it('says what will show here when nothing has yet', async () => {
     const { listNotifications } = await import('../api')
     vi.mocked(listNotifications).mockResolvedValue({ notifications: [], next_before: null })

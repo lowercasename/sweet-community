@@ -4,21 +4,8 @@ import { useGroupActions, useGroups, usePostActions, useProfile, useSetBio, useU
 import { useStreamStatus } from '../hooks/StreamContext'
 import { commentExtensions } from '../editor/extensions'
 import { groupPath } from '../routes'
-import {
-  Alert,
-  Avatar,
-  Button,
-  Card,
-  Heading,
-  HtmlContent,
-  Measure,
-  Pane,
-  Row,
-  ScrollArea,
-  Stack,
-  Text,
-  Time,
-} from '../ui'
+import { Alert, Avatar, Button, Card, Heading, Measure, Pane, Row, ScrollArea, Stack, Text, Time } from '../ui'
+import { Body } from './Body'
 import { BodyEditor } from './BodyEditor'
 import { Post } from './Post'
 
@@ -121,7 +108,7 @@ function Loaded({ profile, me, onGo }: { profile: Profile; me: User; onGo: (path
                     onCancel={() => setEditing(false)}
                   />
                 ) : profile.bio_html ? (
-                  <HtmlContent html={profile.bio_html} />
+                  <Body html={profile.bio_html} />
                 ) : profile.can.edit ? (
                   <Text variant="secondary">Nothing about you yet.</Text>
                 ) : null}

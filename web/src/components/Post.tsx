@@ -3,21 +3,8 @@ import type { Post as PostData } from '../api'
 import { useAuthor } from '../data/hooks'
 import { postExtensions } from '../editor/extensions'
 import { groupPath, postPath } from '../routes'
-import {
-  Alert,
-  Button,
-  Card,
-  ConfirmDialog,
-  HtmlContent,
-  Link,
-  Menu,
-  type MenuItem,
-  Row,
-  Stack,
-  Text,
-  Tile,
-  Time,
-} from '../ui'
+import { Alert, Button, Card, ConfirmDialog, Link, Menu, type MenuItem, Row, Stack, Text, Tile, Time } from '../ui'
+import { Body } from './Body'
 import { BodyEditor } from './BodyEditor'
 import { CommentThread } from './CommentThread'
 import { PersonName } from './PersonName'
@@ -127,7 +114,7 @@ export function Post({ post, linked = true, expanded = false, place, disabled, o
               onCancel={() => setEditing(false)}
             />
           ) : (
-            <HtmlContent html={post.body_html} />
+            <Body html={post.body_html} />
           )}
           {deleteError && <Alert tone="error">{deleteError}</Alert>}
         </Stack>

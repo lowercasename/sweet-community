@@ -87,6 +87,10 @@ export const dm = (id: string, people: User[], extra: Partial<Group> = {}): Grou
 /** A one-paragraph body, for fixtures: the markup lives here, where the atomic check allows it. */
 export const paragraph = (text: string) => `<p>${text}</p>`
 
+/** A stored mention, as the server keeps it. */
+export const mentionSpan = (id: string, name: string) =>
+  `<span data-type="mention" data-mention-id="${id}">@${name}</span>`
+
 export const post = (id: string, author: User, extra: Partial<Post> = {}): Post => ({
   id,
   group_id: ROOT,

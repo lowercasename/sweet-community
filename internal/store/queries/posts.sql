@@ -44,3 +44,4 @@ JOIN groups g ON g.id = p.group_id AND g.deleted_at IS NULL
 WHERE p.author_id = sqlc.arg(author_id) AND p.deleted_at IS NULL AND p.created_at < sqlc.arg(before)
 ORDER BY p.created_at DESC, p.id DESC
 LIMIT sqlc.arg(page_size);
+

@@ -1,6 +1,8 @@
 import { useRef, useState } from 'react'
 import { useEditor, useEditorState, type Extensions } from '@tiptap/react'
 import { withPlaceholder } from '../editor/extensions'
+import { mentionSuggestionKey, withMentions } from '../editor/mentions'
+import { useUsers } from '../data/hooks'
 import { Alert, Button, EditorSurface, Form, ImageCard, Row, Stack } from '../ui'
 import { imageFiles, imagesHtml, insertImages, uploadImages, type AttachedImage } from '../editor/images'
 import { EditorToolbar, promptLink } from './EditorToolbar'
@@ -61,12 +63,20 @@ export function BodyEditor({
   const cancelRef = useRef<(() => void) | undefined>(onCancel)
   cancelRef.current = onCancel
 
+  // The people an @ can name: the users cache as it is when the list opens.
+  const { data: users } = useUsers()
+  const usersRef = useRef(users)
+  usersRef.current = users
   const editor = useEditor({
-    extensions: placeholder ? withPlaceholder(extensions, placeholder) : extensions,
+    extensions: withMentions(placeholder ? withPlaceholder(extensions, placeholder) : extensions, () => [
+      ...(usersRef.current?.values() ?? []),
+    ]),
     content: initialHtml ?? '',
     autofocus: editing ? 'end' : false,
     editorProps: {
-      handleKeyDown(_view, event) {
+      handleKeyDown(view, event) {
+        // While an @ list is open, Enter picks from it (the suggestion plugin's keydown runs after this one).
+        if (event.key === 'Enter' && mentionSuggestionKey.getState(view.state)?.active) return false
         const modKey = event.metaKey || event.ctrlKey
         if (event.key === 'Enter' && (enterSubmits ? !event.shiftKey : modKey)) {
           event.preventDefault()

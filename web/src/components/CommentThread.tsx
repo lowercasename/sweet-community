@@ -2,20 +2,8 @@ import { useState } from 'react'
 import type { Comment as CommentData } from '../api'
 import { useAuthor, useCommentActions, useComments } from '../data/hooks'
 import { commentExtensions } from '../editor/extensions'
-import {
-  Alert,
-  Box,
-  Card,
-  ConfirmDialog,
-  Hairline,
-  HtmlContent,
-  Menu,
-  type MenuItem,
-  Row,
-  Stack,
-  Text,
-  Time,
-} from '../ui'
+import { Alert, Box, Card, ConfirmDialog, Hairline, Menu, type MenuItem, Row, Stack, Text, Time } from '../ui'
+import { Body } from './Body'
 import { BodyEditor } from './BodyEditor'
 import { PersonName } from './PersonName'
 
@@ -92,7 +80,7 @@ function CommentItem({ comment, disabled, onEdit, onDelete }: CommentItemProps) 
             onCancel={() => setEditing(false)}
           />
         ) : (
-          <HtmlContent html={comment.body_html} size="small" />
+          <Body html={comment.body_html} size="small" />
         )}
         {error && <Alert tone="error">{error}</Alert>}
       </Stack>

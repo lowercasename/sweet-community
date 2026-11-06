@@ -8,6 +8,7 @@ import (
 	"github.com/google/uuid"
 
 	"sweet/internal/db"
+	"sweet/internal/events"
 	"sweet/internal/perm"
 	"sweet/internal/sanitize"
 	"sweet/internal/store"
@@ -69,13 +70,21 @@ func (s *Server) createMessage(w http.ResponseWriter, r *http.Request) {
 	}
 	author, _ := userFrom(r.Context())
 	now := db.Now()
-	s.logged(w, r, "message", now, func(qtx *store.Queries) (any, int, error) {
+	// The message, and a notification to each person it mentions, in one transaction.
+	s.loggedMany(w, r, now, func(qtx *store.Queries) ([]events.Entry, any, int, error) {
 		if err := qtx.CreateMessage(r.Context(), store.CreateMessageParams{ID: id.String(), GroupID: g.ID, AuthorID: author.ID, BodyHtml: clean, BodyText: sanitize.Text(clean), CreatedAt: now}); err != nil {
-			return nil, http.StatusInternalServerError, err
+			return nil, nil, http.StatusInternalServerError, err
 		}
 		row, err := qtx.GetMessage(r.Context(), id.String())
+		if err != nil {
+			return nil, nil, http.StatusInternalServerError, err
+		}
 		m := wireMessage(row)
-		return &m, http.StatusCreated, err
+		told, err := mentionEvents(r, qtx, clean, author.ID, g.ID, nil, now, "")
+		if err != nil {
+			return nil, nil, http.StatusInternalServerError, err
+		}
+		return append([]events.Entry{{Kind: "message", Payload: &m}}, told...), &m, http.StatusCreated, nil
 	})
 }
 
