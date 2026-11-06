@@ -9,6 +9,9 @@ interface InputProps {
   readOnly?: boolean
   /** Select everything on focus; for copyable values. */
   selectOnFocus?: boolean
+  /** Its name when no Field labels it (a search box). */
+  label?: string
+  placeholder?: string
 }
 
 /** A single-line text input in the editor's style. */
@@ -22,6 +25,8 @@ export function Input({
   required,
   readOnly,
   selectOnFocus,
+  label,
+  placeholder,
 }: InputProps) {
   return (
     <input
@@ -35,6 +40,8 @@ export function Input({
       autoFocus={autoFocus}
       required={required}
       readOnly={readOnly}
+      aria-label={label}
+      placeholder={placeholder}
       spellCheck={false}
     />
   )

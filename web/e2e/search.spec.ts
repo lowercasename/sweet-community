@@ -25,13 +25,17 @@ test.describe('search', () => {
     await mo.page.getByRole('navigation', { name: 'Main' }).getByRole('button', { name: 'Search' }).click()
     await expect(mo.page).toHaveURL(/\/search$/)
     await expect(mo.page.getByRole('heading', { name: 'Search' })).toBeVisible()
-    await mo.page.getByRole('textbox', { name: 'Search for' }).fill(word)
+    await mo.page.getByRole('textbox', { name: 'Search' }).fill(word)
     await mo.page.keyboard.press('Enter')
     await expect(mo.page).toHaveURL(new RegExp(`/search\\?q=${word}$`))
     const rows = mo.page.getByRole('list').getByRole('button')
     await expect(rows).toHaveCount(3)
     await expect(mo.page.getByText('secret')).toHaveCount(0)
     await expect(rows.filter({ hasText: 'Post' }).first()).toContainText(word)
+    // The start of a word is enough.
+    await mo.page.getByRole('textbox', { name: 'Search' }).fill(word.slice(0, -2))
+    await mo.page.keyboard.press('Enter')
+    await expect(rows).toHaveCount(3)
     // Reload keeps the search; a hit opens its post.
     await mo.page.reload()
     await expect(mo.page.getByRole('list').getByRole('button')).toHaveCount(3)
@@ -47,7 +51,7 @@ test.describe('search', () => {
     await open(kit.page)
     await kit.page.locator('nav').last().getByRole('button', { name: 'Search' }).click()
     await expect(kit.page).toHaveURL(/\/search$/)
-    await expect(kit.page.getByRole('textbox', { name: 'Search for' })).toBeVisible()
+    await expect(kit.page.getByRole('textbox', { name: 'Search' })).toBeVisible()
     await expect(kit.page.locator('nav').last().getByRole('button', { name: 'Search' })).toHaveAttribute(
       'aria-current',
       'page',

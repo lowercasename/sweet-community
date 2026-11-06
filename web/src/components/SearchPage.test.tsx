@@ -49,8 +49,8 @@ describe('SearchPage', () => {
     const { search } = await import('../api')
     const onGo = await draw('')
     expect(search).not.toHaveBeenCalled()
-    fireEvent.change(screen.getByRole('textbox', { name: 'Search for' }), { target: { value: ' marmalade ' } })
-    fireEvent.submit(screen.getByRole('textbox', { name: 'Search for' }).closest('form')!)
+    fireEvent.change(screen.getByRole('textbox', { name: 'Search' }), { target: { value: ' marmalade ' } })
+    fireEvent.submit(screen.getByRole('textbox', { name: 'Search' }).closest('form')!)
     expect(onGo).toHaveBeenCalledWith('/search?q=marmalade')
   })
 
@@ -65,6 +65,8 @@ describe('SearchPage', () => {
       'Message in Knitting by kit: the marmalade is ready',
     ])
     expect(within(rows[0]).getByText('marmalade').className).toContain('font-medium')
+    // The line above the excerpt: who, then what and where, then when (Raphael, 2026-11-06).
+    expect(rows[2].textContent).toMatch(/^kit · Message in Knitting · /)
     fireEvent.click(rows[1])
     expect(onGo).toHaveBeenCalledWith('/p/p1')
     fireEvent.click(rows[2])

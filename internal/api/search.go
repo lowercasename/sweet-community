@@ -27,11 +27,12 @@ const (
 )
 
 // ftsQuery turns what was typed into an FTS5 query that cannot be a syntax
-// error: each word quoted (quotes inside doubled), all words required.
+// error: each word quoted (quotes inside doubled) and taken as the start of
+// a word (`"marm"*` finds marmalade), all words required.
 func ftsQuery(q string) string {
 	var terms []string
 	for _, w := range strings.Fields(q) {
-		terms = append(terms, `"`+strings.ReplaceAll(w, `"`, `""`)+`"`)
+		terms = append(terms, `"`+strings.ReplaceAll(w, `"`, `""`)+`"*`)
 	}
 	return strings.Join(terms, " ")
 }
