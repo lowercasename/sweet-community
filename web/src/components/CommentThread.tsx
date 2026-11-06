@@ -2,7 +2,20 @@ import { useState } from 'react'
 import type { Comment as CommentData } from '../api'
 import { useAuthor, useCommentActions, useComments } from '../data/hooks'
 import { commentExtensions } from '../editor/extensions'
-import { Alert, Box, ConfirmDialog, Hairline, HtmlContent, Menu, type MenuItem, Row, Stack, Text, Time } from '../ui'
+import {
+  Alert,
+  Box,
+  Card,
+  ConfirmDialog,
+  Hairline,
+  HtmlContent,
+  Menu,
+  type MenuItem,
+  Row,
+  Stack,
+  Text,
+  Time,
+} from '../ui'
 import { BodyEditor } from './BodyEditor'
 import { PersonName } from './PersonName'
 
@@ -63,7 +76,7 @@ function CommentItem({ comment, disabled, onEdit, onDelete }: CommentItemProps) 
               )}
             </Text>
           </Row>
-          {items.length > 0 && !editing && !disabled && <Menu label="Comment options" items={items} />}
+          {items.length > 0 && !editing && !disabled && <Menu label="Comment options" items={items} reveal />}
         </Row>
         {editing ? (
           <BodyEditor
@@ -77,7 +90,7 @@ function CommentItem({ comment, disabled, onEdit, onDelete }: CommentItemProps) 
             onCancel={() => setEditing(false)}
           />
         ) : (
-          <HtmlContent html={comment.body_html} />
+          <HtmlContent html={comment.body_html} size="small" />
         )}
         {error && <Alert tone="error">{error}</Alert>}
       </Stack>
@@ -95,33 +108,42 @@ function CommentItem({ comment, disabled, onEdit, onDelete }: CommentItemProps) 
   )
 }
 
-/** Flat comments under a post, oldest first, with the reply editor at the end. */
+/**
+ * The thread under a post, on its own ground (architecture.md, Posts): a
+ * grey panel holding the comments, oldest first, a hairline between each,
+ * and the reply editor at its foot, the one white thing in it.
+ */
 export function CommentThread({ postId, groupId, disabled }: CommentThreadProps) {
   const { comments, loading, error } = useComments(postId)
   const { create, edit, remove } = useCommentActions(postId, groupId)
 
   return (
-    <Stack gap={2}>
-      <Hairline />
-      {loading && <Text variant="secondary">Loading comments…</Text>}
-      {error && <Alert tone="error">{error.message}</Alert>}
-      {comments.map((c) => (
-        <CommentItem
-          key={c.id}
-          comment={c}
+    <Card tone="field">
+      <Stack gap={2}>
+        {loading && <Text variant="secondary">Loading comments…</Text>}
+        {error && <Alert tone="error">{error.message}</Alert>}
+        {comments.map((c, i) => (
+          <Box key={c.id}>
+            <Stack gap={2}>
+              {i > 0 && <Hairline />}
+              <CommentItem
+                comment={c}
+                disabled={disabled}
+                onEdit={(html) => edit(c.id, html)}
+                onDelete={() => remove(c.id)}
+              />
+            </Stack>
+          </Box>
+        ))}
+        <BodyEditor
+          extensions={commentExtensions}
+          size="line"
+          submitLabel="Reply"
+          busyLabel="Replying…"
           disabled={disabled}
-          onEdit={(html) => edit(c.id, html)}
-          onDelete={() => remove(c.id)}
+          onSubmit={create}
         />
-      ))}
-      <BodyEditor
-        extensions={commentExtensions}
-        size="line"
-        submitLabel="Reply"
-        busyLabel="Replying…"
-        disabled={disabled}
-        onSubmit={create}
-      />
-    </Stack>
+      </Stack>
+    </Card>
   )
 }

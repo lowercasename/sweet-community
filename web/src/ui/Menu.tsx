@@ -28,7 +28,18 @@ interface MenuProps {
   label: string
   icon?: IconName
   items: MenuItem[]
+  /**
+   * Out of sight until its block (the nearest `group`: a card, a row) is
+   * hovered or holds focus, where there is a pointer to hover with; always
+   * shown on a touch screen, and while open. Quiet by default on a page of
+   * posts or a room of messages, where every block has one.
+   */
+  reveal?: boolean
 }
+
+/** The classes that hide a revealed menu until its nearest group is hovered or focused, on pointer screens only. */
+const REVEAL =
+  'pointer-fine:opacity-0 pointer-fine:[.group:hover:not(:has(.group:hover))_&]:opacity-100 pointer-fine:[.group:focus-within:not(:has(.group:focus-within))_&]:opacity-100 pointer-fine:focus-visible:opacity-100'
 
 /**
  * A three-dot menu: a ghost icon button that opens a short list of actions.
@@ -39,7 +50,7 @@ interface MenuProps {
  * clipped by the pane's edge; it never needs to close on scroll, which once
  * shut it one frame after it opened.
  */
-export function Menu({ label, icon = 'more', items }: MenuProps) {
+export function Menu({ label, icon = 'more', items, reveal = false }: MenuProps) {
   const [open, setOpen] = useState(false)
   const [activeIndex, setActiveIndex] = useState<number | null>(null)
   const listRef = useRef<(HTMLElement | null)[]>([])
@@ -64,7 +75,7 @@ export function Menu({ label, icon = 'more', items }: MenuProps) {
       <button
         ref={triggerRef}
         type="button"
-        className={buttonClass('ghost', true)}
+        className={`${buttonClass('ghost', true)} ${reveal && !open ? REVEAL : ''}`}
         aria-label={label}
         {...getReferenceProps(tip.props())}
       >

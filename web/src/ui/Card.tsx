@@ -16,6 +16,7 @@ export function Card({ as = 'div', fill = false, flush = false, tone = 'card', c
   const bg = tone === 'field' ? 'bg-field' : 'bg-card'
   const frame = flush ? bg : `rounded-card border border-line ${bg}`
   const pad = tone === 'field' ? 'px-3 py-2' : 'p-4'
-  const cls = `${frame} ${fill ? 'flex min-h-0 flex-1 flex-col overflow-hidden' : pad}`
+  // An article (a post) is a `group`: a revealed Menu inside shows when it is hovered (ui/Menu). A pane's card is not, or hovering a room would show every message's menu.
+  const cls = `${as === 'article' ? 'group ' : ''}${frame} ${fill ? 'flex min-h-0 flex-1 flex-col overflow-hidden' : pad}`
   return as === 'article' ? <article className={cls}>{children}</article> : <div className={cls}>{children}</div>
 }

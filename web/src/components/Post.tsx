@@ -80,33 +80,35 @@ export function Post({ post, linked = true, expanded = false, disabled, onEdit, 
 
   return (
     <Card as="article">
-      <Stack gap={2}>
-        <Row justify="between" align="center">
-          <Row gap={2} align="center">
-            <PersonName user={author} avatar="md" />
-            <Text as="span" variant="small">
-              {linked ? <Link href={postPath(post.id)}>{when}</Link> : when}
-            </Text>
+      <Stack gap={3}>
+        <Stack gap={2}>
+          <Row justify="between" align="center">
+            <Row gap={2} align="center">
+              <PersonName user={author} avatar="md" />
+              <Text as="span" variant="small">
+                {linked ? <Link href={postPath(post.id)}>{when}</Link> : when}
+              </Text>
+            </Row>
+            {items.length > 0 && !editing && !disabled && <Menu label="Post options" items={items} reveal />}
           </Row>
-          {items.length > 0 && !editing && !disabled && <Menu label="Post options" items={items} />}
-        </Row>
-        {editing ? (
-          // The stored HTML is the editor's input: no separate document format.
-          <BodyEditor
-            key={post.edited_at ?? 0}
-            extensions={postExtensions}
-            size="post"
-            submitLabel="Save"
-            busyLabel="Saving…"
-            initialHtml={post.body_html}
-            disabled={disabled}
-            onSubmit={save}
-            onCancel={() => setEditing(false)}
-          />
-        ) : (
-          <HtmlContent html={post.body_html} />
-        )}
-        {deleteError && <Alert tone="error">{deleteError}</Alert>}
+          {editing ? (
+            // The stored HTML is the editor's input: no separate document format.
+            <BodyEditor
+              key={post.edited_at ?? 0}
+              extensions={postExtensions}
+              size="post"
+              submitLabel="Save"
+              busyLabel="Saving…"
+              initialHtml={post.body_html}
+              disabled={disabled}
+              onSubmit={save}
+              onCancel={() => setEditing(false)}
+            />
+          ) : (
+            <HtmlContent html={post.body_html} />
+          )}
+          {deleteError && <Alert tone="error">{deleteError}</Alert>}
+        </Stack>
         <Row>
           <Button
             variant="ghost"

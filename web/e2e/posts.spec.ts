@@ -1,4 +1,4 @@
-import { article, confirm, expect, member, open, pick, test, uniq, view, writePost } from './helpers'
+import { article, confirm, expect, member, open, pick, sendMessage, test, uniq, view, writePost } from './helpers'
 
 test.describe('posts and comments', () => {
   test('write, edit, comment, delete; another person sees each change live', async ({ browser }, testInfo) => {
@@ -130,6 +130,51 @@ test.describe('post page', () => {
     await kit.page.getByRole('button', { name: 'Back to Home' }).click()
     await expect(kit.page).toHaveURL(/\/$/)
     await expect(article(kit.page, text)).toBeVisible()
+    await kit.context.close()
+  })
+})
+
+test.describe('menus', () => {
+  test('a post, comment or message menu is out of sight until its block is hovered', async ({ browser }, testInfo) => {
+    const kit = await member(browser, testInfo)
+    await open(kit.page)
+    const text = uniq('Hover me ')
+    await writePost(kit.page, text)
+    const post = article(kit.page, text)
+    const menu = post.getByRole('button', { name: 'Post options' })
+    await expect(menu).toHaveCSS('opacity', '0')
+    await post.hover()
+    await expect(menu).toHaveCSS('opacity', '1')
+    // A comment's menu, when hovered, shows instead of the post's.
+    await post.getByRole('button', { name: 'Show comments' }).click()
+    await post.locator('.editor-line .ProseMirror').click()
+    await kit.page.keyboard.type('A reply')
+    await kit.page.getByRole('button', { name: 'Reply' }).click()
+    const comment = post.getByRole('article').filter({ hasText: 'A reply' })
+    await comment.hover()
+    await expect(comment.getByRole('button', { name: 'Comment options' })).toHaveCSS('opacity', '1')
+    await expect(menu).toHaveCSS('opacity', '0')
+    // The open menu stays while the pointer is on it.
+    await menu.click({ force: true })
+    await expect(kit.page.getByRole('menuitem', { name: 'Edit' })).toBeVisible()
+    await kit.page.keyboard.press('Escape')
+    // Chat: the same. (The thread closes first, so its reply box is not the first line editor on the page.)
+    await post.getByRole('button', { name: 'Hide comments' }).click()
+    const said = uniq('hover word ')
+    await sendMessage(kit.page, said)
+    await expect(article(kit.page, said).getByRole('button', { name: 'Message options' })).toHaveCSS('opacity', '0')
+    await article(kit.page, said).hover()
+    await expect(article(kit.page, said).getByRole('button', { name: 'Message options' })).toHaveCSS('opacity', '1')
+    await kit.context.close()
+  })
+
+  test('@phone menus are always in sight, since there is nothing to hover with', async ({ browser }, testInfo) => {
+    const kit = await member(browser, testInfo)
+    await open(kit.page)
+    await view(kit.page, 'Posts').click()
+    const text = uniq('Touch me ')
+    await writePost(kit.page, text)
+    await expect(article(kit.page, text).getByRole('button', { name: 'Post options' })).toHaveCSS('opacity', '1')
     await kit.context.close()
   })
 })

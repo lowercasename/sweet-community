@@ -55,6 +55,7 @@ export function MessageGroup({ messages, onDelete }: MessageGroupProps) {
               <Menu
                 label="Message options"
                 items={[{ label: 'Delete', icon: 'trash', onSelect: () => setConfirming(m.id) }]}
+                reveal
               />
             )}
           </Row>

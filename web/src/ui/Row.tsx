@@ -40,7 +40,8 @@ export function Row({
   children,
 }: RowProps) {
   const cls = [
-    'flex min-w-0 flex-row',
+    // `group`: a revealed Menu inside shows when this row is hovered (ui/Menu).
+    'group flex min-w-0 flex-row',
     wrap === 'narrow' ? 'flex-wrap @xl:flex-nowrap' : wrap === 'never' ? 'flex-nowrap' : 'flex-wrap',
     shrink ? '' : 'flex-none',
     GAPS[gap],

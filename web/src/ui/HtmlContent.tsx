@@ -4,6 +4,8 @@ import { wrapGalleries } from '../content/galleries'
 interface HtmlContentProps {
   /** HTML that has ALREADY been sanitised by the server (bluemonday). */
   html: string
+  /** `small` is a comment: a size under the post it answers. */
+  size?: 'body' | 'small'
 }
 
 /**
@@ -15,7 +17,12 @@ interface HtmlContentProps {
  * before storage; nothing client-generated may be passed here unsanitised.
  * `pnpm check:atomic` fails if dangerouslySetInnerHTML appears anywhere else.
  */
-export function HtmlContent({ html }: HtmlContentProps) {
+export function HtmlContent({ html, size = 'body' }: HtmlContentProps) {
   const rendered = useMemo(() => wrapGalleries(html), [html])
-  return <div className="content" dangerouslySetInnerHTML={{ __html: rendered }} />
+  return (
+    <div
+      className={size === 'small' ? 'content text-[15px]' : 'content'}
+      dangerouslySetInnerHTML={{ __html: rendered }}
+    />
+  )
 }
