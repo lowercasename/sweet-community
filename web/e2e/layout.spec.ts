@@ -35,6 +35,27 @@ test.describe('layout', () => {
     await kit.context.close()
   })
 
+  test('a pane scrolls from its top edge to its bottom edge; the margin is inside the scroll', async ({
+    browser,
+  }, testInfo) => {
+    const kit = await member(browser, testInfo)
+    await open(kit.page)
+    const pane = kit.page.locator('.editor-post').first().locator('xpath=ancestor::section[1]')
+    const scroll = pane.locator('[data-scroll]').first()
+    const p = (await pane.boundingBox())!
+    const s = (await scroll.boundingBox())!
+    expect(Math.abs(s.y - p.y)).toBeLessThan(1)
+    expect(Math.abs(s.y + s.height - (p.y + p.height))).toBeLessThan(1)
+    // The first card sits 16px in from the scroll's top: the margin scrolls with the content.
+    const card = (await kit.page
+      .locator('.editor-post')
+      .first()
+      .locator('xpath=ancestor::div[contains(@class,"rounded-card")][1]')
+      .boundingBox())!
+    expect(Math.round(card.y - s.y)).toBe(16)
+    await kit.context.close()
+  })
+
   test('dragging the divider resizes; double-click resets', async ({ browser }, testInfo) => {
     const kit = await member(browser, testInfo)
     await open(kit.page)

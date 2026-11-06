@@ -8,10 +8,11 @@ interface PaneProps {
   children?: ReactNode
 }
 
+// Side margins only: the top and bottom margin is the ScrollArea's, inside the scroll, so a pane scrolls edge to edge.
 const PADS: Record<NonNullable<PaneProps['side']>, string> = {
-  left: 'py-4 pl-4',
-  right: 'py-4 pr-4',
-  full: 'p-4',
+  left: 'pl-4',
+  right: 'pr-4',
+  full: 'px-4',
 }
 
 /** One column of the layout; its ScrollArea or Card child scrolls. */

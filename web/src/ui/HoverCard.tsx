@@ -43,11 +43,14 @@ const TRIGGER =
  */
 export function HoverCard({ name, card, children, small = false }: HoverCardProps) {
   const [open, setOpen] = useState(false)
+  const [scrollPane, setScrollPane] = useState<Element | null>(null)
   const { refs, floatingStyles, context } = useFloating({
     open,
     onOpenChange: setOpen,
     placement: 'bottom-start',
-    middleware: [offset(6), flip(), shift({ padding: 8 })],
+    // The card flips above its name when the name's own scroll pane has no room below: the card is portalled to
+    // the body, so the pane is not among its clipping ancestors and must be named.
+    middleware: [offset(6), flip({ boundary: scrollPane ?? undefined, padding: 8 }), shift({ padding: 8 })],
     whileElementsMounted: autoUpdate,
   })
   const hover = useHover(context, { mouseOnly: true, delay: { open: 250, close: 150 }, handleClose: safePolygon() })
@@ -60,7 +63,10 @@ export function HoverCard({ name, card, children, small = false }: HoverCardProp
   return (
     <>
       <button
-        ref={refs.setReference}
+        ref={(el) => {
+          refs.setReference(el)
+          setScrollPane(el?.closest('[data-scroll]') ?? null)
+        }}
         type="button"
         className={small ? `${TRIGGER} text-[15px]` : TRIGGER}
         aria-label={name}

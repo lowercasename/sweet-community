@@ -48,6 +48,32 @@ test.describe('people', () => {
     await mo.context.close()
   })
 
+  test("a card near the pane's foot opens above its name, not over the editor", async ({ browser }, testInfo) => {
+    const kit = await member(browser, testInfo, 'kit')
+    const mo = await member(browser, testInfo, 'mo')
+    // Turns alternate, so each message is its own run with its own name, the last one at the foot.
+    for (let i = 0; i < 30; i++) {
+      await (i % 2 ? kit : mo).context.request.post('/api/groups/00000000-0000-7000-8000-000000000000/messages', {
+        data: { body_html: `<p>filler ${i}</p>` },
+      })
+    }
+    const last = uniq('last word ')
+    await mo.context.request.post('/api/groups/00000000-0000-7000-8000-000000000000/messages', {
+      data: { body_html: `<p>${last}</p>` },
+    })
+    await open(kit.page)
+    const name = article(kit.page, last).getByRole('button', { name: mo.username })
+    await expect(name).toBeVisible()
+    await name.hover()
+    const card = kit.page.getByRole('dialog', { name: `About ${mo.username}` })
+    await expect(card).toBeVisible()
+    const n = (await name.boundingBox())!
+    const c = (await card.boundingBox())!
+    expect(c.y + c.height).toBeLessThanOrEqual(n.y + 1)
+    await kit.context.close()
+    await mo.context.close()
+  })
+
   test('@phone a tap on a name opens the card, and Message goes to the conversation', async ({ browser }, testInfo) => {
     const kit = await member(browser, testInfo, 'kit')
     const mo = await member(browser, testInfo, 'mo')

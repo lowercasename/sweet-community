@@ -7,8 +7,9 @@ interface ScrollAreaProps {
   children?: ReactNode
 }
 
+// `cards` carries the pane's top and bottom margin, so it scrolls with the content and the pane runs edge to edge.
 const PADS: Record<NonNullable<ScrollAreaProps['pad']>, string> = {
-  cards: 'p-1',
+  cards: 'px-1 py-4',
   inner: 'px-4 py-3',
 }
 
