@@ -781,7 +781,7 @@ func filterEvent(viewer User, roles map[string]string, st *Settings, e events.Ev
 			*st = next
 		}
 		return e, true
-	case "notification", "marker":
+	case "notification", "notification_delete", "marker":
 		// Mine alone: a notification is for its person, a marker is where they have read to.
 		var own struct {
 			UserID string `json:"user_id"`

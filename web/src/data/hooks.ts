@@ -2,6 +2,7 @@ import { useInfiniteQuery, useQuery, useQueryClient } from '@tanstack/react-quer
 import {
   ApiError,
   addMember,
+  clearNotifications,
   createComment,
   createGroup,
   createInvite,
@@ -321,6 +322,14 @@ export function useNotifications() {
     error: q.error,
     hasMore: q.hasNextPage,
     loadMore: () => void q.fetchNextPage(),
+  }
+}
+
+/** Clearing the ones I have seen, up to a time: the reply goes through the cache's one write path. */
+export function useClearNotifications() {
+  const qc = useQueryClient()
+  return async (before: number) => {
+    applyEvent(qc, 'notification_delete', await clearNotifications(before))
   }
 }
 

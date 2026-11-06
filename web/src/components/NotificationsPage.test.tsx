@@ -13,6 +13,7 @@ vi.mock('../api', () => ({
   listNotifications: vi.fn(),
   listMarkers: vi.fn(),
   setMarker: vi.fn(),
+  clearNotifications: vi.fn(),
   listUsers: vi.fn(() => Promise.resolve({ users: [] })),
 }))
 
@@ -42,14 +43,22 @@ async function draw() {
 }
 
 describe('NotificationsPage', () => {
-  it('lists what was done to me, newest first, the new ones marked, and marks them read by being looked at', async () => {
+  it('lists what was done to me in two sections, New and Earlier, and marks them read by being looked at', async () => {
     const { setMarker } = await import('../api')
     const onGo = await draw()
-    const rows = within(await screen.findByRole('list')).getAllByRole('button')
-    expect(rows.map((b) => b.getAttribute('aria-label'))).toEqual([
-      'mo added you to Knitting, new',
-      'mo commented on your post',
-    ])
+    await screen.findByRole('heading', { name: 'New' })
+    const lists = screen.getAllByRole('list')
+    expect(
+      within(lists[0])
+        .getAllByRole('button')
+        .map((b) => b.getAttribute('aria-label')),
+    ).toEqual(['mo added you to Knitting, new'])
+    expect(screen.getByRole('heading', { name: 'Earlier' })).toBeTruthy()
+    expect(
+      within(lists[1])
+        .getAllByRole('button')
+        .map((b) => b.getAttribute('aria-label')),
+    ).toEqual(['mo commented on your post'])
     await vi.waitFor(() => expect(setMarker).toHaveBeenCalledWith('notifications', 20))
     // Still marked new while I look, though the marker has moved on.
     expect(screen.getByRole('button', { name: 'mo added you to Knitting, new' })).toBeTruthy()
@@ -67,6 +76,17 @@ describe('NotificationsPage', () => {
     await new Promise((r) => setTimeout(r, 20))
     expect(setMarker).not.toHaveBeenCalled()
     expect(screen.queryByRole('button', { name: /new$/ })).toBeNull()
+  })
+
+  it('clears the earlier ones for good, up to where I had read when I arrived; the new ones stay', async () => {
+    const { clearNotifications } = await import('../api')
+    vi.mocked(clearNotifications).mockImplementation((before) => Promise.resolve({ user_id: 'raphael', before }))
+    await draw()
+    await screen.findByRole('heading', { name: 'Earlier' })
+    fireEvent.click(screen.getByRole('button', { name: 'Clear' }))
+    expect(clearNotifications).toHaveBeenCalledWith(10)
+    await vi.waitFor(() => expect(screen.queryByRole('heading', { name: 'Earlier' })).toBeNull())
+    expect(screen.getByRole('button', { name: 'mo added you to Knitting, new' })).toBeTruthy()
   })
 
   it('says what will show here when nothing has yet', async () => {

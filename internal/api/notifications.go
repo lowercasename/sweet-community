@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
+	"strconv"
 	"strings"
 
 	"github.com/google/uuid"
@@ -100,6 +101,37 @@ func (s *Server) listNotifications(w http.ResponseWriter, r *http.Request) {
 		next = &n
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"notifications": out, "next_before": next})
+}
+
+// Cleared says which of my notifications are gone: every one up to Before.
+type Cleared struct {
+	UserID string `json:"user_id"`
+	Before int64  `json:"before"`
+}
+
+// clearNotifications deletes the ones I have seen, up to ?before= and never
+// past my marker, for good (architecture.md, Notifications). One event
+// names the set rather than each row.
+func (s *Server) clearNotifications(w http.ResponseWriter, r *http.Request) {
+	before, err := strconv.ParseInt(r.URL.Query().Get("before"), 10, 64)
+	if err != nil || before <= 0 {
+		writeErr(w, http.StatusBadRequest, "before is a time")
+		return
+	}
+	me, _ := userFrom(r.Context())
+	s.logged(w, r, "notification_delete", db.Now(), func(qtx *store.Queries) (any, int, error) {
+		m, err := qtx.GetNotificationsMarker(r.Context(), me.ID)
+		if err != nil {
+			return nil, http.StatusInternalServerError, err
+		}
+		if before > m.ReadAt {
+			before = m.ReadAt
+		}
+		if err := qtx.DeleteReadNotifications(r.Context(), store.DeleteReadNotificationsParams{UserID: me.ID, Before: before}); err != nil {
+			return nil, http.StatusInternalServerError, err
+		}
+		return &Cleared{UserID: me.ID, Before: before}, http.StatusOK, nil
+	})
 }
 
 // listMarkers is a row for every stream of mine, read or not, each with its unread count.

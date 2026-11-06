@@ -19,6 +19,11 @@ WHERE n.user_id = sqlc.arg(user_id) AND n.created_at < sqlc.arg(before)
 ORDER BY n.created_at DESC, n.id DESC
 LIMIT sqlc.arg(page_size);
 
+-- name: DeleteReadNotifications :exec
+-- The ones I have seen, up to a time, and never past my marker.
+DELETE FROM notifications WHERE notifications.user_id = sqlc.arg(user_id) AND notifications.created_at <= sqlc.arg(before)
+  AND notifications.created_at <= COALESCE((SELECT r.read_at FROM read_markers r WHERE r.user_id = sqlc.arg(user_id) AND r.stream = 'notifications'), 0);
+
 -- name: SetMarker :exec
 -- Forward only: a stale tab cannot unread what another has read.
 INSERT INTO read_markers (user_id, stream, read_at) VALUES (sqlc.arg(user_id), sqlc.arg(stream), sqlc.arg(read_at))

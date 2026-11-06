@@ -35,9 +35,19 @@ test.describe('notifications', () => {
     await kit.page.reload()
     await expect(kit.page.getByRole('heading', { name: 'Notifications' })).toBeVisible()
     await expect(nav.getByRole('button', { name: 'Notifications', exact: true })).toBeVisible()
+    // Seen before this visit: under Earlier now.
+    await expect(kit.page.getByRole('heading', { name: 'Earlier' })).toBeVisible()
+    await expect(kit.page.getByRole('heading', { name: 'New' })).toHaveCount(0)
     await expect(kit.page.getByRole('button', { name: `${mo.username} commented on your post` })).toBeVisible()
 
-    // Being added to a room arrives while I am looking, so it is read as it lands.
+    // The comment opens its post; coming back, the page is a fresh visit.
+    await kit.page.getByRole('button', { name: `${mo.username} commented on your post` }).click()
+    await expect(kit.page).toHaveURL(/\/p\/[0-9a-f-]+$/)
+    await expect(kit.page.getByRole('heading', { name: `Post by ${kit.username}` })).toBeVisible()
+    await kit.page.goBack()
+    await expect(kit.page.getByRole('heading', { name: 'Earlier' })).toBeVisible()
+
+    // Being added to a room arrives while I am looking: under New, read as it lands, so the bell stays quiet.
     const name = uniq('Wool')
     const room = await boss.context.request.post('/api/groups', { data: { kind: 'group', name, mode: 'both' } })
     const gid = ((await room.json()) as { id: string }).id
@@ -45,13 +55,18 @@ test.describe('notifications', () => {
     await boss.context.request.post(`/api/groups/${gid}/members`, { data: { user_id: me.id } })
     const added = kit.page.getByRole('button', { name: `raphael added you to ${name}, new` })
     await expect(added).toBeVisible()
+    await expect(kit.page.getByRole('heading', { name: 'New' })).toBeVisible()
     await expect(nav.getByRole('button', { name: 'Notifications', exact: true })).toBeVisible()
 
-    // Each opens its thing.
-    await kit.page.getByRole('button', { name: `${mo.username} commented on your post` }).click()
-    await expect(kit.page).toHaveURL(/\/p\/[0-9a-f-]+$/)
-    await expect(kit.page.getByRole('heading', { name: `Post by ${kit.username}` })).toBeVisible()
-    await kit.page.goBack()
+    // Clearing takes the earlier ones for good; the new one stays, and a reload agrees (it is Earlier by then).
+    await kit.page.getByRole('button', { name: 'Clear' }).click()
+    await expect(kit.page.getByRole('heading', { name: 'Earlier' })).toHaveCount(0)
+    await expect(kit.page.getByRole('button', { name: `${mo.username} commented on your post` })).toHaveCount(0)
+    await expect(added).toBeVisible()
+    await kit.page.reload()
+    await expect(kit.page.getByRole('heading', { name: 'Earlier' })).toBeVisible()
+    await expect(kit.page.getByRole('button', { name: `raphael added you to ${name}` })).toBeVisible()
+    await expect(kit.page.getByRole('button', { name: `${mo.username} commented on your post` })).toHaveCount(0)
     await kit.page.getByRole('button', { name: `raphael added you to ${name}` }).click()
     await expect(kit.page).toHaveURL(new RegExp(`/r/${gid}$`))
     await expect(kit.page.getByRole('heading', { name })).toBeVisible()

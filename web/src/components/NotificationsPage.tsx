@@ -1,8 +1,23 @@
 import { useEffect, useRef, useState } from 'react'
 import type { Group, Notification } from '../api'
-import { useAuthor, useMarkRead, useMarkers, useNotifications } from '../data/hooks'
+import { useAuthor, useClearNotifications, useMarkRead, useMarkers, useNotifications } from '../data/hooks'
 import { NOTIFICATIONS, describe, markerOf, targetOf, unreadOf } from '../data/notifications'
-import { Avatar, Button, Card, List, ListItem, ListRow, Measure, Pane, Row, ScrollArea, Stack, Text, Time } from '../ui'
+import {
+  Avatar,
+  Button,
+  Card,
+  Heading,
+  List,
+  ListItem,
+  ListRow,
+  Measure,
+  Pane,
+  Row,
+  ScrollArea,
+  Stack,
+  Text,
+  Time,
+} from '../ui'
 
 interface NotificationsPageProps {
   groups: Group[]
@@ -11,14 +26,19 @@ interface NotificationsPageProps {
 
 /**
  * What was done to me (architecture.md, Notifications): newest first, each
- * a sentence that opens the thing. The ones newer than my marker when I
- * arrived stay marked new while I look; looking moves the marker to the
- * newest, here and on every other device, so the bell's dot goes.
+ * a sentence that opens the thing, in two sections. New is what is newer
+ * than my marker as it stood when I arrived; looking moves the marker to
+ * the newest, here and on every other device, so the bell's dot goes, but
+ * the section holds while I look. Earlier is what I had already seen, and
+ * can be cleared for good.
  */
 export function NotificationsPage({ groups, onGo }: NotificationsPageProps) {
   const { notifications, loading, error, hasMore, loadMore } = useNotifications()
   const { markers, loaded } = useMarkers()
   const markRead = useMarkRead()
+  const clear = useClearNotifications()
+  const [clearing, setClearing] = useState(false)
+  const [problem, setProblem] = useState<string | null>(null)
   const readAt = markerOf(markers, NOTIFICATIONS)
   const root = groups.find((g) => g.kind === 'root')
 
@@ -39,6 +59,33 @@ export function NotificationsPage({ groups, onGo }: NotificationsPageProps) {
   }, [loaded, readAt, newest, markRead])
 
   const fresh = new Set(unreadOf(notifications, arrivedAt).map((n) => n.id))
+  const recent = notifications.filter((n) => fresh.has(n.id))
+  const earlier = notifications.filter((n) => !fresh.has(n.id))
+  const clearSeen = async () => {
+    if (arrivedAt === undefined) return
+    setClearing(true)
+    setProblem(null)
+    try {
+      await clear(arrivedAt)
+    } catch (e) {
+      setProblem(e instanceof Error ? e.message : 'Could not clear them')
+    } finally {
+      setClearing(false)
+    }
+  }
+  const rows = (list: Notification[]) => (
+    <List gap={1}>
+      {list.map((n) => (
+        <NotificationRow
+          key={n.id}
+          notification={n}
+          fresh={fresh.has(n.id)}
+          groups={groups}
+          onOpen={() => onGo(targetOf(n, root?.id))}
+        />
+      ))}
+    </List>
+  )
   return (
     <Pane>
       <ScrollArea>
@@ -51,18 +98,23 @@ export function NotificationsPage({ groups, onGo }: NotificationsPageProps) {
                   Nothing yet. When someone comments on your post or adds you to a room, it shows here.
                 </Text>
               )}
-              {notifications.length > 0 && (
-                <List gap={1}>
-                  {notifications.map((n) => (
-                    <NotificationRow
-                      key={n.id}
-                      notification={n}
-                      fresh={fresh.has(n.id)}
-                      groups={groups}
-                      onOpen={() => onGo(targetOf(n, root?.id))}
-                    />
-                  ))}
-                </List>
+              {recent.length > 0 && (
+                <Stack gap={1}>
+                  <Heading level={3}>New</Heading>
+                  {rows(recent)}
+                </Stack>
+              )}
+              {earlier.length > 0 && (
+                <Stack gap={1}>
+                  <Row justify="between" align="center">
+                    <Heading level={3}>Earlier</Heading>
+                    <Button variant="ghost" icon="trash" disabled={clearing} onClick={() => void clearSeen()}>
+                      {clearing ? 'Clearing…' : 'Clear'}
+                    </Button>
+                  </Row>
+                  {problem && <Text variant="secondary">{problem}</Text>}
+                  {rows(earlier)}
+                </Stack>
               )}
               {hasMore && (
                 <Row>

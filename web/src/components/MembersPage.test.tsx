@@ -64,7 +64,8 @@ describe('MembersPage', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Add' }))
     expect(addMember).toHaveBeenCalledWith('club', 'jo')
     await screen.findByText('jo')
-    fireEvent.click(within(rowOf('mo')).getByRole('button', { name: 'Remove' }))
+    fireEvent.click(within(rowOf('mo')).getByRole('button', { name: 'Options for mo' }))
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Remove' }))
     expect(removeMember).toHaveBeenCalledWith('club', 'mo')
     // Gone from the list; back among the people who can be added.
     await vi.waitFor(() => expect(within(screen.getByRole('list')).queryByText('mo')).toBeNull())
@@ -74,11 +75,18 @@ describe('MembersPage', () => {
   it('lets the owner set roles and hand over, the latter after a confirm', async () => {
     const { setMemberRole } = await import('../api')
     await page('owner')
-    expect(within(rowOf('kit')).queryByRole('button', { name: /Make|Remove/ })).toBeNull()
-    fireEvent.click(within(rowOf('mo')).getByRole('button', { name: 'Make moderator' }))
+    expect(within(rowOf('kit')).queryByRole('button', { name: 'Options for kit' })).toBeNull()
+    fireEvent.click(within(rowOf('mo')).getByRole('button', { name: 'Options for mo' }))
+    expect(screen.getAllByRole('menuitem').map((b) => b.textContent)).toEqual([
+      'Make moderator',
+      'Make owner',
+      'Remove',
+    ])
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Make moderator' }))
     expect(setMemberRole).toHaveBeenCalledWith('club', 'mo', 'moderator')
-    await within(rowOf('mo')).findByRole('button', { name: 'Make member' })
-    fireEvent.click(within(rowOf('mo')).getByRole('button', { name: 'Make owner' }))
+    await vi.waitFor(() => fireEvent.click(within(rowOf('mo')).getByRole('button', { name: 'Options for mo' })))
+    await screen.findByRole('menuitem', { name: 'Make member' })
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Make owner' }))
     expect(setMemberRole).not.toHaveBeenCalledWith('club', 'mo', 'owner')
     const dialog = screen.getByRole('dialog', { hidden: true })
     fireEvent.click(within(dialog).getByRole('button', { name: 'Switch ownership' }))
@@ -103,7 +111,7 @@ describe('MembersPage', () => {
     expect(screen.getByRole('heading', { name: 'People' })).toBeTruthy()
     expect(screen.queryByLabelText('Name')).toBeNull()
     expect(screen.queryByLabelText('Add someone')).toBeNull()
-    expect(screen.queryByRole('button', { name: 'Remove' })).toBeNull()
+    expect(screen.queryByRole('button', { name: /^Options for/ })).toBeNull()
     fireEvent.click(screen.getByRole('button', { name: 'New conversation with these people and others' }))
     expect(onStartWith).toHaveBeenCalledWith(['kit'])
     fireEvent.click(screen.getByRole('button', { name: 'Hide conversation' }))
@@ -114,8 +122,7 @@ describe('MembersPage', () => {
     const { removeMember } = await import('../api')
     const onLeft = await page('member')
     expect(screen.queryByLabelText('Add someone')).toBeNull()
-    expect(screen.queryByRole('button', { name: /Make / })).toBeNull()
-    expect(screen.queryByRole('button', { name: 'Remove' })).toBeNull()
+    expect(screen.queryByRole('button', { name: /^Options for/ })).toBeNull()
     expect(screen.queryByLabelText('Name')).toBeNull()
     fireEvent.click(screen.getByRole('button', { name: 'Leave room' }))
     fireEvent.click(within(screen.getByRole('dialog', { hidden: true })).getByRole('button', { name: 'Leave' }))

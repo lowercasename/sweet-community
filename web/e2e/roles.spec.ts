@@ -17,14 +17,13 @@ test.describe('roles', () => {
 
     await open(o.page, '/people')
     const row = o.page.getByRole('listitem').filter({ hasText: kit.username })
-    await row.getByRole('button', { name: 'Make moderator' }).click()
+    await pick(o.page, row, `Options for ${kit.username}`, 'Make moderator')
     await expect(row).toContainText('moderator')
-    await expect(row.getByRole('button', { name: 'Make member' })).toBeVisible()
     // The membership keeps its joined time, and the actions stay on the name's line at this width.
     await expect(row).toContainText(/joined (just now|\d+m ago)/)
     await expect(row).not.toContainText('1970')
     const face = await row.getByRole('img').boundingBox()
-    const action = await row.getByRole('button', { name: 'Make member' }).boundingBox()
+    const action = await row.getByRole('button', { name: `Options for ${kit.username}` }).boundingBox()
     expect(face && action && action.y < face.y + face.height && action.y + action.height > face.y).toBeTruthy()
 
     // Kit's open page learns of the new role: the menu appears, with Delete and without Edit.
@@ -68,7 +67,7 @@ test.describe('roles', () => {
     // The owner removes kit from People, after a confirm.
     await open(o.page, '/people')
     const row = o.page.getByRole('listitem').filter({ hasText: kit.username })
-    await row.getByRole('button', { name: 'Remove' }).click()
+    await pick(o.page, row, `Options for ${kit.username}`, 'Remove')
     await confirm(o.page, 'Remove')
     await expect(o.page.getByRole('listitem').filter({ hasText: kit.username })).toHaveCount(0)
     // Kit's open page signs itself out; the account cannot sign in again.

@@ -64,6 +64,9 @@ describe('applyEvent', () => {
     applyEvent(qc, 'notification', notification('n2', 'added', mo))
     applyEvent(qc, 'notification', notification('n2', 'added', mo))
     expect(list().map((n) => n.id)).toEqual(['n2', 'n1'])
+    // Clearing names a time: everything up to it is gone.
+    applyEvent(qc, 'notification_delete', { user_id: 'raphael', before: 1 })
+    expect(list().map((n) => n.id)).toEqual(['n2'])
 
     qc.setQueryData(keys.markers, { markers: [marker('notifications', 5, 2)] })
     const markers = () => (qc.getQueryData(keys.markers) as { markers: Marker[] }).markers

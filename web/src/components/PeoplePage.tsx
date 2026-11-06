@@ -10,6 +10,8 @@ import {
   List,
   ListItem,
   Measure,
+  Menu,
+  type MenuItem,
   Pane,
   Row,
   ScrollArea,
@@ -113,6 +115,18 @@ export function PeoplePage({ me, root, onOpenGroup }: PeoplePageProps) {
     }
   }
 
+  // Staff's doings to one person, behind a three-dot menu on their row; Message stays in the open.
+  const items = (u: Member): MenuItem[] => {
+    const out: MenuItem[] = []
+    if (root.can.set_roles && u.role !== 'owner')
+      out.push({
+        label: u.role === 'moderator' ? 'Make member' : 'Make moderator',
+        onSelect: () => void change(u),
+      })
+    if (u.can.remove) out.push({ label: 'Remove', icon: 'remove', onSelect: () => setRemoving(u) })
+    return out
+  }
+
   return (
     <Pane>
       <ScrollArea>
@@ -152,15 +166,8 @@ export function PeoplePage({ me, root, onOpenGroup }: PeoplePageProps) {
                               Message
                             </Button>
                           )}
-                          {root.can.set_roles && u.role !== 'owner' && u.id !== me.id && (
-                            <Button variant="ghost" onClick={() => void change(u)}>
-                              {u.role === 'moderator' ? 'Make member' : 'Make moderator'}
-                            </Button>
-                          )}
-                          {u.can.remove && u.id !== me.id && (
-                            <Button variant="ghost" icon="remove" onClick={() => setRemoving(u)}>
-                              Remove
-                            </Button>
+                          {u.id !== me.id && items(u).length > 0 && (
+                            <Menu label={`Options for ${u.username}`} items={items(u)} />
                           )}
                         </Row>
                       </Row>

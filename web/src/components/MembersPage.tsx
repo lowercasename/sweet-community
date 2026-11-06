@@ -11,6 +11,8 @@ import {
   List,
   ListItem,
   Measure,
+  Menu,
+  type MenuItem,
   Pane,
   Row,
   ScrollArea,
@@ -81,6 +83,24 @@ export function MembersPage({ group, me, onLeft, onStartWith }: MembersPageProps
   const others = members.filter((m) => m.user.id !== me.id).map((m) => m.user.id)
   const dirty = name.trim() !== group.name || mode !== group.mode
   const canEdit = group.can.rename || group.can.set_mode
+
+  // What I may do to one member, behind a three-dot menu on their row (the server's can flags say what).
+  const items = (m: Membership): MenuItem[] => {
+    const out: MenuItem[] = []
+    if (group.can.set_roles)
+      out.push({
+        label: m.role === 'moderator' ? 'Make member' : 'Make moderator',
+        onSelect: () => void run(() => setRole(m.user.id, m.role === 'moderator' ? 'member' : 'moderator')),
+      })
+    if (group.can.transfer) out.push({ label: 'Make owner', onSelect: () => setConfirm({ kind: 'handover', to: m }) })
+    if (group.can.remove_members)
+      out.push({
+        label: 'Remove',
+        icon: 'remove',
+        onSelect: () => void run(() => actions.removeMember(group.id, m.user.id)),
+      })
+    return out
+  }
 
   return (
     <Pane>
@@ -172,39 +192,8 @@ export function MembersPage({ group, me, onLeft, onStartWith }: MembersPageProps
                               joined <Time at={m.joined_at} />
                             </Text>
                           </Row>
-                          {!self && m.role !== 'owner' && (
-                            <Row gap={1} align="center" shrink={false}>
-                              {group.can.set_roles && (
-                                <Button
-                                  variant="ghost"
-                                  disabled={busy}
-                                  onClick={() =>
-                                    void run(() => setRole(m.user.id, m.role === 'moderator' ? 'member' : 'moderator'))
-                                  }
-                                >
-                                  {m.role === 'moderator' ? 'Make member' : 'Make moderator'}
-                                </Button>
-                              )}
-                              {group.can.transfer && (
-                                <Button
-                                  variant="ghost"
-                                  disabled={busy}
-                                  onClick={() => setConfirm({ kind: 'handover', to: m })}
-                                >
-                                  Make owner
-                                </Button>
-                              )}
-                              {group.can.remove_members && (
-                                <Button
-                                  variant="ghost"
-                                  icon="remove"
-                                  disabled={busy}
-                                  onClick={() => void run(() => actions.removeMember(group.id, m.user.id))}
-                                >
-                                  Remove
-                                </Button>
-                              )}
-                            </Row>
+                          {!self && m.role !== 'owner' && !busy && items(m).length > 0 && (
+                            <Menu label={`Options for ${m.user.username}`} items={items(m)} />
                           )}
                         </Row>
                       </ListItem>

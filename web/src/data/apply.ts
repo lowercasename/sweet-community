@@ -62,6 +62,9 @@ export function applyEvent(qc: QueryClient, kind: string, data: unknown): void {
     case 'notification':
       if (isNotification(data)) upsertNotification(qc, data)
       break
+    case 'notification_delete':
+      if (isCleared(data)) clearNotifications(qc, data.before)
+      break
     case 'marker':
       if (isMarker(data)) upsertMarker(qc, data)
       break
@@ -246,6 +249,18 @@ function upsertNotification(qc: QueryClient, n: Notification) {
   })
 }
 
+/** The ones up to a time are gone, for good. */
+function clearNotifications(qc: QueryClient, before: number) {
+  qc.setQueryData<Notifications>(keys.notifications, (old) =>
+    old
+      ? {
+          ...old,
+          pages: old.pages.map((p) => ({ ...p, notifications: p.notifications.filter((n) => n.created_at > before) })),
+        }
+      : old,
+  )
+}
+
 /** Where I have read a stream to, and what is still unread past it: forward only, as on the server, so a stale tab's word changes nothing. */
 function upsertMarker(qc: QueryClient, m: Marker) {
   qc.setQueryData<Markers>(keys.markers, (old) => {
@@ -419,6 +434,9 @@ function isMembership(data: unknown): data is Membership {
 function isNotification(data: unknown): data is Notification {
   const n = data as Notification
   return hasId(data) && typeof n.kind === 'string' && typeof n.group_id === 'string' && isUser(n.actor)
+}
+function isCleared(data: unknown): data is { before: number } {
+  return typeof data === 'object' && data !== null && typeof (data as { before?: unknown }).before === 'number'
 }
 function isMarker(data: unknown): data is Marker {
   const m = data as Marker

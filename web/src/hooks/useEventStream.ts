@@ -19,6 +19,7 @@ const EVENT_KINDS = [
   'membership_delete',
   'settings',
   'notification',
+  'notification_delete',
   'marker',
 ] as const
 const HEALTH_INTERVAL_MS = 30_000

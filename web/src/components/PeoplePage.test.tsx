@@ -53,16 +53,20 @@ describe('PeoplePage', () => {
     const { PeoplePage } = await import('./PeoplePage')
     renderWithQuery(<PeoplePage me={user('raphael')} root={group(ROOT, 'owner')} onOpenGroup={() => {}} />)
     await screen.findByText('mo')
-    expect(within(rowOf('raphael')).queryByRole('button', { name: /Message|Make/ })).toBeNull()
+    expect(within(rowOf('raphael')).queryByRole('button', { name: /Message|Options/ })).toBeNull()
     // A role change refetches the list, since who may remove whom moves with it; the server would answer with the new role.
     const { listUsers } = await import('../api')
     vi.mocked(listUsers).mockResolvedValue({
       users: [member('raphael', 'owner'), member('kit', 'moderator', true), member('mo', 'moderator', true)],
     })
-    fireEvent.click(within(rowOf('kit')).getByRole('button', { name: 'Make moderator' }))
+    fireEvent.click(within(rowOf('kit')).getByRole('button', { name: 'Options for kit' }))
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Make moderator' }))
     expect(setMemberRole).toHaveBeenCalledWith(ROOT, 'kit', 'moderator')
-    await within(rowOf('kit')).findByRole('button', { name: 'Make member' })
-    fireEvent.click(within(rowOf('mo')).getByRole('button', { name: 'Make member' }))
+    await vi.waitFor(() => fireEvent.click(within(rowOf('kit')).getByRole('button', { name: 'Options for kit' })))
+    await screen.findByRole('menuitem', { name: 'Make member' })
+    fireEvent.keyDown(document.activeElement ?? document.body, { key: 'Escape' })
+    fireEvent.click(within(rowOf('mo')).getByRole('button', { name: 'Options for mo' }))
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Make member' }))
     expect(setMemberRole).toHaveBeenCalledWith(ROOT, 'mo', 'member')
   })
 
@@ -71,8 +75,9 @@ describe('PeoplePage', () => {
     const { PeoplePage } = await import('./PeoplePage')
     renderWithQuery(<PeoplePage me={user('raphael')} root={group(ROOT, 'owner')} onOpenGroup={() => {}} />)
     await screen.findByText('mo')
-    expect(within(rowOf('raphael')).queryByRole('button', { name: 'Remove' })).toBeNull()
-    fireEvent.click(within(rowOf('kit')).getByRole('button', { name: 'Remove' }))
+    expect(within(rowOf('raphael')).queryByRole('button', { name: 'Options for raphael' })).toBeNull()
+    fireEvent.click(within(rowOf('kit')).getByRole('button', { name: 'Options for kit' }))
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Remove' }))
     expect(removeUser).not.toHaveBeenCalled()
     const dialog = screen.getByRole('dialog', { hidden: true })
     expect(within(dialog).getByText('Remove kit from this place?')).toBeTruthy()
@@ -87,7 +92,9 @@ describe('PeoplePage', () => {
     renderWithQuery(<PeoplePage me={user('mo')} root={group(ROOT, 'moderator')} onOpenGroup={() => {}} />)
     await screen.findByText('kit')
     expect(screen.getByText('Invite someone')).toBeTruthy()
-    expect(screen.queryByRole('button', { name: /Make / })).toBeNull()
+    // A moderator may remove a member, not set roles: the row's menu holds Remove alone.
+    fireEvent.click(screen.getByRole('button', { name: 'Options for kit' }))
+    expect(screen.getAllByRole('menuitem').map((b) => b.textContent)).toEqual(['Remove'])
   })
 
   it('shows a member only the list', async () => {
@@ -99,7 +106,6 @@ describe('PeoplePage', () => {
     renderWithQuery(<PeoplePage me={user('kit')} root={group(ROOT, 'member')} onOpenGroup={() => {}} />)
     await screen.findByText('mo')
     expect(screen.queryByText('Invite someone')).toBeNull()
-    expect(screen.queryByRole('button', { name: /Make / })).toBeNull()
-    expect(screen.queryByRole('button', { name: 'Remove' })).toBeNull()
+    expect(screen.queryByRole('button', { name: /^Options for/ })).toBeNull()
   })
 })

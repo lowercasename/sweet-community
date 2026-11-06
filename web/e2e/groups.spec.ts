@@ -1,4 +1,4 @@
-import { article, confirm, expect, member, open, owner, sendMessage, test, uniq, writePost } from './helpers'
+import { article, confirm, expect, member, open, owner, pick, sendMessage, test, uniq, writePost } from './helpers'
 
 const nav = (page: Parameters<typeof open>[0]) => page.getByRole('navigation', { name: 'Main' })
 
@@ -106,13 +106,13 @@ test.describe('groups', () => {
     await expect(moRow).toBeVisible()
     // The owner has no Leave; mo may be made moderator, then owner, after a confirm.
     await expect(kit.page.getByRole('button', { name: 'Leave room' })).toHaveCount(0)
-    await moRow.getByRole('button', { name: 'Make moderator' }).click()
+    await pick(kit.page, moRow, `Options for ${mo.username}`, 'Make moderator')
     await expect(moRow).toContainText('moderator')
-    // Three actions and the longer role text still share the name's line: the text shrinks before the row wraps.
+    // The row's menu and the longer role text share the name's line.
     const face = await moRow.getByRole('img').boundingBox()
-    const action = await moRow.getByRole('button', { name: 'Remove' }).boundingBox()
+    const action = await moRow.getByRole('button', { name: `Options for ${mo.username}` }).boundingBox()
     expect(face && action && action.y < face.y + face.height && action.y + action.height > face.y).toBeTruthy()
-    await moRow.getByRole('button', { name: 'Make owner' }).click()
+    await pick(kit.page, moRow, `Options for ${mo.username}`, 'Make owner')
     await confirm(kit.page, 'Switch ownership')
     await expect(moRow).toContainText('owner')
     await expect(moRow).toContainText(/joined (just now|\d+m ago)/)

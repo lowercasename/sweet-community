@@ -2,6 +2,7 @@ package api
 
 import (
 	"reflect"
+	"strconv"
 	"testing"
 	"time"
 
@@ -79,6 +80,29 @@ func TestNotifications(t *testing.T) {
 		t.Fatalf("first page: %v", page)
 	}
 
+	// Clearing: the ones I have seen go for good, told to me alone; what is newer than my marker, or than
+	// the time I name, stays. The marker is where it was.
+	kit.mustStatus(200, "PUT", "/api/markers/notifications", map[string]any{"read_at": int64(n["created_at"].(float64))})
+	cleared := kit.mustStatus(200, "DELETE", "/api/notifications?before="+strconv.FormatInt(int64(n["created_at"].(float64)), 10), nil)
+	if cleared["user_id"] != kitID || int64(cleared["before"].(float64)) != int64(n["created_at"].(float64)) {
+		t.Fatalf("cleared: %v", cleared)
+	}
+	if left := list(kit); len(left) != 1 || left[0].(map[string]any)["id"] != added["id"] {
+		t.Fatalf("after clearing the seen one: %v", left)
+	}
+	if evs := events(kit, "notification_delete"); len(evs) != 1 || !reflect.DeepEqual(evs[0], cleared) {
+		t.Fatalf("kit's clear events: %v", evs)
+	}
+	if evs := events(mo, "notification_delete"); len(evs) != 0 {
+		t.Fatalf("mo hears kit's clearing: %v", evs)
+	}
+	// Naming a time past my marker clears only up to the marker: the unread one stays.
+	kit.mustStatus(200, "DELETE", "/api/notifications?before="+strconv.FormatInt(int64(added["created_at"].(float64))+1, 10), nil)
+	if left := list(kit); len(left) != 1 {
+		t.Fatalf("an unread notification was cleared: %v", left)
+	}
+	kit.mustStatus(400, "DELETE", "/api/notifications", nil)
+
 	// Read markers: a row per stream of mine from the start (notifications, the root's chat, Knitting's chat),
 	// unread counted; reading moves one forward, never backwards; told to me alone.
 	if m := kit.mustStatus(200, "GET", "/api/markers", nil)["markers"].([]any); len(m) != 5 {
@@ -102,7 +126,7 @@ func TestNotifications(t *testing.T) {
 	if !reflect.DeepEqual(listed, marker) {
 		t.Fatalf("listed marker: %v, reply: %v", listed, marker)
 	}
-	if evs := events(kit, "marker"); len(evs) != 2 || !reflect.DeepEqual(evs[1], marker) {
+	if evs := events(kit, "marker"); len(evs) == 0 || !reflect.DeepEqual(evs[len(evs)-1], marker) {
 		t.Fatalf("kit's marker events: %v", evs)
 	}
 	if evs := events(mo, "marker"); len(evs) != 0 {

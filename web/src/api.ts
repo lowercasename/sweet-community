@@ -310,6 +310,17 @@ export function listNotifications(before?: number | null, limit = 30): Promise<N
   return request<NotificationPage>(`/api/notifications?${params}`)
 }
 
+/** What clearing removed: every notification of mine up to a time. */
+export interface Cleared {
+  user_id: string
+  before: number
+}
+
+/** Clears the notifications I have seen, up to a time (never past my marker), for good. */
+export function clearNotifications(before: number): Promise<Cleared> {
+  return request<Cleared>(`/api/notifications?before=${before}`, { method: 'DELETE' })
+}
+
 export function listMarkers(): Promise<{ markers: Marker[] }> {
   return request('/api/markers')
 }

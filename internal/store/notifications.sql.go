@@ -41,6 +41,22 @@ func (q *Queries) CreateNotification(ctx context.Context, arg CreateNotification
 	return err
 }
 
+const deleteReadNotifications = `-- name: DeleteReadNotifications :exec
+DELETE FROM notifications WHERE notifications.user_id = ?1 AND notifications.created_at <= ?2
+  AND notifications.created_at <= COALESCE((SELECT r.read_at FROM read_markers r WHERE r.user_id = ?1 AND r.stream = 'notifications'), 0)
+`
+
+type DeleteReadNotificationsParams struct {
+	UserID string
+	Before int64
+}
+
+// The ones I have seen, up to a time, and never past my marker.
+func (q *Queries) DeleteReadNotifications(ctx context.Context, arg DeleteReadNotificationsParams) error {
+	_, err := q.db.ExecContext(ctx, deleteReadNotifications, arg.UserID, arg.Before)
+	return err
+}
+
 const getChatMarker = `-- name: GetChatMarker :one
 SELECT m.user_id, CAST('chat:' || m.group_id AS TEXT) AS stream, CAST(COALESCE(r.read_at, m.joined_at) AS INTEGER) AS read_at,
        (SELECT COUNT(*) FROM messages x WHERE x.group_id = m.group_id AND x.deleted_at IS NULL AND x.author_id != m.user_id
