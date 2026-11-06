@@ -29,7 +29,6 @@ export const SweetImage = Image.extend({
   },
 }).configure({ inline: false, allowBase64: false })
 
-// Old Sweet's one placeholder, for posts and comments alike.
 const placeholder = Placeholder.configure({ placeholder: 'What would you like to say?' })
 
 /**

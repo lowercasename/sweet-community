@@ -44,7 +44,7 @@ describe('PeoplePage', () => {
     await screen.findByText('kit')
     expect(within(rowOf('raphael')).queryByRole('button', { name: 'Message' })).toBeNull()
     fireEvent.click(within(rowOf('kit')).getByRole('button', { name: 'Message' }))
-    expect(openDM).toHaveBeenCalledWith(['kit'])
+    expect(openDM).toHaveBeenCalledWith('kit')
     await vi.waitFor(() => expect(onOpenGroup).toHaveBeenCalledWith('d1'))
   })
 

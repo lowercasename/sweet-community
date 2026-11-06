@@ -235,8 +235,9 @@ func (s *Server) createGroup(w http.ResponseWriter, r *http.Request) {
 		for _, id := range in.Members {
 			people[id] = true
 		}
-		if len(people) < 2 {
-			writeErr(w, http.StatusBadRequest, "a conversation needs someone else in it")
+		// A conversation is two people (architecture.md, Groups); more is a room.
+		if len(people) != 2 {
+			writeErr(w, http.StatusBadRequest, "a conversation is you and one other person; for more, make a room")
 			return
 		}
 		ids := make([]string, 0, len(people))
@@ -249,8 +250,8 @@ func (s *Server) createGroup(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// openConversation is the conversation of exactly these people
-// (architecture.md, Groups): one per set, keyed by the sorted ids, found or
+// openConversation is the conversation of exactly these two people
+// (architecture.md, Groups): one per pair, keyed by the sorted ids, found or
 // made inside one transaction so two openings cannot make two. The viewer
 // is one of them; having hidden it, it shows again, which is a membership
 // event. The reply is the group, 200 found or 201 made.

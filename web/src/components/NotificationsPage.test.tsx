@@ -93,7 +93,7 @@ describe('NotificationsPage', () => {
     const { listNotifications } = await import('../api')
     vi.mocked(listNotifications).mockResolvedValue({ notifications: [], next_before: null })
     await draw()
-    await screen.findByText(/Nothing yet/)
+    await screen.findByText(/Nice and quiet/)
     expect(screen.queryByRole('list')).toBeNull()
   })
 

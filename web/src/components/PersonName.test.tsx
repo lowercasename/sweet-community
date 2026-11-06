@@ -50,7 +50,7 @@ describe('PersonName', () => {
     fireEvent.click(screen.getByRole('button', { name: 'mo' }))
     // Message waits for their standing: only someone on the instance can be messaged.
     fireEvent.click(await within(card('mo')).findByRole('button', { name: 'Message' }))
-    expect(openDM).toHaveBeenCalledWith(['mo'])
+    expect(openDM).toHaveBeenCalledWith('mo')
     await vi.waitFor(() => expect(window.location.pathname).toBe('/r/d1'))
   })
 

@@ -239,9 +239,9 @@ export function setSettings(s: Settings): Promise<Settings> {
   return request<Settings>('/api/settings', json('PUT', s))
 }
 
-/** A DM with these people: the existing one if there is one, else a new one. */
-export function openDM(members: string[]): Promise<Group> {
-  return request<Group>('/api/groups', json('POST', { kind: 'dm', members }))
+/** The conversation with one person: the existing one if there is one, else a new one. */
+export function openDM(userId: string): Promise<Group> {
+  return request<Group>('/api/groups', json('POST', { kind: 'dm', members: [userId] }))
 }
 
 export async function deleteGroup(groupId: string): Promise<void> {

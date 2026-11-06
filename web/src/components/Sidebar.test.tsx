@@ -23,7 +23,6 @@ const root = (create: boolean) =>
 const knitting = group('knit', 'member', { name: 'Knitting' })
 const withKit = dm('d1', [kit, raphael])
 const mo = user('mo')
-const jo = user('jo')
 /** Seven conversations, the newest word in d7, the oldest in d1. */
 const many = Array.from({ length: 7 }, (_, i) =>
   dm(`d${i + 1}`, [user(`p${i + 1}`), raphael], { last_message_at: i + 1 }),
@@ -114,13 +113,11 @@ describe('Sidebar', () => {
     expect(within(messages()).getAllByRole('button').map(nameOf)).toEqual(['New message', 'kit', 'All messages'])
   })
 
-  it('names a conversation by its other people and marks it by their faces: one, two, or one and a count', async () => {
-    await draw([root(true), withKit, dm('d2', [kit, mo, raphael]), dm('d3', [jo, kit, mo, raphael])], '/', false)
+  it('names a conversation by its other person and marks it by their face', async () => {
+    await draw([root(true), withKit, dm('d2', [mo, raphael])], '/', false)
     const item = (name: string) => screen.getByRole('button', { name })
     expect(item('kit').querySelectorAll('img').length).toBe(1)
-    expect(item('kit, mo').querySelectorAll('img').length).toBe(2)
-    expect(item('jo, kit, mo').querySelectorAll('img').length).toBe(1)
-    expect(item('jo, kit, mo').textContent).toBe('+2')
+    expect(item('mo').querySelectorAll('img').length).toBe(1)
   })
 
   it('lists rooms alphabetically, case aside, whatever order they came in', async () => {

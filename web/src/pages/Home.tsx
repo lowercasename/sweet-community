@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
-import { Redirect, Route, Switch, useLocation, useRoute, useSearch } from 'wouter'
+import { Redirect, Route, Switch, useLocation, useRoute } from 'wouter'
 import type { User } from '../api'
-import { useAuthor, useGroups, usePost, useUnreadNotifications, useUnreadPlaces } from '../data/hooks'
+import { useAuthor, useGroupActions, useGroups, usePost, useUnreadNotifications, useUnreadPlaces } from '../data/hooks'
 import { anyUnread } from '../data/notifications'
 import { StreamProvider } from '../hooks/StreamContext'
 import { useLayout } from '../hooks/useLayout'
@@ -18,7 +18,7 @@ import { PeoplePage } from '../components/PeoplePage'
 import { PostPage } from '../components/PostPage'
 import { SettingsPage } from '../components/SettingsPage'
 import { Sidebar } from '../components/Sidebar'
-import { Button, Segmented, Shell, TabBar } from '../ui'
+import { Button, ConfirmDialog, Menu, Segmented, Shell, TabBar, Text } from '../ui'
 
 /** What the bar calls each page that is not a place. */
 const PAGE_TITLES: Record<string, string> = {
@@ -52,8 +52,6 @@ export function Home({ me, onSignOut }: HomeProps) {
   const places = useUnreadPlaces()
   const root = groups.find((g) => g.kind === 'root')
   const [location, navigate] = useLocation()
-  // New message starts from the people a conversation's page sends it (?with=ids).
-  const withPeople = (new URLSearchParams(useSearch()).get('with') ?? '').split(',').filter(Boolean)
   const [atGroup, groupParams] = useRoute('/r/:id')
   const [atMembers, membersParams] = useRoute('/r/:id/members')
   const [atPost, postParams] = useRoute('/p/:id')
@@ -71,6 +69,21 @@ export function Home({ me, onSignOut }: HomeProps) {
   const viewing = atRoot || atGroup
   const tabActive = atRoot ? 'home' : location === '/menu' ? 'menu' : location === NOTIFICATIONS ? 'bell' : undefined
   const postAuthor = useAuthor(openPost?.author ?? me)
+  // Hiding a conversation (architecture.md, Groups): from its bar's menu, after a word of confirmation.
+  const groupActions = useGroupActions()
+  const [hiding, setHiding] = useState(false)
+  const [busy, setBusy] = useState(false)
+  const hide = async () => {
+    if (!current) return
+    setBusy(true)
+    try {
+      await groupActions.leave(current.id, me.id)
+      setHiding(false)
+      navigate(MESSAGES)
+    } finally {
+      setBusy(false)
+    }
+  }
 
   // The bar names the view; under something, it leads back to it.
   const label = current ? groupLabel(current, me) : ''
@@ -90,6 +103,8 @@ export function Home({ me, onSignOut }: HomeProps) {
 
   // A group the URL names that is not mine (or is gone) does not exist to me.
   if (!loading && named && !groups.some((g) => g.id === named)) return <Redirect to="/" replace />
+  // A conversation has no members page: it is two people, named in its bar.
+  if (atMembers && current?.kind === 'dm') return <Redirect to={groupPath(current.id)} replace />
 
   return (
     <StreamProvider>
@@ -130,19 +145,21 @@ export function Home({ me, onSignOut }: HomeProps) {
               onChange={setLayout}
             />
           )}
-          {viewing && current && current.kind !== 'root' && (
+          {viewing && current && current.kind === 'group' && (
             <Button
               variant="ghost"
               icon="people"
-              label={current.kind === 'dm' ? `${(current.members ?? []).length} people` : 'Members and settings'}
+              label="Members and settings"
               onClick={() => navigate(membersPath(current))}
             >
-              {narrow
-                ? undefined
-                : current.kind === 'dm'
-                  ? `${(current.members ?? []).length} people`
-                  : 'Members and settings'}
+              {narrow ? undefined : 'Members and settings'}
             </Button>
+          )}
+          {viewing && current && current.kind === 'dm' && (
+            <Menu
+              label="Conversation options"
+              items={[{ label: 'Hide conversation', icon: 'remove', onSelect: () => setHiding(true) }]}
+            />
           )}
         </PageBar>
         <Switch>
@@ -157,7 +174,7 @@ export function Home({ me, onSignOut }: HomeProps) {
             <MessagesPage me={me} onGo={navigate} />
           </Route>
           <Route path={NEW_MESSAGE}>
-            <NewMessagePage me={me} initial={withPeople} onOpened={(g) => navigate(groupPath(g.id, root?.id))} />
+            <NewMessagePage me={me} onOpened={(g) => navigate(groupPath(g.id, root?.id))} />
           </Route>
           <Route path="/menu">
             <MenuPage me={me} groups={groups} onGo={navigate} onLogout={onSignOut} />
@@ -167,13 +184,7 @@ export function Home({ me, onSignOut }: HomeProps) {
           </Route>
           <Route path="/r/:id/members">
             {atMembers && current && current.id === membersParams.id && (
-              <MembersPage
-                key={current.id}
-                group={current}
-                me={me}
-                onLeft={() => navigate(current.kind === 'dm' ? MESSAGES : '/')}
-                onStartWith={(ids) => navigate(`${NEW_MESSAGE}?with=${ids.map(encodeURIComponent).join(',')}`)}
-              />
+              <MembersPage key={current.id} group={current} me={me} onLeft={() => navigate('/')} />
             )}
           </Route>
           <Route path="/p/:id">
@@ -186,6 +197,19 @@ export function Home({ me, onSignOut }: HomeProps) {
           </Route>
         </Switch>
         {current && <GroupView key={current.id} group={current} hidden={!viewing} />}
+        <ConfirmDialog
+          open={hiding}
+          title="Hide this conversation?"
+          confirmLabel={busy ? 'Hiding…' : 'Hide'}
+          busy={busy}
+          onConfirm={() => void hide()}
+          onClose={() => setHiding(false)}
+        >
+          <Text variant="secondary">
+            It moves to Hidden at the foot of All messages. Opening it brings it back, with everything said meanwhile.
+            Nobody else is told.
+          </Text>
+        </ConfirmDialog>
         {narrow && (
           <TabBar
             tabs={[

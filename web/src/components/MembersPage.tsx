@@ -28,8 +28,6 @@ interface MembersPageProps {
   me: User
   /** After I have left or deleted the group: there is nothing here to show any more. */
   onLeft: () => void
-  /** Start a conversation with these people and others: New message, with them filled in. */
-  onStartWith?: (userIds: string[]) => void
 }
 
 const MODES: { value: GroupMode; label: string }[] = [
@@ -45,11 +43,11 @@ const ROLE_WORD: Record<Membership['role'], string> = {
 }
 
 /**
- * Who is in a group and, for those the group's can flags allow, the controls:
+ * Who is in a room and, for those the room's can flags allow, the controls:
  * add and remove people, set roles, hand the group over, rename it, set its
  * mode, delete it, leave it. Nothing here reasons about roles.
  */
-export function MembersPage({ group, me, onLeft, onStartWith }: MembersPageProps) {
+export function MembersPage({ group, me, onLeft }: MembersPageProps) {
   const { members, loading, error } = useMembers(group.id)
   const { data: users } = useUsers()
   const actions = useGroupActions()
@@ -78,9 +76,6 @@ export function MembersPage({ group, me, onLeft, onStartWith }: MembersPageProps
 
   const inGroup = new Set(members.map((m) => m.user.id))
   const candidates = [...(users?.values() ?? [])].filter((u) => !inGroup.has(u.id))
-  // A conversation's people are fixed (architecture.md, Groups): a word with
-  // someone else is another conversation, started on New message with these people filled in.
-  const others = members.filter((m) => m.user.id !== me.id).map((m) => m.user.id)
   const dirty = name.trim() !== group.name || mode !== group.mode
   const canEdit = group.can.rename || group.can.set_mode
 
@@ -151,7 +146,7 @@ export function MembersPage({ group, me, onLeft, onStartWith }: MembersPageProps
             )}
             <Card>
               <Stack gap={2}>
-                <Heading level={2}>{group.kind === 'dm' ? 'People' : 'Members'}</Heading>
+                <Heading level={2}>Members</Heading>
                 {loading && <Text variant="secondary">Loading…</Text>}
                 {error && <Text variant="secondary">{error.message}</Text>}
                 {problem && <Text variant="secondary">{problem}</Text>}
@@ -204,17 +199,12 @@ export function MembersPage({ group, me, onLeft, onStartWith }: MembersPageProps
                   <Row gap={2}>
                     <Button
                       variant="secondary"
-                      icon={group.kind === 'dm' ? 'remove' : 'logout'}
+                      icon="logout"
                       disabled={busy}
                       onClick={() => setConfirm({ kind: 'leave' })}
                     >
-                      {group.kind === 'dm' ? 'Hide conversation' : 'Leave room'}
+                      Leave room
                     </Button>
-                    {group.kind === 'dm' && (
-                      <Button variant="secondary" icon="chat" disabled={busy} onClick={() => onStartWith?.(others)}>
-                        New conversation with these people and others
-                      </Button>
-                    )}
                   </Row>
                 )}
               </Stack>
@@ -236,17 +226,13 @@ export function MembersPage({ group, me, onLeft, onStartWith }: MembersPageProps
       </ConfirmDialog>
       <ConfirmDialog
         open={confirm?.kind === 'leave'}
-        title={group.kind === 'dm' ? 'Hide this conversation?' : 'Leave this room?'}
-        confirmLabel={group.kind === 'dm' ? 'Hide' : 'Leave'}
+        title="Leave this room?"
+        confirmLabel="Leave"
         busy={busy}
         onConfirm={() => void run(() => actions.leave(group.id, me.id).then(onLeft))}
         onClose={() => setConfirm(null)}
       >
-        <Text variant="secondary">
-          {group.kind === 'dm'
-            ? 'It moves to Hidden at the foot of All messages. Opening it brings it back, with everything said meanwhile. Nobody else is told.'
-            : 'Someone in it will have to add you again.'}
-        </Text>
+        <Text variant="secondary">Someone in it will have to add you again.</Text>
       </ConfirmDialog>
       <ConfirmDialog
         open={confirm?.kind === 'delete'}

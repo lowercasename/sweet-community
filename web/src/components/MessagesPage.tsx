@@ -19,7 +19,7 @@ import {
 } from '../ui'
 import { groupPath } from '../routes'
 import { activity, conversationsOf, hiddenOf } from '../data/groups'
-import { ConversationFaces } from './ConversationsSection'
+import { ConversationFace, other } from './ConversationsSection'
 import { groupLabel } from './GroupView'
 
 interface MessagesPageProps {
@@ -29,8 +29,8 @@ interface MessagesPageProps {
 
 /**
  * All my conversations, latest word first (architecture.md, Layout): the
- * nav shows the latest five, this page every one, each opening at its own
- * URL under its bar like any room. Below them, the ones I have hidden;
+ * nav shows the latest five, this page every one, each named by its other
+ * person and opening at its own URL under its bar like any room. Below them, the ones I have hidden;
  * opening one shows it again.
  */
 export function MessagesPage({ me, onGo }: MessagesPageProps) {
@@ -42,8 +42,9 @@ export function MessagesPage({ me, onGo }: MessagesPageProps) {
   const out = hiddenOf(groups)
   const show = async (g: Group) => {
     try {
-      const opened = await openDM((g.members ?? []).filter((u) => u.id !== me.id).map((u) => u.id))
-      onGo(groupPath(opened.id))
+      const them = other(g, me)
+      if (!them) return
+      onGo(groupPath((await openDM(them.id)).id))
     } catch (e) {
       setProblem(e instanceof Error ? e.message : 'Could not open the conversation')
     }
@@ -55,7 +56,7 @@ export function MessagesPage({ me, onGo }: MessagesPageProps) {
       <ListItem key={g.id}>
         <ListRow label={n > 0 ? `${label}, unread` : label} onClick={onClick}>
           <Dotted shown={n > 0}>
-            <ConversationFaces group={g} me={me} />
+            <ConversationFace group={g} me={me} />
           </Dotted>
           <Text as="span" variant="name">
             {label}

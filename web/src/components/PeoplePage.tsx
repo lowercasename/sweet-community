@@ -109,7 +109,7 @@ export function PeoplePage({ me, root, onOpenGroup }: PeoplePageProps) {
   }
   const message = async (u: Member) => {
     try {
-      onOpenGroup((await openDM([u.id])).id)
+      onOpenGroup((await openDM(u.id)).id)
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Could not open a conversation')
     }

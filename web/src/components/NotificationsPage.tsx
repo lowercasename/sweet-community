@@ -93,11 +93,7 @@ export function NotificationsPage({ groups, onGo }: NotificationsPageProps) {
           <Card>
             <Stack gap={2}>
               {error && <Text variant="secondary">{error.message}</Text>}
-              {!loading && notifications.length === 0 && (
-                <Text variant="secondary">
-                  Nothing yet. When someone comments on your post or adds you to a room, it shows here.
-                </Text>
-              )}
+              {!loading && notifications.length === 0 && <Text variant="secondary">Nice and quiet in here.</Text>}
               {recent.length > 0 && (
                 <Stack gap={1}>
                   <Heading level={3}>New</Heading>

@@ -72,7 +72,7 @@ describe('MessagesPage', () => {
         .map((b) => b.getAttribute('aria-label')),
     ).toEqual(['mo'])
     fireEvent.click(within(lists[1]).getByRole('button', { name: 'mo' }))
-    expect(openDM).toHaveBeenCalledWith(['mo'])
+    expect(openDM).toHaveBeenCalledWith('mo')
     await vi.waitFor(() => expect(onGo).toHaveBeenCalledWith('/r/d2'))
   })
 

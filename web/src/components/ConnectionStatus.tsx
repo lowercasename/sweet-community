@@ -6,9 +6,9 @@ interface ConnectionStatusProps {
 }
 
 const LABELS: Record<Exclude<StreamStatus, 'live'>, string> = {
-  connecting: 'connecting…',
-  reconnecting: 'reconnecting…',
-  offline: 'offline — you can read but not post',
+  connecting: 'Connecting…',
+  reconnecting: 'Reconnecting…',
+  offline: 'Offline - you can read but not post',
 }
 
 /** Quiet status line. Renders nothing while live. */

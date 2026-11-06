@@ -26,7 +26,7 @@ function PersonCard({ person, me }: { person: Member | User; me: User | null | u
   const standing = 'role' in person ? person : null
   const message = async () => {
     try {
-      navigate(groupPath((await openDM([person.id])).id))
+      navigate(groupPath((await openDM(person.id)).id))
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Could not open a conversation')
     }

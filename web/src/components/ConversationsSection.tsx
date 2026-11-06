@@ -3,17 +3,23 @@ import { conversationsOf } from '../data/groups'
 import { anyUnread, type UnreadPlace } from '../data/notifications'
 import { useUsers } from '../data/hooks'
 import { MESSAGES, NEW_MESSAGE, groupPath } from '../routes'
-import { FacePile, NavItem, NavSection } from '../ui'
+import { Avatar, NavItem, NavSection } from '../ui'
 import { groupLabel } from './GroupView'
 
 /** How many conversations the nav shows: the latest five, and the open one. */
 export const SHOWN = 5
 
-/** The faces of a conversation's other people, as they are now. */
-export function ConversationFaces({ group, me }: { group: Group; me: User }) {
+/** The other person of a conversation, as they are now: the conversation's face. */
+export function other(group: Group, me: User, users?: Map<string, User>): User | undefined {
+  const u = (group.members ?? []).find((x) => x.id !== me.id)
+  return u && (users?.get(u.id) ?? u)
+}
+
+/** A conversation's mark, in the slot a room's tile takes: the other person's face. */
+export function ConversationFace({ group, me }: { group: Group; me: User }) {
   const { data: users } = useUsers()
-  const others = (group.members ?? []).filter((u) => u.id !== me.id).map((u) => users?.get(u.id) ?? u)
-  return <FacePile people={others.map((u) => ({ name: u.username, picture: u.picture }))} />
+  const them = other(group, me, users)
+  return <Avatar name={them?.username ?? ''} picture={them?.picture} size="sm" decorative />
 }
 
 interface ConversationsSectionProps {
@@ -30,8 +36,8 @@ interface ConversationsSectionProps {
 /**
  * The Messages section of the nav (architecture.md, Layout): New message as
  * its own control, the five conversations with the latest word, the open
- * one too if it is older, each named by its other people and marked by
- * their faces, and All messages at the foot. A conversation is a room
+ * one too if it is older, each named by its other person and marked by
+ * their face, and All messages at the foot. A conversation is a room
  * without a name, so it sits with the rooms, drawn the same way.
  */
 export function ConversationsSection({ groups, me, location, places, expanded, onGo }: ConversationsSectionProps) {
@@ -55,7 +61,7 @@ export function ConversationsSection({ groups, me, location, places, expanded, o
       {shown.map((g) => (
         <NavItem
           key={g.id}
-          mark={<ConversationFaces group={g} me={me} />}
+          mark={<ConversationFace group={g} me={me} />}
           label={groupLabel(g, me)}
           expanded={expanded}
           size="sm"

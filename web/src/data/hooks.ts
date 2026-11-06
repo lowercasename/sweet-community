@@ -294,9 +294,9 @@ export function useGroupActions() {
       if (m) applyEvent(qc, 'membership', m)
       else applyEvent(qc, 'membership_delete', { group_id: groupId, user_id: meId })
     },
-    /** A DM with these people: the existing one, or a new one; either way it is in my groups now. */
-    async openDM(userIds: string[]): Promise<Group> {
-      const g = await openDM(userIds)
+    /** The conversation with one person: the existing one, or a new one; either way it is in my groups now. */
+    async openDM(userId: string): Promise<Group> {
+      const g = await openDM(userId)
       applyEvent(qc, 'group', g)
       return g
     },

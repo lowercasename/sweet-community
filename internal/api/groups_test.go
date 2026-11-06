@@ -241,7 +241,7 @@ func TestConversationIsItsPeople(t *testing.T) {
 	ts, owner := newTestServer(t)
 	kit, kitID := registerMember(t, ts, owner, "kit")
 	mo, moID := registerMember(t, ts, owner, "mo")
-	jo, joID := registerMember(t, ts, owner, "jo")
+	_, joID := registerMember(t, ts, owner, "jo")
 
 	pair := kit.mustStatus(201, "POST", "/api/groups", map[string]any{"kind": "dm", "members": []string{moID}})
 	pid := pair["id"].(string)
@@ -250,41 +250,27 @@ func TestConversationIsItsPeople(t *testing.T) {
 		t.Fatalf("conversation abilities: %v", pair)
 	}
 	kit.mustStatus(201, "POST", pp+"/messages", map[string]string{"body_html": "<p>between us</p>"})
-	// Nobody is added, staff included.
+	// Nobody is added, staff included; and a conversation is two people, no more: that is a room.
 	mo.mustStatus(403, "POST", pp+"/members", map[string]string{"user_id": joID})
 	owner.mustStatus(404, "POST", pp+"/members", map[string]string{"user_id": joID})
-
-	// A word with jo too is another conversation, empty; the pair is untouched.
-	three := kit.mustStatus(201, "POST", "/api/groups", map[string]any{"kind": "dm", "members": []string{moID, joID}})
-	tid := three["id"].(string)
-	tp := "/api/groups/" + tid
-	if tid == pid || memberNames(three) != "jo,kit,mo" {
-		t.Fatalf("three: %v", three)
-	}
-	if msgs := jo.mustStatus(200, "GET", tp+"/messages", nil)["messages"].([]any); len(msgs) != 0 {
-		t.Fatalf("the new conversation carries %d messages from the pair", len(msgs))
-	}
+	kit.mustStatus(400, "POST", "/api/groups", map[string]any{"kind": "dm", "members": []string{moID, joID}})
+	kit.mustStatus(400, "POST", "/api/groups", map[string]any{"kind": "dm", "members": []string{}})
 	if got := memberNames(kit.mustStatus(200, "GET", pp, nil)); got != "kit,mo" {
-		t.Fatalf("the pair after: %q", got)
+		t.Fatalf("the pair: %q", got)
 	}
-	// The same people, in any order, from anyone of them, is the same conversation.
-	if again := mo.mustStatus(200, "POST", "/api/groups", map[string]any{"kind": "dm", "members": []string{joID, kitID}}); again["id"] != tid {
-		t.Fatalf("mo opening jo and kit got %v, want %v", again["id"], tid)
-	}
-	kit.mustStatus(201, "POST", tp+"/messages", map[string]string{"body_html": "<p>all three</p>"})
 
-	// Jo hides it: gone from jo's sight, still of the three to the others, who are not told.
-	if out := jo.mustStatus(200, "DELETE", tp+"/members/"+joID, nil); out["hidden_at"] == nil || out["user"].(map[string]any)["id"] != joID {
+	// Mo hides it: gone from mo's sight, still the pair's to kit, who is not told.
+	if out := mo.mustStatus(200, "DELETE", pp+"/members/"+moID, nil); out["hidden_at"] == nil || out["user"].(map[string]any)["id"] != moID {
 		t.Fatalf("hiding replies with the membership: %v", out)
 	}
-	jo.mustStatus(404, "GET", tp+"/messages", nil)
-	if g := myGroups(jo)[tid]; g == nil || g["hidden_at"] == nil {
-		t.Fatalf("jo's list after hiding: %v", g)
+	mo.mustStatus(404, "GET", pp+"/messages", nil)
+	if g := myGroups(mo)[pid]; g == nil || g["hidden_at"] == nil {
+		t.Fatalf("mo's list after hiding: %v", g)
 	}
-	if got := memberNames(kit.mustStatus(200, "GET", tp, nil)); got != "jo,kit,mo" {
-		t.Fatalf("the three after jo hid it: %q", got)
+	if got := memberNames(kit.mustStatus(200, "GET", pp, nil)); got != "kit,mo" {
+		t.Fatalf("the pair after mo hid it: %q", got)
 	}
-	for _, m := range kit.mustStatus(200, "GET", tp+"/members", nil)["members"].([]any) {
+	for _, m := range kit.mustStatus(200, "GET", pp+"/members", nil)["members"].([]any) {
 		if mm := m.(map[string]any); mm["hidden_at"] != nil {
 			t.Fatalf("kit is told who has hidden the conversation: %v", mm)
 		}
@@ -294,22 +280,21 @@ func TestConversationIsItsPeople(t *testing.T) {
 			t.Fatalf("kit's stream carries someone else's hiding: %v", p)
 		}
 	}
-	kit.mustStatus(201, "POST", tp+"/messages", map[string]string{"body_html": "<p>while jo is away</p>"})
-	// Even both the others hiding it deletes nothing.
-	kit.mustStatus(200, "DELETE", tp+"/members/"+kitID, nil)
-	mo.mustStatus(200, "DELETE", tp+"/members/"+moID, nil)
-	mo.mustStatus(404, "GET", tp, nil)
+	kit.mustStatus(201, "POST", pp+"/messages", map[string]string{"body_html": "<p>while mo is away</p>"})
+	// Even both hiding it deletes nothing.
+	kit.mustStatus(200, "DELETE", pp+"/members/"+kitID, nil)
+	kit.mustStatus(404, "GET", pp, nil)
 
-	// Jo opens the conversation of the three again: the same one, shown again, with everything said in it.
-	back := jo.mustStatus(200, "POST", "/api/groups", map[string]any{"kind": "dm", "members": []string{kitID, moID}})
-	if back["id"] != tid || back["hidden_at"] != nil {
-		t.Fatalf("jo showing it again: %v", back)
+	// Mo opens the conversation with kit again: the same one, shown again, with everything said in it.
+	back := mo.mustStatus(200, "POST", "/api/groups", map[string]any{"kind": "dm", "members": []string{kitID}})
+	if back["id"] != pid || back["hidden_at"] != nil {
+		t.Fatalf("mo showing it again: %v", back)
 	}
-	if msgs := jo.mustStatus(200, "GET", tp+"/messages", nil)["messages"].([]any); len(msgs) != 2 {
-		t.Fatalf("jo sees %d messages, want 2", len(msgs))
+	if msgs := mo.mustStatus(200, "GET", pp+"/messages", nil)["messages"].([]any); len(msgs) != 2 {
+		t.Fatalf("mo sees %d messages, want 2", len(msgs))
 	}
-	if g := myGroups(jo)[tid]; g == nil || g["hidden_at"] != nil {
-		t.Fatalf("jo's list after showing it again: %v", g)
+	if g := myGroups(mo)[pid]; g == nil || g["hidden_at"] != nil {
+		t.Fatalf("mo's list after showing it again: %v", g)
 	}
 }
 

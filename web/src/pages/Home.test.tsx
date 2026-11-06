@@ -34,6 +34,7 @@ vi.mock('../api', async (importOriginal) => ({
   ),
   setSettings: vi.fn(),
   logout: vi.fn(() => Promise.resolve()),
+  removeMember: vi.fn(),
 }))
 
 const raphael = user('raphael')
@@ -68,7 +69,8 @@ beforeEach(async () => {
 async function home(path = '/') {
   window.history.replaceState(null, '', path)
   const { Home } = await import('./Home')
-  const result = renderWithQuery(<Home me={raphael} onSignOut={() => {}} />)
+  // The app sets me in the cache before Home mounts; the stream's events about me depend on it.
+  const result = renderWithQuery(<Home me={raphael} onSignOut={() => {}} />, (qc) => qc.setQueryData(['me'], raphael))
   if (path === '/') {
     await screen.findByText('p1')
     await screen.findByText('Nobody has said anything yet. Say hello.')
@@ -178,6 +180,29 @@ describe('Home', () => {
     expect(nav().getByRole('button', { name: 'kit' }).getAttribute('aria-current')).toBe('page')
     expect(nav().getByRole('button', { name: 'All messages' }).getAttribute('aria-current')).toBeNull()
     expect(nav().getByRole('button', { name: 'Home' }).getAttribute('aria-current')).toBeNull()
+  })
+
+  it("a conversation's bar has no people button, only a menu with Hide; its members page does not exist", async () => {
+    const { removeMember } = await import('../api')
+    vi.mocked(removeMember).mockResolvedValue({
+      group_id: 'd1',
+      user: raphael,
+      role: 'member',
+      joined_at: 1,
+      hidden_at: 9,
+    })
+    await home('/r/d1/members')
+    await vi.waitFor(() => expect(window.location.pathname).toBe('/r/d1'))
+    await screen.findByRole('heading', { name: 'kit' })
+    expect(screen.queryByRole('button', { name: 'Members and settings' })).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: 'Conversation options' }))
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Hide conversation' }))
+    const dialog = screen.getByRole('dialog', { hidden: true })
+    expect(within(dialog).getByText('Hide this conversation?')).toBeTruthy()
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Hide' }))
+    expect(removeMember).toHaveBeenCalledWith('d1', 'raphael')
+    await vi.waitFor(() => expect(window.location.pathname).toBe('/messages'))
+    expect(nav().queryByRole('button', { name: 'kit' })).toBeNull()
   })
 
   it('opens whatever page the URL names, and the back button returns', async () => {

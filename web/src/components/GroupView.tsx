@@ -11,11 +11,10 @@ interface GroupViewProps {
   hidden: boolean
 }
 
-/** What to call a group in the nav and at the top of its view: a DM is its other people. */
+/** What to call a group in the nav and at the top of its view: a conversation is its other person. */
 export function groupLabel(g: Group, me: User): string {
   if (g.kind !== 'dm') return g.name
-  const others = (g.members ?? []).filter((u) => u.id !== me.id).map((u) => u.username)
-  return others.length > 0 ? others.join(', ') : 'Just you'
+  return (g.members ?? []).find((u) => u.id !== me.id)?.username ?? 'Just you'
 }
 
 /**

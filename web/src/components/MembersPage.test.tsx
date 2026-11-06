@@ -102,22 +102,6 @@ describe('MembersPage', () => {
     expect(updateGroup).toHaveBeenCalledWith('club', { name: 'Knitting', mode: 'chat' })
   })
 
-  it('a conversation: its People, nobody added, a new one with them and others, and Hide', async () => {
-    const { MembersPage } = await import('./MembersPage')
-    const { dm } = await import('../test-utils')
-    const onStartWith = vi.fn()
-    renderWithQuery(<MembersPage group={dm('club', [kit, mo])} me={mo} onLeft={() => {}} onStartWith={onStartWith} />)
-    await screen.findByText('mo')
-    expect(screen.getByRole('heading', { name: 'People' })).toBeTruthy()
-    expect(screen.queryByLabelText('Name')).toBeNull()
-    expect(screen.queryByLabelText('Add someone')).toBeNull()
-    expect(screen.queryByRole('button', { name: /^Options for/ })).toBeNull()
-    fireEvent.click(screen.getByRole('button', { name: 'New conversation with these people and others' }))
-    expect(onStartWith).toHaveBeenCalledWith(['kit'])
-    fireEvent.click(screen.getByRole('button', { name: 'Hide conversation' }))
-    expect(within(screen.getByRole('dialog', { hidden: true })).getByText('Hide this conversation?')).toBeTruthy()
-  })
-
   it('shows a member the list and Leave, nothing else', async () => {
     const { removeMember } = await import('../api')
     const onLeft = await page('member')
