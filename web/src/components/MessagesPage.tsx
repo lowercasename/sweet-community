@@ -1,9 +1,10 @@
 import { useState } from 'react'
 import type { Group, User } from '../api'
-import { useGroupActions, useGroups } from '../data/hooks'
+import { useChatUnread, useGroupActions, useGroups } from '../data/hooks'
 import {
   Button,
   Card,
+  Count,
   Heading,
   List,
   ListItem,
@@ -35,6 +36,7 @@ interface MessagesPageProps {
 export function MessagesPage({ me, onGo }: MessagesPageProps) {
   const { groups, loading } = useGroups()
   const { openDM } = useGroupActions()
+  const counts = useChatUnread()
   const [problem, setProblem] = useState<string | null>(null)
   const dms = conversationsOf(groups)
   const out = hiddenOf(groups)
@@ -48,9 +50,10 @@ export function MessagesPage({ me, onGo }: MessagesPageProps) {
   }
   const row = (g: Group, onClick: () => void) => {
     const label = groupLabel(g, me)
+    const n = counts.get(g.id) ?? 0
     return (
       <ListItem key={g.id}>
-        <ListRow label={label} onClick={onClick}>
+        <ListRow label={n > 0 ? `${label}, ${n} unread` : label} onClick={onClick}>
           <ConversationFaces group={g} me={me} />
           <Text as="span" variant="name">
             {label}
@@ -58,6 +61,7 @@ export function MessagesPage({ me, onGo }: MessagesPageProps) {
           <Text as="span" variant="small">
             <Time at={activity(g)} />
           </Text>
+          <Count n={n} />
         </ListRow>
       </ListItem>
     )

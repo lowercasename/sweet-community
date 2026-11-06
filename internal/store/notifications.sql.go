@@ -41,19 +41,35 @@ func (q *Queries) CreateNotification(ctx context.Context, arg CreateNotification
 	return err
 }
 
-const getMarker = `-- name: GetMarker :one
-SELECT user_id, stream, read_at FROM read_markers WHERE user_id = ?1 AND stream = ?2
+const getChatMarker = `-- name: GetChatMarker :one
+SELECT m.user_id, CAST('chat:' || m.group_id AS TEXT) AS stream, CAST(COALESCE(r.read_at, m.joined_at) AS INTEGER) AS read_at,
+       (SELECT COUNT(*) FROM messages x WHERE x.group_id = m.group_id AND x.deleted_at IS NULL AND x.author_id != m.user_id
+          AND x.created_at > COALESCE(r.read_at, m.joined_at)) AS unread
+FROM memberships m LEFT JOIN read_markers r ON r.user_id = m.user_id AND r.stream = 'chat:' || m.group_id
+WHERE m.user_id = ?1 AND m.group_id = ?2 AND m.hidden_at IS NULL
 `
 
-type GetMarkerParams struct {
-	UserID string
-	Stream string
+type GetChatMarkerParams struct {
+	UserID  string
+	GroupID string
 }
 
-func (q *Queries) GetMarker(ctx context.Context, arg GetMarkerParams) (ReadMarker, error) {
-	row := q.db.QueryRowContext(ctx, getMarker, arg.UserID, arg.Stream)
-	var i ReadMarker
-	err := row.Scan(&i.UserID, &i.Stream, &i.ReadAt)
+type GetChatMarkerRow struct {
+	UserID string
+	Stream string
+	ReadAt int64
+	Unread int64
+}
+
+func (q *Queries) GetChatMarker(ctx context.Context, arg GetChatMarkerParams) (GetChatMarkerRow, error) {
+	row := q.db.QueryRowContext(ctx, getChatMarker, arg.UserID, arg.GroupID)
+	var i GetChatMarkerRow
+	err := row.Scan(
+		&i.UserID,
+		&i.Stream,
+		&i.ReadAt,
+		&i.Unread,
+	)
 	return i, err
 }
 
@@ -93,20 +109,73 @@ func (q *Queries) GetNotification(ctx context.Context, id string) (GetNotificati
 	return i, err
 }
 
-const listMarkers = `-- name: ListMarkers :many
-SELECT user_id, stream, read_at FROM read_markers WHERE user_id = ?1 ORDER BY stream
+const getNotificationsMarker = `-- name: GetNotificationsMarker :one
+
+SELECT u.id AS user_id, CAST('notifications' AS TEXT) AS stream, CAST(COALESCE(r.read_at, 0) AS INTEGER) AS read_at,
+       (SELECT COUNT(*) FROM notifications n WHERE n.user_id = u.id AND n.created_at > COALESCE(r.read_at, 0)) AS unread
+FROM users u LEFT JOIN read_markers r ON r.user_id = u.id AND r.stream = 'notifications'
+WHERE u.id = ?1
 `
 
-func (q *Queries) ListMarkers(ctx context.Context, userID string) ([]ReadMarker, error) {
+type GetNotificationsMarkerRow struct {
+	UserID string
+	Stream string
+	ReadAt int64
+	Unread int64
+}
+
+// A marker row exists for every stream of mine whether or not I have read
+// anything: the notifications stream, and the chat of every group I am
+// present in. Unread is what is newer than where I have read to; in a chat,
+// others' live messages since my marker, or since I joined if I never read.
+func (q *Queries) GetNotificationsMarker(ctx context.Context, userID string) (GetNotificationsMarkerRow, error) {
+	row := q.db.QueryRowContext(ctx, getNotificationsMarker, userID)
+	var i GetNotificationsMarkerRow
+	err := row.Scan(
+		&i.UserID,
+		&i.Stream,
+		&i.ReadAt,
+		&i.Unread,
+	)
+	return i, err
+}
+
+const listMarkers = `-- name: ListMarkers :many
+SELECT u.id AS user_id, CAST('notifications' AS TEXT) AS stream, CAST(COALESCE(r.read_at, 0) AS INTEGER) AS read_at,
+       (SELECT COUNT(*) FROM notifications n WHERE n.user_id = u.id AND n.created_at > COALESCE(r.read_at, 0)) AS unread
+FROM users u LEFT JOIN read_markers r ON r.user_id = u.id AND r.stream = 'notifications'
+WHERE u.id = ?1
+UNION ALL
+SELECT m.user_id, CAST('chat:' || m.group_id AS TEXT) AS stream, CAST(COALESCE(r.read_at, m.joined_at) AS INTEGER) AS read_at,
+       (SELECT COUNT(*) FROM messages x WHERE x.group_id = m.group_id AND x.deleted_at IS NULL AND x.author_id != m.user_id
+          AND x.created_at > COALESCE(r.read_at, m.joined_at)) AS unread
+FROM memberships m JOIN groups g ON g.id = m.group_id AND g.deleted_at IS NULL
+LEFT JOIN read_markers r ON r.user_id = m.user_id AND r.stream = 'chat:' || m.group_id
+WHERE m.user_id = ?1 AND m.hidden_at IS NULL
+`
+
+type ListMarkersRow struct {
+	UserID string
+	Stream string
+	ReadAt int64
+	Unread int64
+}
+
+func (q *Queries) ListMarkers(ctx context.Context, userID string) ([]ListMarkersRow, error) {
 	rows, err := q.db.QueryContext(ctx, listMarkers, userID)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	items := []ReadMarker{}
+	items := []ListMarkersRow{}
 	for rows.Next() {
-		var i ReadMarker
-		if err := rows.Scan(&i.UserID, &i.Stream, &i.ReadAt); err != nil {
+		var i ListMarkersRow
+		if err := rows.Scan(
+			&i.UserID,
+			&i.Stream,
+			&i.ReadAt,
+			&i.Unread,
+		); err != nil {
 			return nil, err
 		}
 		items = append(items, i)

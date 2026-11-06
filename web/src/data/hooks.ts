@@ -45,7 +45,7 @@ import {
 } from '../api'
 import { applyEvent, findPost } from './apply'
 import { ROOT_ID, keys } from './keys'
-import { NOTIFICATIONS, markerOf, unreadOf } from './notifications'
+import { NOTIFICATIONS, chatUnread } from './notifications'
 
 /*
  * Reads are queries; writes call the API and then feed the reply through
@@ -332,18 +332,41 @@ export function useMarkers() {
 
 /** Is anything on the notifications stream newer than where I have read to? The bell's dot. */
 export function useUnreadNotifications(): boolean {
-  const { notifications } = useNotifications()
   const { markers } = useMarkers()
-  return unreadOf(notifications, markerOf(markers, NOTIFICATIONS)).length > 0
+  return (markers.find((m) => m.stream === NOTIFICATIONS)?.unread ?? 0) > 0
 }
 
-/** I have read a stream up to a time: the cache moves at once, the server's answer follows through the same path. */
+/** Unread messages by group id, for the counts in the nav. */
+export function useChatUnread(): Map<string, number> {
+  const { markers } = useMarkers()
+  return chatUnread(markers)
+}
+
+/** PUTs waiting to go, one per stream: the latest time wins. */
+const pendingMarks = new Map<string, ReturnType<typeof setTimeout>>()
+
+/**
+ * I have read a stream up to a time: the cache moves at once, the server's
+ * answer follows through the same path. A chat marks with a debounce (the
+ * document's "updated from the client with a debounce"), so a busy room is
+ * one PUT, not one per message.
+ */
 export function useMarkRead() {
   const qc = useQueryClient()
-  return async (stream: string, readAt: number) => {
+  return (stream: string, readAt: number, debounceMs = 0) => {
     const me = qc.getQueryData<User | null>(keys.me)
-    applyEvent(qc, 'marker', { user_id: me?.id ?? '', stream, read_at: readAt })
-    applyEvent(qc, 'marker', await setMarker(stream, readAt))
+    applyEvent(qc, 'marker', { user_id: me?.id ?? '', stream, read_at: readAt, unread: 0 })
+    const send = () => {
+      pendingMarks.delete(stream)
+      setMarker(stream, readAt).then(
+        (m) => applyEvent(qc, 'marker', m),
+        (e: unknown) => console.error('could not mark as read', e),
+      )
+    }
+    const waiting = pendingMarks.get(stream)
+    if (waiting) clearTimeout(waiting)
+    if (debounceMs <= 0) send()
+    else pendingMarks.set(stream, setTimeout(send, debounceMs))
   }
 }
 

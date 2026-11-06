@@ -26,7 +26,9 @@ vi.mock('../api', async (importOriginal) => ({
   listInvites: vi.fn(() => Promise.resolve({ invites: [] })),
   getSettings: vi.fn(() => Promise.resolve({ group_creation: 'anyone' })),
   listNotifications: vi.fn(() => Promise.resolve({ notifications: [], next_before: null })),
-  listMarkers: vi.fn(() => Promise.resolve({ markers: [] })),
+  listMarkers: vi.fn(() =>
+    Promise.resolve({ markers: [{ user_id: 'raphael', stream: 'notifications', read_at: 0, unread: 0 }] }),
+  ),
   setMarker: vi.fn((stream: string, readAt: number) =>
     Promise.resolve({ user_id: 'raphael', stream, read_at: readAt }),
   ),
@@ -239,10 +241,13 @@ describe('Home', () => {
   })
 
   it('a notification on the stream lights the bell; the Notifications page puts it out', async () => {
-    const { setMarker } = await import('../api')
+    const { setMarker, listNotifications } = await import('../api')
     await home()
     expect(nav().getByRole('button', { name: 'Notifications' })).toBeTruthy()
-    FakeEventSource.last!.emit('notification', notification('n5', 'comment', kit, { post_id: 'p1' }), 8)
+    // The list is not loaded until the page asks for it; the stream counts it on my marker meanwhile.
+    const fresh = notification('n5', 'comment', kit, { post_id: 'p1' })
+    vi.mocked(listNotifications).mockResolvedValue({ notifications: [fresh], next_before: null })
+    FakeEventSource.last!.emit('notification', fresh, 8)
     const bell = await nav().findByRole('button', { name: 'Notifications, unread' })
     fireEvent.click(bell)
     expect(window.location.pathname).toBe('/notifications')

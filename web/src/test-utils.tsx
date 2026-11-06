@@ -125,10 +125,11 @@ export const notification = (
   ...extra,
 })
 
-export const marker = (stream: string, readAt: number, userId = 'raphael'): Marker => ({
-  user_id: userId,
+export const marker = (stream: string, readAt: number, unread = 0): Marker => ({
+  user_id: 'raphael',
   stream,
   read_at: readAt,
+  unread,
 })
 
 export const message = (id: string, author: User, extra: Partial<Message> = {}): Message => ({

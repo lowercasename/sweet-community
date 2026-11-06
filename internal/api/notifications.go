@@ -42,6 +42,9 @@ type Marker struct {
 	UserID string `json:"user_id"`
 	Stream string `json:"stream"`
 	ReadAt int64  `json:"read_at"`
+	// Unread is how much of the stream is newer than ReadAt: others' live
+	// messages in a chat, notifications on that stream. The server's count.
+	Unread int64 `json:"unread"`
 }
 
 // The streams a marker can be on.
@@ -98,7 +101,7 @@ func (s *Server) listNotifications(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{"notifications": out, "next_before": next})
 }
 
-// listMarkers is every stream I have read some way along.
+// listMarkers is a row for every stream of mine, read or not, each with its unread count.
 func (s *Server) listMarkers(w http.ResponseWriter, r *http.Request) {
 	me, _ := userFrom(r.Context())
 	rows, err := s.q().ListMarkers(r.Context(), me.ID)
@@ -132,15 +135,26 @@ func (s *Server) setMarker(w http.ResponseWriter, r *http.Request) {
 		in.ReadAt = now
 	}
 	s.logged(w, r, "marker", now, func(qtx *store.Queries) (any, int, error) {
+		// The row re-read after the write, as its stream's query lists it.
+		var reread func() (store.ListMarkersRow, error)
 		switch {
 		case stream == StreamNotifications:
+			reread = func() (store.ListMarkersRow, error) {
+				row, err := qtx.GetNotificationsMarker(r.Context(), me.ID)
+				return store.ListMarkersRow(row), err
+			}
 		case strings.HasPrefix(stream, streamChatPrefix):
-			a, err := actorIn(r.Context(), qtx, me, strings.TrimPrefix(stream, streamChatPrefix))
+			gid := strings.TrimPrefix(stream, streamChatPrefix)
+			a, err := actorIn(r.Context(), qtx, me, gid)
 			if err != nil {
 				return nil, http.StatusInternalServerError, err
 			}
 			if !perm.CanSee(a) {
 				return nil, http.StatusNotFound, errors.New("no such group")
+			}
+			reread = func() (store.ListMarkersRow, error) {
+				row, err := qtx.GetChatMarker(r.Context(), store.GetChatMarkerParams{UserID: me.ID, GroupID: gid})
+				return store.ListMarkersRow(row), err
 			}
 		default:
 			return nil, http.StatusBadRequest, errors.New("no such stream")
@@ -148,7 +162,7 @@ func (s *Server) setMarker(w http.ResponseWriter, r *http.Request) {
 		if err := qtx.SetMarker(r.Context(), store.SetMarkerParams{UserID: me.ID, Stream: stream, ReadAt: in.ReadAt}); err != nil {
 			return nil, http.StatusInternalServerError, err
 		}
-		row, err := qtx.GetMarker(r.Context(), store.GetMarkerParams{UserID: me.ID, Stream: stream})
+		row, err := reread()
 		if err != nil {
 			return nil, http.StatusInternalServerError, err
 		}

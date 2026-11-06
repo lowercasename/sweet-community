@@ -1,6 +1,8 @@
 import { useEffect, useLayoutEffect, useRef } from 'react'
 import type { Message as MessageData } from '../api'
-import { useMessageActions, useMessages } from '../data/hooks'
+import { useMarkRead, useMarkers, useMessageActions, useMessages } from '../data/hooks'
+import { chatStream, markerOf } from '../data/notifications'
+import { usePageVisible } from '../hooks/usePageVisible'
 import { useStreamStatus } from '../hooks/StreamContext'
 import { Bar, Button, Card, Pane, Row, ScrollArea, Stack, Text } from '../ui'
 import { chatExtensions } from '../editor/extensions'
@@ -13,6 +15,8 @@ interface ChatPaneProps {
   groupId: string
   /** Which outer edge is padded; `left`/`right` inside a Split. */
   side?: 'left' | 'right' | 'full'
+  /** Being looked at: open, and not behind another page. Looking is reading. */
+  watching: boolean
 }
 
 const GROUP_WINDOW_MS = 5 * 60_000
@@ -30,10 +34,25 @@ function group(list: MessageData[]): MessageData[][] {
   return groups
 }
 
-export function ChatPane({ groupId, side = 'full' }: ChatPaneProps) {
+/** A chat marks itself read this long after the last message it showed, so a busy room is one PUT. */
+const READ_DEBOUNCE_MS = 800
+
+export function ChatPane({ groupId, side = 'full', watching }: ChatPaneProps) {
   const status = useStreamStatus()
   const { messages, loading, error, hasEarlier, loadEarlier } = useMessages(groupId)
   const { send: sendMessage, remove } = useMessageActions(groupId)
+
+  // Looking is reading (architecture.md, Notifications): while watched and
+  // the page is in front, my marker on this chat follows its newest message.
+  const { markers, loaded } = useMarkers()
+  const markRead = useMarkRead()
+  const visible = usePageVisible()
+  const newest = messages[messages.length - 1]?.created_at
+  const readAt = markerOf(markers, chatStream(groupId))
+  useEffect(() => {
+    if (!watching || !visible || !loaded || newest === undefined) return
+    if (newest > (readAt ?? 0)) markRead(chatStream(groupId), newest, READ_DEBOUNCE_MS)
+  }, [watching, visible, loaded, newest, readAt, groupId, markRead])
 
   const scrollRef = useRef<HTMLDivElement>(null)
   // Follow new messages only while the viewer is already at the bottom.

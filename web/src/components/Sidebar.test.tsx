@@ -201,7 +201,7 @@ describe('Sidebar', () => {
       notifications: [notification('n9', 'comment', kit), notification('n3', 'added', kit)],
       next_before: null,
     })
-    vi.mocked(listMarkers).mockResolvedValue({ markers: [marker('notifications', 3)] })
+    vi.mocked(listMarkers).mockResolvedValue({ markers: [marker('notifications', 3, 1)] })
     const onGo = await draw([root(false)])
     const bell = await screen.findByRole('button', { name: 'Notifications, unread' })
     fireEvent.click(bell)
@@ -214,5 +214,26 @@ describe('Sidebar', () => {
       expect(screen.getByRole('button', { name: 'Notifications' }).getAttribute('aria-current')).toBe('page'),
     )
     expect(screen.queryByRole('button', { name: 'Notifications, unread' })).toBeNull()
+  })
+
+  it('counts unread messages on Home, a room and a conversation; collapsed, a dot stands for the count', async () => {
+    const { listMarkers } = await import('../api')
+    vi.mocked(listMarkers).mockResolvedValue({
+      markers: [
+        marker('notifications', 0),
+        marker(`chat:${ROOT}`, 0, 3),
+        marker('chat:knit', 0, 0),
+        marker('chat:d1', 0, 12),
+      ],
+    })
+    await draw([root(false), knitting, withKit])
+    await screen.findByRole('button', { name: 'Home, 3 unread' })
+    expect(screen.getByRole('button', { name: 'Home, 3 unread' }).textContent).toContain('3')
+    expect(screen.getByRole('button', { name: 'Knitting' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'kit, 12 unread' }).textContent).toContain('12')
+    cleanup()
+    await draw([root(false), knitting, withKit], '/', false)
+    const home = await screen.findByRole('button', { name: 'Home, 3 unread' })
+    expect(home.textContent).not.toContain('3')
   })
 })

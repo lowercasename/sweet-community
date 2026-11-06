@@ -43,12 +43,18 @@ export function GroupView({ group, hidden }: GroupViewProps) {
             rails ? <Rail side="right" icon="chat" label="Chat" onOpen={() => setLayout('both')} /> : undefined
           }
           left={<PostsPane groupId={group.id} side={show === 'both' ? 'left' : 'full'} />}
-          right={<ChatPane groupId={group.id} side={show === 'both' ? 'right' : 'full'} />}
+          right={
+            <ChatPane
+              groupId={group.id}
+              side={show === 'both' ? 'right' : 'full'}
+              watching={!hidden && show !== 'left'}
+            />
+          }
         />
       ) : group.mode === 'posts' ? (
         <PostsPane groupId={group.id} />
       ) : (
-        <ChatPane groupId={group.id} />
+        <ChatPane groupId={group.id} watching={!hidden} />
       )}
     </Stack>
   )

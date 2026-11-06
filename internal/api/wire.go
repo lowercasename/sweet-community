@@ -78,8 +78,8 @@ func wireNotification(row store.GetNotificationRow) Notification {
 	}
 }
 
-func wireMarker(row store.ReadMarker) Marker {
-	return Marker{UserID: row.UserID, Stream: row.Stream, ReadAt: row.ReadAt}
+func wireMarker(row store.ListMarkersRow) Marker {
+	return Marker{UserID: row.UserID, Stream: row.Stream, ReadAt: row.ReadAt, Unread: row.Unread}
 }
 
 func wireMembership(groupID string, row store.GetMemberRow) Membership {

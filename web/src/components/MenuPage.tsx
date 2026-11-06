@@ -1,6 +1,6 @@
 import type { Group, User } from '../api'
 import { roomsOf } from '../data/groups'
-import { useAuthor } from '../data/hooks'
+import { useAuthor, useChatUnread } from '../data/hooks'
 import { NEW_ROOM, groupPath } from '../routes'
 import { Card, Hairline, NavAccount, NavItem, NavSection, Pane, Stack, Tile } from '../ui'
 import { ConversationsSection } from './ConversationsSection'
@@ -19,6 +19,7 @@ interface MenuPageProps {
  */
 export function MenuPage({ me, groups, onGo, onLogout }: MenuPageProps) {
   const live = useAuthor(me)
+  const counts = useChatUnread()
   const root = groups.find((g) => g.kind === 'root')
   const mine = roomsOf(groups)
   const canCreate = root?.can.create_groups === true
@@ -28,7 +29,13 @@ export function MenuPage({ me, groups, onGo, onLogout }: MenuPageProps) {
         <Stack gap={1}>
           <NavAccount username={live.username} picture={live.picture} expanded />
           <Hairline />
-          <NavItem icon="home" label="Home" expanded onClick={() => onGo('/')} />
+          <NavItem
+            icon="home"
+            label="Home"
+            expanded
+            count={root ? (counts.get(root.id) ?? 0) : 0}
+            onClick={() => onGo('/')}
+          />
           {(mine.length > 0 || canCreate) && (
             <NavSection
               title="Rooms"
@@ -42,12 +49,13 @@ export function MenuPage({ me, groups, onGo, onLogout }: MenuPageProps) {
                   label={g.name}
                   expanded
                   size="sm"
+                  count={counts.get(g.id) ?? 0}
                   onClick={() => onGo(groupPath(g.id))}
                 />
               ))}
             </NavSection>
           )}
-          <ConversationsSection groups={groups} me={me} expanded onGo={onGo} />
+          <ConversationsSection groups={groups} me={me} counts={counts} expanded onGo={onGo} />
           <Hairline />
           <NavItem icon="people" label="People" expanded onClick={() => onGo('/people')} />
           <NavItem icon="settings" label="Settings" expanded onClick={() => onGo('/settings')} />

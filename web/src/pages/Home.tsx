@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Redirect, Route, Switch, useLocation, useRoute, useSearch } from 'wouter'
 import type { User } from '../api'
-import { useGroups, usePost, useUnreadNotifications } from '../data/hooks'
+import { useChatUnread, useGroups, usePost, useUnreadNotifications } from '../data/hooks'
 import { StreamProvider } from '../hooks/StreamContext'
 import { useLayout } from '../hooks/useLayout'
 import { MESSAGES, NEW_MESSAGE, NEW_ROOM, NOTIFICATIONS, groupPath, membersPath } from '../routes'
@@ -36,6 +36,7 @@ export function Home({ me, onSignOut }: HomeProps) {
   const { layout, narrow, navExpanded, setLayout, toggleNav } = useLayout()
   const { groups, loading } = useGroups()
   const unread = useUnreadNotifications()
+  const counts = useChatUnread()
   const root = groups.find((g) => g.kind === 'root')
   const [location, navigate] = useLocation()
   // New message starts from the people a conversation's page sends it (?with=ids).
@@ -137,7 +138,12 @@ export function Home({ me, onSignOut }: HomeProps) {
           <TabBar
             tabs={[
               { key: 'posts', icon: 'posts', label: 'Posts' },
-              { key: 'chat', icon: 'chat', label: 'Chat' },
+              {
+                key: 'chat',
+                icon: 'chat',
+                label: 'Chat',
+                dot: tabActive !== 'chat' && !!current && (counts.get(current.id) ?? 0) > 0,
+              },
               { key: 'search', icon: 'search', label: 'Search' },
               { key: 'bell', icon: 'bell', label: 'Notifications', dot: unread },
               { key: 'menu', icon: 'menu', label: 'Menu' },

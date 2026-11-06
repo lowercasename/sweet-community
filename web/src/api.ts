@@ -149,11 +149,13 @@ export interface NotificationPage {
   next_before: number | null
 }
 
-/** How far along a stream I have read: `notifications`, or `chat:<group id>`. Forward only. */
+/** How far along a stream I have read: `notifications`, or `chat:<group id>`. One row per stream of mine, read or not. Forward only. */
 export interface Marker {
   user_id: string
   stream: string
   read_at: number
+  /** How much of the stream is newer than read_at: others' messages in a chat, notifications on that stream. The server's count. */
+  unread: number
 }
 
 export interface MessagePage {

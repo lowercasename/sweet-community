@@ -72,7 +72,7 @@ test.describe('nav', () => {
     await nav(mo).getByRole('button', { name: kit.username }).click()
     await expect(mo.page.getByRole('heading', { name: kit.username })).toBeVisible()
     await sendMessage(mo.page, uniq('hello back '))
-    await expect(items.nth(1)).toHaveText(mo.username)
+    await expect(items.nth(1)).toHaveText(new RegExp(`^${mo.username}`))
     await expect(rows.nth(0)).toContainText(mo.username)
     await expect(rows.nth(1)).toContainText(jo.username)
 

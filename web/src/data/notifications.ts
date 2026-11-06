@@ -10,6 +10,13 @@ export function markerOf(markers: Marker[] | undefined, stream: string): number 
   return markers?.find((m) => m.stream === stream)?.read_at
 }
 
+/** Unread messages per group, from my chat markers. */
+export function chatUnread(markers: Marker[]): Map<string, number> {
+  const out = new Map<string, number>()
+  for (const m of markers) if (m.stream.startsWith('chat:') && m.unread > 0) out.set(m.stream.slice(5), m.unread)
+  return out
+}
+
 /** The ones newer than my marker. */
 export function unreadOf(notifications: Notification[], readAt: number | undefined): Notification[] {
   return notifications.filter((n) => n.created_at > (readAt ?? 0))

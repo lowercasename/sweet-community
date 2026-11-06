@@ -12,6 +12,7 @@ vi.mock('../api', () => ({
   listGroups: vi.fn(),
   openDM: vi.fn(),
   listUsers: vi.fn(() => Promise.resolve({ users: [] })),
+  listMarkers: vi.fn(() => Promise.resolve({ markers: [] })),
 }))
 
 const raphael = user('raphael')
@@ -74,6 +75,17 @@ describe('MessagesPage', () => {
     fireEvent.click(within(lists[1]).getByRole('button', { name: 'mo' }))
     expect(openDM).toHaveBeenCalledWith(['mo'])
     await vi.waitFor(() => expect(onGo).toHaveBeenCalledWith('/r/d2'))
+  })
+
+  it('counts unread messages on a conversation', async () => {
+    const { listMarkers } = await import('../api')
+    vi.mocked(listMarkers).mockResolvedValue({
+      markers: [{ user_id: 'raphael', stream: 'chat:d1', read_at: 0, unread: 4 }],
+    })
+    await draw()
+    const row = await screen.findByRole('button', { name: 'kit, 4 unread' })
+    expect(row.textContent).toContain('4')
+    expect(screen.getByRole('button', { name: 'jo' })).toBeTruthy()
   })
 
   it('says where a conversation starts when there are none', async () => {

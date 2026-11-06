@@ -65,14 +65,37 @@ describe('applyEvent', () => {
     applyEvent(qc, 'notification', notification('n2', 'added', mo))
     expect(list().map((n) => n.id)).toEqual(['n2', 'n1'])
 
-    qc.setQueryData(keys.markers, { markers: [marker('notifications', 5)] })
+    qc.setQueryData(keys.markers, { markers: [marker('notifications', 5, 2)] })
     const markers = () => (qc.getQueryData(keys.markers) as { markers: Marker[] }).markers
-    applyEvent(qc, 'marker', marker('notifications', 9))
-    applyEvent(qc, 'marker', marker('notifications', 7))
-    applyEvent(qc, 'marker', marker(`chat:${CLUB}`, 3))
-    expect(markers().map((m) => [m.stream, m.read_at])).toEqual([
-      ['notifications', 9],
-      [`chat:${CLUB}`, 3],
+    applyEvent(qc, 'marker', marker('notifications', 9, 0))
+    applyEvent(qc, 'marker', marker('notifications', 7, 1))
+    applyEvent(qc, 'marker', marker(`chat:${CLUB}`, 3, 4))
+    expect(markers().map((m) => [m.stream, m.read_at, m.unread])).toEqual([
+      ['notifications', 9, 0],
+      [`chat:${CLUB}`, 3, 4],
+    ])
+  })
+
+  it("counts others' new messages and notifications against my markers as they arrive; never my own, never old ones", () => {
+    qc.setQueryData(keys.markers, {
+      markers: [marker('notifications', 5, 0), marker(`chat:${ROOT}`, 10, 0), marker(`chat:${CLUB}`, 10, 2)],
+    })
+    const unread = (stream: string) =>
+      (qc.getQueryData(keys.markers) as { markers: Marker[] }).markers.find((m) => m.stream === stream)!.unread
+    applyEvent(qc, 'message', message('m3', mo, { created_at: 11 }))
+    applyEvent(qc, 'message', message('m4', kit, { created_at: 12 }))
+    applyEvent(qc, 'message', message('m0', mo, { created_at: 9 }))
+    applyEvent(qc, 'message', message('c1', mo, { group_id: CLUB, created_at: 30 }))
+    expect(unread(`chat:${ROOT}`)).toBe(1)
+    expect(unread(`chat:${CLUB}`)).toBe(3)
+    applyEvent(qc, 'notification', notification('n6', 'comment', mo))
+    applyEvent(qc, 'notification', notification('n4', 'comment', mo))
+    expect(unread('notifications')).toBe(1)
+    // Leaving a room, or hiding a conversation, takes its marker with it.
+    applyEvent(qc, 'membership_delete', { group_id: CLUB, user_id: 'kit' })
+    expect((qc.getQueryData(keys.markers) as { markers: Marker[] }).markers.map((m) => m.stream)).toEqual([
+      'notifications',
+      `chat:${ROOT}`,
     ])
   })
 

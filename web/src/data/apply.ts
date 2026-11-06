@@ -152,6 +152,9 @@ function deleteComment(qc: QueryClient, id: string, postId: string, groupId: str
 }
 
 function upsertMessage(qc: QueryClient, m: Message) {
+  // Someone else's word I have not read counts on the room (architecture.md, Notifications).
+  const me = qc.getQueryData<User | null>(keys.me)
+  if (!me || me.id !== m.author.id) bumpMarker(qc, `chat:${m.group_id}`, m.created_at)
   // The newest word in a group is what orders the Messages page; a replay never moves it back.
   qc.setQueryData<Groups>(keys.groups, (old) =>
     old
@@ -214,8 +217,21 @@ function upsertUser(qc: QueryClient, u: User) {
   )
 }
 
-/** Something done to me: at the top of my list, once. */
+/** One more thing on a stream, newer than where I have read to: it counts. A replay after a reconnect refetches the markers anyway. */
+function bumpMarker(qc: QueryClient, stream: string, at: number) {
+  qc.setQueryData<Markers>(keys.markers, (old) => {
+    if (!old) return old
+    const known = old.markers.some((x) => x.stream === stream)
+    if (!known) return { markers: [...old.markers, { user_id: '', stream, read_at: 0, unread: 1 }] }
+    return {
+      markers: old.markers.map((x) => (x.stream === stream && at > x.read_at ? { ...x, unread: x.unread + 1 } : x)),
+    }
+  })
+}
+
+/** Something done to me: at the top of my list, once; and one more unread on the notifications stream. */
 function upsertNotification(qc: QueryClient, n: Notification) {
+  bumpMarker(qc, 'notifications', n.created_at)
   qc.setQueryData<Notifications>(keys.notifications, (old) => {
     if (!old) return old
     const known = old.pages.some((p) => p.notifications.some((x) => x.id === n.id))
@@ -226,23 +242,32 @@ function upsertNotification(qc: QueryClient, n: Notification) {
   })
 }
 
-/** Where I have read a stream to: forward only, as on the server, so a stale tab's word changes nothing. */
+/** Where I have read a stream to, and what is still unread past it: forward only, as on the server, so a stale tab's word changes nothing. */
 function upsertMarker(qc: QueryClient, m: Marker) {
   qc.setQueryData<Markers>(keys.markers, (old) => {
     const markers = old?.markers ?? []
     const known = markers.some((x) => x.stream === m.stream)
     return {
-      markers: known ? markers.map((x) => (x.stream === m.stream && x.read_at < m.read_at ? m : x)) : [...markers, m],
+      markers: known ? markers.map((x) => (x.stream === m.stream && x.read_at <= m.read_at ? m : x)) : [...markers, m],
     }
   })
 }
 
+/** A stream I no longer have: its marker goes. */
+function dropMarker(qc: QueryClient, stream: string) {
+  qc.setQueryData<Markers>(keys.markers, (old) =>
+    old ? { markers: old.markers.filter((x) => x.stream !== stream) } : old,
+  )
+}
+
 function upsertGroup(qc: QueryClient, g: Group) {
+  const known = qc.getQueryData<Groups>(keys.groups)?.groups.some((x) => x.id === g.id) ?? true
   qc.setQueryData<Groups>(keys.groups, (old) => {
     if (!old) return old
-    const known = old.groups.some((x) => x.id === g.id)
     return { groups: known ? old.groups.map((x) => (x.id === g.id ? g : x)) : [...old.groups, g] }
   })
+  // A new place of mine has a chat marker.
+  if (!known) void qc.invalidateQueries({ queryKey: keys.markers })
 }
 
 /** A group gone, or me gone from it: nothing of it stays in the cache. */
@@ -254,6 +279,7 @@ function dropGroup(qc: QueryClient, id: string) {
   qc.removeQueries({
     predicate: (q) => q.queryKey[0] === 'post' && (q.state.data as Post | undefined)?.group_id === id,
   })
+  dropMarker(qc, `chat:${id}`)
 }
 
 const ROOT_KIND = 'root'
@@ -269,6 +295,7 @@ function upsertMembership(qc: QueryClient, m: Membership) {
     qc.removeQueries({ queryKey: keys.posts(m.group_id) })
     qc.removeQueries({ queryKey: keys.messages(m.group_id) })
     qc.removeQueries({ queryKey: keys.members(m.group_id) })
+    dropMarker(qc, `chat:${m.group_id}`)
     return
   }
   qc.setQueryData<Members>(keys.members(m.group_id), (old) => {
@@ -296,6 +323,8 @@ function upsertMembership(qc: QueryClient, m: Membership) {
   // My own role in a group moved every can flag in it; the server recomputes them on refetch.
   const me = qc.getQueryData<User | null>(keys.me)
   if (me && me.id === m.user.id) {
+    // A place of mine, new or back: it has a chat marker now.
+    void qc.invalidateQueries({ queryKey: keys.markers })
     void qc.invalidateQueries({ queryKey: keys.groups })
     void qc.invalidateQueries({ queryKey: keys.posts(m.group_id) })
     void qc.invalidateQueries({ queryKey: keys.messages(m.group_id) })
@@ -387,7 +416,13 @@ function isNotification(data: unknown): data is Notification {
 }
 function isMarker(data: unknown): data is Marker {
   const m = data as Marker
-  return typeof m === 'object' && m !== null && typeof m.stream === 'string' && typeof m.read_at === 'number'
+  return (
+    typeof m === 'object' &&
+    m !== null &&
+    typeof m.stream === 'string' &&
+    typeof m.read_at === 'number' &&
+    typeof m.unread === 'number'
+  )
 }
 function isSettings(data: unknown): data is Settings {
   return typeof data === 'object' && data !== null && typeof (data as Settings).group_creation === 'string'

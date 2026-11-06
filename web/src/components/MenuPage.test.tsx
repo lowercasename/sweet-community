@@ -10,6 +10,9 @@ import { ROOT, dm, group, nameOf, renderWithQuery, user } from '../test-utils'
  */
 vi.mock('../api', () => ({
   listUsers: vi.fn(() => Promise.resolve({ users: [] })),
+  listMarkers: vi.fn(() =>
+    Promise.resolve({ markers: [{ user_id: 'raphael', stream: 'chat:knit', read_at: 0, unread: 2 }] }),
+  ),
 }))
 
 const raphael = user('raphael')
@@ -30,10 +33,11 @@ describe('MenuPage', () => {
         onLogout={onLogout}
       />,
     )
+    await screen.findByRole('button', { name: 'Knitting, 2 unread' })
     expect(screen.getAllByRole('button').map(nameOf)).toEqual([
       'Home',
       'New room',
-      'Knitting',
+      'Knitting, 2 unread',
       'New message',
       'kit',
       'All messages',
@@ -41,7 +45,9 @@ describe('MenuPage', () => {
       'Settings',
       'Sign out',
     ])
-    expect(within(screen.getByRole('group', { name: 'Rooms' })).getByRole('button', { name: 'Knitting' })).toBeTruthy()
+    expect(
+      within(screen.getByRole('group', { name: 'Rooms' })).getByRole('button', { name: 'Knitting, 2 unread' }),
+    ).toBeTruthy()
     expect(within(screen.getByRole('group', { name: 'Messages' })).getByRole('button', { name: 'kit' })).toBeTruthy()
     expect(screen.getByText('raphael')).toBeTruthy()
 
