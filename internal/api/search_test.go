@@ -56,10 +56,11 @@ func TestSearch(t *testing.T) {
 	if len(find(kit, "marmalade")) != 4 {
 		t.Fatalf("kit, in the room too, finds %d", len(find(kit, "marmalade")))
 	}
-	// The start of a word is enough; a word that is only in the middle of one is not.
-	if len(find(kit, "marmal")) != 4 || len(find(kit, "armalade")) != 0 {
-		t.Fatalf("prefix: %d, infix: %d", len(find(kit, "marmal")), len(find(kit, "armalade")))
+	// Any part of a word is enough; a word under three letters is not looked for.
+	if len(find(kit, "marmal")) != 4 || len(find(kit, "armalade")) != 4 || len(find(kit, "marmalade is")) != 4 {
+		t.Fatalf("prefix: %d, infix: %d, with a short word: %d", len(find(kit, "marmal")), len(find(kit, "armalade")), len(find(kit, "marmalade is")))
 	}
+	kit.mustStatus(400, "GET", "/api/search?q=ma", nil)
 	// Stems and case do not matter; every word must match; nonsense syntax is just words.
 	if len(find(mo, "MARMALADE ready")) != 1 || kinds(find(mo, "MARMALADE ready")) != "post" {
 		t.Fatalf("two words: %v", find(mo, "MARMALADE ready"))

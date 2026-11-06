@@ -27,12 +27,17 @@ const (
 )
 
 // ftsQuery turns what was typed into an FTS5 query that cannot be a syntax
-// error: each word quoted (quotes inside doubled) and taken as the start of
-// a word (`"marm"*` finds marmalade), all words required.
+// error: each word quoted (quotes inside doubled), all required. The index
+// is trigrams, so a word matches any part of a word ("armalade" finds
+// marmalade), and a word of fewer than three characters cannot match at
+// all: those are dropped, and with nothing left the query is empty.
 func ftsQuery(q string) string {
 	var terms []string
 	for _, w := range strings.Fields(q) {
-		terms = append(terms, `"`+strings.ReplaceAll(w, `"`, `""`)+`"*`)
+		if len([]rune(w)) < 3 {
+			continue
+		}
+		terms = append(terms, `"`+strings.ReplaceAll(w, `"`, `""`)+`"`)
 	}
 	return strings.Join(terms, " ")
 }
@@ -44,7 +49,7 @@ func ftsQuery(q string) string {
 func (s *Server) search(w http.ResponseWriter, r *http.Request) {
 	q := ftsQuery(r.URL.Query().Get("q"))
 	if q == "" {
-		writeErr(w, http.StatusBadRequest, "say what to look for")
+		writeErr(w, http.StatusBadRequest, "You can search for words of three letters or more.")
 		return
 	}
 	limit := 50
@@ -54,7 +59,7 @@ func (s *Server) search(w http.ResponseWriter, r *http.Request) {
 	me, _ := userFrom(r.Context())
 	rows, err := s.DB.QueryContext(r.Context(), `
 		SELECT s.kind, s.id, s.group_id, s.post_id, s.created_at, u.id, u.username, u.picture_id,
-		       snippet(search, 0, ?, ?, '…', 14)
+		       snippet(search, 0, ?, ?, '…', 64)
 		FROM search s
 		JOIN users u ON u.id = s.author_id
 		JOIN memberships m ON m.group_id = s.group_id AND m.user_id = ? AND m.hidden_at IS NULL
