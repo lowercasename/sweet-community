@@ -1,8 +1,4 @@
-# Sweet behind a reverse proxy you already run (Caddy, nginx, Traefik…).
-# Same service as compose.yml, without the Caddy, listening on
-# 127.0.0.1:8080 (SWEET_PORT and SWEET_BIND in .env to change them). Point
-# your proxy at it and have it send X-Forwarded-For and X-Forwarded-Proto,
-# as they all do.
+# Sweet alone, for a host that already runs a reverse proxy. See the README.
 name: sweet
 
 services:

@@ -145,7 +145,10 @@ export function MembersPage({ group, me, onLeft }: MembersPageProps) {
                     </Field>
                   )}
                   {group.can.set_mode && (
-                    <Field label="Mode">
+                    <Field
+                      label="Mode"
+                      hint="Posts are longer pieces that people comment on. Chat is a running conversation."
+                    >
                       <Select value={mode} options={MODES} onChange={setMode} />
                     </Field>
                   )}
@@ -180,6 +183,10 @@ export function MembersPage({ group, me, onLeft }: MembersPageProps) {
             <Card>
               <Stack gap={2}>
                 <Heading level={2}>Members</Heading>
+                <Text variant="secondary">
+                  Moderators can delete anything in the room and add or remove members. The owner can also change its
+                  settings and hand it over.
+                </Text>
                 {loading && <Text variant="secondary">Loading…</Text>}
                 {error && <Alert tone="error">{error.message}</Alert>}
                 {problem && <Alert tone="error">{problem}</Alert>}
@@ -275,7 +282,7 @@ export function MembersPage({ group, me, onLeft }: MembersPageProps) {
         onConfirm={() => void run(() => actions.remove(group.id).then(onLeft))}
         onClose={() => setConfirm(null)}
       >
-        <Text variant="secondary">Its posts and chat go with it, for everyone. This action cannot be undone.</Text>
+        <Text variant="secondary">Its posts and chat will be deleted for everyone. This action cannot be undone.</Text>
       </ConfirmDialog>
     </Pane>
   )

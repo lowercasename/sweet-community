@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react'
+import { Children, type ReactNode } from 'react'
 import { Button } from './Button'
 import type { IconName } from './Icon'
 
@@ -24,6 +24,8 @@ interface NavSectionProps {
  * the small size and sit with no gap, a stack under the title.
  */
 export function NavSection({ title, expanded, action, children }: NavSectionProps) {
+  // Collapsed, a section with no items has nothing to draw, and its padding alone was a gap in the bar.
+  if (!expanded && Children.toArray(children).length === 0) return null
   return (
     // pb-1.5: a section's small items carry 4px of air inside them where a full-size item carries 10, so the section ends 6px early to leave the same air before what follows (a rule, another section).
     <div role="group" aria-label={title} className="flex flex-col gap-0 pb-1.5">

@@ -138,7 +138,9 @@ export function PeoplePage({ me, root, onOpenGroup }: PeoplePageProps) {
               <Card>
                 <Stack gap={2}>
                   <Heading level={2}>Invite someone</Heading>
-                  <Text variant="secondary">An invitation link can be used once and expires after seven days.</Text>
+                  <Text variant="secondary">
+                    Anyone with an invite link can join for seven days. Create a new one whenever you need to.
+                  </Text>
                   <Row>
                     <Button onClick={() => void invite()}>Create invite link</Button>
                   </Row>
@@ -151,6 +153,9 @@ export function PeoplePage({ me, root, onOpenGroup }: PeoplePageProps) {
             )}
             <Card>
               <Stack gap={2}>
+                <Text variant="secondary">
+                  Moderators help run the community. They can delete anything posted, invite people and remove them.
+                </Text>
                 {error && <Alert tone="error">{error}</Alert>}
                 <List>
                   {[...(users?.values() ?? [])].map((u) => (
@@ -190,8 +195,8 @@ export function PeoplePage({ me, root, onOpenGroup }: PeoplePageProps) {
         onClose={() => setRemoving(null)}
       >
         <Text variant="secondary">
-          Their posts, comments and messages stay, under a removed name. Rooms they own pass to their longest-serving
-          moderator, or member. They cannot sign in again. This cannot be undone.
+          Their posts, comments and messages stay, under a removed name. They cannot sign in again. This action cannot
+          be undone.
         </Text>
       </ConfirmDialog>
     </Pane>

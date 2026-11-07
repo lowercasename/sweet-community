@@ -72,7 +72,7 @@ func (s *Server) deleteInvite(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if n == 0 {
-		writeErr(w, http.StatusNotFound, "no such invite")
+		writeErr(w, http.StatusNotFound, "No such invite")
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
@@ -82,7 +82,7 @@ func (s *Server) deleteInvite(w http.ResponseWriter, r *http.Request) {
 func (s *Server) getInvite(w http.ResponseWriter, r *http.Request) {
 	by, err := s.q().GetOpenInviteCreator(r.Context(), store.GetOpenInviteCreatorParams{Code: r.PathValue("code"), Now: db.Now()})
 	if errors.Is(err, sql.ErrNoRows) {
-		writeErr(w, http.StatusNotFound, "this invite link has been revoked or has expired")
+		writeErr(w, http.StatusNotFound, "This invite link has expired or been revoked")
 		return
 	}
 	if err != nil {
@@ -101,7 +101,7 @@ func (s *Server) register(w http.ResponseWriter, r *http.Request) {
 	}
 	r.Body = http.MaxBytesReader(w, r.Body, 4096)
 	if err := json.NewDecoder(r.Body).Decode(&in); err != nil {
-		writeErr(w, http.StatusBadRequest, "bad request body")
+		writeErr(w, http.StatusBadRequest, "Bad request")
 		return
 	}
 	if err := auth.ValidateUsername(in.Username); err != nil {
@@ -143,14 +143,14 @@ func (s *Server) register(w http.ResponseWriter, r *http.Request) {
 	// used_at set, rolls back, and the user it inserted goes with it.
 	qtx := store.New(tx)
 	if _, err := qtx.GetUserByEmail(ctx, in.Email); err == nil {
-		writeErr(w, http.StatusConflict, "that email address already has an account")
+		writeErr(w, http.StatusConflict, "That email address already has an account")
 		return
 	}
 	if err := qtx.CreateUserWithEmail(ctx, store.CreateUserWithEmailParams{
 		ID: u.ID, Username: u.Username, PasswordHash: sql.NullString{String: hash, Valid: true}, Email: sql.NullString{String: in.Email, Valid: true}, CreatedAt: now,
 	}); err != nil {
 		if db.IsUniqueViolation(err) {
-			writeErr(w, http.StatusConflict, "that username is taken")
+			writeErr(w, http.StatusConflict, "That username is taken")
 			return
 		}
 		writeErr(w, http.StatusInternalServerError, err.Error())
@@ -162,7 +162,7 @@ func (s *Server) register(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if n == 0 {
-		writeErr(w, http.StatusNotFound, "this invite link has been revoked or has expired")
+		writeErr(w, http.StatusNotFound, "This invite link has expired or been revoked")
 		return
 	}
 	// A new account is a membership of the root group, and that is an event:

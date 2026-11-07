@@ -35,7 +35,7 @@ type Comment struct {
 func (s *Server) postActor(r *http.Request, q *store.Queries, postID string) (store.GetPostOwnersRow, perm.Actor, int, error) {
 	owners, err := q.GetPostOwners(r.Context(), postID)
 	if errors.Is(err, sql.ErrNoRows) {
-		return owners, perm.Actor{}, http.StatusNotFound, errors.New("no such post")
+		return owners, perm.Actor{}, http.StatusNotFound, errors.New("No such post")
 	}
 	if err != nil {
 		return owners, perm.Actor{}, http.StatusInternalServerError, err
@@ -46,7 +46,7 @@ func (s *Server) postActor(r *http.Request, q *store.Queries, postID string) (st
 		return owners, a, http.StatusInternalServerError, err
 	}
 	if !perm.CanSee(a) {
-		return owners, a, http.StatusNotFound, errors.New("no such post")
+		return owners, a, http.StatusNotFound, errors.New("No such post")
 	}
 	return owners, a, 0, nil
 }
@@ -93,7 +93,7 @@ func (s *Server) createComment(w http.ResponseWriter, r *http.Request) {
 			return nil, nil, status, err
 		}
 		if !perm.Write(a) {
-			return nil, nil, http.StatusForbidden, errors.New("not allowed")
+			return nil, nil, http.StatusForbidden, errors.New("Not allowed")
 		}
 		if err := qtx.CreateComment(r.Context(), store.CreateCommentParams{
 			ID: id.String(), PostID: postID, AuthorID: author.ID, BodyHtml: clean, BodyText: sanitize.Text(clean), CreatedAt: now,
@@ -130,7 +130,7 @@ func (s *Server) createComment(w http.ResponseWriter, r *http.Request) {
 func (s *Server) commentActor(r *http.Request, q *store.Queries, id string) (store.GetCommentOwnersRow, perm.Actor, int, error) {
 	owners, err := q.GetCommentOwners(r.Context(), id)
 	if errors.Is(err, sql.ErrNoRows) {
-		return owners, perm.Actor{}, http.StatusNotFound, errors.New("no such comment")
+		return owners, perm.Actor{}, http.StatusNotFound, errors.New("No such comment")
 	}
 	if err != nil {
 		return owners, perm.Actor{}, http.StatusInternalServerError, err
@@ -141,7 +141,7 @@ func (s *Server) commentActor(r *http.Request, q *store.Queries, id string) (sto
 		return owners, a, http.StatusInternalServerError, err
 	}
 	if !perm.CanSee(a) {
-		return owners, a, http.StatusNotFound, errors.New("no such comment")
+		return owners, a, http.StatusNotFound, errors.New("No such comment")
 	}
 	return owners, a, 0, nil
 }
@@ -159,7 +159,7 @@ func (s *Server) editComment(w http.ResponseWriter, r *http.Request) {
 			return nil, status, err
 		}
 		if !perm.EditComment(a, perm.Comment{AuthorID: owners.AuthorID, PostAuthorID: owners.PostAuthorID}) {
-			return nil, http.StatusForbidden, errors.New("not your comment")
+			return nil, http.StatusForbidden, errors.New("Not your comment")
 		}
 		if err := qtx.EditComment(r.Context(), store.EditCommentParams{
 			BodyHtml: clean, BodyText: sanitize.Text(clean), EditedAt: sql.NullInt64{Int64: now, Valid: true}, ID: id,
@@ -183,7 +183,7 @@ func (s *Server) deleteComment(w http.ResponseWriter, r *http.Request) {
 			return nil, status, err
 		}
 		if !perm.DeleteComment(a, perm.Comment{AuthorID: owners.AuthorID, PostAuthorID: owners.PostAuthorID}) {
-			return nil, http.StatusForbidden, errors.New("not your comment")
+			return nil, http.StatusForbidden, errors.New("Not your comment")
 		}
 		if err := qtx.DeleteComment(r.Context(), store.DeleteCommentParams{DeletedAt: sql.NullInt64{Int64: now, Valid: true}, ID: id}); err != nil {
 			return nil, http.StatusInternalServerError, err

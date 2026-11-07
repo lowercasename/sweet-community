@@ -1,5 +1,4 @@
-# One image: the Sweet binary (frontend and migrations embedded) and
-# Litestream beside it. See deploy/ for the compose stack that runs it.
+# The Sweet binary and Litestream in one image. deploy/ has the compose stack that runs it.
 
 FROM node:22-alpine AS web
 RUN npm install -g pnpm@11
@@ -7,7 +6,7 @@ WORKDIR /src/web
 COPY web/package.json web/pnpm-lock.yaml web/pnpm-workspace.yaml ./
 RUN pnpm install --frozen-lockfile
 COPY web ./
-# Writes to ../internal/web/dist (web/vite.config.ts).
+# Vite writes to ../internal/web/dist.
 RUN pnpm build
 
 FROM golang:1.26-alpine AS build

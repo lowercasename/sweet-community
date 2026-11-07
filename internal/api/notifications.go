@@ -116,7 +116,7 @@ func (s *Server) readNotification(w http.ResponseWriter, r *http.Request) {
 	s.logged(w, r, "notification", now, func(qtx *store.Queries) (any, int, error) {
 		row, err := qtx.GetNotification(r.Context(), id)
 		if errors.Is(err, sql.ErrNoRows) || (err == nil && row.UserID != me.ID) {
-			return nil, http.StatusNotFound, errors.New("no such notification")
+			return nil, http.StatusNotFound, errors.New("No such notification")
 		}
 		if err != nil {
 			return nil, http.StatusInternalServerError, err
@@ -176,7 +176,7 @@ func (s *Server) setMarker(w http.ResponseWriter, r *http.Request) {
 	}
 	r.Body = http.MaxBytesReader(w, r.Body, 4096)
 	if err := json.NewDecoder(r.Body).Decode(&in); err != nil || in.ReadAt <= 0 {
-		writeErr(w, http.StatusBadRequest, "read_at is a time")
+		writeErr(w, http.StatusBadRequest, "read_at must be a time")
 		return
 	}
 	stream := r.PathValue("stream")
@@ -197,7 +197,7 @@ func (s *Server) setMarker(w http.ResponseWriter, r *http.Request) {
 				return nil, http.StatusInternalServerError, err
 			}
 			if !perm.CanSee(a) {
-				return nil, http.StatusNotFound, errors.New("no such group")
+				return nil, http.StatusNotFound, errors.New("No such room")
 			}
 			reread = func() (store.ListMarkersRow, error) {
 				if chat {
@@ -208,7 +208,7 @@ func (s *Server) setMarker(w http.ResponseWriter, r *http.Request) {
 				return store.ListMarkersRow(row), err
 			}
 		default:
-			return nil, http.StatusBadRequest, errors.New("no such stream")
+			return nil, http.StatusBadRequest, errors.New("No such stream")
 		}
 		if err := qtx.SetMarker(r.Context(), store.SetMarkerParams{UserID: me.ID, Stream: stream, ReadAt: in.ReadAt}); err != nil {
 			return nil, http.StatusInternalServerError, err

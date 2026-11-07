@@ -47,13 +47,16 @@ export function CommunityForm({ settings, submitLabel, onSaved }: CommunityFormP
   return (
     <Form onSubmit={() => void submit()}>
       <Stack gap={2}>
-        <Field label="Name">
+        <Field label="Community name">
           <Input name="name" value={name} onChange={setName} autoFocus={settings.name === ''} required />
         </Field>
-        <Field label="What it is for">
+        <Field label="Short community description">
           <Textarea value={description} onChange={setDescription} rows={3} maxLength={500} />
         </Field>
-        <Field label="Who can create rooms">
+        <Field
+          label="Who can create rooms"
+          hint="A room is a private space inside the community, with its own posts and chat. Only the people added to a room can see it. Moderators are people you choose to help run the community. They can delete anything posted and add or remove people."
+        >
           <Select value={creation} options={CREATION} onChange={setCreation} disabled={busy} />
         </Field>
         {note && <Alert tone={note.tone}>{note.text}</Alert>}

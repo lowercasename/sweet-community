@@ -63,7 +63,7 @@ export function CheckEmail({ email, onChangeAddress, backLabel, onBack }: CheckE
         </Text>
         . Open it to verify your address and sign in. It works for a day.
       </Text>
-      {sent && <Alert>Sent again. Give it a minute, and look in the spam folder too.</Alert>}
+      {sent && <Alert>Sent again. Check your spam folder if it does not arrive.</Alert>}
       {changing ? (
         <Form onSubmit={() => void change()}>
           <Field label="Email address">

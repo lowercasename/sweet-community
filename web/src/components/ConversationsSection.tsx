@@ -35,7 +35,7 @@ interface ConversationsSectionProps {
 
 /**
  * The Messages section of the nav (architecture.md, Layout): New message as
- * its own control, the five conversations with the latest word, the open
+ * its own control, the five conversations with the latest message, the open
  * one too if it is older, each named by its other person and marked by
  * their face, and All messages at the foot when there is more than it
  * shows (Raphael, 2026-11-06: with five or fewer it was a row for nothing). A conversation is a room

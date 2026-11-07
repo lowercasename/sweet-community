@@ -55,7 +55,7 @@ func (s *Server) setBio(w http.ResponseWriter, r *http.Request) {
 	}
 	r.Body = http.MaxBytesReader(w, r.Body, sanitize.MaxBodyBytes)
 	if err := json.NewDecoder(r.Body).Decode(&in); err != nil {
-		writeErr(w, http.StatusBadRequest, "bad request body")
+		writeErr(w, http.StatusBadRequest, "Bad request")
 		return
 	}
 	clean := sanitize.Body(in.BodyHTML)

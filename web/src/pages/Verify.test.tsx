@@ -32,7 +32,7 @@ describe('Verify', () => {
   it('a dead link says so and offers a new one', async () => {
     const { ApiError, verifyEmail, resendVerification } = await import('../api')
     const { Verify } = await import('./Verify')
-    vi.mocked(verifyEmail).mockRejectedValue(new ApiError(404, 'that link has been used, or has expired, or never was'))
+    vi.mocked(verifyEmail).mockRejectedValue(new ApiError(404, 'This link has been used or has expired'))
     render(<Verify token="old" onVerified={() => {}} />)
     await screen.findByText('This link does not work')
     fireEvent.change(screen.getByLabelText('Send a new link to'), { target: { value: 'kit@example.test' } })

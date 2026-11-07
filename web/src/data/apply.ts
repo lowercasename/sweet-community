@@ -226,7 +226,7 @@ function upsertUser(qc: QueryClient, u: User) {
   )
   const me = qc.getQueryData<User | null>(keys.me)
   if (me && me.id === u.id) qc.setQueryData<User>(keys.me, { ...me, ...u })
-  // Their words everywhere: the author snapshots in loaded feeds, threads and
+  // Their content everywhere: the author snapshots in loaded feeds, threads and
   // rooms follow too, so a renamed (or removed) person reads right at once,
   // whether or not they are still on the people list.
   const as = (a: User) => (a.id === u.id ? { ...a, ...u } : a)

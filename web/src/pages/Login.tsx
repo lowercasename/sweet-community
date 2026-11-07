@@ -40,9 +40,7 @@ export function Login({ community, onSignedIn }: LoginProps) {
   return (
     <AuthFrame name={community?.name}>
       {community && !community.owner_set ? (
-        <Text variant="secondary">
-          This community has not been set up yet. Its owner has a setup link, in the server's log.
-        </Text>
+        <Text variant="secondary">This community has not been set up yet.</Text>
       ) : unverified ? (
         <CheckEmail
           email={unverified}

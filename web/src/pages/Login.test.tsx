@@ -60,10 +60,10 @@ describe('Login', () => {
   it('any other refusal is shown as it came', async () => {
     const { ApiError, login } = await import('../api')
     const { Login } = await import('./Login')
-    vi.mocked(login).mockRejectedValue(new ApiError(401, 'wrong username or password'))
+    vi.mocked(login).mockRejectedValue(new ApiError(401, 'Wrong username or password'))
     render(<Login onSignedIn={() => {}} />)
     fill()
-    await screen.findByText('wrong username or password')
+    await screen.findByText('Wrong username or password')
     expect(screen.queryByText('Check your email')).toBeNull()
   })
 })

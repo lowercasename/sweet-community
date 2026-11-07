@@ -47,7 +47,10 @@ export function NewGroupPage({ onCreated }: NewGroupPageProps) {
                 <Field label="Room name">
                   <Input value={name} onChange={setName} autoFocus required />
                 </Field>
-                <Field label="Mode">
+                <Field
+                  label="Mode"
+                  hint="Posts are longer pieces that people comment on. Chat is a running conversation."
+                >
                   <Select value={mode} options={MODES} onChange={setMode} />
                 </Field>
                 {error && <Alert tone="error">{error}</Alert>}

@@ -256,10 +256,7 @@ export function Home({ me, onSignOut }: HomeProps) {
           onConfirm={() => void hide()}
           onClose={() => setHiding(false)}
         >
-          <Text variant="secondary">
-            It moves to Hidden at the foot of All messages. Opening it brings it back, with everything said meanwhile.
-            Nobody else is told.
-          </Text>
+          <Text variant="secondary">You can bring it back from All messages. The other person is not told.</Text>
         </ConfirmDialog>
         {narrow && (
           <TabBar

@@ -65,10 +65,10 @@ export function AccountCard() {
                 {!account.email_verified && ' (not verified yet)'}
               </Text>
             ) : (
-              <Text variant="secondary">No address yet. Add one, so a forgotten password can be reset.</Text>
+              <Text variant="secondary">No email address yet.</Text>
             ))}
           {account?.pending_email && (
-            <Alert>A link is on its way to {account.pending_email}. Open it and that becomes your address.</Alert>
+            <Alert>A link is on its way to {account.pending_email}. Open it to confirm the new address.</Alert>
           )}
           <Form onSubmit={() => void submitEmail()}>
             <Field label={account?.email ? 'New email address' : 'Email address'}>

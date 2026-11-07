@@ -26,8 +26,8 @@ const (
 )
 
 var (
-	ErrNotImage = errors.New("that is not a JPEG, PNG, WebP or GIF")
-	ErrTooLarge = errors.New("that image is too large")
+	ErrNotImage = errors.New("That is not a JPEG, PNG, WebP or GIF")
+	ErrTooLarge = errors.New("That image is too large")
 )
 
 // Processed is a stored image: bytes, their type, and the size they were stored at.

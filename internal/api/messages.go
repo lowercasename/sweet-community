@@ -52,11 +52,11 @@ func (s *Server) listMessages(w http.ResponseWriter, r *http.Request) {
 func (s *Server) createMessage(w http.ResponseWriter, r *http.Request) {
 	g, a := groupFrom(r.Context())
 	if !perm.Write(a) {
-		writeErr(w, http.StatusForbidden, "not allowed")
+		writeErr(w, http.StatusForbidden, "Not allowed")
 		return
 	}
 	if g.Mode == perm.ModePosts {
-		writeErr(w, http.StatusForbidden, "this group has no chat")
+		writeErr(w, http.StatusForbidden, "This room has no chat")
 		return
 	}
 	clean, ok := readBody(w, r)
@@ -96,7 +96,7 @@ func (s *Server) deleteMessage(w http.ResponseWriter, r *http.Request) {
 	s.logged(w, r, "message_delete", now, func(qtx *store.Queries) (any, int, error) {
 		owners, err := qtx.GetMessageOwners(r.Context(), id)
 		if errors.Is(err, sql.ErrNoRows) {
-			return nil, http.StatusNotFound, errors.New("no such message")
+			return nil, http.StatusNotFound, errors.New("No such message")
 		}
 		if err != nil {
 			return nil, http.StatusInternalServerError, err
@@ -106,10 +106,10 @@ func (s *Server) deleteMessage(w http.ResponseWriter, r *http.Request) {
 			return nil, http.StatusInternalServerError, err
 		}
 		if !perm.CanSee(a) {
-			return nil, http.StatusNotFound, errors.New("no such message")
+			return nil, http.StatusNotFound, errors.New("No such message")
 		}
 		if !perm.DeleteMessage(a, perm.Message{AuthorID: owners.AuthorID}) {
-			return nil, http.StatusForbidden, errors.New("not your message")
+			return nil, http.StatusForbidden, errors.New("Not your message")
 		}
 		if err := qtx.DeleteMessage(r.Context(), store.DeleteMessageParams{DeletedAt: sql.NullInt64{Int64: now, Valid: true}, ID: id}); err != nil {
 			return nil, http.StatusInternalServerError, err

@@ -50,7 +50,7 @@ func NeedsSetup(ctx context.Context, d *sql.DB) (bool, error) {
 // account, from the setup link, signed in. Once: the token goes with it.
 func (s *Server) setup(w http.ResponseWriter, r *http.Request) {
 	if !s.limiter.open(s.clientAddr(r)) {
-		writeErr(w, http.StatusTooManyRequests, "too many attempts; wait a moment")
+		writeErr(w, http.StatusTooManyRequests, "Too many attempts. Wait a moment and try again.")
 		return
 	}
 	var in struct {
@@ -60,7 +60,7 @@ func (s *Server) setup(w http.ResponseWriter, r *http.Request) {
 	}
 	r.Body = http.MaxBytesReader(w, r.Body, 4096)
 	if err := json.NewDecoder(r.Body).Decode(&in); err != nil {
-		writeErr(w, http.StatusBadRequest, "bad request body")
+		writeErr(w, http.StatusBadRequest, "Bad request")
 		return
 	}
 	if err := auth.ValidateUsername(in.Username); err != nil {
@@ -92,7 +92,7 @@ func (s *Server) setup(w http.ResponseWriter, r *http.Request) {
 	want, err := qtx.GetSetting(ctx, setupTokenKey)
 	if errors.Is(err, sql.ErrNoRows) || (err == nil && want != auth.HashToken(in.Token)) {
 		s.limiter.spend(s.clientAddr(r))
-		writeErr(w, http.StatusNotFound, "that setup link does not work; the one in the server's newest log does")
+		writeErr(w, http.StatusNotFound, "This setup link does not work")
 		return
 	}
 	if err != nil {
@@ -105,7 +105,7 @@ func (s *Server) setup(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if st.OwnerSet {
-		writeErr(w, http.StatusConflict, "this community already has its owner")
+		writeErr(w, http.StatusConflict, "This community has already been set up")
 		return
 	}
 	now := db.Now()
@@ -126,7 +126,7 @@ func (s *Server) setup(w http.ResponseWriter, r *http.Request) {
 		if row.Username != in.Username {
 			if err := qtx.RenameUser(ctx, store.RenameUserParams{Username: in.Username, ID: ownerID}); err != nil {
 				if db.IsUniqueViolation(err) {
-					writeErr(w, http.StatusConflict, "that username is taken")
+					writeErr(w, http.StatusConflict, "That username is taken")
 					return
 				}
 				writeErr(w, http.StatusInternalServerError, err.Error())
@@ -137,7 +137,7 @@ func (s *Server) setup(w http.ResponseWriter, r *http.Request) {
 	} else if errors.Is(err, sql.ErrNoRows) {
 		if err := qtx.CreateUser(ctx, store.CreateUserParams{ID: id.String(), Username: in.Username, CreatedAt: now}); err != nil {
 			if db.IsUniqueViolation(err) {
-				writeErr(w, http.StatusConflict, "that username is taken")
+				writeErr(w, http.StatusConflict, "That username is taken")
 				return
 			}
 			writeErr(w, http.StatusInternalServerError, err.Error())
@@ -157,7 +157,7 @@ func (s *Server) setup(w http.ResponseWriter, r *http.Request) {
 	}
 	if err := qtx.SetUserEmailVerified(ctx, store.SetUserEmailVerifiedParams{Email: sql.NullString{String: in.Email, Valid: true}, VerifiedAt: sql.NullInt64{Int64: now, Valid: true}, ID: id.String()}); err != nil {
 		if db.IsUniqueViolation(err) {
-			writeErr(w, http.StatusConflict, "that email address already has an account")
+			writeErr(w, http.StatusConflict, "That email address already has an account")
 			return
 		}
 		writeErr(w, http.StatusInternalServerError, err.Error())

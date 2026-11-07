@@ -31,9 +31,9 @@ test.describe('a fresh instance', () => {
     await page.getByRole('button', { name: 'Set up' }).click()
 
     // Onboarding: the name, then an invite link.
-    await expect(page.getByRole('heading', { name: 'Welcome' })).toBeVisible()
-    await page.getByLabel('Name').fill('Knitting Circle')
-    await page.getByLabel('What it is for').fill('Wool and gossip.')
+    await expect(page.getByRole('heading', { name: 'Community settings' })).toBeVisible()
+    await page.getByLabel('Community name').fill('Knitting Circle')
+    await page.getByLabel('Short community description').fill('Wool and gossip.')
     await page.getByRole('button', { name: 'Next' }).click()
     await expect(page.getByRole('heading', { name: 'Invite your first people' })).toBeVisible()
     await page.getByRole('button', { name: 'Create invite link' }).click()
@@ -46,7 +46,7 @@ test.describe('a fresh instance', () => {
     // A reload lands on Home, not the welcome page again.
     await page.reload()
     await expect(page.getByRole('navigation', { name: 'Main' })).toBeVisible()
-    await expect(page.getByRole('heading', { name: 'Welcome' })).toHaveCount(0)
+    await expect(page.getByRole('heading', { name: 'Community settings' })).toHaveCount(0)
 
     // The link brings two people in; each is joining Knitting Circle; the owner hears of both.
     const joinPath = new URL(url).pathname
@@ -78,7 +78,7 @@ test.describe('a fresh instance', () => {
     // The Community page, in the nav for the owner: a rename reaches the corner at once.
     await page.getByRole('navigation', { name: 'Main' }).getByRole('button', { name: 'Community' }).click()
     await expect(page).toHaveURL(/\/community$/)
-    await page.getByLabel('Name').fill('The Circle')
+    await page.getByLabel('Community name').fill('The Circle')
     await page.getByRole('button', { name: 'Save' }).click()
     await expect(page.getByText('Saved.')).toBeVisible()
     await expect(page.getByRole('navigation', { name: 'Main' })).toContainText('The Circle')

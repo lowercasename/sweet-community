@@ -1,13 +1,11 @@
 #!/bin/sh
-# Starts Sweet in the container. With a bucket configured, Litestream first
-# restores the database from it when the disk has none (a new host, or one
-# that lost its disk, comes back from the bucket), then replicates every
-# change to it while Sweet runs. Without one, Sweet runs on its own and
-# keeps images and email on the disk.
+# The container's entrypoint.
 #
-#   sweet-entrypoint [flags for sweet]      start
-#   sweet-entrypoint restore [timestamp]    put the database back from the
-#                                           bucket, as it was then (or latest)
+#   sweet-entrypoint [flags]              start Sweet
+#   sweet-entrypoint restore [timestamp]  put the database back from the bucket
+#
+# With a bucket configured, Litestream restores the database when the disk has
+# none, then replicates it while Sweet runs.
 set -e
 
 data=${SWEET_DATA:-/data}
@@ -28,7 +26,7 @@ if [ -z "$SWEET_S3_ENDPOINT" ] || [ -z "$SWEET_S3_ACCESS_KEY" ] || [ -z "$SWEET_
   exit 1
 fi
 
-# The one bucket holds images under images/ and the database under db/.
+# Images go under images/ and the database under db/ in the same bucket.
 export SWEET_S3_PREFIX=${SWEET_S3_PREFIX:-images}
 export SWEET_S3_REGION=${SWEET_S3_REGION:-auto}
 if [ "$SWEET_S3_INSECURE" = 1 ]; then

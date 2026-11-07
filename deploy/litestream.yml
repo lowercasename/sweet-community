@@ -1,5 +1,4 @@
-# Litestream's view of the instance's bucket; the entrypoint fills the
-# variables from the same SWEET_S3_* settings the binary uses for images.
+# Litestream replicates the database to the bucket. The entrypoint sets these variables.
 dbs:
   - path: ${SWEET_DATA}/sweet.db
     replica:

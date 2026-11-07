@@ -69,14 +69,13 @@ export function Join({ code, community }: JoinProps) {
         <Form onSubmit={() => void submit()}>
           <Text>{invitedBy ? `${invitedBy} invited you to ${name}.` : 'Checking your invite…'}</Text>
           {community?.description && <Text variant="secondary">{community.description}</Text>}
-          <Text variant="small">Choose a username and a password, and say where to send your sign-in link.</Text>
-          <Field label="Username">
+          <Field label="Username" hint="Letters, digits and underscores.">
             <Input name="username" value={username} onChange={setUsername} autoComplete="username" autoFocus required />
           </Field>
-          <Field label="Email address">
+          <Field label="Email address" hint="A link to sign in will be sent here.">
             <Input type="email" name="email" value={email} onChange={setEmail} autoComplete="email" required />
           </Field>
-          <Field label="Password">
+          <Field label="Password" hint="At least 8 characters.">
             <Input
               type="password"
               name="password"
@@ -86,7 +85,6 @@ export function Join({ code, community }: JoinProps) {
               required
             />
           </Field>
-          <Text variant="small">Letters, digits and underscores; a password of at least 8 characters.</Text>
           {error && <Alert tone="error">{error}</Alert>}
           <Row justify="end" align="center">
             <Button type="submit" disabled={busy || !invitedBy || !username || !email || !password}>

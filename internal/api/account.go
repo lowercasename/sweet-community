@@ -69,7 +69,7 @@ func (s *Server) sendToken(ctx context.Context, q *store.Queries, userID, kind, 
 		m = mail.Message{To: email, Subject: "Reset your Sweet password", Text: fmt.Sprintf("Open this link to choose a new password:\n\n%s/reset/%s\n\nIt works once, for an hour. If you did not ask for it, ignore this and your password stays as it is.", s.BaseURL, token)}
 	}
 	if s.Mail == nil {
-		return errors.New("no way to send email is configured")
+		return errors.New("Email is not set up")
 	}
 	return s.Mail.Send(ctx, m)
 }
@@ -104,7 +104,7 @@ func (s *Server) verify(w http.ResponseWriter, r *http.Request) {
 	}
 	r.Body = http.MaxBytesReader(w, r.Body, 4096)
 	if err := json.NewDecoder(r.Body).Decode(&in); err != nil || in.Token == "" {
-		writeErr(w, http.StatusBadRequest, "bad request body")
+		writeErr(w, http.StatusBadRequest, "Bad request")
 		return
 	}
 	ctx := r.Context()
@@ -117,7 +117,7 @@ func (s *Server) verify(w http.ResponseWriter, r *http.Request) {
 	qtx := store.New(tx)
 	tok, err := useToken(ctx, qtx, in.Token, TokenVerify)
 	if errors.Is(err, errNotFound) {
-		writeErr(w, http.StatusNotFound, "that link has been used, or has expired, or never was")
+		writeErr(w, http.StatusNotFound, "This link has been used or has expired")
 		return
 	}
 	if err != nil {
@@ -126,7 +126,7 @@ func (s *Server) verify(w http.ResponseWriter, r *http.Request) {
 	}
 	if err := qtx.SetUserEmailVerified(ctx, store.SetUserEmailVerifiedParams{Email: sql.NullString{String: tok.Email, Valid: true}, VerifiedAt: sql.NullInt64{Int64: db.Now(), Valid: true}, ID: tok.UserID}); err != nil {
 		if db.IsUniqueViolation(err) {
-			writeErr(w, http.StatusConflict, "that address now belongs to another account")
+			writeErr(w, http.StatusConflict, "That address now belongs to another account")
 			return
 		}
 		writeErr(w, http.StatusInternalServerError, err.Error())
@@ -153,7 +153,7 @@ func (s *Server) verify(w http.ResponseWriter, r *http.Request) {
 // address that belongs to an unverified account; the same 202 either way.
 func (s *Server) resendVerification(w http.ResponseWriter, r *http.Request) {
 	if !s.mailLimiter.allow(s.clientAddr(r)) {
-		writeErr(w, http.StatusTooManyRequests, "too many attempts; wait a moment")
+		writeErr(w, http.StatusTooManyRequests, "Too many attempts. Wait a moment and try again.")
 		return
 	}
 	var in struct {
@@ -161,7 +161,7 @@ func (s *Server) resendVerification(w http.ResponseWriter, r *http.Request) {
 	}
 	r.Body = http.MaxBytesReader(w, r.Body, 4096)
 	if err := json.NewDecoder(r.Body).Decode(&in); err != nil {
-		writeErr(w, http.StatusBadRequest, "bad request body")
+		writeErr(w, http.StatusBadRequest, "Bad request")
 		return
 	}
 	row, err := s.q().GetUserByEmail(r.Context(), strings.TrimSpace(in.Email))
@@ -180,7 +180,7 @@ func (s *Server) resendVerification(w http.ResponseWriter, r *http.Request) {
 // address was never theirs for certain, so the new one simply replaces it.
 func (s *Server) changeUnverifiedEmail(w http.ResponseWriter, r *http.Request) {
 	if !s.mailLimiter.allow(s.clientAddr(r)) {
-		writeErr(w, http.StatusTooManyRequests, "too many attempts; wait a moment")
+		writeErr(w, http.StatusTooManyRequests, "Too many attempts. Wait a moment and try again.")
 		return
 	}
 	var in struct {
@@ -189,7 +189,7 @@ func (s *Server) changeUnverifiedEmail(w http.ResponseWriter, r *http.Request) {
 	}
 	r.Body = http.MaxBytesReader(w, r.Body, 4096)
 	if err := json.NewDecoder(r.Body).Decode(&in); err != nil {
-		writeErr(w, http.StatusBadRequest, "bad request body")
+		writeErr(w, http.StatusBadRequest, "Bad request")
 		return
 	}
 	email := strings.TrimSpace(in.Email)
@@ -200,7 +200,7 @@ func (s *Server) changeUnverifiedEmail(w http.ResponseWriter, r *http.Request) {
 	row, err := s.q().GetUserByUsername(r.Context(), in.Username)
 	if errors.Is(err, sql.ErrNoRows) || !row.PasswordHash.Valid || !auth.CheckPassword(row.PasswordHash.String, in.Password) || row.EmailVerifiedAt.Valid || row.RemovedAt.Valid {
 		if err == nil || errors.Is(err, sql.ErrNoRows) {
-			writeErr(w, http.StatusForbidden, "wrong username or password")
+			writeErr(w, http.StatusForbidden, "Wrong username or password")
 			return
 		}
 	}
@@ -210,7 +210,7 @@ func (s *Server) changeUnverifiedEmail(w http.ResponseWriter, r *http.Request) {
 	}
 	n, err := s.q().SetUnverifiedEmail(r.Context(), store.SetUnverifiedEmailParams{Email: sql.NullString{String: email, Valid: true}, ID: row.ID})
 	if db.IsUniqueViolation(err) {
-		writeErr(w, http.StatusConflict, "that email address already has an account")
+		writeErr(w, http.StatusConflict, "That email address already has an account")
 		return
 	}
 	if err != nil {
@@ -218,7 +218,7 @@ func (s *Server) changeUnverifiedEmail(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if n == 0 {
-		writeErr(w, http.StatusForbidden, "wrong username or password")
+		writeErr(w, http.StatusForbidden, "Wrong username or password")
 		return
 	}
 	if err := s.sendToken(r.Context(), s.q(), row.ID, TokenVerify, email); err != nil {
@@ -232,7 +232,7 @@ func (s *Server) changeUnverifiedEmail(w http.ResponseWriter, r *http.Request) {
 // if the address belongs to a verified account; the same 202 either way.
 func (s *Server) requestReset(w http.ResponseWriter, r *http.Request) {
 	if !s.mailLimiter.allow(s.clientAddr(r)) {
-		writeErr(w, http.StatusTooManyRequests, "too many attempts; wait a moment")
+		writeErr(w, http.StatusTooManyRequests, "Too many attempts. Wait a moment and try again.")
 		return
 	}
 	var in struct {
@@ -240,7 +240,7 @@ func (s *Server) requestReset(w http.ResponseWriter, r *http.Request) {
 	}
 	r.Body = http.MaxBytesReader(w, r.Body, 4096)
 	if err := json.NewDecoder(r.Body).Decode(&in); err != nil {
-		writeErr(w, http.StatusBadRequest, "bad request body")
+		writeErr(w, http.StatusBadRequest, "Bad request")
 		return
 	}
 	row, err := s.q().GetUserByEmail(r.Context(), strings.TrimSpace(in.Email))
@@ -261,7 +261,7 @@ func (s *Server) resetPassword(w http.ResponseWriter, r *http.Request) {
 	}
 	r.Body = http.MaxBytesReader(w, r.Body, 4096)
 	if err := json.NewDecoder(r.Body).Decode(&in); err != nil {
-		writeErr(w, http.StatusBadRequest, "bad request body")
+		writeErr(w, http.StatusBadRequest, "Bad request")
 		return
 	}
 	if err := auth.ValidatePassword(in.Password); err != nil {
@@ -283,7 +283,7 @@ func (s *Server) resetPassword(w http.ResponseWriter, r *http.Request) {
 	qtx := store.New(tx)
 	tok, err := useToken(ctx, qtx, r.PathValue("token"), TokenReset)
 	if errors.Is(err, errNotFound) {
-		writeErr(w, http.StatusNotFound, "that link has been used, or has expired, or never was")
+		writeErr(w, http.StatusNotFound, "This link has been used or has expired")
 		return
 	}
 	if err != nil {
@@ -349,7 +349,7 @@ func (s *Server) changeEmail(w http.ResponseWriter, r *http.Request) {
 	}
 	r.Body = http.MaxBytesReader(w, r.Body, 4096)
 	if err := json.NewDecoder(r.Body).Decode(&in); err != nil {
-		writeErr(w, http.StatusBadRequest, "bad request body")
+		writeErr(w, http.StatusBadRequest, "Bad request")
 		return
 	}
 	email := strings.TrimSpace(in.Email)
@@ -364,7 +364,7 @@ func (s *Server) changeEmail(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if !row.PasswordHash.Valid || !auth.CheckPassword(row.PasswordHash.String, in.Password) {
-		writeErr(w, http.StatusForbidden, "wrong password")
+		writeErr(w, http.StatusForbidden, "Wrong password")
 		return
 	}
 	if err := s.q().SetUserPendingEmail(r.Context(), store.SetUserPendingEmailParams{PendingEmail: sql.NullString{String: email, Valid: true}, ID: me.ID}); err != nil {
@@ -392,7 +392,7 @@ func (s *Server) changePassword(w http.ResponseWriter, r *http.Request) {
 	}
 	r.Body = http.MaxBytesReader(w, r.Body, 4096)
 	if err := json.NewDecoder(r.Body).Decode(&in); err != nil {
-		writeErr(w, http.StatusBadRequest, "bad request body")
+		writeErr(w, http.StatusBadRequest, "Bad request")
 		return
 	}
 	if err := auth.ValidatePassword(in.Password); err != nil {
@@ -406,7 +406,7 @@ func (s *Server) changePassword(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if !row.PasswordHash.Valid || !auth.CheckPassword(row.PasswordHash.String, in.Current) {
-		writeErr(w, http.StatusForbidden, "wrong password")
+		writeErr(w, http.StatusForbidden, "Wrong password")
 		return
 	}
 	hash, err := auth.HashPassword(in.Password)

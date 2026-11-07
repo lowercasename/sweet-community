@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { setup, type User } from '../api'
 import { AuthFrame } from '../components/AuthFrame'
-import { Alert, Button, Field, Form, Heading, Input, Row, Text } from '../ui'
+import { Alert, Button, Field, Form, Heading, Input, Row } from '../ui'
 
 interface SetupProps {
   token: string
@@ -37,15 +37,14 @@ export function Setup({ token, onSetUp }: SetupProps) {
   return (
     <AuthFrame>
       <Heading level={2}>Set up your community</Heading>
-      <Text>You will be its owner. Choose how you appear here, and a password.</Text>
       <Form onSubmit={() => void submit()}>
-        <Field label="Username">
+        <Field label="Username" hint="Letters, digits and underscores.">
           <Input name="username" value={username} onChange={setUsername} autoComplete="username" autoFocus required />
         </Field>
         <Field label="Email address">
           <Input type="email" name="email" value={email} onChange={setEmail} autoComplete="email" required />
         </Field>
-        <Field label="Password">
+        <Field label="Password" hint="At least 8 characters.">
           <Input
             type="password"
             name="password"
@@ -55,7 +54,6 @@ export function Setup({ token, onSetUp }: SetupProps) {
             required
           />
         </Field>
-        <Text variant="small">Letters, digits and underscores; a password of at least 8 characters.</Text>
         {error && <Alert tone="error">{error}</Alert>}
         <Row justify="end" align="center">
           <Button type="submit" disabled={busy || !username || !email || !password}>

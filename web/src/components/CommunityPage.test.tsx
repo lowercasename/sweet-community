@@ -21,9 +21,9 @@ describe('CommunityPage', () => {
     const { setSettings } = await import('../api')
     const { CommunityPage } = await import('./CommunityPage')
     renderWithQuery(<CommunityPage />)
-    const name = (await screen.findByLabelText('Name')) as HTMLInputElement
+    const name = (await screen.findByLabelText('Community name')) as HTMLInputElement
     expect(name.value).toBe('Knitting Circle')
-    expect((screen.getByLabelText('What it is for') as HTMLTextAreaElement).value).toBe('Wool.')
+    expect((screen.getByLabelText('Short community description') as HTMLTextAreaElement).value).toBe('Wool.')
     fireEvent.change(screen.getByLabelText('Who can create rooms'), { target: { value: 'staff' } })
     fireEvent.change(name, { target: { value: ' Knitting ' } })
     fireEvent.click(screen.getByRole('button', { name: 'Save' }))
@@ -35,7 +35,7 @@ describe('CommunityPage', () => {
     const { setSettings } = await import('../api')
     const { CommunityPage } = await import('./CommunityPage')
     renderWithQuery(<CommunityPage />)
-    fireEvent.change(await screen.findByLabelText('Name'), { target: { value: '  ' } })
+    fireEvent.change(await screen.findByLabelText('Community name'), { target: { value: '  ' } })
     expect((screen.getByRole('button', { name: 'Save' }) as HTMLButtonElement).disabled).toBe(true)
     expect(setSettings).not.toHaveBeenCalled()
   })

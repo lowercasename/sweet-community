@@ -253,7 +253,7 @@ const json = (method: string, body: unknown): RequestInit => ({
 
 const g = (groupId: string) => `/api/groups/${encodeURIComponent(groupId)}`
 
-/** Takes someone off the instance (architecture.md, Admin tools): their words stay under a removed name. */
+/** Takes someone off the instance (architecture.md, Admin tools): their posts, comments and messages stay under a removed name. */
 export async function removeUser(userId: string): Promise<void> {
   await request(`/api/users/${encodeURIComponent(userId)}`, { method: 'DELETE' })
 }

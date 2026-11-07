@@ -136,9 +136,7 @@ function Loaded({ profile, me, onGo }: { profile: Profile; me: User; onGo: (path
               <Heading level={3}>Posts</Heading>
               {error && <Alert tone="error">{error.message}</Alert>}
               {!loading && posts.length === 0 && (
-                <Text variant="secondary">
-                  {profile.id === me.id ? 'You have not posted yet.' : 'No posts yet, in the rooms you share.'}
-                </Text>
+                <Text variant="secondary">{profile.id === me.id ? 'You have not posted yet.' : 'No posts yet.'}</Text>
               )}
               {posts.map((p) => (
                 <AuthorPost key={p.id} post={p} place={placeOf(p)} disabled={offline} />

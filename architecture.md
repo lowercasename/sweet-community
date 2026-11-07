@@ -438,6 +438,7 @@ Kept so the reasoning isn't lost when one of these comes back up.
 | Caddy in the stack | A custom xcaddy build with the Cloudflare DNS module | Stock Caddy for a single instance; the xcaddy build when the orchestrator needs a wildcard | One domain needs no DNS challenge, and a stock image is one fewer thing to build and keep up (Raphael, 2026-11-06) |
 | Litestream's place | A service beside the binary | In the binary's container, supervising it | One container, one volume, one `.env`; the two cannot disagree about which file |
 | Instance config | A TOML file with env overrides | Env only, one `.env` for the stack | A file would be a second place for the same settings |
+| Copy | Told the person what the software did (the server's log, where a hidden conversation goes, who a room passes to) | Explains Sweet's own terms where a person first meets them, never the machinery (see CLAUDE.md, Copy) | A visitor is not an operator (Raphael, 2026-11-07) |
 
 ### Corrections from the adversarial review (Nov 2026)
 

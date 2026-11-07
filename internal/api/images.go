@@ -37,13 +37,13 @@ func pictureURL(id sql.NullString) *string {
 // uploadImage takes multipart field "file", processes it and stores it.
 func (s *Server) uploadImage(w http.ResponseWriter, r *http.Request) {
 	if s.Images == nil {
-		writeErr(w, http.StatusNotImplemented, "image storage is not configured")
+		writeErr(w, http.StatusNotImplemented, "Image storage is not configured")
 		return
 	}
 	r.Body = http.MaxBytesReader(w, r.Body, images.MaxUpload+64<<10)
 	file, _, err := r.FormFile("file")
 	if err != nil {
-		writeErr(w, http.StatusBadRequest, "send the image as multipart field \"file\"")
+		writeErr(w, http.StatusBadRequest, "Send the image as the multipart field \"file\"")
 		return
 	}
 	defer file.Close()
@@ -131,7 +131,7 @@ func (s *Server) setPicture(w http.ResponseWriter, r *http.Request) {
 	}
 	r.Body = http.MaxBytesReader(w, r.Body, 4096)
 	if err := json.NewDecoder(r.Body).Decode(&in); err != nil {
-		writeErr(w, http.StatusBadRequest, "bad request body")
+		writeErr(w, http.StatusBadRequest, "Bad request")
 		return
 	}
 	me, _ := userFrom(r.Context())
@@ -141,7 +141,7 @@ func (s *Server) setPicture(w http.ResponseWriter, r *http.Request) {
 		var pic sql.NullString
 		if in.ImageID != nil {
 			if _, err := qtx.GetImage(r.Context(), *in.ImageID); errors.Is(err, sql.ErrNoRows) {
-				return nil, http.StatusNotFound, errors.New("no such image")
+				return nil, http.StatusNotFound, errors.New("No such image")
 			} else if err != nil {
 				return nil, http.StatusInternalServerError, err
 			}

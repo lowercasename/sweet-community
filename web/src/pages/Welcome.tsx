@@ -52,8 +52,8 @@ export function Welcome({ settings: initial, onDone }: WelcomeProps) {
         <Stack gap={3}>
           <Heading level={2}>Invite your first people</Heading>
           <Text>
-            Anyone with this link can join {settings.name} for the next seven days. Send it to the people you want here;
-            you will hear each time someone arrives.
+            Anyone with this link can join {settings.name} for the next seven days. After that, you can create a new
+            link from the People page. You will receive a notification each time someone joins.
           </Text>
           {link ? (
             <Row gap={2} align="center">
@@ -75,7 +75,7 @@ export function Welcome({ settings: initial, onDone }: WelcomeProps) {
         </Stack>
       ) : (
         <Stack gap={3}>
-          <Heading level={2}>Welcome</Heading>
+          <Heading level={2}>Community settings</Heading>
           <Text>This is your community. Give it a name, and say what it is for.</Text>
           <CommunityForm settings={settings} submitLabel="Next" onSaved={() => setNamed(true)} />
         </Stack>

@@ -230,7 +230,7 @@ func (s *Server) Routes(mux *http.ServeMux) {
 
 	// Anything else under /api/ is a 404 in JSON, never the SPA page.
 	mux.HandleFunc("/api/", func(w http.ResponseWriter, r *http.Request) {
-		writeErr(w, http.StatusNotFound, "no such endpoint: "+r.Method+" "+r.URL.Path)
+		writeErr(w, http.StatusNotFound, "No such endpoint: "+r.Method+" "+r.URL.Path)
 	})
 
 	// The root group's staff: an invite link adds someone to the root group.
@@ -311,12 +311,12 @@ func readBody(w http.ResponseWriter, r *http.Request) (clean string, ok bool) {
 	}
 	r.Body = http.MaxBytesReader(w, r.Body, sanitize.MaxBodyBytes)
 	if err := json.NewDecoder(r.Body).Decode(&in); err != nil {
-		writeErr(w, http.StatusBadRequest, "bad request body")
+		writeErr(w, http.StatusBadRequest, "Bad request")
 		return "", false
 	}
 	clean = sanitize.Body(in.BodyHTML)
 	if sanitize.IsEmpty(clean) {
-		writeErr(w, http.StatusBadRequest, "body is empty")
+		writeErr(w, http.StatusBadRequest, "The body is empty")
 		return "", false
 	}
 	return clean, true
@@ -389,16 +389,16 @@ func (s *Server) loggedMany(w http.ResponseWriter, r *http.Request, now int64, f
 	writeJSON(w, status, forViewer(a, response, st))
 }
 
-var errNotFound = errors.New("not found")
+var errNotFound = errors.New("Not found")
 
 func (s *Server) createPost(w http.ResponseWriter, r *http.Request) {
 	g, a := groupFrom(r.Context())
 	if !perm.Write(a) {
-		writeErr(w, http.StatusForbidden, "not allowed")
+		writeErr(w, http.StatusForbidden, "Not allowed")
 		return
 	}
 	if g.Mode == perm.ModeChat {
-		writeErr(w, http.StatusForbidden, "this group has no posts")
+		writeErr(w, http.StatusForbidden, "This room has no posts")
 		return
 	}
 	clean, ok := readBody(w, r)
@@ -443,7 +443,7 @@ func (s *Server) editPost(w http.ResponseWriter, r *http.Request) {
 	s.logged(w, r, "post", now, func(qtx *store.Queries) (any, int, error) {
 		owners, err := qtx.GetPostOwners(r.Context(), id)
 		if errors.Is(err, sql.ErrNoRows) {
-			return nil, http.StatusNotFound, errors.New("no such post")
+			return nil, http.StatusNotFound, errors.New("No such post")
 		}
 		if err != nil {
 			return nil, http.StatusInternalServerError, err
@@ -453,10 +453,10 @@ func (s *Server) editPost(w http.ResponseWriter, r *http.Request) {
 			return nil, http.StatusInternalServerError, err
 		}
 		if !perm.CanSee(a) {
-			return nil, http.StatusNotFound, errors.New("no such post")
+			return nil, http.StatusNotFound, errors.New("No such post")
 		}
 		if !perm.EditPost(a, perm.Post{AuthorID: owners.AuthorID}) {
-			return nil, http.StatusForbidden, errors.New("not your post")
+			return nil, http.StatusForbidden, errors.New("Not your post")
 		}
 		text := sanitize.Text(clean)
 		if err := qtx.EditPost(r.Context(), store.EditPostParams{
@@ -481,7 +481,7 @@ func (s *Server) deletePost(w http.ResponseWriter, r *http.Request) {
 	s.logged(w, r, "post_delete", now, func(qtx *store.Queries) (any, int, error) {
 		owners, err := qtx.GetPostOwners(r.Context(), id)
 		if errors.Is(err, sql.ErrNoRows) {
-			return nil, http.StatusNotFound, errors.New("no such post")
+			return nil, http.StatusNotFound, errors.New("No such post")
 		}
 		if err != nil {
 			return nil, http.StatusInternalServerError, err
@@ -491,10 +491,10 @@ func (s *Server) deletePost(w http.ResponseWriter, r *http.Request) {
 			return nil, http.StatusInternalServerError, err
 		}
 		if !perm.CanSee(a) {
-			return nil, http.StatusNotFound, errors.New("no such post")
+			return nil, http.StatusNotFound, errors.New("No such post")
 		}
 		if !perm.DeletePost(a, perm.Post{AuthorID: owners.AuthorID}) {
-			return nil, http.StatusForbidden, errors.New("not your post")
+			return nil, http.StatusForbidden, errors.New("Not your post")
 		}
 		if err := qtx.DeletePost(r.Context(), store.DeletePostParams{DeletedAt: sql.NullInt64{Int64: now, Valid: true}, ID: id}); err != nil {
 			return nil, http.StatusInternalServerError, err

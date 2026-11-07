@@ -168,7 +168,7 @@ func (s *Server) requireGroup(next http.HandlerFunc) http.HandlerFunc {
 		id := r.PathValue("gid")
 		row, err := s.q().GetGroup(r.Context(), id)
 		if errors.Is(err, sql.ErrNoRows) {
-			writeErr(w, http.StatusNotFound, "no such group")
+			writeErr(w, http.StatusNotFound, "No such room")
 			return
 		}
 		if err != nil {
@@ -181,7 +181,7 @@ func (s *Server) requireGroup(next http.HandlerFunc) http.HandlerFunc {
 			return
 		}
 		if !perm.CanSee(a) {
-			writeErr(w, http.StatusNotFound, "no such group")
+			writeErr(w, http.StatusNotFound, "No such room")
 			return
 		}
 		st, err := s.settings(r.Context())
@@ -241,7 +241,7 @@ func (s *Server) createGroup(w http.ResponseWriter, r *http.Request) {
 	}
 	r.Body = http.MaxBytesReader(w, r.Body, 4096)
 	if err := json.NewDecoder(r.Body).Decode(&in); err != nil {
-		writeErr(w, http.StatusBadRequest, "bad request body")
+		writeErr(w, http.StatusBadRequest, "Bad request")
 		return
 	}
 	me, _ := userFrom(r.Context())
@@ -256,7 +256,7 @@ func (s *Server) createGroup(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if !perm.CreateGroup(root, st.GroupCreation) {
-		writeErr(w, http.StatusForbidden, "not allowed")
+		writeErr(w, http.StatusForbidden, "Not allowed")
 		return
 	}
 	now := db.Now()
@@ -264,14 +264,14 @@ func (s *Server) createGroup(w http.ResponseWriter, r *http.Request) {
 	case "", perm.KindGroup:
 		in.Name = strings.TrimSpace(in.Name)
 		if in.Name == "" || len(in.Name) > 80 {
-			writeErr(w, http.StatusBadRequest, "a room needs a name of up to 80 characters")
+			writeErr(w, http.StatusBadRequest, "A room needs a name of up to 80 characters")
 			return
 		}
 		if in.Mode == "" {
 			in.Mode = perm.ModeBoth
 		}
 		if !validMode(in.Mode) {
-			writeErr(w, http.StatusBadRequest, "mode must be posts, chat or both")
+			writeErr(w, http.StatusBadRequest, "Mode must be posts, chat or both")
 			return
 		}
 		s.createGroupWith(w, r, perm.KindGroup, in.Name, in.Mode, now, map[string]string{me.ID: perm.Owner})
@@ -282,7 +282,7 @@ func (s *Server) createGroup(w http.ResponseWriter, r *http.Request) {
 		}
 		// A conversation is two people (architecture.md, Groups); more is a room.
 		if len(people) != 2 {
-			writeErr(w, http.StatusBadRequest, "a conversation is you and one other person; for more, make a room")
+			writeErr(w, http.StatusBadRequest, "A conversation is between two people. For more people, make a room.")
 			return
 		}
 		ids := make([]string, 0, len(people))
@@ -291,7 +291,7 @@ func (s *Server) createGroup(w http.ResponseWriter, r *http.Request) {
 		}
 		s.openConversation(w, r, me, ids, now)
 	default:
-		writeErr(w, http.StatusBadRequest, "kind must be group or dm")
+		writeErr(w, http.StatusBadRequest, "Kind must be group or dm")
 	}
 }
 
@@ -340,7 +340,7 @@ func (s *Server) openConversation(w http.ResponseWriter, r *http.Request, me Use
 		}
 		for _, uid := range people {
 			if u, err := qtx.GetUser(ctx, uid); errors.Is(err, sql.ErrNoRows) || (err == nil && u.RemovedAt.Valid) {
-				return nil, nil, http.StatusBadRequest, errors.New("no such person: " + uid)
+				return nil, nil, http.StatusBadRequest, errors.New("No such person: " + uid)
 			} else if err != nil {
 				return nil, nil, http.StatusInternalServerError, err
 			}
@@ -385,7 +385,7 @@ func (s *Server) createGroupWith(w http.ResponseWriter, r *http.Request, kind, n
 		}
 		for uid, role := range people {
 			if _, err := qtx.GetUser(r.Context(), uid); errors.Is(err, sql.ErrNoRows) {
-				return nil, nil, http.StatusBadRequest, errors.New("no such person: " + uid)
+				return nil, nil, http.StatusBadRequest, errors.New("No such person: " + uid)
 			} else if err != nil {
 				return nil, nil, http.StatusInternalServerError, err
 			}
@@ -423,19 +423,19 @@ func (s *Server) setGroupPicture(w http.ResponseWriter, r *http.Request) {
 	}
 	r.Body = http.MaxBytesReader(w, r.Body, 4096)
 	if err := json.NewDecoder(r.Body).Decode(&in); err != nil {
-		writeErr(w, http.StatusBadRequest, "bad request body")
+		writeErr(w, http.StatusBadRequest, "Bad request")
 		return
 	}
 	g, a := groupFrom(r.Context())
 	if !perm.Rename(a, perm.Group{Kind: g.Kind}) {
-		writeErr(w, http.StatusForbidden, "not allowed")
+		writeErr(w, http.StatusForbidden, "Not allowed")
 		return
 	}
 	s.logged(w, r, "group", db.Now(), func(qtx *store.Queries) (any, int, error) {
 		var pic sql.NullString
 		if in.ImageID != nil {
 			if _, err := qtx.GetImage(r.Context(), *in.ImageID); errors.Is(err, sql.ErrNoRows) {
-				return nil, http.StatusNotFound, errors.New("no such image")
+				return nil, http.StatusNotFound, errors.New("No such image")
 			} else if err != nil {
 				return nil, http.StatusInternalServerError, err
 			}
@@ -461,7 +461,7 @@ func (s *Server) updateGroup(w http.ResponseWriter, r *http.Request) {
 	}
 	r.Body = http.MaxBytesReader(w, r.Body, 4096)
 	if err := json.NewDecoder(r.Body).Decode(&in); err != nil {
-		writeErr(w, http.StatusBadRequest, "bad request body")
+		writeErr(w, http.StatusBadRequest, "Bad request")
 		return
 	}
 	g, a := groupFrom(r.Context())
@@ -469,26 +469,26 @@ func (s *Server) updateGroup(w http.ResponseWriter, r *http.Request) {
 	if in.Name != nil {
 		name := strings.TrimSpace(*in.Name)
 		if name == "" || len(name) > 80 {
-			writeErr(w, http.StatusBadRequest, "a room needs a name of up to 80 characters")
+			writeErr(w, http.StatusBadRequest, "A room needs a name of up to 80 characters")
 			return
 		}
 		if !perm.Rename(a, pg) {
-			writeErr(w, http.StatusForbidden, "not allowed")
+			writeErr(w, http.StatusForbidden, "Not allowed")
 			return
 		}
 		g.Name = name
 	}
 	if in.Mode != nil {
 		if !validMode(*in.Mode) {
-			writeErr(w, http.StatusBadRequest, "mode must be posts, chat or both")
+			writeErr(w, http.StatusBadRequest, "Mode must be posts, chat or both")
 			return
 		}
 		if g.Kind == perm.KindDM {
-			writeErr(w, http.StatusBadRequest, "a DM is chat only")
+			writeErr(w, http.StatusBadRequest, "A conversation is chat only")
 			return
 		}
 		if !perm.SetMode(a, pg) {
-			writeErr(w, http.StatusForbidden, "not allowed")
+			writeErr(w, http.StatusForbidden, "Not allowed")
 			return
 		}
 		g.Mode = *in.Mode
@@ -509,7 +509,7 @@ func (s *Server) updateGroup(w http.ResponseWriter, r *http.Request) {
 func (s *Server) deleteGroup(w http.ResponseWriter, r *http.Request) {
 	g, a := groupFrom(r.Context())
 	if !perm.DeleteGroup(a, perm.Group{Kind: g.Kind}) {
-		writeErr(w, http.StatusForbidden, "not allowed")
+		writeErr(w, http.StatusForbidden, "Not allowed")
 		return
 	}
 	now := db.Now()
@@ -545,24 +545,24 @@ func (s *Server) addMember(w http.ResponseWriter, r *http.Request) {
 	}
 	r.Body = http.MaxBytesReader(w, r.Body, 4096)
 	if err := json.NewDecoder(r.Body).Decode(&in); err != nil {
-		writeErr(w, http.StatusBadRequest, "bad request body")
+		writeErr(w, http.StatusBadRequest, "Bad request")
 		return
 	}
 	g, a := groupFrom(r.Context())
 	if !perm.AddMembers(a, perm.Group{Kind: g.Kind}) || g.Kind == perm.KindRoot {
-		writeErr(w, http.StatusForbidden, "not allowed")
+		writeErr(w, http.StatusForbidden, "Not allowed")
 		return
 	}
 	now := db.Now()
 	s.loggedMany(w, r, now, func(qtx *store.Queries) ([]events.Entry, any, int, error) {
 		if u, err := qtx.GetUser(r.Context(), in.UserID); errors.Is(err, sql.ErrNoRows) || (err == nil && u.RemovedAt.Valid) {
-			return nil, nil, http.StatusNotFound, errors.New("no such person")
+			return nil, nil, http.StatusNotFound, errors.New("No such person")
 		} else if err != nil {
 			return nil, nil, http.StatusInternalServerError, err
 		}
 		if err := qtx.CreateMembership(r.Context(), store.CreateMembershipParams{GroupID: g.ID, UserID: in.UserID, Role: perm.Member, JoinedAt: now}); err != nil {
 			if db.IsUniqueViolation(err) {
-				return nil, nil, http.StatusConflict, errors.New("already a member")
+				return nil, nil, http.StatusConflict, errors.New("Already a member")
 			}
 			return nil, nil, http.StatusInternalServerError, err
 		}
@@ -589,11 +589,11 @@ func (s *Server) setMemberRole(w http.ResponseWriter, r *http.Request) {
 	}
 	r.Body = http.MaxBytesReader(w, r.Body, 4096)
 	if err := json.NewDecoder(r.Body).Decode(&in); err != nil {
-		writeErr(w, http.StatusBadRequest, "bad request body")
+		writeErr(w, http.StatusBadRequest, "Bad request")
 		return
 	}
 	if in.Role != perm.Member && in.Role != perm.Moderator && in.Role != perm.Owner {
-		writeErr(w, http.StatusBadRequest, "role must be member, moderator or owner")
+		writeErr(w, http.StatusBadRequest, "Role must be member, moderator or owner")
 		return
 	}
 	g, a := groupFrom(r.Context())
@@ -606,7 +606,7 @@ func (s *Server) setMemberRole(w http.ResponseWriter, r *http.Request) {
 			return nil, nil, http.StatusInternalServerError, err
 		}
 		if !perm.CanSee(target) {
-			return nil, nil, http.StatusNotFound, errors.New("not a member")
+			return nil, nil, http.StatusNotFound, errors.New("Not a member")
 		}
 		// member reads a membership back after its role was written: the same row, new role, joined time intact.
 		member := func(userID string) (Membership, error) {
@@ -616,7 +616,7 @@ func (s *Server) setMemberRole(w http.ResponseWriter, r *http.Request) {
 		if in.Role == perm.Owner {
 			// Handing over: the target becomes owner, the owner a moderator. Two memberships change.
 			if !perm.Transfer(a, target) {
-				return nil, nil, http.StatusForbidden, errors.New("not allowed")
+				return nil, nil, http.StatusForbidden, errors.New("Not allowed")
 			}
 			if err := qtx.SetMembershipRole(r.Context(), store.SetMembershipRoleParams{Role: perm.Owner, GroupID: g.ID, UserID: uid}); err != nil {
 				return nil, nil, http.StatusInternalServerError, err
@@ -635,7 +635,7 @@ func (s *Server) setMemberRole(w http.ResponseWriter, r *http.Request) {
 			return []events.Entry{{Kind: "membership", Payload: newOwner}, {Kind: "membership", Payload: oldOwner}}, newOwner, http.StatusOK, nil
 		}
 		if !perm.SetRole(a, target, in.Role) {
-			return nil, nil, http.StatusForbidden, errors.New("not allowed")
+			return nil, nil, http.StatusForbidden, errors.New("Not allowed")
 		}
 		if err := qtx.SetMembershipRole(r.Context(), store.SetMembershipRoleParams{Role: in.Role, GroupID: g.ID, UserID: uid}); err != nil {
 			return nil, nil, http.StatusInternalServerError, err
@@ -660,7 +660,7 @@ func (s *Server) removeMember(w http.ResponseWriter, r *http.Request) {
 			return nil, nil, http.StatusInternalServerError, err
 		}
 		if !perm.CanSee(target) {
-			return nil, nil, http.StatusNotFound, errors.New("not a member")
+			return nil, nil, http.StatusNotFound, errors.New("Not a member")
 		}
 		pg := perm.Group{Kind: g.Kind}
 		allowed := false
@@ -670,7 +670,7 @@ func (s *Server) removeMember(w http.ResponseWriter, r *http.Request) {
 			allowed = perm.RemoveMembers(a) && target.Role != perm.Owner && g.Kind != perm.KindRoot
 		}
 		if !allowed {
-			return nil, nil, http.StatusForbidden, errors.New("not allowed")
+			return nil, nil, http.StatusForbidden, errors.New("Not allowed")
 		}
 		if g.Kind == perm.KindDM {
 			// Hiding a conversation: the row stays, hidden_at is set, and opening the
@@ -745,25 +745,25 @@ func (s *Server) setSettings(w http.ResponseWriter, r *http.Request) {
 	var in Settings
 	r.Body = http.MaxBytesReader(w, r.Body, 4096)
 	if err := json.NewDecoder(r.Body).Decode(&in); err != nil {
-		writeErr(w, http.StatusBadRequest, "bad request body")
+		writeErr(w, http.StatusBadRequest, "Bad request")
 		return
 	}
 	if in.GroupCreation != perm.CreationAnyone && in.GroupCreation != perm.CreationStaff {
-		writeErr(w, http.StatusBadRequest, "group_creation must be anyone or staff")
+		writeErr(w, http.StatusBadRequest, "Who can create rooms must be anyone or staff")
 		return
 	}
 	in.Name = strings.TrimSpace(in.Name)
 	in.Description = strings.TrimSpace(in.Description)
 	if in.Name == "" {
-		writeErr(w, http.StatusBadRequest, "the community needs a name")
+		writeErr(w, http.StatusBadRequest, "The community needs a name")
 		return
 	}
 	if utf8.RuneCountInString(in.Name) > maxNameLen {
-		writeErr(w, http.StatusBadRequest, "the name is too long")
+		writeErr(w, http.StatusBadRequest, "The name is too long")
 		return
 	}
 	if utf8.RuneCountInString(in.Description) > maxDescriptionLen {
-		writeErr(w, http.StatusBadRequest, "the description is too long")
+		writeErr(w, http.StatusBadRequest, "The description is too long")
 		return
 	}
 	s.logged(w, r, "settings", db.Now(), func(qtx *store.Queries) (any, int, error) {

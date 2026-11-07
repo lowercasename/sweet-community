@@ -18,10 +18,10 @@ import (
 )
 
 var (
-	ErrUsernameInvalid  = errors.New("usernames are 2–32 letters, digits or underscores")
-	ErrUsernameReserved = errors.New("that username is reserved")
-	ErrPasswordShort    = errors.New("passwords are at least 8 characters")
-	ErrEmailInvalid     = errors.New("that does not look like an email address")
+	ErrUsernameInvalid  = errors.New("Usernames are 2 to 32 letters, digits or underscores")
+	ErrUsernameReserved = errors.New("That username is reserved")
+	ErrPasswordShort    = errors.New("Passwords are at least 8 characters")
+	ErrEmailInvalid     = errors.New("That does not look like an email address")
 )
 
 var usernameRe = regexp.MustCompile(`^[A-Za-z0-9_]{2,32}$`)

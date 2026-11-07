@@ -2,15 +2,20 @@ import type { ReactNode } from 'react'
 
 interface FieldProps {
   label: string
+  /** A line under the control, for a term the person may not know yet. */
+  hint?: string
   children?: ReactNode
 }
 
 /** A labelled form control. */
-export function Field({ label, children }: FieldProps) {
+export function Field({ label, hint, children }: FieldProps) {
   return (
-    <label className="flex flex-col gap-1">
-      <span className="text-sm font-medium text-mute">{label}</span>
-      {children}
-    </label>
+    <div className="flex flex-col gap-1">
+      <label className="flex flex-col gap-1">
+        <span className="text-sm font-medium text-mute">{label}</span>
+        {children}
+      </label>
+      {hint && <span className="text-xs text-mute">{hint}</span>}
+    </div>
   )
 }

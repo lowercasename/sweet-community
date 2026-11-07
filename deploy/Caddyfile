@@ -1,5 +1,4 @@
-# Stock Caddy: a certificate for the domain from Let's Encrypt, HTTP to
-# HTTPS, and everything to Sweet. The domain comes from .env.
+# Caddy gets the certificate for the domain and passes everything to Sweet.
 {$SWEET_DOMAIN} {
 	encode zstd gzip
 	reverse_proxy sweet:8080

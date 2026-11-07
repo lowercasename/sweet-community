@@ -37,3 +37,7 @@ make e2e
 ## Data to keep out of outputs
 
 Never print or commit `data/sweet.db` (Raphael's own database) or any dump containing emails or password hashes.
+
+## Copy
+
+Raphael, 7 November 2026. Copy is for a person who has never seen Sweet. It explains Sweet's own terms (room, moderator, posts and chat, conversation) at the place where the person first meets them, and never describes how the thing is built: no logs, tokens, streams or seniority rules. Nothing under a heading unless it tells the person something they need. No semicolons, anywhere. Server error messages are capitalised sentences, since the client shows them as they are. A comment in a config file says what a setting is, never what one particular host does with it. Code comments are a programmer's: "last event", "last message", not "last word".

@@ -57,7 +57,7 @@ export function SearchPage({ query, groups, onGo }: SearchPageProps) {
             {error && <Alert tone="error">{error.message}</Alert>}
             {query.trim() !== '' && !loading && hits.length === 0 && !error && (
               <Card>
-                <Text variant="secondary">Nothing matches "{query}" in the rooms you are in.</Text>
+                <Text variant="secondary">Nothing matches "{query}".</Text>
               </Card>
             )}
             {hits.length > 0 && (

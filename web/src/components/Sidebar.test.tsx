@@ -26,7 +26,7 @@ const root = (create: boolean) =>
 const knitting = group('knit', 'member', { name: 'Knitting' })
 const withKit = dm('d1', [kit, raphael])
 const mo = user('mo')
-/** Seven conversations, the newest word in d7, the oldest in d1. */
+/** Seven conversations, the newest message in d7, the oldest in d1. */
 const many = Array.from({ length: 7 }, (_, i) =>
   dm(`d${i + 1}`, [user(`p${i + 1}`), raphael], { last_message_at: i + 1 }),
 )
@@ -78,7 +78,7 @@ describe('Sidebar', () => {
     expect(onGo).toHaveBeenCalledWith('/r/knit')
   })
 
-  it('lists the five conversations with the latest word, the open one too, and All messages at the foot', async () => {
+  it('lists the five conversations with the latest message, the open one too, and All messages at the foot', async () => {
     await draw([root(true), ...many])
     expect(within(messages()).getAllByRole('button').map(nameOf)).toEqual([
       'New message',
@@ -190,6 +190,16 @@ describe('Sidebar', () => {
     expect(screen.getByRole('button', { name: 'Knitting' }).textContent).toBe('K')
     expect(nameOf(screen.getByRole('button', { name: 'Knitting' }))).toBe('Knitting')
     expect(screen.getByRole('navigation').querySelectorAll('hr').length).toBe(2)
+  })
+
+  it('collapsed with no rooms and no conversations, draws no section at all', async () => {
+    await draw([root(true)], '/', false)
+    expect(screen.queryByRole('group')).toBeNull()
+    expect(names()).toEqual(['Home', 'Search', 'Notifications', 'People', 'Community', 'raphael', 'Expand'])
+    cleanup()
+    // Expanded, each section is there to offer its control.
+    await draw([root(true)], '/', true)
+    expect(screen.getAllByRole('group').length).toBe(2)
   })
 
   it('the bell carries a dot while a notification is newer than my marker, and opens the page', async () => {

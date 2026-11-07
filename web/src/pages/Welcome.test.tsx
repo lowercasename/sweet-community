@@ -36,8 +36,8 @@ describe('Welcome', () => {
     // The page reads the live settings too; let that first read land before saving over it.
     await vi.waitFor(() => expect(qc.getQueryData(['settings'])).toBeTruthy())
     expect((screen.getByRole('button', { name: 'Next' }) as HTMLButtonElement).disabled).toBe(true)
-    fireEvent.change(screen.getByLabelText('Name'), { target: { value: 'Knitting Circle' } })
-    fireEvent.change(screen.getByLabelText('What it is for'), { target: { value: 'Wool.' } })
+    fireEvent.change(screen.getByLabelText('Community name'), { target: { value: 'Knitting Circle' } })
+    fireEvent.change(screen.getByLabelText('Short community description'), { target: { value: 'Wool.' } })
     fireEvent.click(screen.getByRole('button', { name: 'Next' }))
     expect(setSettings).toHaveBeenCalledWith({
       name: 'Knitting Circle',

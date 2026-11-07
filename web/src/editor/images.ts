@@ -3,7 +3,7 @@ import { uploadImage, type UploadedImage } from '../api'
 
 export const IMAGE_ACCEPT = 'image/jpeg,image/png,image/webp,image/gif'
 
-/** An uploaded image with the words written about it so far. */
+/** An uploaded image with its alt text so far. */
 export interface AttachedImage extends UploadedImage {
   alt: string
 }

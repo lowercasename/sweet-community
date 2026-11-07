@@ -55,11 +55,11 @@ func (s *Server) listUsers(w http.ResponseWriter, r *http.Request) {
 func removedName(id string) string { return "removed-" + id[len(id)-8:] }
 
 // removeUser takes someone off the instance (architecture.md, Admin
-// tools), by staff from People or by themselves from Settings. Their words
+// tools), by staff from People or by themselves from Settings. Their posts, comments and messages
 // stay under a removed name; each room they own passes by seniority, or
 // closes if they were alone; their conversations keep their place in the
 // set; their sessions end. The name goes out first, so every open page
-// renames their words before their place goes.
+// renames their posts, comments and messages before their membership goes.
 func (s *Server) removeUser(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	me, _ := userFrom(ctx)
@@ -75,7 +75,7 @@ func (s *Server) removeUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if !perm.RemoveFromInstance(a, target) {
-		writeErr(w, http.StatusForbidden, "not allowed")
+		writeErr(w, http.StatusForbidden, "Not allowed")
 		return
 	}
 	now := db.Now()

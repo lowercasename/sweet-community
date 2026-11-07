@@ -99,7 +99,7 @@ func (s *Server) requireAuth(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		u, sid, ok := s.authenticate(r)
 		if !ok {
-			writeErr(w, http.StatusUnauthorized, "sign in first")
+			writeErr(w, http.StatusUnauthorized, "Sign in first")
 			return
 		}
 		ctx := context.WithValue(r.Context(), userKey, u)
@@ -119,7 +119,7 @@ func (s *Server) requireRoot(ok func(perm.Actor) bool, next http.HandlerFunc) ht
 			return
 		}
 		if !ok(a) {
-			writeErr(w, http.StatusForbidden, "not allowed")
+			writeErr(w, http.StatusForbidden, "Not allowed")
 			return
 		}
 		next(w, r)
@@ -137,13 +137,13 @@ func Protect(next http.Handler) http.Handler {
 			return
 		}
 		if site := r.Header.Get("Sec-Fetch-Site"); site == "cross-site" {
-			writeErr(w, http.StatusForbidden, "cross-site request refused")
+			writeErr(w, http.StatusForbidden, "Cross-site request refused")
 			return
 		}
 		if origin := r.Header.Get("Origin"); origin != "" && origin != "null" {
 			o, err := url.Parse(origin)
 			if err != nil || !strings.EqualFold(o.Host, r.Host) {
-				writeErr(w, http.StatusForbidden, "cross-site request refused")
+				writeErr(w, http.StatusForbidden, "Cross-site request refused")
 				return
 			}
 		}
@@ -240,13 +240,13 @@ type credentials struct {
 
 func (s *Server) login(w http.ResponseWriter, r *http.Request) {
 	if !s.limiter.open(s.clientAddr(r)) {
-		writeErr(w, http.StatusTooManyRequests, "too many attempts; wait a moment")
+		writeErr(w, http.StatusTooManyRequests, "Too many attempts. Wait a moment and try again.")
 		return
 	}
 	var in credentials
 	r.Body = http.MaxBytesReader(w, r.Body, 4096)
 	if err := json.NewDecoder(r.Body).Decode(&in); err != nil {
-		writeErr(w, http.StatusBadRequest, "bad request body")
+		writeErr(w, http.StatusBadRequest, "Bad request")
 		return
 	}
 	// The name field takes a username or an email address.
@@ -266,7 +266,7 @@ func (s *Server) login(w http.ResponseWriter, r *http.Request) {
 	if errors.Is(err, sql.ErrNoRows) || !hash.Valid {
 		auth.CheckPassword(auth.DummyHash, in.Password)
 		s.limiter.spend(s.clientAddr(r))
-		writeErr(w, http.StatusUnauthorized, "wrong username or password")
+		writeErr(w, http.StatusUnauthorized, "Wrong username or password")
 		return
 	}
 	if err != nil {
@@ -275,7 +275,7 @@ func (s *Server) login(w http.ResponseWriter, r *http.Request) {
 	}
 	if !auth.CheckPassword(hash.String, in.Password) {
 		s.limiter.spend(s.clientAddr(r))
-		writeErr(w, http.StatusUnauthorized, "wrong username or password")
+		writeErr(w, http.StatusUnauthorized, "Wrong username or password")
 		return
 	}
 	// An account with an address uses it only once the address is verified.

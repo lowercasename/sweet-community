@@ -9,7 +9,7 @@ import { EditorToolbar, promptLink } from './EditorToolbar'
 
 interface BodyEditorProps {
   extensions: Extensions
-  /** What the empty box says; the schema's own words when unset. */
+  /** What the empty box says; the extension's default when unset. */
   placeholder?: string
   /** `post` is a tall box; `line` starts one line high and grows. */
   size: 'post' | 'line'

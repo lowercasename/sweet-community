@@ -17,7 +17,7 @@ import (
 	"github.com/minio/minio-go/v7/pkg/credentials"
 )
 
-var ErrNotFound = errors.New("image not found")
+var ErrNotFound = errors.New("Image not found")
 
 // Store is where image bytes live. Keys are "<id>.<ext>".
 type Store interface {

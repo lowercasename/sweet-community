@@ -100,7 +100,7 @@ func ManageInstance(root Actor) bool { return root.Role == Owner }
 func Transfer(a, target Actor) bool { return a.Role == Owner && target.member() && target.ID != a.ID }
 
 // AddMembers: the group's staff. Nobody is added to a conversation: its
-// people are its identity, and a word with someone else is another
+// people are its identity, and a conversation with someone else is another
 // conversation. In the root group, adding is an invite link.
 // RemoveMembers: the group's staff; in a conversation nobody, people step out.
 func AddMembers(a Actor, g Group) bool { return g.Kind != KindDM && a.staff() }
