@@ -14,10 +14,6 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
-        with:
-          go-version-file: go.mod
-      - run: go vet ./... && go test ./...
       - uses: pnpm/action-setup@v4
         with:
           version: 11
@@ -30,6 +26,13 @@ jobs:
         working-directory: web
       - run: pnpm typecheck && pnpm check:atomic && pnpm format:check && pnpm test
         working-directory: web
+      # The binary embeds the frontend build and a copy of migrations/, so both exist before Go runs.
+      - run: pnpm build
+        working-directory: web
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - run: make cmd/sweet/migrations && go vet ./... && go test ./...
 
   image:
     needs: test
