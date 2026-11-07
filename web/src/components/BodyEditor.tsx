@@ -40,8 +40,8 @@ interface BodyEditorProps {
   allowEmpty?: boolean
   /**
    * Posts on the community's feed (architecture.md, Topics): the topic the
-   * post will carry, a pill beside the submit button, so where it goes is
-   * where the eye is when it is sent. Nothing is shown while no topics exist.
+   * post will carry, a pill after the toolbar: a property of the post, with
+   * the formatting, apart from the actions. Nothing is shown while no topics exist.
    */
   topic?: { topics: Topic[]; value: string | null; onChange: (topicId: string | null) => void }
 }
@@ -185,13 +185,10 @@ export function BodyEditor({
         )}
         <EditorSurface editor={editor} size={size} />
         <Row justify="between" align="center">
-          <EditorToolbar editor={editor} onImage={(files) => addImagesRef.current(files)} />
           <Row gap={2} align="center" wrap="never">
-            {onCancel && (
-              <Button variant="ghost" disabled={busy} onClick={onCancel}>
-                Cancel
-              </Button>
-            )}
+            <Row shrink={false}>
+              <EditorToolbar editor={editor} onImage={(files) => addImagesRef.current(files)} />
+            </Row>
             {topic && topic.topics.length > 0 && (
               <TopicMenu
                 topics={topic.topics}
@@ -202,6 +199,13 @@ export function BodyEditor({
                 label="Topic"
                 disabled={busy || disabled}
               />
+            )}
+          </Row>
+          <Row gap={2} align="center" wrap="never" shrink={false} push="end">
+            {onCancel && (
+              <Button variant="ghost" disabled={busy} onClick={onCancel}>
+                Cancel
+              </Button>
             )}
             <Button type="submit" disabled={!canSubmit}>
               {busy ? busyLabel : submitLabel}

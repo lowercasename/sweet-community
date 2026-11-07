@@ -73,7 +73,9 @@ export function Post({
     setEditing(true)
   }
 
-  // The pill (architecture.md, Topics) opens the topic, for everyone. The topic is changed while editing the post.
+  // The pill (architecture.md, Topics) follows the time in the author line, who, when, where, and opens the topic,
+  // for everyone. The card's right edge is the menu's, which is out of sight until hovered. The topic is changed
+  // while editing the post.
   const pill = topic ? (
     <Pill href={topicPath(topic.id)} label={`Topic: ${topic.name}`}>
       {topic.name}
@@ -133,17 +135,15 @@ export function Post({
     >
       <Stack gap={3}>
         <Stack gap={2}>
-          <Row justify="between" align="center" wrap="never">
-            <Row gap={2} align="center" wrap="never" shrink={false}>
+          <Row justify="between" align="start" wrap="never">
+            <Row gap={2} align="center">
               <PersonName user={author} avatar="md" />
               <Text as="span" variant="small">
                 {linked ? <Link href={postPath(post.id)}>{when}</Link> : when}
               </Text>
-            </Row>
-            <Row gap={1} align="center" wrap="never">
               {!editing && pill}
-              {items.length > 0 && !editing && !disabled && <Menu label="Post options" items={items} reveal="post" />}
             </Row>
+            {items.length > 0 && !editing && !disabled && <Menu label="Post options" items={items} reveal="post" />}
           </Row>
           {editing ? (
             // The stored HTML is the editor's input: no separate document format.

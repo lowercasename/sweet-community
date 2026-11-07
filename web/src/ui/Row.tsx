@@ -28,6 +28,8 @@ interface RowProps {
   wrap?: 'always' | 'narrow' | 'never'
   /** Never shrink: an actions cluster keeps its buttons whole. */
   shrink?: boolean
+  /** Pushed to the end of its line, so an actions cluster that wraps onto its own line stays right-aligned. */
+  push?: 'end'
   children?: ReactNode
 }
 
@@ -39,12 +41,14 @@ export function Row({
   pad = false,
   wrap = 'always',
   shrink = true,
+  push,
   children,
 }: RowProps) {
   const cls = [
     'flex min-w-0 flex-row',
     wrap === 'narrow' ? 'flex-wrap @xl:flex-nowrap' : wrap === 'never' ? 'flex-nowrap' : 'flex-wrap',
     shrink ? '' : 'flex-none',
+    push === 'end' ? 'ml-auto' : '',
     GAPS[gap],
     justify === 'between' ? 'justify-between' : justify === 'end' ? 'justify-end' : 'justify-start',
     align === 'center'

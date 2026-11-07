@@ -5,7 +5,6 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"net/http"
 	"strings"
 	"time"
@@ -61,12 +60,29 @@ func (s *Server) sendToken(ctx context.Context, q *store.Queries, userID, kind, 
 	if err := q.CreateEmailToken(ctx, store.CreateEmailTokenParams{Hash: hash, UserID: userID, Kind: kind, Email: email, CreatedAt: now, ExpiresAt: now + ttl.Milliseconds()}); err != nil {
 		return err
 	}
+	// Every email names the community it comes from, or Sweet before it has a name.
+	community := "Sweet"
+	if st, err := settingsOf(ctx, q); err == nil && st.Name != "" {
+		community = st.Name
+	}
 	var m mail.Message
 	switch kind {
 	case TokenVerify:
-		m = mail.Message{To: email, Subject: "Verify your email for Sweet", Text: fmt.Sprintf("Open this link to verify your email address:\n\n%s/verify/%s\n\nIt works once, for a day. If you did not ask for it, ignore this.", s.BaseURL, token)}
+		m = mail.Content{
+			Community: community,
+			Heading:   "Verify your email address",
+			Lines:     []string{"Open the link to verify your address and sign in to " + community + "."},
+			Action:    &mail.Action{Label: "Verify and sign in", URL: s.BaseURL + "/verify/" + token},
+			Note:      "It works once, for a day. If you did not ask for it, ignore this.",
+		}.Message(email, "Verify your email for "+community)
 	case TokenReset:
-		m = mail.Message{To: email, Subject: "Reset your Sweet password", Text: fmt.Sprintf("Open this link to choose a new password:\n\n%s/reset/%s\n\nIt works once, for an hour. If you did not ask for it, ignore this and your password stays as it is.", s.BaseURL, token)}
+		m = mail.Content{
+			Community: community,
+			Heading:   "Choose a new password",
+			Lines:     []string{"Open the link to choose a new password for " + community + "."},
+			Action:    &mail.Action{Label: "Choose a new password", URL: s.BaseURL + "/reset/" + token},
+			Note:      "It works once, for an hour. If you did not ask for it, ignore this and your password stays as it is.",
+		}.Message(email, "Reset your password for "+community)
 	}
 	if s.Mail == nil {
 		return errors.New("Email is not set up")
