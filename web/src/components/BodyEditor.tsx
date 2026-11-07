@@ -186,28 +186,26 @@ export function BodyEditor({
         <EditorSurface editor={editor} size={size} />
         <Row justify="between" align="center">
           <EditorToolbar editor={editor} onImage={(files) => addImagesRef.current(files)} />
-          <Row gap={3} align="center">
+          <Row gap={2} align="center" wrap="never">
             {onCancel && (
               <Button variant="ghost" disabled={busy} onClick={onCancel}>
                 Cancel
               </Button>
             )}
-            <Row gap={2} align="center" wrap="never">
-              {topic && topic.topics.length > 0 && (
-                <TopicMenu
-                  topics={topic.topics}
-                  value={topic.value}
-                  onChange={topic.onChange}
-                  noneLabel="No topic"
-                  emptyLabel="Set topic"
-                  label="Topic"
-                  disabled={busy || disabled}
-                />
-              )}
-              <Button type="submit" disabled={!canSubmit}>
-                {busy ? busyLabel : submitLabel}
-              </Button>
-            </Row>
+            {topic && topic.topics.length > 0 && (
+              <TopicMenu
+                topics={topic.topics}
+                value={topic.value}
+                onChange={topic.onChange}
+                noneLabel="No topic"
+                emptyLabel="Set topic"
+                label="Topic"
+                disabled={busy || disabled}
+              />
+            )}
+            <Button type="submit" disabled={!canSubmit}>
+              {busy ? busyLabel : submitLabel}
+            </Button>
           </Row>
         </Row>
         {error && <Alert tone="error">{error}</Alert>}

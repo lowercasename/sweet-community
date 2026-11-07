@@ -93,6 +93,7 @@ test.describe('topics', () => {
     const moPost = article(mo.page, second)
     await moPost.getByRole('button', { name: 'Post options' }).click()
     await mo.page.getByRole('menuitem', { name: 'Edit' }).click()
+    await mo.page.screenshot({ path: `test-results/topics-${testInfo.project.name}-edit.png` })
     await moPost.getByRole('button', { name: 'Topic' }).click()
     await mo.page.getByRole('menuitemradio', { name: 'No topic' }).click()
     await moPost.getByRole('button', { name: 'Save' }).click()

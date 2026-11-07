@@ -6,7 +6,7 @@ import { feedStream, markerOf } from '../data/notifications'
 import { usePageVisible } from '../hooks/usePageVisible'
 import { useStreamStatus } from '../hooks/StreamContext'
 import { topicPath } from '../routes'
-import { Alert, Button, Card, Measure, Pane, Row, ScrollArea, Stack, Text } from '../ui'
+import { Alert, Button, Card, Measure, Pane, PillCaption, Row, ScrollArea, Stack, Text } from '../ui'
 import { postExtensions } from '../editor/extensions'
 import { BodyEditor } from './BodyEditor'
 import { ConnectionStatus } from './ConnectionStatus'
@@ -76,7 +76,7 @@ export function PostsPane({ groupId, side = 'full', watching, topicId = null }: 
             <Card
               head={
                 topical && (
-                  <Stack gap={1}>
+                  <Stack gap={2}>
                     <Row justify="between" align="center" wrap="never">
                       <TopicMenu
                         topics={topics}
@@ -98,7 +98,7 @@ export function PostsPane({ groupId, side = 'full', watching, topicId = null }: 
                         </Button>
                       )}
                     </Row>
-                    {topic?.description && <Text variant="small">{topic.description}</Text>}
+                    {topic?.description && <PillCaption>{topic.description}</PillCaption>}
                   </Stack>
                 )
               }

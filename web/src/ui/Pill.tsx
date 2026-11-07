@@ -74,3 +74,12 @@ export function Pill({ href, onClick, label, tone = 'topic', size = 'sm', childr
     </span>
   )
 }
+
+/**
+ * A line under a control pill that belongs to it (a topic's description):
+ * small and quiet, nudged a few pixels in from the pill's rounded edge so
+ * it sits under the pill's text rather than hugging the card's edge.
+ */
+export function PillCaption({ children }: { children?: ReactNode }) {
+  return <p className="m-0 pl-2 text-sm leading-snug text-mute [overflow-wrap:anywhere]">{children}</p>
+}

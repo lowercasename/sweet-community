@@ -23,7 +23,7 @@ export function Card({ as = 'div', label, fill = false, flush = false, tone = 'c
   const pad = tone === 'field' ? 'p-3' : 'p-4'
   // An article (a post) is a `block-post`: its revealed Menu shows while it is hovered (ui/Menu).
   const cls = `${as === 'article' ? 'block-post ' : ''}${frame} ${fill ? 'flex min-h-0 flex-1 flex-col overflow-hidden' : pad}`
-  const strip = head ? <div className="-mx-4 -mt-4 mb-4 border-b border-line px-4 py-3">{head}</div> : null
+  const strip = head ? <div className="-mx-4 -mt-4 mb-4 border-b border-line px-4 pt-3 pb-3.5">{head}</div> : null
   return as === 'article' ? (
     <article className={cls}>
       {strip}
