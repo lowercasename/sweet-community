@@ -8,5 +8,3 @@ web/playwright-report
 web/e2e/.auth
 internal/web/dist
 cmd/sweet/migrations
-charts
-/sweet-retrospective.html

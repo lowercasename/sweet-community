@@ -2,7 +2,7 @@
 
 A small social network for one group: one feed of long posts, one chat room, side by side, run as one binary. Proof of concept.
 
-Design notes: `architecture.md`. Why: `sweet-retrospective.html`.
+Design notes: `architecture.md`.
 
 ## Run your own
 
