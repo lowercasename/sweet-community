@@ -1,6 +1,8 @@
 # The Sweet binary and Litestream in one image. deploy/ has the compose stack that runs it.
+# The frontend and the binary are built on the build machine for the target platform, so an
+# arm64 image does not need emulation beyond its last stage.
 
-FROM node:22-alpine AS web
+FROM --platform=$BUILDPLATFORM node:22-alpine AS web
 RUN npm install -g pnpm@11
 WORKDIR /src/web
 COPY web/package.json web/pnpm-lock.yaml web/pnpm-workspace.yaml ./
@@ -9,7 +11,8 @@ COPY web ./
 # Vite writes to ../internal/web/dist.
 RUN pnpm build
 
-FROM golang:1.26-alpine AS build
+FROM --platform=$BUILDPLATFORM golang:1.26-alpine AS build
+ARG TARGETOS TARGETARCH
 WORKDIR /src
 COPY go.mod go.sum ./
 RUN go mod download
@@ -17,7 +20,7 @@ COPY . ./
 COPY --from=web /src/internal/web/dist ./internal/web/dist
 # go:embed cannot reach ../../migrations (see the Makefile).
 RUN rm -rf cmd/sweet/migrations && cp -R migrations cmd/sweet/migrations \
- && CGO_ENABLED=0 go build -trimpath -ldflags '-s -w' -o /sweet ./cmd/sweet
+ && CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH go build -trimpath -ldflags '-s -w' -o /sweet ./cmd/sweet
 
 FROM alpine:3.21
 RUN apk add --no-cache ca-certificates tzdata \

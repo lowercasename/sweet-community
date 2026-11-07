@@ -3,8 +3,8 @@ name: sweet
 
 services:
   sweet:
+    image: ${SWEET_IMAGE:-ghcr.io/lowercasename/sweet-community:latest}
     build: ..
-    image: sweet
     restart: unless-stopped
     env_file: .env
     environment:

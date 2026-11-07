@@ -18,22 +18,26 @@ Sweet runs as one container, with Caddy in a second one for HTTPS. Everything it
 ### Install
 
 ```
-git clone <the Sweet repository> sweet
+git clone https://github.com/lowercasename/sweet-community.git sweet
 cd sweet/deploy
 cp env.example .env
 nano .env                      # the domain, then email and the bucket if you have them
-docker compose up -d --build   # builds the image (a few minutes the first time) and starts it
+docker compose pull            # fetches the image
+docker compose up -d           # starts it
 docker compose logs sweet      # look for the line starting SETUP:
 ```
 
 The `SETUP:` line holds a link. Open it to become the owner, name the community and get an invite link to send to your people.
+
+The image is built from this repository on every change, for amd64 and arm64. To build it yourself instead, run `docker compose up -d --build` in place of the pull.
 
 ### If you already run a reverse proxy
 
 Use `compose.proxied.yml` instead. It starts Sweet alone, listening on `127.0.0.1:8080` (`SWEET_PORT` in `.env` changes the port).
 
 ```
-docker compose -f compose.proxied.yml up -d --build
+docker compose -f compose.proxied.yml pull
+docker compose -f compose.proxied.yml up -d
 ```
 
 Send the domain to that port from your proxy. It must pass `X-Forwarded-For` and `X-Forwarded-Proto`, which Caddy, nginx and Traefik do by default. In a Caddyfile:
@@ -73,15 +77,16 @@ Any S3 service works in place of R2. Set `SWEET_S3_REGION` to its region.
 cd sweet
 git pull
 cd deploy
-docker compose up -d --build
+docker compose pull
+docker compose up -d
 ```
 
-Before changing the database's structure, Sweet keeps a copy of it beside it in the volume as `sweet.db.before-upgrade`. Open tabs reload themselves. `docker compose run --rm sweet -version` prints the installed version.
+`git pull` brings any change to the compose files, and `docker compose pull` the new image. Before changing the database's structure, Sweet keeps a copy of it beside it in the volume as `sweet.db.before-upgrade`. Open tabs reload themselves.
 
 ### Restoring
 
 - **The server is gone.** On a new one, install as above with the same `.env`. Sweet finds no database, fetches the latest from the bucket and starts. The images are already there.
-- **An upgrade went wrong.** `docker compose down`, go back to the version you had (`git checkout <the previous commit>`), then `docker compose run --rm sweet sh -c 'cp /data/sweet.db.before-upgrade /data/sweet.db'` and `docker compose up -d --build`.
+- **An upgrade went wrong.** `docker compose down`. Find the commit you were on in `git log` and put `SWEET_IMAGE=ghcr.io/lowercasename/sweet-community:sha-<its first seven characters>` in `.env`. Then `docker compose run --rm sweet sh -c 'cp /data/sweet.db.before-upgrade /data/sweet.db'` and `docker compose up -d`. Remove the `SWEET_IMAGE` line when the next release is good.
 - **Something was deleted and you want the database as it was at a moment.** Stop Sweet, restore the database as of that moment (UTC), start it:
 
   ```
