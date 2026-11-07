@@ -54,7 +54,7 @@ function InviteRow({ invite, onRevoke }: { invite: Invite; onRevoke: () => void 
         </Button>
       </Row>
       <Text variant="small">
-        Anyone with the link can join until <Time at={invite.expires_at} />
+        Expires <Time at={invite.expires_at} />
         {invite.uses > 0 && ` · ${invite.uses} joined through it`}
       </Text>
     </Stack>

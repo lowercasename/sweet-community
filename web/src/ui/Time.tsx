@@ -5,11 +5,12 @@ interface TimeProps {
   at: number
 }
 
-function relative(at: number, now: number): string {
+/** How long ago, or until, in a word. A server's clock and a browser's never agree exactly, so under a minute either way is just now. */
+export function relative(at: number, now: number): string {
   const future = at > now
   const s = Math.round(Math.abs(now - at) / 1000)
   const wrap = (v: string) => (future ? `in ${v}` : `${v} ago`)
-  if (s < 45) return future ? 'any moment' : 'just now'
+  if (s < 45) return 'just now'
   const m = Math.round(s / 60)
   if (m < 60) return wrap(`${m}m`)
   const h = Math.round(m / 60)
