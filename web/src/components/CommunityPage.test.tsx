@@ -5,6 +5,7 @@ import { renderWithQuery } from '../test-utils'
 
 /** The owner's page for the community: name, what it is for, who may make rooms. */
 vi.mock('../api', () => ({
+  listTopics: vi.fn(() => Promise.resolve({ topics: [] })),
   getSettings: vi.fn(() =>
     Promise.resolve({ group_creation: 'anyone', name: 'Knitting Circle', description: 'Wool.', owner_set: true }),
   ),

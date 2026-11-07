@@ -2,6 +2,9 @@ import {
   ArrowLeft,
   Bell,
   Bold,
+  Check,
+  ChevronDown,
+  Tag,
   ChevronsLeft,
   GripVertical,
   ChevronsRight,
@@ -53,6 +56,9 @@ export type IconName =
   | 'trash'
   | 'plus'
   | 'back'
+  | 'tag'
+  | 'chevron'
+  | 'check'
 
 const ICONS: Record<IconName, LucideIcon> = {
   bold: Bold,
@@ -80,6 +86,9 @@ const ICONS: Record<IconName, LucideIcon> = {
   trash: Trash2,
   plus: Plus,
   back: ArrowLeft,
+  tag: Tag,
+  chevron: ChevronDown,
+  check: Check,
 }
 
 interface IconProps {

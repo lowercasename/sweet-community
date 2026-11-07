@@ -9,6 +9,32 @@ vi.mock('../api', () => ({
   listMarkers: vi.fn(),
   setMarker: vi.fn(),
   listUsers: vi.fn(() => Promise.resolve({ users: [] })),
+  listTopics: vi.fn(() =>
+    Promise.resolve({
+      topics: [
+        {
+          id: 't1',
+          name: 'Practice',
+          description: 'What works.',
+          created_at: 1,
+          post_count: 2,
+          follower_count: 1,
+          following: false,
+        },
+      ],
+    }),
+  ),
+  followTopic: vi.fn((id: string, on: boolean) =>
+    Promise.resolve({
+      id,
+      name: 'Practice',
+      description: 'What works.',
+      created_at: 1,
+      post_count: 2,
+      follower_count: on ? 2 : 1,
+      following: on,
+    }),
+  ),
 }))
 
 const mo = user('mo')
@@ -40,5 +66,35 @@ describe('PostsPane reading', () => {
     await draw(false)
     await new Promise((r) => setTimeout(r, 1200))
     expect(setMarker).not.toHaveBeenCalled()
+  })
+})
+
+/** Showing one topic (architecture.md, Topics): the feed narrows, a strip names it, Notify me follows it. */
+describe('PostsPane showing a topic', () => {
+  it('fetches that topic alone, names it above the composer, and follows it on Notify me', async () => {
+    const { getPosts, followTopic } = await import('../api')
+    const { PostsPane } = await import('./PostsPane')
+    const { fireEvent } = await import('@testing-library/react')
+    renderWithQuery(<PostsPane groupId={ROOT} topicId="t1" watching={false} />)
+    await screen.findByText('p20')
+    expect(getPosts).toHaveBeenCalledWith(ROOT, null, 20, 't1')
+    const strip = await screen.findByRole('region', { name: 'Topic' })
+    expect(strip.textContent).toContain('Practice')
+    expect(strip.textContent).toContain('What works.')
+    const notify = screen.getByRole('button', { name: 'Notify me' })
+    expect(notify.getAttribute('aria-pressed')).toBe('false')
+    fireEvent.click(notify)
+    expect(followTopic).toHaveBeenCalledWith('t1', true)
+    await vi.waitFor(() =>
+      expect(screen.getByRole('button', { name: 'Notify me' }).getAttribute('aria-pressed')).toBe('true'),
+    )
+    expect(screen.getByRole('link', { name: 'Show everything' }).getAttribute('href')).toBe('/')
+  })
+
+  it('shows no strip and asks for everything when no topic is named', async () => {
+    const { getPosts } = await import('../api')
+    await draw(false)
+    expect(getPosts).toHaveBeenCalledWith(ROOT, null, 20, null)
+    expect(screen.queryByRole('region', { name: 'Topic' })).toBeNull()
   })
 })

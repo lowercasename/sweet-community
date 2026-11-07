@@ -11,6 +11,12 @@ import {
   createInvite,
   createMessage,
   createPost,
+  createTopic,
+  deleteTopic,
+  followTopic,
+  listTopics,
+  setPostTopic,
+  updateTopic,
   deleteComment,
   deleteGroup,
   deleteMessage,
@@ -51,9 +57,10 @@ import {
   type Notification,
   type Role,
   type Settings,
+  type Topic,
   type User,
 } from '../api'
-import { applyEvent, findPost } from './apply'
+import { applyEvent, applyFollowing, findPost } from './apply'
 import { ROOT_ID, keys } from './keys'
 import { NOTIFICATIONS, unreadPlaces, type UnreadPlace } from './notifications'
 
@@ -127,10 +134,10 @@ export function useRootGroup(): Group | undefined {
   return useGroups().groups.find((g) => g.kind === 'root')
 }
 
-export function usePosts(groupId: string) {
+export function usePosts(groupId: string, topicId: string | null = null) {
   const q = useInfiniteQuery({
-    queryKey: keys.posts(groupId),
-    queryFn: ({ pageParam }) => getPosts(groupId, pageParam),
+    queryKey: keys.posts(groupId, topicId),
+    queryFn: ({ pageParam }) => getPosts(groupId, pageParam, 20, topicId),
     initialPageParam: null as number | null,
     getNextPageParam: (last) => last.next_before,
   })
@@ -170,11 +177,15 @@ export function usePost(id: string, enabled = true) {
 export function usePostActions(groupId: string) {
   const qc = useQueryClient()
   return {
-    async create(html: string) {
-      applyEvent(qc, 'post', await createPost(groupId, html))
+    async create(html: string, topicId: string | null = null) {
+      applyEvent(qc, 'post', await createPost(groupId, html, topicId))
     },
     async edit(id: string, html: string) {
       applyEvent(qc, 'post', await updatePost(id, html))
+    },
+    /** Files a post under a topic, or none (architecture.md, Topics). */
+    async setTopic(id: string, topicId: string | null) {
+      applyEvent(qc, 'post', await setPostTopic(id, topicId))
     },
     async remove(id: string) {
       await deletePost(id)
@@ -452,6 +463,31 @@ export function useSetBio() {
 
 /** The instance's settings; only the root owner may ask. */
 /** The community's settings: its name above all, which every page wears. Public, so the sign-in page reads them too. */
+/** The community's topics, alphabetical, with whether I follow each (architecture.md, Topics). */
+export function useTopics(): { topics: Topic[]; loading: boolean; error: Error | null } {
+  const q = useQuery({ queryKey: keys.topics, queryFn: listTopics })
+  return { topics: q.data?.topics ?? [], loading: q.isPending, error: q.error }
+}
+
+export function useTopicActions() {
+  const qc = useQueryClient()
+  return {
+    async create(name: string, description: string) {
+      applyEvent(qc, 'topic', await createTopic(name, description))
+    },
+    async update(id: string, name: string, description: string) {
+      applyEvent(qc, 'topic', await updateTopic(id, name, description))
+    },
+    async remove(id: string) {
+      await deleteTopic(id)
+      applyEvent(qc, 'topic_delete', { id })
+    },
+    async follow(id: string, on: boolean) {
+      applyFollowing(qc, await followTopic(id, on))
+    },
+  }
+}
+
 export function useSettings() {
   const q = useQuery({ queryKey: keys.settings, queryFn: getSettings })
   return { settings: q.data, error: q.error }

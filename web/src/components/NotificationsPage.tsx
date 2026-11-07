@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import type { Group, Notification } from '../api'
-import { useAuthor, useClearNotifications, useNotifications, useReadNotification } from '../data/hooks'
+import { useAuthor, useClearNotifications, useNotifications, useReadNotification, useTopics } from '../data/hooks'
 import { describe, targetOf } from '../data/notifications'
 import {
   Alert,
@@ -118,7 +118,8 @@ interface NotificationRowProps {
 /** One line: who, what, when. The row is the control, so the name is text, not a card. Unopened, it is marked new. */
 function NotificationRow({ notification: n, groups, onOpen }: NotificationRowProps) {
   const actor = useAuthor(n.actor)
-  const sentence = `${actor.username} ${describe(n, groups)}`
+  const { topics } = useTopics()
+  const sentence = `${actor.username} ${describe(n, groups, topics)}`
   const fresh = n.read_at == null
   return (
     <ListItem>

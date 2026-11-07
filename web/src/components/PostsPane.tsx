@@ -1,9 +1,10 @@
-import { useEffect } from 'react'
-import { useMarkRead, useMarkers, usePostActions, usePosts } from '../data/hooks'
+import { useEffect, useState } from 'react'
+import { useMarkRead, useMarkers, usePostActions, usePosts, useTopicActions, useTopics } from '../data/hooks'
+import { ROOT_ID } from '../data/keys'
 import { feedStream, markerOf } from '../data/notifications'
 import { usePageVisible } from '../hooks/usePageVisible'
 import { useStreamStatus } from '../hooks/StreamContext'
-import { Alert, Button, Card, Measure, Pane, Row, ScrollArea, Stack, Text } from '../ui'
+import { Alert, Button, Card, Heading, Link, Measure, Pane, Row, ScrollArea, Stack, Text } from '../ui'
 import { postExtensions } from '../editor/extensions'
 import { BodyEditor } from './BodyEditor'
 import { ConnectionStatus } from './ConnectionStatus'
@@ -16,16 +17,39 @@ interface PostsPaneProps {
   side?: 'left' | 'right' | 'full'
   /** Being looked at: open, and not behind another page. Looking is reading. */
   watching: boolean
+  /** The community's feed showing one topic (architecture.md, Topics), from the URL. */
+  topicId?: string | null
 }
 
 /** A feed marks itself read this long after the newest post it showed. */
 const READ_DEBOUNCE_MS = 800
 
-export function PostsPane({ groupId, side = 'full', watching }: PostsPaneProps) {
+export function PostsPane({ groupId, side = 'full', watching, topicId = null }: PostsPaneProps) {
   const status = useStreamStatus()
-  const { posts, loading, error, hasMore, loadMore } = usePosts(groupId)
-  const { create, edit, remove } = usePostActions(groupId)
+  const { posts, loading, error, hasMore, loadMore } = usePosts(groupId, topicId)
+  const { create, edit, remove, setTopic } = usePostActions(groupId)
   const offline = status === 'offline'
+  // Topics are the community's feed's alone. The composer starts with the topic showing.
+  const { topics } = useTopics()
+  const topical = groupId === ROOT_ID && topics.length > 0
+  const topic = topical ? topics.find((t) => t.id === topicId) : undefined
+  const topicActions = useTopicActions()
+  const [draftTopic, setDraftTopic] = useState<string | null>(topicId)
+  useEffect(() => setDraftTopic(topicId), [topicId])
+  const [following, setFollowing] = useState(false)
+  const follow = async () => {
+    if (!topic) return
+    setFollowing(true)
+    try {
+      await topicActions.follow(topic.id, !topic.following)
+    } finally {
+      setFollowing(false)
+    }
+  }
+  const post = async (html: string) => {
+    await create(html, topical ? draftTopic : null)
+    setDraftTopic(topicId)
+  }
 
   // Looking is reading (architecture.md, Notifications): while watched and
   // the page is in front, my marker on this feed follows its newest post.
@@ -44,16 +68,42 @@ export function PostsPane({ groupId, side = 'full', watching }: PostsPaneProps) 
       <ScrollArea>
         <Measure>
           <Stack gap={3}>
+            {topic && (
+              <Card as="section" label="Topic" tone="field">
+                <Row justify="between" align="center">
+                  <Stack gap={0}>
+                    <Heading level={3}>{topic.name}</Heading>
+                    {topic.description && <Text variant="small">{topic.description}</Text>}
+                  </Stack>
+                  <Row gap={2} align="center" shrink={false}>
+                    <Button
+                      variant="ghost"
+                      icon="bell"
+                      pressed={topic.following}
+                      disabled={following || offline}
+                      onClick={() => void follow()}
+                    >
+                      Notify me
+                    </Button>
+                    <Text as="span" variant="small">
+                      <Link href="/">Show everything</Link>
+                    </Text>
+                  </Row>
+                </Row>
+              </Card>
+            )}
             <Card>
               <Stack gap={1}>
                 <ConnectionStatus status={status} />
                 <BodyEditor
                   extensions={postExtensions}
                   size="post"
+                  placeholder={topic ? `Say something in ${topic.name}…` : undefined}
                   submitLabel="Post"
                   busyLabel="Posting…"
                   disabled={offline}
-                  onSubmit={create}
+                  onSubmit={post}
+                  topic={topical ? { topics, value: draftTopic, onChange: setDraftTopic } : undefined}
                 />
               </Stack>
             </Card>
@@ -61,7 +111,13 @@ export function PostsPane({ groupId, side = 'full', watching }: PostsPaneProps) 
               {loading && posts.length === 0 ? (
                 <Text variant="secondary">Loading…</Text>
               ) : (
-                <PostList posts={posts} disabled={offline} onEdit={edit} onDelete={remove} />
+                <PostList
+                  posts={posts}
+                  disabled={offline}
+                  onEdit={edit}
+                  onDelete={remove}
+                  onSetTopic={topical ? setTopic : undefined}
+                />
               )}
               {error && <Alert tone="error">{error.message}</Alert>}
               {hasMore && (

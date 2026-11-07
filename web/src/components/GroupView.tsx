@@ -9,6 +9,8 @@ interface GroupViewProps {
   group: Group
   /** Hidden behind another page, but kept mounted so drafts survive. */
   hidden: boolean
+  /** The community's feed showing one topic (architecture.md, Topics). */
+  topicId?: string | null
 }
 
 /** What to call a group in the nav and at the top of its view: a conversation is its other person. */
@@ -22,7 +24,7 @@ export function groupLabel(g: Group, me: User): string {
  * exactly as the root group is; one pane across the whole width otherwise.
  * The bar above them (GroupBar) is Home's, since it outlives the view.
  */
-export function GroupView({ group, hidden }: GroupViewProps) {
+export function GroupView({ group, hidden, topicId = null }: GroupViewProps) {
   const { layout, narrow, ratio, setLayout, setRatio } = useLayout()
   const both = group.mode === 'both'
   const show = layout === 'both' ? 'both' : layout === 'posts' ? 'left' : 'right'
@@ -64,6 +66,7 @@ export function GroupView({ group, hidden }: GroupViewProps) {
               groupId={group.id}
               side={show === 'both' ? 'left' : 'full'}
               watching={!hidden && show !== 'right'}
+              topicId={topicId}
             />
           }
           right={
@@ -75,7 +78,7 @@ export function GroupView({ group, hidden }: GroupViewProps) {
           }
         />
       ) : group.mode === 'posts' ? (
-        <PostsPane groupId={group.id} watching={!hidden} />
+        <PostsPane groupId={group.id} watching={!hidden} topicId={topicId} />
       ) : (
         <ChatPane groupId={group.id} watching={!hidden} />
       )}

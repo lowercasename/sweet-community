@@ -14,6 +14,7 @@ vi.mock('../api', () => ({
   listMarkers: vi.fn(() => Promise.resolve({ markers: [] })),
   readNotification: vi.fn(),
   clearNotifications: vi.fn(),
+  listTopics: vi.fn(() => Promise.resolve({ topics: [] })),
   listUsers: vi.fn(() => Promise.resolve({ users: [] })),
 }))
 

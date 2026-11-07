@@ -22,6 +22,7 @@ vi.mock('../api', async (importOriginal) => ({
   getUserPosts: vi.fn(() => Promise.resolve({ posts: [], next_before: null })),
   getComments: vi.fn(() => Promise.resolve({ comments: [] })),
   getMessages: vi.fn(() => Promise.resolve({ messages: [], next_before: null })),
+  listTopics: vi.fn(() => Promise.resolve({ topics: [] })),
   listUsers: vi.fn(),
   listGroups: vi.fn(),
   listMembers: vi.fn(() => Promise.resolve({ members: [] })),
@@ -99,7 +100,7 @@ describe('Home', () => {
   it('shows the root group and fetches its feed and room once each', async () => {
     const { getPosts, getMessages } = await import('../api')
     await home()
-    expect(getPosts).toHaveBeenCalledWith(ROOT, null)
+    expect(getPosts).toHaveBeenCalledWith(ROOT, null, 20, null)
     expect(getMessages).toHaveBeenCalledWith(ROOT, null)
   })
 

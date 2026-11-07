@@ -2,11 +2,11 @@
 -- own and nobody else's. Markers likewise.
 
 -- name: CreateNotification :exec
-INSERT INTO notifications (id, user_id, kind, actor_id, group_id, post_id, created_at)
-VALUES (sqlc.arg(id), sqlc.arg(user_id), sqlc.arg(kind), sqlc.arg(actor_id), sqlc.arg(group_id), sqlc.arg(post_id), sqlc.arg(created_at));
+INSERT INTO notifications (id, user_id, kind, actor_id, group_id, post_id, topic_id, created_at)
+VALUES (sqlc.arg(id), sqlc.arg(user_id), sqlc.arg(kind), sqlc.arg(actor_id), sqlc.arg(group_id), sqlc.arg(post_id), sqlc.narg(topic_id), sqlc.arg(created_at));
 
 -- name: GetNotification :one
-SELECT n.id, n.user_id, n.kind, n.group_id, n.post_id, n.created_at, n.read_at,
+SELECT n.id, n.user_id, n.kind, n.group_id, n.post_id, n.topic_id, n.created_at, n.read_at,
        u.id AS actor_id, u.username AS actor_username, u.picture_id AS actor_picture_id
 FROM notifications n JOIN users u ON u.id = n.actor_id
 WHERE n.id = sqlc.arg(id);
@@ -16,7 +16,7 @@ WHERE n.id = sqlc.arg(id);
 UPDATE notifications SET read_at = sqlc.arg(read_at) WHERE id = sqlc.arg(id) AND user_id = sqlc.arg(user_id) AND read_at IS NULL;
 
 -- name: ListNotifications :many
-SELECT n.id, n.user_id, n.kind, n.group_id, n.post_id, n.created_at, n.read_at,
+SELECT n.id, n.user_id, n.kind, n.group_id, n.post_id, n.topic_id, n.created_at, n.read_at,
        u.id AS actor_id, u.username AS actor_username, u.picture_id AS actor_picture_id
 FROM notifications n JOIN users u ON u.id = n.actor_id
 WHERE n.user_id = sqlc.arg(user_id) AND n.created_at < sqlc.arg(before)

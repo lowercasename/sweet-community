@@ -1,7 +1,15 @@
 import { useEffect, useState } from 'react'
 import { Redirect, Route, Switch, useLocation, useRoute, useSearch } from 'wouter'
 import type { User } from '../api'
-import { useAuthor, useGroupActions, useGroups, usePost, useUnreadNotifications, useUnreadPlaces } from '../data/hooks'
+import {
+  useAuthor,
+  useGroupActions,
+  useGroups,
+  usePost,
+  useTopics,
+  useUnreadNotifications,
+  useUnreadPlaces,
+} from '../data/hooks'
 import { anyUnread } from '../data/notifications'
 import { StreamProvider } from '../hooks/StreamContext'
 import { useLayout } from '../hooks/useLayout'
@@ -15,6 +23,7 @@ import {
   groupPath,
   membersPath,
   profilePath,
+  topicPath,
 } from '../routes'
 import { CommunityPage } from '../components/CommunityPage'
 import { GroupView, groupLabel } from '../components/GroupView'
@@ -31,6 +40,7 @@ import { ProfilePage } from '../components/ProfilePage'
 import { SearchPage } from '../components/SearchPage'
 import { SettingsPage } from '../components/SettingsPage'
 import { Sidebar } from '../components/Sidebar'
+import { TopicMenu } from '../components/TopicMenu'
 import { Button, ConfirmDialog, Menu, Segmented, Shell, TabBar, Text } from '../ui'
 
 /** What the bar calls each page that is not a place. */
@@ -70,9 +80,12 @@ export function Home({ me, onSignOut }: HomeProps) {
   const [atMembers, membersParams] = useRoute('/r/:id/members')
   const [atPost, postParams] = useRoute('/p/:id')
   const [atProfile, profileParams] = useRoute('/u/:name')
-  // The words searched for live in the URL.
-  const searched = new URLSearchParams(useSearch()).get('q') ?? ''
+  // The words searched for live in the URL, and so does the topic Home is showing (architecture.md, Topics).
+  const search = new URLSearchParams(useSearch())
+  const searched = search.get('q') ?? ''
   const atRoot = location === '/'
+  const topicId = atRoot ? search.get('topic') : null
+  const { topics, loading: topicsLoading } = useTopics()
   // A post's page sits over the room the post is in, once the post is known.
   const { post: openPost } = usePost(postParams?.id ?? '', atPost)
 
@@ -133,8 +146,9 @@ export function Home({ me, onSignOut }: HomeProps) {
                 }
               : { title: PAGE_TITLES[location] ?? 'Home' }
 
-  // A group the URL names that is not mine (or is gone) does not exist to me.
+  // A group the URL names that is not mine (or is gone) does not exist to me. A topic that is gone is everything.
   if (!loading && named && !groups.some((g) => g.id === named)) return <Redirect to="/" replace />
+  if (topicId && !topicsLoading && !topics.some((t) => t.id === topicId)) return <Redirect to="/" replace />
   // A conversation has no members page: it is two people, named in its bar.
   if (atMembers && current?.kind === 'dm') return <Redirect to={groupPath(current.id)} replace />
 
@@ -157,6 +171,16 @@ export function Home({ me, onSignOut }: HomeProps) {
         {/* The phone's menu is the one view under no bar: it is not a place to be named. */}
         {location !== '/menu' && (
           <PageBar title={bar.title} back={bar.back}>
+            {atRoot && topics.length > 0 && (
+              <TopicMenu
+                topics={topics}
+                value={topicId}
+                onChange={(id) => navigate(id ? topicPath(id) : '/')}
+                noneLabel="Everything"
+                label="Topic"
+                trigger="pill"
+              />
+            )}
             {narrow && viewing && current?.mode === 'both' && (
               <Segmented
                 label="View"
@@ -247,7 +271,7 @@ export function Home({ me, onSignOut }: HomeProps) {
             <Redirect to="/" replace />
           </Route>
         </Switch>
-        {current && <GroupView key={current.id} group={current} hidden={!viewing} />}
+        {current && <GroupView key={current.id} group={current} hidden={!viewing} topicId={topicId} />}
         <ConfirmDialog
           open={hiding}
           title="Hide this conversation?"

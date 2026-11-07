@@ -12,6 +12,7 @@ interface InputProps {
   /** Its name when no Field labels it (a search box). */
   label?: string
   placeholder?: string
+  maxLength?: number
 }
 
 /** A single-line text input in the editor's style. */
@@ -27,6 +28,7 @@ export function Input({
   selectOnFocus,
   label,
   placeholder,
+  maxLength,
 }: InputProps) {
   return (
     <input
@@ -42,6 +44,7 @@ export function Input({
       readOnly={readOnly}
       aria-label={label}
       placeholder={placeholder}
+      maxLength={maxLength}
       spellCheck={false}
     />
   )

@@ -1,6 +1,7 @@
 import { useSettings } from '../data/hooks'
 import { Alert, Card, Heading, Measure, Pane, ScrollArea, Stack } from '../ui'
 import { CommunityForm } from './CommunityForm'
+import { TopicsCard } from './TopicsCard'
 
 /** The owner's page for the community itself: in the nav, not behind the owner's own page (Raphael, 2026-11-06). */
 export function CommunityPage() {
@@ -17,6 +18,7 @@ export function CommunityPage() {
                 {settings && <CommunityForm settings={settings} submitLabel="Save" />}
               </Stack>
             </Card>
+            <TopicsCard />
           </Stack>
         </Measure>
       </ScrollArea>

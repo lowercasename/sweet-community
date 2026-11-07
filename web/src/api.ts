@@ -11,6 +11,22 @@ export interface User {
 export interface Can {
   edit: boolean
   delete: boolean
+  /** A post's alone (architecture.md, Topics): I may file it under a topic, as its author or the community's staff. */
+  set_topic?: boolean
+}
+
+/**
+ * A topic (architecture.md, Topics): a label a post on the community's feed
+ * can carry, at most one. The staff keep the list. `following` is mine.
+ */
+export interface Topic {
+  id: string
+  name: string
+  description: string
+  created_at: number
+  post_count: number
+  follower_count: number
+  following: boolean
 }
 
 export type Role = 'owner' | 'moderator' | 'member'
@@ -121,6 +137,8 @@ export interface Session {
 export interface Post {
   id: string
   group_id: string
+  /** The topic it is filed under, or null (architecture.md, Topics). Named from the topics cache at render time. */
+  topic_id: string | null
   author: User
   body_html: string
   body_text: string
@@ -159,10 +177,12 @@ export interface Message {
 export interface Notification {
   id: string
   user_id: string
-  kind: 'comment' | 'added' | 'mention' | 'joined'
+  kind: 'comment' | 'added' | 'mention' | 'joined' | 'topic_post'
   actor: User
   group_id: string
   post_id: string | null
+  /** The topic, for a post in one I follow. */
+  topic_id?: string | null
   created_at: number
   /** When I opened it; null until I do. */
   read_at: number | null
@@ -320,9 +340,15 @@ export function removeMember(groupId: string, userId: string): Promise<Membershi
   return request<Membership | undefined>(`${g(groupId)}/members/${encodeURIComponent(userId)}`, { method: 'DELETE' })
 }
 
-export function getPosts(groupId: string, before?: number | null, limit = 20): Promise<PostPage> {
+export function getPosts(
+  groupId: string,
+  before?: number | null,
+  limit = 20,
+  topicId?: string | null,
+): Promise<PostPage> {
   const params = new URLSearchParams({ limit: String(limit) })
   if (before != null) params.set('before', String(before))
+  if (topicId) params.set('topic', topicId)
   return request<PostPage>(`${g(groupId)}/posts?${params}`)
 }
 
@@ -331,8 +357,34 @@ export function getPost(id: string): Promise<Post> {
   return request<Post>(`/api/posts/${encodeURIComponent(id)}`)
 }
 
-export function createPost(groupId: string, bodyHtml: string): Promise<Post> {
-  return request<Post>(`${g(groupId)}/posts`, json('POST', { body_html: bodyHtml }))
+export function createPost(groupId: string, bodyHtml: string, topicId: string | null = null): Promise<Post> {
+  return request<Post>(`${g(groupId)}/posts`, json('POST', { body_html: bodyHtml, topic_id: topicId }))
+}
+
+/** Files a post under a topic, or under none (architecture.md, Topics): its author's or the community staff's call. */
+export function setPostTopic(id: string, topicId: string | null): Promise<Post> {
+  return request<Post>(`/api/posts/${encodeURIComponent(id)}/topic`, json('PUT', { topic_id: topicId }))
+}
+
+export function listTopics(): Promise<{ topics: Topic[] }> {
+  return request('/api/topics')
+}
+
+export function createTopic(name: string, description: string): Promise<Topic> {
+  return request<Topic>('/api/topics', json('POST', { name, description }))
+}
+
+export function updateTopic(id: string, name: string, description: string): Promise<Topic> {
+  return request<Topic>(`/api/topics/${encodeURIComponent(id)}`, json('PUT', { name, description }))
+}
+
+export async function deleteTopic(id: string): Promise<void> {
+  await request(`/api/topics/${encodeURIComponent(id)}`, { method: 'DELETE' })
+}
+
+/** Follow a topic to be told of posts in it, or stop. The reply is the topic as I now see it. */
+export function followTopic(id: string, on: boolean): Promise<Topic> {
+  return request<Topic>(`/api/topics/${encodeURIComponent(id)}/follow`, { method: on ? 'PUT' : 'DELETE' })
 }
 
 export function updatePost(id: string, bodyHtml: string): Promise<Post> {

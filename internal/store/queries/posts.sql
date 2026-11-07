@@ -3,24 +3,25 @@
 -- made after GetPostOwners. The queries themselves do not check.
 
 -- name: ListPosts :many
-SELECT p.id, p.group_id, p.body_html, p.body_text, p.created_at, p.edited_at,
+SELECT p.id, p.group_id, p.topic_id, p.body_html, p.body_text, p.created_at, p.edited_at,
        u.id AS author_id, u.username AS author_username, u.picture_id AS author_picture_id,
        (SELECT COUNT(*) FROM comments c WHERE c.post_id = p.id AND c.deleted_at IS NULL) AS comment_count
 FROM posts p JOIN users u ON u.id = p.author_id
 WHERE p.group_id = sqlc.arg(group_id) AND p.deleted_at IS NULL AND p.created_at < sqlc.arg(before)
+  AND (sqlc.narg(topic_id) IS NULL OR p.topic_id = sqlc.narg(topic_id))
 ORDER BY p.created_at DESC, p.id DESC
 LIMIT sqlc.arg(page_size);
 
 -- name: GetPost :one
-SELECT p.id, p.group_id, p.body_html, p.body_text, p.created_at, p.edited_at,
+SELECT p.id, p.group_id, p.topic_id, p.body_html, p.body_text, p.created_at, p.edited_at,
        u.id AS author_id, u.username AS author_username, u.picture_id AS author_picture_id,
        (SELECT COUNT(*) FROM comments c WHERE c.post_id = p.id AND c.deleted_at IS NULL) AS comment_count
 FROM posts p JOIN users u ON u.id = p.author_id
 WHERE p.id = sqlc.arg(id) AND p.deleted_at IS NULL;
 
 -- name: CreatePost :exec
-INSERT INTO posts (id, group_id, author_id, body_html, body_text, created_at)
-VALUES (sqlc.arg(id), sqlc.arg(group_id), sqlc.arg(author_id), sqlc.arg(body_html), sqlc.arg(body_text), sqlc.arg(created_at));
+INSERT INTO posts (id, group_id, author_id, topic_id, body_html, body_text, created_at)
+VALUES (sqlc.arg(id), sqlc.arg(group_id), sqlc.arg(author_id), sqlc.narg(topic_id), sqlc.arg(body_html), sqlc.arg(body_text), sqlc.arg(created_at));
 
 -- name: GetPostOwners :one
 SELECT p.author_id, p.group_id FROM posts p JOIN groups g ON g.id = p.group_id
@@ -35,7 +36,7 @@ UPDATE posts SET deleted_at = sqlc.arg(deleted_at) WHERE id = sqlc.arg(id) AND d
 
 -- name: ListPostsByAuthor :many
 -- One person's posts, as a viewer may see them: only from groups the viewer is present in.
-SELECT p.id, p.group_id, p.body_html, p.body_text, p.created_at, p.edited_at,
+SELECT p.id, p.group_id, p.topic_id, p.body_html, p.body_text, p.created_at, p.edited_at,
        u.id AS author_id, u.username AS author_username, u.picture_id AS author_picture_id,
        (SELECT COUNT(*) FROM comments c WHERE c.post_id = p.id AND c.deleted_at IS NULL) AS comment_count
 FROM posts p JOIN users u ON u.id = p.author_id

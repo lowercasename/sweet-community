@@ -26,8 +26,10 @@ type Notification struct {
 	Kind   string `json:"kind"`
 	Actor  User   `json:"actor"`
 	// GroupID is where it happened; PostID the post, for a comment.
-	GroupID   string  `json:"group_id"`
-	PostID    *string `json:"post_id"`
+	GroupID string  `json:"group_id"`
+	PostID  *string `json:"post_id"`
+	// TopicID is the topic, for a post in one I follow.
+	TopicID   *string `json:"topic_id"`
 	CreatedAt int64   `json:"created_at"`
 	// ReadAt is when its person opened it; null until then.
 	ReadAt *int64 `json:"read_at"`
@@ -38,6 +40,8 @@ const (
 	NotifyAdded   = "added"
 	// NotifyJoined tells the owner someone came in through an invite link.
 	NotifyJoined = "joined"
+	// NotifyTopicPost tells a topic's followers of a post in it (architecture.md, Topics).
+	NotifyTopicPost = "topic_post"
 )
 
 // Marker is how far along a stream a person has read: the newest time they
@@ -62,6 +66,11 @@ const (
 // notify writes one notification inside the caller's transaction and returns
 // its event. Nobody is told about their own doing: to == actor is no row.
 func notify(r *http.Request, qtx *store.Queries, kind, to, actor, groupID string, postID *string, now int64) (*events.Entry, error) {
+	return notifyIn(r, qtx, kind, to, actor, groupID, postID, nil, now)
+}
+
+// notifyIn is notify with the topic a topic_post is about.
+func notifyIn(r *http.Request, qtx *store.Queries, kind, to, actor, groupID string, postID, topicID *string, now int64) (*events.Entry, error) {
 	if to == actor {
 		return nil, nil
 	}
@@ -73,8 +82,12 @@ func notify(r *http.Request, qtx *store.Queries, kind, to, actor, groupID string
 	if postID != nil {
 		pid = sql.NullString{String: *postID, Valid: true}
 	}
+	tid := sql.NullString{}
+	if topicID != nil {
+		tid = sql.NullString{String: *topicID, Valid: true}
+	}
 	if err := qtx.CreateNotification(r.Context(), store.CreateNotificationParams{
-		ID: id.String(), UserID: to, Kind: kind, ActorID: actor, GroupID: groupID, PostID: pid, CreatedAt: now,
+		ID: id.String(), UserID: to, Kind: kind, ActorID: actor, GroupID: groupID, PostID: pid, TopicID: tid, CreatedAt: now,
 	}); err != nil {
 		return nil, err
 	}

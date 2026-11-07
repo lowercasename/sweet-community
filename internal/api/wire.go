@@ -19,6 +19,15 @@ import (
 // Personalising for a viewer (can flags, role) is forViewer's job, on the
 // way out, never here.
 
+// nullStr is the wire's nullable string.
+func nullStr(v sql.NullString) *string {
+	if !v.Valid {
+		return nil
+	}
+	s := v.String
+	return &s
+}
+
 func wireUser(id, username string, pictureID sql.NullString) User {
 	return User{ID: id, Username: username, Picture: pictureURL(pictureID)}
 }
@@ -27,6 +36,7 @@ func wirePost(row store.GetPostRow) Post {
 	return Post{
 		ID:           row.ID,
 		GroupID:      row.GroupID,
+		TopicID:      nullStr(row.TopicID),
 		Author:       wireUser(row.AuthorID, row.AuthorUsername, row.AuthorPictureID),
 		BodyHTML:     row.BodyHtml,
 		BodyText:     row.BodyText,
@@ -74,6 +84,7 @@ func wireNotification(row store.GetNotificationRow) Notification {
 		Actor:     wireUser(row.ActorID, row.ActorUsername, row.ActorPictureID),
 		GroupID:   row.GroupID,
 		PostID:    pid,
+		TopicID:   nullStr(row.TopicID),
 		CreatedAt: row.CreatedAt,
 		ReadAt:    nullInt(row.ReadAt),
 	}

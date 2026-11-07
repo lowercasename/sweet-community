@@ -7,7 +7,10 @@ export const keys = {
   users: ['users'] as const,
   groups: ['groups'] as const,
   members: (groupId: string) => ['members', groupId] as const,
-  posts: (groupId: string) => ['posts', groupId] as const,
+  /** A feed, or the community's feed narrowed to one topic; the group's prefix matches both. */
+  posts: (groupId: string, topicId?: string | null) =>
+    topicId ? (['posts', groupId, topicId] as const) : (['posts', groupId] as const),
+  topics: ['topics'] as const,
   /** One post, for its page; applyEvent keeps it in step with the feed that holds it. */
   post: (id: string) => ['post', id] as const,
   comments: (postId: string) => ['comments', postId] as const,

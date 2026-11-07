@@ -11,14 +11,15 @@ import (
 )
 
 const createPost = `-- name: CreatePost :exec
-INSERT INTO posts (id, group_id, author_id, body_html, body_text, created_at)
-VALUES (?1, ?2, ?3, ?4, ?5, ?6)
+INSERT INTO posts (id, group_id, author_id, topic_id, body_html, body_text, created_at)
+VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)
 `
 
 type CreatePostParams struct {
 	ID        string
 	GroupID   string
 	AuthorID  string
+	TopicID   sql.NullString
 	BodyHtml  string
 	BodyText  string
 	CreatedAt int64
@@ -29,6 +30,7 @@ func (q *Queries) CreatePost(ctx context.Context, arg CreatePostParams) error {
 		arg.ID,
 		arg.GroupID,
 		arg.AuthorID,
+		arg.TopicID,
 		arg.BodyHtml,
 		arg.BodyText,
 		arg.CreatedAt,
@@ -73,7 +75,7 @@ func (q *Queries) EditPost(ctx context.Context, arg EditPostParams) error {
 }
 
 const getPost = `-- name: GetPost :one
-SELECT p.id, p.group_id, p.body_html, p.body_text, p.created_at, p.edited_at,
+SELECT p.id, p.group_id, p.topic_id, p.body_html, p.body_text, p.created_at, p.edited_at,
        u.id AS author_id, u.username AS author_username, u.picture_id AS author_picture_id,
        (SELECT COUNT(*) FROM comments c WHERE c.post_id = p.id AND c.deleted_at IS NULL) AS comment_count
 FROM posts p JOIN users u ON u.id = p.author_id
@@ -83,6 +85,7 @@ WHERE p.id = ?1 AND p.deleted_at IS NULL
 type GetPostRow struct {
 	ID              string
 	GroupID         string
+	TopicID         sql.NullString
 	BodyHtml        string
 	BodyText        string
 	CreatedAt       int64
@@ -99,6 +102,7 @@ func (q *Queries) GetPost(ctx context.Context, id string) (GetPostRow, error) {
 	err := row.Scan(
 		&i.ID,
 		&i.GroupID,
+		&i.TopicID,
 		&i.BodyHtml,
 		&i.BodyText,
 		&i.CreatedAt,
@@ -130,24 +134,27 @@ func (q *Queries) GetPostOwners(ctx context.Context, id string) (GetPostOwnersRo
 
 const listPosts = `-- name: ListPosts :many
 
-SELECT p.id, p.group_id, p.body_html, p.body_text, p.created_at, p.edited_at,
+SELECT p.id, p.group_id, p.topic_id, p.body_html, p.body_text, p.created_at, p.edited_at,
        u.id AS author_id, u.username AS author_username, u.picture_id AS author_picture_id,
        (SELECT COUNT(*) FROM comments c WHERE c.post_id = p.id AND c.deleted_at IS NULL) AS comment_count
 FROM posts p JOIN users u ON u.id = p.author_id
 WHERE p.group_id = ?1 AND p.deleted_at IS NULL AND p.created_at < ?2
+  AND (?3 IS NULL OR p.topic_id = ?3)
 ORDER BY p.created_at DESC, p.id DESC
-LIMIT ?3
+LIMIT ?4
 `
 
 type ListPostsParams struct {
 	GroupID  string
 	Before   int64
+	TopicID  interface{}
 	PageSize int64
 }
 
 type ListPostsRow struct {
 	ID              string
 	GroupID         string
+	TopicID         sql.NullString
 	BodyHtml        string
 	BodyText        string
 	CreatedAt       int64
@@ -162,7 +169,12 @@ type ListPostsRow struct {
 // membership of the group it lists; who may edit or delete is perm's call,
 // made after GetPostOwners. The queries themselves do not check.
 func (q *Queries) ListPosts(ctx context.Context, arg ListPostsParams) ([]ListPostsRow, error) {
-	rows, err := q.db.QueryContext(ctx, listPosts, arg.GroupID, arg.Before, arg.PageSize)
+	rows, err := q.db.QueryContext(ctx, listPosts,
+		arg.GroupID,
+		arg.Before,
+		arg.TopicID,
+		arg.PageSize,
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -173,6 +185,7 @@ func (q *Queries) ListPosts(ctx context.Context, arg ListPostsParams) ([]ListPos
 		if err := rows.Scan(
 			&i.ID,
 			&i.GroupID,
+			&i.TopicID,
 			&i.BodyHtml,
 			&i.BodyText,
 			&i.CreatedAt,
@@ -196,7 +209,7 @@ func (q *Queries) ListPosts(ctx context.Context, arg ListPostsParams) ([]ListPos
 }
 
 const listPostsByAuthor = `-- name: ListPostsByAuthor :many
-SELECT p.id, p.group_id, p.body_html, p.body_text, p.created_at, p.edited_at,
+SELECT p.id, p.group_id, p.topic_id, p.body_html, p.body_text, p.created_at, p.edited_at,
        u.id AS author_id, u.username AS author_username, u.picture_id AS author_picture_id,
        (SELECT COUNT(*) FROM comments c WHERE c.post_id = p.id AND c.deleted_at IS NULL) AS comment_count
 FROM posts p JOIN users u ON u.id = p.author_id
@@ -217,6 +230,7 @@ type ListPostsByAuthorParams struct {
 type ListPostsByAuthorRow struct {
 	ID              string
 	GroupID         string
+	TopicID         sql.NullString
 	BodyHtml        string
 	BodyText        string
 	CreatedAt       int64
@@ -245,6 +259,7 @@ func (q *Queries) ListPostsByAuthor(ctx context.Context, arg ListPostsByAuthorPa
 		if err := rows.Scan(
 			&i.ID,
 			&i.GroupID,
+			&i.TopicID,
 			&i.BodyHtml,
 			&i.BodyText,
 			&i.CreatedAt,

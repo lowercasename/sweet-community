@@ -1,4 +1,4 @@
-import type { Group, Marker, Notification } from '../api'
+import type { Group, Marker, Notification, Topic } from '../api'
 import { groupPath, postPath, profilePath } from '../routes'
 
 /** The notifications stream's marker name; a room's chat and feed each have their own. */
@@ -36,8 +36,12 @@ export function unreadPlaces(markers: Marker[]): Map<string, UnreadPlace> {
 export const anyUnread = (p: UnreadPlace | undefined) => p !== undefined && (p.chat || p.feed)
 
 /** What was done, in words after the actor's name. A room I am no longer in has no name to give. */
-export function describe(n: Notification, groups: Group[]): string {
+export function describe(n: Notification, groups: Group[], topics: Topic[] = []): string {
   switch (n.kind) {
+    case 'topic_post': {
+      const topic = topics.find((t) => t.id === n.topic_id)
+      return topic ? `posted in ${topic.name}` : 'posted in a topic'
+    }
     case 'comment':
       return 'commented on your post'
     case 'added': {

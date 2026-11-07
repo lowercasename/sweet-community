@@ -8,9 +8,10 @@ interface PostListProps {
   disabled: boolean
   onEdit: (id: string, bodyHtml: string) => Promise<void>
   onDelete: (id: string) => Promise<void>
+  onSetTopic?: (id: string, topicId: string | null) => Promise<void>
 }
 
-export function PostList({ posts, disabled, onEdit, onDelete }: PostListProps) {
+export function PostList({ posts, disabled, onEdit, onDelete, onSetTopic }: PostListProps) {
   if (posts.length === 0) return <Alert>Nothing here yet. Write the first post.</Alert>
   return (
     <Stack gap={3}>
@@ -21,6 +22,7 @@ export function PostList({ posts, disabled, onEdit, onDelete }: PostListProps) {
           disabled={disabled}
           onEdit={(html) => onEdit(post.id, html)}
           onDelete={() => onDelete(post.id)}
+          onSetTopic={onSetTopic && ((topicId) => onSetTopic(post.id, topicId))}
         />
       ))}
     </Stack>

@@ -36,20 +36,24 @@ type User struct {
 type Can struct {
 	Edit   bool `json:"edit"`
 	Delete bool `json:"delete"`
+	// SetTopic is a post's alone (architecture.md, Topics): the author or the root staff file it.
+	SetTopic bool `json:"set_topic,omitempty"`
 }
 
 // Post is the wire shape. It carries no event sequence: the SSE "id:" line
 // is the sequence, and the feed paginates by created_at.
 type Post struct {
-	ID           string `json:"id"`
-	GroupID      string `json:"group_id"`
-	Author       User   `json:"author"`
-	BodyHTML     string `json:"body_html"`
-	BodyText     string `json:"body_text"`
-	CreatedAt    int64  `json:"created_at"`
-	EditedAt     *int64 `json:"edited_at"`
-	CommentCount int64  `json:"comment_count"`
-	Can          Can    `json:"can"`
+	ID      string `json:"id"`
+	GroupID string `json:"group_id"`
+	// TopicID is the topic the post is filed under, or null (architecture.md, Topics).
+	TopicID      *string `json:"topic_id"`
+	Author       User    `json:"author"`
+	BodyHTML     string  `json:"body_html"`
+	BodyText     string  `json:"body_text"`
+	CreatedAt    int64   `json:"created_at"`
+	EditedAt     *int64  `json:"edited_at"`
+	CommentCount int64   `json:"comment_count"`
+	Can          Can     `json:"can"`
 }
 
 // forViewer fills in the viewer's can flags on a post, comment, message or
@@ -65,7 +69,8 @@ func forViewer(a perm.Actor, v any, st Settings) any {
 		return &p
 	case *Post:
 		p := *x
-		p.Can = Can{Edit: perm.EditPost(a, perm.Post{AuthorID: p.Author.ID}), Delete: perm.DeletePost(a, perm.Post{AuthorID: p.Author.ID})}
+		pp := perm.Post{AuthorID: p.Author.ID}
+		p.Can = Can{Edit: perm.EditPost(a, pp), Delete: perm.DeletePost(a, pp), SetTopic: p.GroupID == perm.Root && perm.SetTopic(a, pp)}
 		return &p
 	case *Comment:
 		c := *x
@@ -209,6 +214,13 @@ func (s *Server) Routes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/posts/{id}", s.requireAuth(s.getPost))
 	mux.HandleFunc("GET /api/search", s.requireAuth(s.search))
 	mux.HandleFunc("PUT /api/posts/{id}", s.requireAuth(s.editPost))
+	mux.HandleFunc("PUT /api/posts/{id}/topic", s.requireAuth(s.setPostTopic))
+	mux.HandleFunc("GET /api/topics", s.requireAuth(s.listTopics))
+	mux.HandleFunc("POST /api/topics", s.requireRoot(perm.ManageTopics, s.createTopic))
+	mux.HandleFunc("PUT /api/topics/{id}", s.requireRoot(perm.ManageTopics, s.updateTopic))
+	mux.HandleFunc("DELETE /api/topics/{id}", s.requireRoot(perm.ManageTopics, s.deleteTopic))
+	mux.HandleFunc("PUT /api/topics/{id}/follow", s.requireAuth(s.followTopic))
+	mux.HandleFunc("DELETE /api/topics/{id}/follow", s.requireAuth(s.unfollowTopic))
 	mux.HandleFunc("DELETE /api/posts/{id}", s.requireAuth(s.deletePost))
 	mux.HandleFunc("GET /api/posts/{id}/comments", s.requireAuth(s.listComments))
 	mux.HandleFunc("POST /api/posts/{id}/comments", s.requireAuth(s.createComment))
@@ -265,7 +277,12 @@ func pageParams(r *http.Request, defaultLimit, maxLimit int) (before int64, limi
 func (s *Server) listPosts(w http.ResponseWriter, r *http.Request) {
 	g, a := groupFrom(r.Context())
 	before, limit := pageParams(r, 20, 100)
-	rows, err := s.q().ListPosts(r.Context(), store.ListPostsParams{GroupID: g.ID, Before: before, PageSize: int64(limit + 1)})
+	// ?topic= narrows the community's feed to one topic (architecture.md, Topics).
+	var topic any
+	if t := r.URL.Query().Get("topic"); t != "" {
+		topic = t
+	}
+	rows, err := s.q().ListPosts(r.Context(), store.ListPostsParams{GroupID: g.ID, Before: before, TopicID: topic, PageSize: int64(limit + 1)})
 	if err != nil {
 		writeErr(w, http.StatusInternalServerError, err.Error())
 		return
@@ -320,6 +337,28 @@ func readBody(w http.ResponseWriter, r *http.Request) (clean string, ok bool) {
 		return "", false
 	}
 	return clean, true
+}
+
+// readPostBody is readBody plus the post's optional topic_id.
+func readPostBody(w http.ResponseWriter, r *http.Request) (clean string, topicID *string, ok bool) {
+	var in struct {
+		BodyHTML string  `json:"body_html"`
+		TopicID  *string `json:"topic_id"`
+	}
+	r.Body = http.MaxBytesReader(w, r.Body, sanitize.MaxBodyBytes)
+	if err := json.NewDecoder(r.Body).Decode(&in); err != nil {
+		writeErr(w, http.StatusBadRequest, "Bad request")
+		return "", nil, false
+	}
+	clean = sanitize.Body(in.BodyHTML)
+	if sanitize.IsEmpty(clean) {
+		writeErr(w, http.StatusBadRequest, "The body is empty")
+		return "", nil, false
+	}
+	if in.TopicID != nil && *in.TopicID == "" {
+		in.TopicID = nil
+	}
+	return clean, in.TopicID, true
 }
 
 // logged runs fn inside a write transaction, logs the one event it returns,
@@ -401,8 +440,13 @@ func (s *Server) createPost(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusForbidden, "This room has no posts")
 		return
 	}
-	clean, ok := readBody(w, r)
+	clean, topicID, ok := readPostBody(w, r)
 	if !ok {
+		return
+	}
+	// Only the community's feed has topics (architecture.md, Topics).
+	if topicID != nil && g.ID != perm.Root {
+		writeErr(w, http.StatusBadRequest, "Only posts on the community's feed have topics")
 		return
 	}
 	id, err := uuid.NewV7()
@@ -412,10 +456,17 @@ func (s *Server) createPost(w http.ResponseWriter, r *http.Request) {
 	}
 	author, _ := userFrom(r.Context())
 	now := db.Now()
-	// The post and a notification to each person it mentions, in one transaction.
+	// The post, a notification to each person it mentions and to each follower of its topic, in one transaction.
 	s.loggedMany(w, r, now, func(qtx *store.Queries) ([]events.Entry, any, int, error) {
+		if status, err := topicExists(r, qtx, topicID); err != nil {
+			return nil, nil, status, err
+		}
+		topic := sql.NullString{}
+		if topicID != nil {
+			topic = sql.NullString{String: *topicID, Valid: true}
+		}
 		text := sanitize.Text(clean)
-		if err := qtx.CreatePost(r.Context(), store.CreatePostParams{ID: id.String(), GroupID: g.ID, AuthorID: author.ID, BodyHtml: clean, BodyText: text, CreatedAt: now}); err != nil {
+		if err := qtx.CreatePost(r.Context(), store.CreatePostParams{ID: id.String(), GroupID: g.ID, AuthorID: author.ID, TopicID: topic, BodyHtml: clean, BodyText: text, CreatedAt: now}); err != nil {
 			return nil, nil, http.StatusInternalServerError, err
 		}
 		row, err := qtx.GetPost(r.Context(), id.String())
@@ -424,11 +475,20 @@ func (s *Server) createPost(w http.ResponseWriter, r *http.Request) {
 		}
 		p := wirePost(row)
 		pid := p.ID
+		entries := []events.Entry{{Kind: "post", Payload: &p}}
 		told, err := mentionEvents(r, qtx, clean, author.ID, g.ID, &pid, now, "")
 		if err != nil {
 			return nil, nil, http.StatusInternalServerError, err
 		}
-		return append([]events.Entry{{Kind: "post", Payload: &p}}, told...), &p, http.StatusCreated, nil
+		entries = append(entries, told...)
+		if topic.Valid {
+			followers, err := tellFollowers(r, qtx, topic.String, pid, author.ID, now)
+			if err != nil {
+				return nil, nil, http.StatusInternalServerError, err
+			}
+			entries = append(entries, followers...)
+		}
+		return entries, &p, http.StatusCreated, nil
 	})
 }
 

@@ -1,13 +1,30 @@
 import { useState } from 'react'
+import { useLocation } from 'wouter'
 import type { Post as PostData } from '../api'
-import { useAuthor } from '../data/hooks'
+import { useAuthor, useTopics } from '../data/hooks'
+import { ROOT_ID } from '../data/keys'
 import { postExtensions } from '../editor/extensions'
-import { groupPath, postPath } from '../routes'
-import { Alert, Button, Card, ConfirmDialog, Link, Menu, type MenuItem, Row, Stack, Text, Tile, Time } from '../ui'
+import { groupPath, postPath, topicPath } from '../routes'
+import {
+  Alert,
+  Button,
+  Card,
+  ConfirmDialog,
+  Link,
+  Menu,
+  type MenuItem,
+  Pill,
+  Row,
+  Stack,
+  Text,
+  Tile,
+  Time,
+} from '../ui'
 import { Body } from './Body'
 import { BodyEditor } from './BodyEditor'
 import { CommentThread } from './CommentThread'
 import { PersonName } from './PersonName'
+import { TopicMenu } from './TopicMenu'
 
 interface PostProps {
   post: PostData
@@ -23,10 +40,26 @@ interface PostProps {
   onEdit: (bodyHtml: string) => Promise<void>
   /** Resolves when the server has deleted the post; the cache drops it. */
   onDelete: () => Promise<void>
+  /** Files the post under a topic, or none (architecture.md, Topics); the author's or the staff's, by its can flag. */
+  onSetTopic?: (topicId: string | null) => Promise<void>
 }
 
-export function Post({ post, linked = true, expanded = false, place, disabled, onEdit, onDelete }: PostProps) {
+export function Post({
+  post,
+  linked = true,
+  expanded = false,
+  place,
+  disabled,
+  onEdit,
+  onDelete,
+  onSetTopic,
+}: PostProps) {
   const author = useAuthor(post.author)
+  const [, navigate] = useLocation()
+  // The topic is named from the topics cache, so a rename reaches every pill at once.
+  const { topics } = useTopics()
+  const topic = topics.find((t) => t.id === post.topic_id)
+  const [draftTopic, setDraftTopic] = useState<string | null>(post.topic_id)
   const [editing, setEditing] = useState(false)
   const [open, setOpen] = useState(expanded)
   const [confirming, setConfirming] = useState(false)
@@ -35,8 +68,32 @@ export function Post({ post, linked = true, expanded = false, place, disabled, o
 
   const save = async (bodyHtml: string) => {
     await onEdit(bodyHtml)
+    if (draftTopic !== post.topic_id && onSetTopic) await onSetTopic(draftTopic)
     setEditing(false)
   }
+  const startEditing = () => {
+    setDraftTopic(post.topic_id)
+    setEditing(true)
+  }
+
+  // The pill (architecture.md, Topics): for a reader, the way into the topic; for its author and the staff, the way to file it.
+  const pill = topic ? (
+    post.can.set_topic && onSetTopic && !disabled ? (
+      <TopicMenu
+        topics={topics}
+        value={post.topic_id}
+        onChange={(id) => void onSetTopic(id)}
+        noneLabel="No topic"
+        label={`Topic: ${topic.name}`}
+        leading={[{ label: `Show ${topic.name}`, icon: 'tag', onSelect: () => navigate(topicPath(topic.id)) }]}
+        trigger="pill"
+      />
+    ) : (
+      <Pill href={topicPath(topic.id)} label={`Topic: ${topic.name}`}>
+        {topic.name}
+      </Pill>
+    )
+  ) : null
 
   const remove = async () => {
     setDeleting(true)
@@ -53,7 +110,7 @@ export function Post({ post, linked = true, expanded = false, place, disabled, o
 
   // What this person may do is the server's call, carried on the post.
   const items: MenuItem[] = []
-  if (post.can.edit) items.push({ label: 'Edit', icon: 'pencil', onSelect: () => setEditing(true) })
+  if (post.can.edit) items.push({ label: 'Edit', icon: 'pencil', onSelect: startEditing })
   if (post.can.delete) items.push({ label: 'Delete', icon: 'trash', onSelect: () => setConfirming(true) })
 
   const when = (
@@ -98,7 +155,10 @@ export function Post({ post, linked = true, expanded = false, place, disabled, o
                 {linked ? <Link href={postPath(post.id)}>{when}</Link> : when}
               </Text>
             </Row>
-            {items.length > 0 && !editing && !disabled && <Menu label="Post options" items={items} reveal="post" />}
+            <Row gap={1} align="center" wrap="never" shrink={false}>
+              {!editing && pill}
+              {items.length > 0 && !editing && !disabled && <Menu label="Post options" items={items} reveal="post" />}
+            </Row>
           </Row>
           {editing ? (
             // The stored HTML is the editor's input: no separate document format.
@@ -112,6 +172,11 @@ export function Post({ post, linked = true, expanded = false, place, disabled, o
               disabled={disabled}
               onSubmit={save}
               onCancel={() => setEditing(false)}
+              topic={
+                post.group_id === ROOT_ID && onSetTopic
+                  ? { topics, value: draftTopic, onChange: setDraftTopic }
+                  : undefined
+              }
             />
           ) : (
             <Body html={post.body_html} />

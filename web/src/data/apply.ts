@@ -13,6 +13,7 @@ import type {
   PostPage,
   Profile,
   Settings,
+  Topic,
   User,
 } from '../api'
 import { ROOT_ID, keys } from './keys'
@@ -79,7 +80,54 @@ export function applyEvent(qc: QueryClient, kind: string, data: unknown): void {
         void qc.invalidateQueries({ queryKey: keys.groups })
       }
       break
+    case 'topic':
+      if (isTopic(data)) upsertTopic(qc, data)
+      break
+    case 'topic_delete':
+      if (hasId(data)) deleteTopic(qc, data.id)
+      break
   }
+}
+
+type Topics = { topics: Topic[] }
+
+/**
+ * A topic as the stream carries it says nothing about whether I follow it,
+ * so what the cache already knows of that is kept. A reply to my own
+ * follow or unfollow carries the truth and is applied with `setFollowing`.
+ */
+function upsertTopic(qc: QueryClient, t: Topic, following?: boolean) {
+  qc.setQueryData<Topics>(keys.topics, (old) => {
+    const known = old?.topics.find((x) => x.id === t.id)
+    const next = { ...t, following: following ?? known?.following ?? false }
+    const rest = (old?.topics ?? []).filter((x) => x.id !== t.id)
+    return { topics: [...rest, next].sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' })) }
+  })
+}
+
+/** My own follow or unfollow, answered by the server with the topic as I now see it. */
+export function applyFollowing(qc: QueryClient, t: Topic) {
+  upsertTopic(qc, t, t.following)
+}
+
+/** A deleted topic goes from the list, and the posts that carried it carry none. */
+function deleteTopic(qc: QueryClient, id: string) {
+  qc.setQueryData<Topics>(keys.topics, (old) => old && { topics: old.topics.filter((x) => x.id !== id) })
+  const unfiled = (p: Post) => (p.topic_id === id ? { ...p, topic_id: null } : p)
+  qc.setQueriesData<Posts>(
+    { queryKey: ['posts'] },
+    (old) => old && { ...old, pages: old.pages.map((pg) => ({ ...pg, posts: pg.posts.map(unfiled) })) },
+  )
+  qc.setQueriesData<Posts>(
+    { queryKey: ['userPosts'] },
+    (old) => old && { ...old, pages: old.pages.map((pg) => ({ ...pg, posts: pg.posts.map(unfiled) })) },
+  )
+  qc.setQueriesData<Post>({ queryKey: ['post'] }, (old) => old && unfiled(old))
+  qc.removeQueries({ queryKey: ['posts'], predicate: (q) => q.queryKey[2] === id })
+}
+
+function isTopic(v: unknown): v is Topic {
+  return hasId(v) && typeof (v as { name?: unknown }).name === 'string'
 }
 
 type Posts = InfiniteData<PostPage>
@@ -120,18 +168,29 @@ function upsertPost(qc: QueryClient, post: Post) {
     bumpMarker(qc, `feed:${post.group_id}`, post.created_at)
   // Its page, if open, shows the same post.
   qc.setQueryData<Post>(keys.post(post.id), (old) => (old ? post : old))
-  qc.setQueryData<Posts>(keys.posts(post.group_id), (old) => {
-    if (!old) return old
-    const known = old.pages.some((p) => p.posts.some((x) => x.id === post.id))
-    const pages = known
-      ? old.pages.map((p) => ({ ...p, posts: p.posts.map((x) => (x.id === post.id ? post : x)) }))
-      : old.pages.map((p, i) => (i === 0 ? { ...p, posts: [post, ...p.posts] } : p))
-    return { ...old, pages }
-  })
+  // The group's feed, and each topic view of it that is loaded: in the one
+  // it is filed under, out of the others (architecture.md, Topics).
+  for (const [key] of qc.getQueriesData<Posts>({ queryKey: keys.posts(post.group_id) })) {
+    const topicId = key[2]
+    const belongs = topicId === undefined || topicId === post.topic_id
+    qc.setQueryData<Posts>(key, (old) => {
+      if (!old) return old
+      const known = old.pages.some((p) => p.posts.some((x) => x.id === post.id))
+      if (!belongs) {
+        return known
+          ? { ...old, pages: old.pages.map((p) => ({ ...p, posts: p.posts.filter((x) => x.id !== post.id) })) }
+          : old
+      }
+      const pages = known
+        ? old.pages.map((p) => ({ ...p, posts: p.posts.map((x) => (x.id === post.id ? post : x)) }))
+        : old.pages.map((p, i) => (i === 0 ? { ...p, posts: [post, ...p.posts] } : p))
+      return { ...old, pages }
+    })
+  }
 }
 
 function deletePost(qc: QueryClient, id: string, groupId: string) {
-  qc.setQueryData<Posts>(keys.posts(groupId), (old) =>
+  qc.setQueriesData<Posts>({ queryKey: keys.posts(groupId) }, (old) =>
     old ? { ...old, pages: old.pages.map((p) => ({ ...p, posts: p.posts.filter((x) => x.id !== id) })) } : old,
   )
   qc.removeQueries({ queryKey: keys.comments(id) })
@@ -153,7 +212,7 @@ function countComments(qc: QueryClient, postId: string, groupId: string, by: num
         pages: old.pages.map((p) => ({ ...p, posts: p.posts.map((x) => (x.id === postId ? counted(x) : x)) })),
       },
   )
-  qc.setQueryData<Posts>(keys.posts(groupId), (old) =>
+  qc.setQueriesData<Posts>({ queryKey: keys.posts(groupId) }, (old) =>
     old
       ? {
           ...old,

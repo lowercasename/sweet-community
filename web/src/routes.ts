@@ -27,6 +27,9 @@ export const RESET = '/reset'
 /** The owner's page for the community itself (architecture.md, Admin tools): name, description, who may create rooms. */
 export const COMMUNITY = '/community'
 
+/** The community's feed showing one topic (architecture.md, Topics). */
+export const topicPath = (id: string) => `/?topic=${encodeURIComponent(id)}`
+
 /** A person's page (architecture.md, Accounts). */
 export const profilePath = (name: string) => `/u/${encodeURIComponent(name)}`
 

@@ -96,6 +96,18 @@ func CreateGroup(root Actor, policy string) bool {
 // ManageInstance: the root group's owner edits instance settings.
 func ManageInstance(root Actor) bool { return root.Role == Owner }
 
+// ManageTopics (architecture.md, Topics): the root group's staff keep the
+// community's list of topics.
+func ManageTopics(root Actor) bool { return root.staff() }
+
+// SetTopic: the author files their own post, and the root staff may file
+// anyone's, the one change staff make to another's post (Raphael,
+// 2026-11-07: filing is moderation, not rewriting). The actor is as they
+// stand in the root group, since only the community's feed has topics.
+func SetTopic(root Actor, p Post) bool {
+	return root.member() && (root.ID == p.AuthorID || root.staff())
+}
+
 // Transfer: the owner hands ownership to another member of the group.
 func Transfer(a, target Actor) bool { return a.Role == Owner && target.member() && target.ID != a.ID }
 

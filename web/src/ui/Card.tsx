@@ -1,7 +1,9 @@
 import type { ReactNode } from 'react'
 
 interface CardProps {
-  as?: 'div' | 'article'
+  as?: 'div' | 'article' | 'section'
+  /** A section's accessible name (the topic strip above a feed). */
+  label?: string
   /** `fill` makes the card a flex column that takes the pane's height (chat). */
   fill?: boolean
   /** No corners or border: the card is the pane (used with Pane flush). */
@@ -14,7 +16,7 @@ interface CardProps {
 }
 
 /** A white card with a hairline, on the dotted paper. */
-export function Card({ as = 'div', fill = false, flush = false, tone = 'card', head, children }: CardProps) {
+export function Card({ as = 'div', label, fill = false, flush = false, tone = 'card', head, children }: CardProps) {
   const bg = tone === 'field' ? 'bg-ground' : 'bg-card'
   const frame = flush ? bg : tone === 'field' ? `rounded-card ${bg}` : `rounded-card border border-line ${bg}`
   // A thread's ground is drawn with 12px all round; a card with 16.
@@ -27,6 +29,11 @@ export function Card({ as = 'div', fill = false, flush = false, tone = 'card', h
       {strip}
       {children}
     </article>
+  ) : as === 'section' ? (
+    <section className={cls} aria-label={label}>
+      {strip}
+      {children}
+    </section>
   ) : (
     <div className={cls}>
       {strip}

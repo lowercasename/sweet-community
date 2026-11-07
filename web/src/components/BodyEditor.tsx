@@ -3,9 +3,11 @@ import { useEditor, useEditorState, type Extensions } from '@tiptap/react'
 import { withPlaceholder } from '../editor/extensions'
 import { mentionSuggestionKey, withMentions } from '../editor/mentions'
 import { useUsers } from '../data/hooks'
+import type { Topic } from '../api'
 import { Alert, Button, EditorSurface, Form, ImageCard, Row, Stack } from '../ui'
 import { imageFiles, imagesHtml, insertImages, uploadImages, type AttachedImage } from '../editor/images'
 import { EditorToolbar, promptLink } from './EditorToolbar'
+import { TopicMenu } from './TopicMenu'
 
 interface BodyEditorProps {
   extensions: Extensions
@@ -36,6 +38,12 @@ interface BodyEditorProps {
   onCancel?: () => void
   /** An empty body may be submitted (a bio, cleared). */
   allowEmpty?: boolean
+  /**
+   * Posts on the community's feed (architecture.md, Topics): the topic the
+   * post will carry, grafted onto the submit button so where it goes is
+   * where the eye is when it is sent. Nothing is shown while no topics exist.
+   */
+  topic?: { topics: Topic[]; value: string | null; onChange: (topicId: string | null) => void }
 }
 
 /** The one editor: posts, chat and comments differ only in schema, size, submit key and where images go. */
@@ -52,6 +60,7 @@ export function BodyEditor({
   initialHtml,
   onCancel,
   allowEmpty = false,
+  topic,
 }: BodyEditorProps) {
   const editing = initialHtml !== undefined
   const [busy, setBusy] = useState(false)
@@ -183,9 +192,27 @@ export function BodyEditor({
                 Cancel
               </Button>
             )}
-            <Button type="submit" disabled={!canSubmit}>
-              {busy ? busyLabel : submitLabel}
-            </Button>
+            {topic && topic.topics.length > 0 ? (
+              <Row gap={0} align="center" wrap="never" shrink={false}>
+                <Button type="submit" attach="right" disabled={!canSubmit}>
+                  {busy ? busyLabel : submitLabel}
+                </Button>
+                <TopicMenu
+                  topics={topic.topics}
+                  value={topic.value}
+                  onChange={topic.onChange}
+                  noneLabel="No topic"
+                  label="Topic"
+                  trigger="graft"
+                  quiet={!canSubmit}
+                  disabled={busy || disabled}
+                />
+              </Row>
+            ) : (
+              <Button type="submit" disabled={!canSubmit}>
+                {busy ? busyLabel : submitLabel}
+              </Button>
+            )}
           </Row>
         </Row>
         {error && <Alert tone="error">{error}</Alert>}

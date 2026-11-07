@@ -15,6 +15,7 @@ vi.mock('../api', async (importOriginal) => ({
   setBio: vi.fn(),
   openDM: vi.fn(),
   listGroups: vi.fn(() => Promise.resolve({ groups: [] })),
+  listTopics: vi.fn(() => Promise.resolve({ topics: [] })),
   listUsers: vi.fn(() => Promise.resolve({ users: [] })),
   getComments: vi.fn(() => Promise.resolve({ comments: [] })),
   listMarkers: vi.fn(() => Promise.resolve({ markers: [] })),

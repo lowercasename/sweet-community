@@ -94,6 +94,7 @@ export const mentionSpan = (id: string, name: string) =>
 export const post = (id: string, author: User, extra: Partial<Post> = {}): Post => ({
   id,
   group_id: ROOT,
+  topic_id: null,
   author,
   body_html: `<p>${id}</p>`,
   body_text: id,
