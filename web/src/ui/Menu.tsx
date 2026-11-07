@@ -16,7 +16,7 @@ import {
 import type { ReactNode } from 'react'
 import { buttonClass } from './Button'
 import { Icon, type IconName } from './Icon'
-import { pillClass } from './Pill'
+import { PILL_ICON, pillClass, type PillSize } from './Pill'
 import { useTooltip } from './Tooltip'
 
 export interface MenuItem {
@@ -36,14 +36,14 @@ interface MenuProps {
   items: MenuItem[]
   /**
    * What the trigger looks like. `icon` (the default) is a ghost icon
-   * button, the three dots. `pill` is a topic pill with a chevron, in the
-   * bar and on a post. `graft` is the right half of a primary button, the
-   * topic on Post. `text` is a ghost button with words. The last three show
-   * `children` as their text.
+   * button, the three dots. `pill` is a topic pill with a chevron, wherever
+   * a topic is chosen, showing `children` as its text.
    */
-  trigger?: 'icon' | 'pill' | 'graft' | 'text'
-  /** A pill trigger with nothing chosen is quiet. A grafted trigger beside a disabled Post takes its grey, and still opens. */
+  trigger?: 'icon' | 'pill'
+  /** A pill with nothing chosen is quiet. */
   quiet?: boolean
+  /** A pill trigger's size: a label among content, or a control among controls. */
+  size?: PillSize
   disabled?: boolean
   children?: ReactNode
   /**
@@ -77,13 +77,6 @@ const REVEAL: Record<NonNullable<MenuProps['reveal']>, string> = {
  * clipped by the pane's edge; it never needs to close on scroll, which once
  * shut it one frame after it opened.
  */
-/** The grafted trigger: the right half of a primary button, sharing its edge. */
-const GRAFT_BASE =
-  'inline-flex cursor-pointer items-center gap-1 rounded-r-[4px] border border-l-0 py-1 pr-2 pl-2 font-sans text-[inherit] leading-6 font-medium ' +
-  'transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-pink disabled:cursor-default disabled:border-line disabled:bg-line disabled:text-mute'
-const GRAFT = `${GRAFT_BASE} border-pink bg-pink text-white hover:border-sweet hover:bg-sweet`
-const GRAFT_QUIET = `${GRAFT_BASE} border-line bg-line text-mute hover:text-ink`
-
 export function Menu({
   label,
   icon = 'more',
@@ -91,6 +84,7 @@ export function Menu({
   reveal,
   trigger = 'icon',
   quiet = false,
+  size = 'md',
   disabled,
   children,
 }: MenuProps) {
@@ -115,13 +109,7 @@ export function Menu({
   const triggerClass =
     trigger === 'icon'
       ? `${buttonClass('ghost', true)} ${reveal && !open ? REVEAL[reveal] : ''}`
-      : trigger === 'pill'
-        ? pillClass(quiet ? 'quiet' : 'topic')
-        : trigger === 'graft'
-          ? quiet
-            ? GRAFT_QUIET
-            : GRAFT
-          : buttonClass('ghost', false)
+      : pillClass(quiet ? 'quiet' : 'topic', size)
 
   return (
     <>
@@ -139,9 +127,13 @@ export function Menu({
           <Icon name={icon} />
         ) : (
           <>
-            {trigger !== 'pill' && <Icon name="tag" size={16} />}
-            {children !== undefined && <span className="truncate">{children}</span>}
-            <Icon name="chevron" size={16} />
+            <span className="flex-none">
+              <Icon name="tag" size={PILL_ICON[size].tag} />
+            </span>
+            <span className="truncate">{children}</span>
+            <span className="flex-none">
+              <Icon name="chevron" size={PILL_ICON[size].chevron} />
+            </span>
           </>
         )}
       </button>

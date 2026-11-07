@@ -69,32 +69,35 @@ describe('PostsPane reading', () => {
   })
 })
 
-/** Showing one topic (architecture.md, Topics): the feed narrows, a strip names it, Notify me follows it. */
+/** Showing one topic (architecture.md, Topics): the feed narrows, its header names it, Subscribe follows it. */
 describe('PostsPane showing a topic', () => {
-  it('fetches that topic alone, names it above the composer, and follows it on Notify me', async () => {
+  it('fetches that topic alone, names it above the composer, and follows it on Subscribe', async () => {
     const { getPosts, followTopic } = await import('../api')
     const { PostsPane } = await import('./PostsPane')
     const { fireEvent } = await import('@testing-library/react')
     renderWithQuery(<PostsPane groupId={ROOT} topicId="t1" watching={false} />)
     await screen.findByText('p20')
     expect(getPosts).toHaveBeenCalledWith(ROOT, null, 20, 't1')
-    const strip = await screen.findByRole('region', { name: 'Topic' })
-    expect(strip.textContent).toContain('Practice')
-    expect(strip.textContent).toContain('What works.')
-    const notify = screen.getByRole('button', { name: 'Notify me' })
+    const showing = await screen.findByRole('button', { name: 'Showing' })
+    expect(showing.textContent).toContain('Practice')
+    await screen.findByText('What works.')
+    const notify = screen.getByRole('button', { name: 'Subscribe' })
     expect(notify.getAttribute('aria-pressed')).toBe('false')
     fireEvent.click(notify)
     expect(followTopic).toHaveBeenCalledWith('t1', true)
     await vi.waitFor(() =>
-      expect(screen.getByRole('button', { name: 'Notify me' }).getAttribute('aria-pressed')).toBe('true'),
+      expect(screen.getByRole('button', { name: 'Subscribed' }).getAttribute('aria-pressed')).toBe('true'),
     )
-    expect(screen.getByRole('link', { name: 'Show everything' }).getAttribute('href')).toBe('/')
+    // Inside a topic the post goes where you are: no chooser beside Post.
+    expect(screen.queryByRole('button', { name: 'Topic' })).toBeNull()
   })
 
-  it('shows no strip and asks for everything when no topic is named', async () => {
+  it('reads Everything at the head of the feed, with nothing to subscribe to, when no topic is named', async () => {
     const { getPosts } = await import('../api')
     await draw(false)
     expect(getPosts).toHaveBeenCalledWith(ROOT, null, 20, null)
-    expect(screen.queryByRole('region', { name: 'Topic' })).toBeNull()
+    expect((await screen.findByRole('button', { name: 'Showing' })).textContent).toContain('Everything')
+    expect(screen.queryByRole('button', { name: 'Subscribe' })).toBeNull()
+    expect(screen.getByRole('button', { name: 'Topic' }).textContent).toContain('Set topic')
   })
 })

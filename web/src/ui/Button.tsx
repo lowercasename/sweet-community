@@ -16,9 +16,9 @@ interface ButtonProps {
   icon?: IconName
   /** A small number after the icon, as old Sweet's post toolbar showed comment counts. Hidden when 0. */
   count?: number
-  /** Grafted to a control on its right (the topic on Post): no right corners. */
-  attach?: 'right'
   onClick?: () => void
+  /** The pointer entering or leaving: a toggle shows its action (Unsubscribe) over its state (Subscribed) while hovered. */
+  onHoverChange?: (hovered: boolean) => void
   children?: ReactNode
 }
 
@@ -51,8 +51,8 @@ export function Button({
   label,
   icon,
   count,
-  attach,
   onClick,
+  onHoverChange,
   children,
 }: ButtonProps) {
   const iconOnly = icon !== undefined && children === undefined && !count
@@ -64,7 +64,7 @@ export function Button({
     <>
       <button
         ref={tip.ref}
-        className={`${buttonClass(variant, iconOnly)}${attach === 'right' ? ' rounded-r-none' : ''}`}
+        className={buttonClass(variant, iconOnly)}
         type={type}
         disabled={disabled}
         aria-pressed={pressed === undefined ? undefined : pressed}
@@ -73,6 +73,8 @@ export function Button({
         {...tip.props({
           onMouseDown: pressed === undefined ? undefined : (e) => e.preventDefault(), // toggles keep editor focus
           onClick,
+          onMouseEnter: onHoverChange && (() => onHoverChange(true)),
+          onMouseLeave: onHoverChange && (() => onHoverChange(false)),
         })}
       >
         {icon && <Icon name={icon} />}

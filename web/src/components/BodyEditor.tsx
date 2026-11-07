@@ -40,7 +40,7 @@ interface BodyEditorProps {
   allowEmpty?: boolean
   /**
    * Posts on the community's feed (architecture.md, Topics): the topic the
-   * post will carry, grafted onto the submit button so where it goes is
+   * post will carry, a pill beside the submit button, so where it goes is
    * where the eye is when it is sent. Nothing is shown while no topics exist.
    */
   topic?: { topics: Topic[]; value: string | null; onChange: (topicId: string | null) => void }
@@ -192,27 +192,22 @@ export function BodyEditor({
                 Cancel
               </Button>
             )}
-            {topic && topic.topics.length > 0 ? (
-              <Row gap={0} align="center" wrap="never" shrink={false}>
-                <Button type="submit" attach="right" disabled={!canSubmit}>
-                  {busy ? busyLabel : submitLabel}
-                </Button>
+            <Row gap={2} align="center" wrap="never">
+              {topic && topic.topics.length > 0 && (
                 <TopicMenu
                   topics={topic.topics}
                   value={topic.value}
                   onChange={topic.onChange}
                   noneLabel="No topic"
+                  emptyLabel="Set topic"
                   label="Topic"
-                  trigger="graft"
-                  quiet={!canSubmit}
                   disabled={busy || disabled}
                 />
-              </Row>
-            ) : (
+              )}
               <Button type="submit" disabled={!canSubmit}>
                 {busy ? busyLabel : submitLabel}
               </Button>
-            )}
+            </Row>
           </Row>
         </Row>
         {error && <Alert tone="error">{error}</Alert>}

@@ -23,7 +23,6 @@ import {
   groupPath,
   membersPath,
   profilePath,
-  topicPath,
 } from '../routes'
 import { CommunityPage } from '../components/CommunityPage'
 import { GroupView, groupLabel } from '../components/GroupView'
@@ -40,7 +39,6 @@ import { ProfilePage } from '../components/ProfilePage'
 import { SearchPage } from '../components/SearchPage'
 import { SettingsPage } from '../components/SettingsPage'
 import { Sidebar } from '../components/Sidebar'
-import { TopicMenu } from '../components/TopicMenu'
 import { Button, ConfirmDialog, Menu, Segmented, Shell, TabBar, Text } from '../ui'
 
 /** What the bar calls each page that is not a place. */
@@ -171,16 +169,6 @@ export function Home({ me, onSignOut }: HomeProps) {
         {/* The phone's menu is the one view under no bar: it is not a place to be named. */}
         {location !== '/menu' && (
           <PageBar title={bar.title} back={bar.back}>
-            {atRoot && topics.length > 0 && (
-              <TopicMenu
-                topics={topics}
-                value={topicId}
-                onChange={(id) => navigate(id ? topicPath(id) : '/')}
-                noneLabel="Everything"
-                label="Topic"
-                trigger="pill"
-              />
-            )}
             {narrow && viewing && current?.mode === 'both' && (
               <Segmented
                 label="View"

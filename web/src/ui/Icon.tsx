@@ -1,6 +1,8 @@
 import {
   ArrowLeft,
   Bell,
+  BellOff,
+  BellRing,
   Bold,
   Check,
   ChevronDown,
@@ -37,6 +39,8 @@ export type IconName =
   | 'home'
   | 'search'
   | 'bell'
+  | 'bell-ring'
+  | 'bell-off'
   | 'people'
   | 'settings'
   | 'expand'
@@ -67,6 +71,8 @@ const ICONS: Record<IconName, LucideIcon> = {
   home: House,
   search: Search,
   bell: Bell,
+  'bell-ring': BellRing,
+  'bell-off': BellOff,
   people: Users,
   settings: Settings,
   expand: ChevronsRight,
@@ -93,7 +99,7 @@ const ICONS: Record<IconName, LucideIcon> = {
 
 interface IconProps {
   name: IconName
-  size?: 16 | 18 | 20 | 22
+  size?: 14 | 16 | 18 | 20 | 22
 }
 
 /** A Lucide icon in the current text colour. Decorative; the control around it carries the label. */

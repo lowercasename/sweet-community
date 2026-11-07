@@ -1,5 +1,4 @@
 import { useState } from 'react'
-import { useLocation } from 'wouter'
 import type { Post as PostData } from '../api'
 import { useAuthor, useTopics } from '../data/hooks'
 import { ROOT_ID } from '../data/keys'
@@ -24,7 +23,6 @@ import { Body } from './Body'
 import { BodyEditor } from './BodyEditor'
 import { CommentThread } from './CommentThread'
 import { PersonName } from './PersonName'
-import { TopicMenu } from './TopicMenu'
 
 interface PostProps {
   post: PostData
@@ -40,7 +38,7 @@ interface PostProps {
   onEdit: (bodyHtml: string) => Promise<void>
   /** Resolves when the server has deleted the post; the cache drops it. */
   onDelete: () => Promise<void>
-  /** Files the post under a topic, or none (architecture.md, Topics); the author's or the staff's, by its can flag. */
+  /** Files the post under a topic, or none (architecture.md, Topics), from the editor when the author saves. */
   onSetTopic?: (topicId: string | null) => Promise<void>
 }
 
@@ -55,7 +53,6 @@ export function Post({
   onSetTopic,
 }: PostProps) {
   const author = useAuthor(post.author)
-  const [, navigate] = useLocation()
   // The topic is named from the topics cache, so a rename reaches every pill at once.
   const { topics } = useTopics()
   const topic = topics.find((t) => t.id === post.topic_id)
@@ -76,23 +73,11 @@ export function Post({
     setEditing(true)
   }
 
-  // The pill (architecture.md, Topics): for a reader, the way into the topic; for its author and the staff, the way to file it.
+  // The pill (architecture.md, Topics) opens the topic, for everyone. The topic is changed while editing the post.
   const pill = topic ? (
-    post.can.set_topic && onSetTopic && !disabled ? (
-      <TopicMenu
-        topics={topics}
-        value={post.topic_id}
-        onChange={(id) => void onSetTopic(id)}
-        noneLabel="No topic"
-        label={`Topic: ${topic.name}`}
-        leading={[{ label: `Show ${topic.name}`, icon: 'tag', onSelect: () => navigate(topicPath(topic.id)) }]}
-        trigger="pill"
-      />
-    ) : (
-      <Pill href={topicPath(topic.id)} label={`Topic: ${topic.name}`}>
-        {topic.name}
-      </Pill>
-    )
+    <Pill href={topicPath(topic.id)} label={`Topic: ${topic.name}`}>
+      {topic.name}
+    </Pill>
   ) : null
 
   const remove = async () => {
@@ -148,14 +133,14 @@ export function Post({
     >
       <Stack gap={3}>
         <Stack gap={2}>
-          <Row justify="between" align="center">
-            <Row gap={2} align="center">
+          <Row justify="between" align="center" wrap="never">
+            <Row gap={2} align="center" wrap="never" shrink={false}>
               <PersonName user={author} avatar="md" />
               <Text as="span" variant="small">
                 {linked ? <Link href={postPath(post.id)}>{when}</Link> : when}
               </Text>
             </Row>
-            <Row gap={1} align="center" wrap="never" shrink={false}>
+            <Row gap={1} align="center" wrap="never">
               {!editing && pill}
               {items.length > 0 && !editing && !disabled && <Menu label="Post options" items={items} reveal="post" />}
             </Row>

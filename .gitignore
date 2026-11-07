@@ -11,3 +11,4 @@ internal/web/dist/*
 !internal/web/dist/.gitkeep
 # Copied from migrations/ by the Makefile at build time.
 cmd/sweet/migrations/
+/CLAUDE.md

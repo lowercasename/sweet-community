@@ -2,13 +2,13 @@ import { anyView, article, expect, member, open, owner, postEditor, test, uniq }
 
 /**
  * Topics (architecture.md, Topics): the owner adds one on the Community
- * page, a post is filed under it from the grafted Post button, its pill
- * opens the topic for a reader and the filing menu for the staff, the bar
- * wears the same pill, following a topic brings a notification, and a
+ * page, a post is filed under it from the button beside Post, its pill
+ * opens the topic, the author changes it while editing, the feed's head
+ * wears the same pill, subscribing brings a notification, and a
  * deleted topic leaves its posts without one.
  */
 test.describe('topics', () => {
-  test('from the owner adding one to a follower being told, and a moderator refiling', async ({
+  test('from the owner adding one to a subscriber being told, and the author unfiling', async ({
     browser,
   }, testInfo) => {
     const o = await owner(browser, testInfo)
@@ -19,13 +19,13 @@ test.describe('topics', () => {
     // The owner adds a topic. Until one exists, nothing about topics shows anywhere.
     await open(o.page, '/community')
     await o.page.getByLabel('Topic name').fill(name)
-    await o.page.getByLabel('What goes in it').fill('What is working, what is not.')
+    await o.page.getByLabel('Short description').fill('What is working, what is not.')
     await o.page.getByRole('button', { name: 'Add topic' }).click()
     await expect(o.page.getByRole('listitem').filter({ hasText: name })).toContainText('0 posts')
 
-    // Home: the bar's pill reads Everything. The post is filed from the control grafted onto Post.
+    // Home: the feed's head reads Everything. The post is filed from the pill beside Post.
     await open(o.page)
-    await expect(o.page.getByRole('button', { name: 'Topic' }).first()).toContainText('Everything')
+    await expect(o.page.getByRole('button', { name: 'Showing' })).toContainText('Everything')
     const text = uniq('A filed post ')
     await postEditor(o.page).click()
     await o.page.keyboard.type(text)
@@ -33,36 +33,42 @@ test.describe('topics', () => {
     await composer.getByRole('button', { name: 'Topic' }).click()
     await o.page.getByRole('menuitemradio', { name: new RegExp(`^${name}`) }).click()
     await expect(composer.getByRole('button', { name: 'Topic' })).toContainText(name)
+    await o.page.screenshot({ path: `test-results/topics-${testInfo.project.name}-composer.png` })
     await o.page.getByRole('button', { name: 'Post', exact: true }).click()
     const mine = article(o.page, text)
     await expect(mine).toBeVisible()
-    // The owner is staff: the pill is the filing menu.
-    await expect(mine.getByRole('button', { name: `Topic: ${name}` })).toBeVisible()
+    // The pill opens the topic for everyone, the author included.
+    await expect(mine.getByRole('link', { name: `Topic: ${name}` })).toBeVisible()
     await o.page.screenshot({ path: `test-results/topics-${testInfo.project.name}-feed.png`, fullPage: true })
 
-    // A reader's pill opens the topic: the URL names it, the strip names it, the bar's pill reads it.
+    // A reader's pill opens the topic: the URL names it, the feed's head reads it.
     await open(kit.page)
     const theirs = article(kit.page, text)
     const pill = theirs.getByRole('link', { name: `Topic: ${name}` })
     await expect(pill).toHaveText(name)
     await pill.click()
     await expect(kit.page).toHaveURL(/\/\?topic=/)
-    const strip = kit.page.getByRole('region', { name: 'Topic' })
-    await expect(strip).toContainText(name)
-    await expect(strip).toContainText('What is working, what is not.')
-    await expect(kit.page.getByRole('button', { name: 'Topic' }).first()).toContainText(name)
+    await expect(kit.page.getByRole('button', { name: 'Showing' })).toContainText(name)
+    await expect(kit.page.getByText('What is working, what is not.')).toBeVisible()
     await expect(article(kit.page, text)).toBeVisible()
-    // Following: Notify me is pressed from then on.
-    await strip.getByRole('button', { name: 'Notify me' }).click()
-    await expect(strip.getByRole('button', { name: 'Notify me' })).toHaveAttribute('aria-pressed', 'true')
+    // Subscribing: the button says so from then on.
+    await kit.page.getByRole('button', { name: 'Subscribe' }).click()
+    // Under the pointer the toggle offers its action, Unsubscribe. Away from it, it shows its state.
+    await expect(kit.page.getByRole('button', { name: 'Unsubscribe' })).toHaveAttribute('aria-pressed', 'true')
+    await kit.page.mouse.move(8, 8)
+    const subscribed = kit.page.getByRole('button', { name: 'Subscribed' })
+    await expect(subscribed).toHaveAttribute('aria-pressed', 'true')
+    // Pressed looks pressed: Sweet red.
+    await expect(subscribed).toHaveCSS('color', 'rgb(206, 23, 23)')
     await kit.page.screenshot({ path: `test-results/topics-${testInfo.project.name}-topic.png`, fullPage: true })
 
-    // In the topic view the composer starts with the topic. Mo posts there; kit, following, is told.
+    // Inside the topic a post goes where you are: no chooser beside Post. Mo posts there; kit, subscribed, is told.
     const url = kit.page.url()
     await mo.page.goto(url)
     await expect(mo.page.getByRole('navigation', { name: 'Main' })).toBeVisible()
+    await expect(mo.page.getByRole('button', { name: 'Showing' })).toContainText(name)
     const moComposer = mo.page.locator('form').filter({ has: postEditor(mo.page) })
-    await expect(moComposer.getByRole('button', { name: 'Topic' })).toContainText(name)
+    await expect(moComposer.getByRole('button', { name: 'Topic' })).toHaveCount(0)
     const second = uniq('Something that worked ')
     await postEditor(mo.page).click()
     await mo.page.keyboard.type(second)
@@ -75,18 +81,22 @@ test.describe('topics', () => {
     await open(mo.page, '/notifications')
     await expect(mo.page.getByText(`posted in ${name}`)).toHaveCount(0)
 
-    // Show everything is the way back. The post outside the topic is on the feed again.
+    // Everything, from the feed's head, is the way back.
     await open(kit.page, url)
-    await kit.page.getByRole('link', { name: 'Show everything' }).click()
+    await kit.page.getByRole('button', { name: 'Showing' }).click()
+    await kit.page.getByRole('menuitemradio', { name: 'Everything' }).click()
     await expect(kit.page).toHaveURL(/\/$/)
-    await expect(kit.page.getByRole('region', { name: 'Topic' })).toHaveCount(0)
+    await expect(kit.page.getByRole('button', { name: 'Showing' })).toContainText('Everything')
 
-    // The owner refiles mo's post from its pill: No topic. The pill goes, for everyone.
-    await open(o.page)
-    const moPost = article(o.page, second)
-    await moPost.getByRole('button', { name: `Topic: ${name}` }).click()
-    await o.page.getByRole('menuitemradio', { name: 'No topic' }).click()
-    await expect(moPost.getByRole('button', { name: `Topic: ${name}` })).toHaveCount(0)
+    // Mo unfiles their post while editing it: No topic, Save. The pill goes, for everyone.
+    await open(mo.page)
+    const moPost = article(mo.page, second)
+    await moPost.getByRole('button', { name: 'Post options' }).click()
+    await mo.page.getByRole('menuitem', { name: 'Edit' }).click()
+    await moPost.getByRole('button', { name: 'Topic' }).click()
+    await mo.page.getByRole('menuitemradio', { name: 'No topic' }).click()
+    await moPost.getByRole('button', { name: 'Save' }).click()
+    await expect(moPost.getByRole('link', { name: `Topic: ${name}` })).toHaveCount(0)
     await expect(article(kit.page, second).getByRole('link', { name: `Topic: ${name}` })).toHaveCount(0)
 
     // Deleting the topic: the dialog says what happens, the owner's post stays, unfiled.
@@ -95,41 +105,62 @@ test.describe('topics', () => {
     await o.page.getByRole('menuitem', { name: 'Delete' }).click()
     const dialog = o.page.getByRole('dialog')
     await expect(dialog).toContainText('Its 1 post stays, without a topic.')
-    await expect(dialog).toContainText('The 1 person who asked to be notified about it will not be any more.')
+    await expect(dialog).toContainText('Its 1 subscriber will no longer be notified.')
     await dialog.getByRole('button', { name: 'Delete', exact: true }).click()
     await expect(o.page.getByRole('listitem').filter({ hasText: name })).toHaveCount(0)
     await open(o.page)
     await expect(article(o.page, text)).toBeVisible()
-    await expect(article(o.page, text).getByRole('button', { name: /^Topic:/ })).toHaveCount(0)
+    await expect(article(o.page, text).getByRole('link', { name: /^Topic:/ })).toHaveCount(0)
 
     await kit.context.close()
     await mo.context.close()
     await o.context.close()
   })
 
-  test('@phone the pill, the strip and the grafted button fit the small screen', async ({ browser }, testInfo) => {
+  test('@phone the pills at the head of the feed, beside Post and on a post fit the small screen', async ({
+    browser,
+  }, testInfo) => {
     const o = await owner(browser, testInfo)
-    const name = uniq('Reading ')
-    const made = await o.context.request.post('/api/topics', { data: { name, description: 'Papers and reports.' } })
+    // The longest a name and a description can be, since that is where a layout breaks.
+    const name = uniq('Seed swaps and saving for spring ').slice(0, 40)
+    const made = await o.context.request.post('/api/topics', {
+      data: {
+        name,
+        description:
+          'Which seeds to keep, how to dry and store them, and who has spare packets to share, at any length up to here.',
+      },
+    })
     expect(made.ok()).toBeTruthy()
     const id = ((await made.json()) as { id: string }).id
     await open(o.page, `/?topic=${id}`)
     await anyView(o.page, 'Posts').click()
-    const strip = o.page.getByRole('region', { name: 'Topic' })
-    await expect(strip).toContainText(name)
-    const composer = o.page.locator('form').filter({ has: postEditor(o.page) })
-    await expect(composer.getByRole('button', { name: 'Topic' })).toContainText(name)
+    await expect(o.page.getByRole('button', { name: 'Showing' })).toContainText(name)
     const text = uniq('On a phone ')
     await postEditor(o.page).click()
     await o.page.keyboard.type(text)
+    await o.page.screenshot({ path: `test-results/topics-phone-composer.png` })
     await o.page.getByRole('button', { name: 'Post', exact: true }).click()
     const mine = article(o.page, text)
-    await expect(mine.getByRole('button', { name: `Topic: ${name}` })).toBeVisible()
-    // Nothing wider than the screen.
-    const width = await o.page.evaluate(
-      () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
+    await expect(mine.getByRole('link', { name: `Topic: ${name}` })).toBeVisible()
+    await expect(mine.getByRole('button', { name: 'Post options' })).toBeVisible()
+    // Nothing wider than the screen, in the composer or on the post, not even clipped.
+    const overflow = await o.page.evaluate(
+      () =>
+        [...document.querySelectorAll('form *, article *')].filter((el) => {
+          const r = el.getBoundingClientRect()
+          return r.width > 0 && (r.right > window.innerWidth + 1 || r.left < -1)
+        }).length,
     )
-    expect(width).toBe(0)
+    expect(overflow).toBe(0)
+    // The author's name is on one line, and the pill's icon kept its size.
+    const nameBox = await mine.getByRole('button', { name: 'raphael' }).boundingBox()
+    expect(nameBox!.height).toBeLessThan(40)
+    const iconBox = await mine
+      .getByRole('link', { name: `Topic: ${name}` })
+      .locator('svg')
+      .first()
+      .boundingBox()
+    expect(iconBox!.width).toBe(14)
     await o.page.screenshot({ path: `test-results/topics-phone.png`, fullPage: true })
     await o.context.request.delete(`/api/topics/${id}`)
     await o.context.close()

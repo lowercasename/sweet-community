@@ -109,14 +109,18 @@ describe('Post topic pill', () => {
     expect(pill.textContent).toBe('Practice')
   })
 
-  it('opens the menu to file it for someone who may, with the topic itself first', async () => {
+  it('is a link for its author too, who changes the topic while editing', async () => {
     const onSetTopic = await drawFiled({ ...mine, set_topic: true })
-    fireEvent.click(await screen.findByRole('button', { name: 'Topic: Practice' }))
-    const items = [...screen.getByRole('menu').querySelectorAll('[role^="menuitem"]')].map((b) => b.textContent)
-    expect(items).toEqual(['Show Practice', 'No topic', 'PracticeWhat works.', 'Reading'])
-    expect(screen.getByRole('menuitemradio', { name: /^Practice/ }).getAttribute('aria-checked')).toBe('true')
+    expect((await screen.findByRole('link', { name: 'Topic: Practice' })).getAttribute('href')).toBe('/?topic=t1')
+    fireEvent.click(screen.getByLabelText('Post options'))
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Edit' }))
+    const chooser = await screen.findByRole('button', { name: 'Topic' })
+    expect(chooser.textContent).toContain('Practice')
+    fireEvent.click(chooser)
     fireEvent.click(screen.getByRole('menuitemradio', { name: 'Reading' }))
-    expect(onSetTopic).toHaveBeenCalledWith('t2')
+    expect(screen.getByRole('button', { name: 'Topic' }).textContent).toContain('Reading')
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }))
+    await vi.waitFor(() => expect(onSetTopic).toHaveBeenCalledWith('t2'))
   })
 
   it('shows no pill on a post without a topic', async () => {

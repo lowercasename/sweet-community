@@ -1,14 +1,17 @@
 import { useEffect, useState } from 'react'
+import { useLocation } from 'wouter'
 import { useMarkRead, useMarkers, usePostActions, usePosts, useTopicActions, useTopics } from '../data/hooks'
 import { ROOT_ID } from '../data/keys'
 import { feedStream, markerOf } from '../data/notifications'
 import { usePageVisible } from '../hooks/usePageVisible'
 import { useStreamStatus } from '../hooks/StreamContext'
-import { Alert, Button, Card, Heading, Link, Measure, Pane, Row, ScrollArea, Stack, Text } from '../ui'
+import { topicPath } from '../routes'
+import { Alert, Button, Card, Measure, Pane, Row, ScrollArea, Stack, Text } from '../ui'
 import { postExtensions } from '../editor/extensions'
 import { BodyEditor } from './BodyEditor'
 import { ConnectionStatus } from './ConnectionStatus'
 import { PostList } from './PostList'
+import { TopicMenu } from './TopicMenu'
 
 interface PostsPaneProps {
   /** The group whose feed this is. */
@@ -34,9 +37,11 @@ export function PostsPane({ groupId, side = 'full', watching, topicId = null }: 
   const topical = groupId === ROOT_ID && topics.length > 0
   const topic = topical ? topics.find((t) => t.id === topicId) : undefined
   const topicActions = useTopicActions()
+  const [, navigate] = useLocation()
   const [draftTopic, setDraftTopic] = useState<string | null>(topicId)
   useEffect(() => setDraftTopic(topicId), [topicId])
   const [following, setFollowing] = useState(false)
+  const [overBell, setOverBell] = useState(false)
   const follow = async () => {
     if (!topic) return
     setFollowing(true)
@@ -68,31 +73,36 @@ export function PostsPane({ groupId, side = 'full', watching, topicId = null }: 
       <ScrollArea>
         <Measure>
           <Stack gap={3}>
-            {topic && (
-              <Card as="section" label="Topic" tone="field">
-                <Row justify="between" align="center">
-                  <Stack gap={0}>
-                    <Heading level={3}>{topic.name}</Heading>
-                    {topic.description && <Text variant="small">{topic.description}</Text>}
+            <Card
+              head={
+                topical && (
+                  <Stack gap={1}>
+                    <Row justify="between" align="center" wrap="never">
+                      <TopicMenu
+                        topics={topics}
+                        value={topic?.id ?? null}
+                        onChange={(id) => navigate(id ? topicPath(id) : '/')}
+                        noneLabel="Everything"
+                        label="Showing"
+                      />
+                      {topic && (
+                        <Button
+                          variant="ghost"
+                          icon={topic.following ? (overBell ? 'bell-off' : 'bell-ring') : 'bell'}
+                          pressed={topic.following}
+                          disabled={following || offline}
+                          onClick={() => void follow()}
+                          onHoverChange={setOverBell}
+                        >
+                          {topic.following ? (overBell ? 'Unsubscribe' : 'Subscribed') : 'Subscribe'}
+                        </Button>
+                      )}
+                    </Row>
+                    {topic?.description && <Text variant="small">{topic.description}</Text>}
                   </Stack>
-                  <Row gap={2} align="center" shrink={false}>
-                    <Button
-                      variant="ghost"
-                      icon="bell"
-                      pressed={topic.following}
-                      disabled={following || offline}
-                      onClick={() => void follow()}
-                    >
-                      Notify me
-                    </Button>
-                    <Text as="span" variant="small">
-                      <Link href="/">Show everything</Link>
-                    </Text>
-                  </Row>
-                </Row>
-              </Card>
-            )}
-            <Card>
+                )
+              }
+            >
               <Stack gap={1}>
                 <ConnectionStatus status={status} />
                 <BodyEditor
@@ -103,7 +113,7 @@ export function PostsPane({ groupId, side = 'full', watching, topicId = null }: 
                   busyLabel="Posting…"
                   disabled={offline}
                   onSubmit={post}
-                  topic={topical ? { topics, value: draftTopic, onChange: setDraftTopic } : undefined}
+                  topic={topical && !topic ? { topics, value: draftTopic, onChange: setDraftTopic } : undefined}
                 />
               </Stack>
             </Card>
