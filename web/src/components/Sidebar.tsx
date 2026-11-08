@@ -41,7 +41,7 @@ export function Sidebar({ me, groups, location, expanded, onGo, onToggle }: Side
   return (
     <NavBar
       expanded={expanded}
-      head={<Wordmark expanded={expanded} name={settings?.name} />}
+      head={<Wordmark expanded={expanded} label={settings?.name} />}
       foot={
         <>
           <NavItem
