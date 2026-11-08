@@ -4,6 +4,8 @@ import {
   addMember,
   changeEmail,
   getAccount,
+  getMySettings,
+  setMySettings,
   clearNotifications,
   createComment,
   readNotification,
@@ -54,6 +56,7 @@ import {
   type GroupMode,
   type Invite,
   type Member,
+  type MySettings,
   type Notification,
   type Role,
   type Settings,
@@ -508,6 +511,15 @@ export function useSetPicture() {
 }
 
 /** My account's address and its state, for Settings. */
+export function useMySettings() {
+  return useQuery({ queryKey: keys.mySettings, queryFn: getMySettings })
+}
+export function useSetMySettings() {
+  const qc = useQueryClient()
+  return async (s: MySettings) => {
+    qc.setQueryData(keys.mySettings, await setMySettings(s))
+  }
+}
 export function useAccount() {
   return useQuery({ queryKey: keys.account, queryFn: getAccount })
 }

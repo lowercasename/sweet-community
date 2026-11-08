@@ -15,6 +15,11 @@ vi.mock('../api', () => ({
     Promise.resolve({ email: 'kit@example.test', email_verified: true, pending_email: email }),
   ),
   changePassword: vi.fn(() => Promise.resolve()),
+  getMySettings: vi.fn(() => Promise.resolve({ digest: 'weekly' })),
+  setMySettings: vi.fn(),
+  getPushKey: vi.fn(),
+  subscribePush: vi.fn(),
+  unsubscribePush: vi.fn(),
 }))
 
 afterEach(cleanup)

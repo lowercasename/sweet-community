@@ -14,6 +14,15 @@ type Image struct {
 	CreatedAt   int64
 }
 
+type PushSubscription struct {
+	ID        string
+	UserID    string
+	Endpoint  string
+	P256dh    string
+	Auth      string
+	CreatedAt int64
+}
+
 type Setting struct {
 	Key   string
 	Value string

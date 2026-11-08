@@ -1,11 +1,17 @@
 package api
 
 import (
+	"context"
+	"encoding/json"
+	"fmt"
 	"reflect"
+	"strings"
+	"sync"
 	"testing"
 	"time"
 
 	"sweet/internal/perm"
+	"sweet/internal/push"
 )
 
 // Notifications (architecture.md, Notifications): one row per person per
@@ -276,4 +282,129 @@ func TestChatUnread(t *testing.T) {
 	if _, ok := markers(kit)["feed:"+gid]; ok {
 		t.Fatalf("a feed marker for a room I left: %v", markers(kit))
 	}
+}
+
+// A person's own settings (architecture.md, Notifications): the digest is weekly until they turn it off.
+func TestMySettings(t *testing.T) {
+	ts, owner := newTestServer(t)
+	kit, _ := registerMember(t, ts, owner, "kit")
+	if got := kit.mustStatus(200, "GET", "/api/me/settings", nil); got["digest"] != "weekly" {
+		t.Fatalf("default: %v", got)
+	}
+	kit.mustStatus(400, "PUT", "/api/me/settings", map[string]string{"digest": "never"})
+	if got := kit.mustStatus(200, "PUT", "/api/me/settings", map[string]string{"digest": "off"}); got["digest"] != "off" {
+		t.Fatalf("set: %v", got)
+	}
+	if got := kit.mustStatus(200, "GET", "/api/me/settings", nil); got["digest"] != "off" {
+		t.Fatalf("kept: %v", got)
+	}
+	// Mine alone.
+	if got := owner.mustStatus(200, "GET", "/api/me/settings", nil); got["digest"] != "weekly" {
+		t.Fatalf("someone else's: %v", got)
+	}
+}
+
+// A sender that remembers, and can be told a device is gone.
+type fakePush struct {
+	mu   sync.Mutex
+	sent []string // "endpoint body url"
+	gone map[string]bool
+}
+
+func (f *fakePush) Send(_ context.Context, sub push.Subscription, data []byte) (bool, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if f.gone[sub.Endpoint] {
+		return true, nil
+	}
+	var p push.Payload
+	_ = json.Unmarshal(data, &p)
+	f.sent = append(f.sent, sub.Endpoint+" "+p.Title+" "+p.Body+" "+p.URL)
+	return false, nil
+}
+
+func (f *fakePush) all() []string {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return append([]string(nil), f.sent...)
+}
+
+// Web push (architecture.md, Notifications): a mention or a comment on your
+// post reaches each device you asked to be notified on, nothing else does,
+// and a device the push service has lost is dropped.
+func TestPushForMentionsAndReplies(t *testing.T) {
+	ts, owner, srv := newTestServerWith(t)
+	fake := &fakePush{gone: map[string]bool{}}
+	srv.Push = &push.Pusher{DB: srv.DB, Send: fake}
+	srv.PushKey = "test-public-key"
+	kit, kitID := registerMember(t, ts, owner, "kit")
+	mo, _ := registerMember(t, ts, owner, "mo")
+	owner.mustStatus(200, "PUT", "/api/settings", map[string]string{"group_creation": "anyone", "name": "Thursday Group", "description": ""})
+
+	if got := kit.mustStatus(200, "GET", "/api/push/key", nil); got["key"] != "test-public-key" {
+		t.Fatalf("key: %v", got)
+	}
+	sub := func(endpoint string) map[string]any {
+		return map[string]any{"endpoint": endpoint, "keys": map[string]string{"p256dh": "p", "auth": "a"}}
+	}
+	kit.mustStatus(400, "POST", "/api/push/subscriptions", sub("http://insecure.test/x"))
+	kit.mustStatus(201, "POST", "/api/push/subscriptions", sub("https://push.test/kit-phone"))
+	kit.mustStatus(201, "POST", "/api/push/subscriptions", sub("https://push.test/kit-laptop"))
+	kit.mustStatus(201, "POST", "/api/push/subscriptions", sub("https://push.test/kit-phone")) // again: the same device, once
+
+	wait := func(n int) []string {
+		t.Helper()
+		deadline := time.Now().Add(3 * time.Second)
+		for time.Now().Before(deadline) {
+			if got := fake.all(); len(got) >= n {
+				return got
+			}
+			time.Sleep(20 * time.Millisecond)
+		}
+		t.Fatalf("waited for %d pushes, got %v", n, fake.all())
+		return nil
+	}
+
+	// A comment on kit's post: both of kit's devices, with the words and the post's address. Not mo, not the owner.
+	post := kit.mustStatus(201, "POST", rootPath+"/posts", map[string]string{"body_html": "<p>hello</p>"})
+	pid := post["id"].(string)
+	mo.mustStatus(201, "POST", "/api/posts/"+pid+"/comments", map[string]string{"body_html": "<p>hi</p>"})
+	got := wait(2)
+	for _, s := range got {
+		if !strings.HasPrefix(s, "https://push.test/kit-") || !strings.Contains(s, " Thursday Group mo commented on your post http://sweet.test/p/"+pid) {
+			t.Fatalf("push: %q", s)
+		}
+	}
+	// Being added to a room is a notification but not a push.
+	room := owner.mustStatus(201, "POST", "/api/groups", map[string]any{"kind": "group", "name": "Knitting", "mode": "both"})
+	owner.mustStatus(201, "POST", "/api/groups/"+room["id"].(string)+"/members", map[string]string{"user_id": kitID})
+	time.Sleep(150 * time.Millisecond)
+	if len(fake.all()) != 2 {
+		t.Fatalf("pushed for an add: %v", fake.all())
+	}
+	// A mention pushes. The phone is gone now: the push service says so, and it is dropped, so the laptop alone hears next time.
+	fake.gone["https://push.test/kit-phone"] = true
+	mo.mustStatus(201, "POST", rootPath+"/posts", map[string]string{"body_html": "<p>" + mentionOf(kitID, "kit") + " look</p>"})
+	got = wait(3)
+	if !strings.Contains(got[2], "kit-laptop Thursday Group mo mentioned you http://sweet.test/p/") {
+		t.Fatalf("mention push: %q", got[2])
+	}
+	time.Sleep(100 * time.Millisecond)
+	mo.mustStatus(201, "POST", "/api/posts/"+pid+"/comments", map[string]string{"body_html": "<p>again</p>"})
+	got = wait(4)
+	if len(got) != 4 || !strings.HasPrefix(got[3], "https://push.test/kit-laptop") {
+		t.Fatalf("after the phone went: %v", got)
+	}
+	// Kit drops the laptop: silence.
+	kit.mustStatus(200, "DELETE", "/api/push/subscriptions", map[string]string{"endpoint": "https://push.test/kit-laptop"})
+	mo.mustStatus(201, "POST", "/api/posts/"+pid+"/comments", map[string]string{"body_html": "<p>once more</p>"})
+	time.Sleep(150 * time.Millisecond)
+	if len(fake.all()) != 4 {
+		t.Fatalf("pushed to a dropped device: %v", fake.all())
+	}
+}
+
+// mentionOf is a stored mention of a person, as the editor writes it.
+func mentionOf(id, name string) string {
+	return fmt.Sprintf(`<span data-type="mention" data-mention-id="%s">@%s</span>`, id, name)
 }

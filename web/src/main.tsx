@@ -12,6 +12,13 @@ import { makeQueryClient } from './data/client'
 
 const queryClient = makeQueryClient()
 
+// The service worker is for web push alone (architecture.md, Notifications): it caches nothing.
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('/sw.js').catch(() => {
+    // Without it there is no push; everything else works.
+  })
+}
+
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
     <QueryClientProvider client={queryClient}>

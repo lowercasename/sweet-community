@@ -18,9 +18,11 @@ import (
 
 	"sweet/internal/api"
 	"sweet/internal/db"
+	"sweet/internal/digest"
 	"sweet/internal/events"
 	"sweet/internal/images"
 	"sweet/internal/mail"
+	"sweet/internal/push"
 	"sweet/internal/version"
 	"sweet/internal/web"
 )
@@ -121,9 +123,20 @@ func main() {
 	// Unreferenced images go after a day: long enough for any draft.
 	go images.SweepEvery(ctx, d, imgStore, time.Hour, 24*time.Hour, log.Printf)
 
+	sender := mail.FromEnv(*mailDir)
+	// The weekly digest for anyone who has not visited (architecture.md, Notifications): looked at every hour.
+	go digest.Every(ctx, d, sender, base, time.Hour, log.Printf)
+
 	hub := events.NewHub(d)
 	hub.Version = version.Of()
-	srv := &api.Server{DB: d, Hub: hub, Images: imgStore, Mail: mail.FromEnv(*mailDir), BaseURL: base, TrustProxy: *trustProxy}
+	srv := &api.Server{DB: d, Hub: hub, Images: imgStore, Mail: sender, BaseURL: base, TrustProxy: *trustProxy}
+	// Web push (architecture.md, Notifications): the instance's VAPID keys, made on first start.
+	if keys, err := push.LoadKeys(ctx, d); err != nil {
+		log.Printf("push: %v (push is off)", err)
+	} else {
+		srv.Push = &push.Pusher{DB: d, Send: push.WebPush{Keys: keys, Subscriber: base}}
+		srv.PushKey = keys.Public
+	}
 
 	mux := http.NewServeMux()
 	srv.Routes(mux)

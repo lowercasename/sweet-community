@@ -29,6 +29,11 @@ vi.mock('../api', async (importOriginal) => ({
   listInvites: vi.fn(() => Promise.resolve({ invites: [] })),
   getSettings: vi.fn(() => Promise.resolve({ group_creation: 'anyone' })),
   getAccount: vi.fn(() => Promise.resolve({ email: null, email_verified: false, pending_email: null })),
+  getMySettings: vi.fn(() => Promise.resolve({ digest: 'weekly' })),
+  setMySettings: vi.fn(),
+  getPushKey: vi.fn(),
+  subscribePush: vi.fn(),
+  unsubscribePush: vi.fn(),
   listNotifications: vi.fn(() => Promise.resolve({ notifications: [], next_before: null })),
   listMarkers: vi.fn(() =>
     Promise.resolve({ markers: [{ user_id: 'raphael', stream: 'notifications', read_at: 0, unread: 0 }] }),

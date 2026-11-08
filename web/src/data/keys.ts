@@ -23,4 +23,5 @@ export const keys = {
   markers: ['markers'] as const,
   settings: ['settings'] as const,
   account: ['account'] as const,
+  mySettings: ['mySettings'] as const,
 }

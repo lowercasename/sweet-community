@@ -499,6 +499,33 @@ export function resetPassword(token: string, password: string): Promise<Session>
   return request<Session>(`/api/reset/${encodeURIComponent(token)}`, json('POST', { password }))
 }
 
+/** What I set for myself (architecture.md, Notifications): the weekly digest, on or off. */
+export interface MySettings {
+  digest: 'weekly' | 'off'
+}
+
+export function getMySettings(): Promise<MySettings> {
+  return request('/api/me/settings')
+}
+
+export function setMySettings(s: MySettings): Promise<MySettings> {
+  return request<MySettings>('/api/me/settings', json('PUT', s))
+}
+
+/** The server's public key for web push, or a 404 when push is not set up. */
+export function getPushKey(): Promise<{ key: string }> {
+  return request('/api/push/key')
+}
+
+/** This device, as the browser describes it, kept by the server so it can be told of mentions and replies. */
+export function subscribePush(sub: PushSubscriptionJSON): Promise<void> {
+  return request('/api/push/subscriptions', json('POST', sub))
+}
+
+export function unsubscribePush(endpoint: string): Promise<void> {
+  return request('/api/push/subscriptions', json('DELETE', { endpoint }))
+}
+
 export function getAccount(): Promise<Account> {
   return request('/api/me/account')
 }

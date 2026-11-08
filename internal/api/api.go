@@ -20,6 +20,7 @@ import (
 	"sweet/internal/images"
 	"sweet/internal/mail"
 	"sweet/internal/perm"
+	"sweet/internal/push"
 	"sweet/internal/sanitize"
 	"sweet/internal/store"
 )
@@ -112,6 +113,10 @@ type Server struct {
 	// TrustProxy: requests come through a reverse proxy that sets
 	// X-Forwarded-For, and its first address is the client's.
 	TrustProxy bool
+	// Push tells a person's devices of a mention or a reply (architecture.md,
+	// Notifications); nil when push is not set up. PushKey is the public VAPID key.
+	Push    *push.Pusher
+	PushKey string
 
 	limiter loginLimiter
 	// mailLimiter paces the endpoints that send a link to any address asked for.
@@ -190,6 +195,11 @@ func (s *Server) Routes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/me/account", s.requireAuth(s.getAccount))
 	mux.HandleFunc("PUT /api/me/email", s.requireAuth(s.changeEmail))
 	mux.HandleFunc("PUT /api/me/password", s.requireAuth(s.changePassword))
+	mux.HandleFunc("GET /api/me/settings", s.requireAuth(s.getMySettings))
+	mux.HandleFunc("GET /api/push/key", s.requireAuth(s.pushKey))
+	mux.HandleFunc("POST /api/push/subscriptions", s.requireAuth(s.subscribePush))
+	mux.HandleFunc("DELETE /api/push/subscriptions", s.requireAuth(s.unsubscribePush))
+	mux.HandleFunc("PUT /api/me/settings", s.requireAuth(s.setMySettings))
 	mux.HandleFunc("POST /api/logout", s.requireAuth(s.logout))
 	mux.HandleFunc("POST /api/logout-all", s.requireAuth(s.logoutAll))
 	mux.HandleFunc("GET /api/users", s.requireAuth(s.listUsers))
@@ -418,8 +428,15 @@ func (s *Server) loggedMany(w http.ResponseWriter, r *http.Request, now int64, f
 		writeErr(w, http.StatusInternalServerError, err.Error())
 		return
 	}
+	var told []json.RawMessage
 	for _, ev := range logged {
 		s.Hub.Broadcast(ev)
+		if ev.Kind == "notification" {
+			told = append(told, ev.Payload)
+		}
+	}
+	if len(told) > 0 {
+		s.pushAfterCommit(told, st.Name)
 	}
 	if status == http.StatusNoContent {
 		w.WriteHeader(status)
