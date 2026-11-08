@@ -55,7 +55,7 @@ describe('TopicsCard', () => {
     expect(rows[1].textContent).toContain('22 subscribers')
     fireEvent.change(screen.getByLabelText('Topic name'), { target: { value: '  Reading ' } })
     fireEvent.change(screen.getByLabelText('Short description'), { target: { value: ' Papers. ' } })
-    fireEvent.click(screen.getByRole('button', { name: 'Add topic' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Create topic' }))
     expect(createTopic).toHaveBeenCalledWith('Reading', 'Papers.')
     await screen.findByText('Reading')
     expect((screen.getByLabelText('Topic name') as HTMLInputElement).value).toBe('')

@@ -62,7 +62,20 @@ export function TopicsCard() {
     <Card>
       <Stack gap={2}>
         <Heading level={2}>Topics</Heading>
-        <Text variant="secondary">{ABOUT}</Text>
+        <Text variant="small">{ABOUT}</Text>
+        <Form onSubmit={() => void add()}>
+          <Field label="Topic name" hint="Up to 40 characters.">
+            <Input value={name} onChange={setName} maxLength={40} required />
+          </Field>
+          <Field label="Short description">
+            <Input value={description} onChange={setDescription} maxLength={140} />
+          </Field>
+          <Row justify="end">
+            <Button type="submit" disabled={name.trim() === ''} busy={busy}>
+              Create topic
+            </Button>
+          </Row>
+        </Form>
         {error && <Alert tone="error">{error.message}</Alert>}
         {problem && <Alert tone="error">{problem}</Alert>}
         {topics.length > 0 && (
@@ -92,7 +105,7 @@ export function TopicsCard() {
                         label={`Options for ${t.name}`}
                         items={[
                           { label: 'Edit', icon: 'pencil', onSelect: () => setEditing(t) },
-                          { label: 'Delete', icon: 'trash', onSelect: () => setDeleting(t) },
+                          { label: 'Delete', icon: 'trash', danger: true, onSelect: () => setDeleting(t) },
                         ]}
                       />
                     </Row>
@@ -100,27 +113,14 @@ export function TopicsCard() {
                 </ListItem>
               ))}
             </List>
-            <Hairline />
           </>
         )}
-        <Form onSubmit={() => void add()}>
-          <Field label="Topic name" hint="Up to 40 characters.">
-            <Input value={name} onChange={setName} maxLength={40} required />
-          </Field>
-          <Field label="Short description">
-            <Input value={description} onChange={setDescription} maxLength={140} />
-          </Field>
-          <Row justify="end">
-            <Button type="submit" variant="secondary" disabled={busy || name.trim() === ''}>
-              {busy ? 'Adding…' : 'Add topic'}
-            </Button>
-          </Row>
-        </Form>
       </Stack>
       <ConfirmDialog
         open={deleting !== null}
         title={deleting ? `Delete ${deleting.name}?` : ''}
-        confirmLabel={busy ? 'Deleting…' : 'Delete'}
+        confirmLabel="Delete"
+        icon="trash"
         busy={busy}
         onConfirm={() => void remove()}
         onClose={() => setDeleting(null)}
@@ -161,8 +161,8 @@ function TopicFields({ topic, busy, submitLabel, onSubmit, onCancel }: TopicFiel
         <Button variant="ghost" disabled={busy} onClick={onCancel}>
           Cancel
         </Button>
-        <Button type="submit" variant="secondary" disabled={busy || name.trim() === ''}>
-          {busy ? 'Saving…' : submitLabel}
+        <Button type="submit" disabled={name.trim() === ''} busy={busy}>
+          {submitLabel}
         </Button>
       </Row>
     </Form>

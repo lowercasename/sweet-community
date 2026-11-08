@@ -15,6 +15,7 @@ import {
   Image as ImageIcon,
   Italic,
   Link,
+  LoaderCircle,
   LogOut,
   Mail,
   Menu,
@@ -27,6 +28,7 @@ import {
   Settings,
   TabletSmartphone,
   Trash2,
+  User,
   Users,
   X,
   type LucideIcon,
@@ -63,6 +65,8 @@ export type IconName =
   | 'tag'
   | 'chevron'
   | 'check'
+  | 'user'
+  | 'spinner'
 
 const ICONS: Record<IconName, LucideIcon> = {
   bold: Bold,
@@ -95,6 +99,8 @@ const ICONS: Record<IconName, LucideIcon> = {
   tag: Tag,
   chevron: ChevronDown,
   check: Check,
+  user: User,
+  spinner: LoaderCircle,
 }
 
 interface IconProps {

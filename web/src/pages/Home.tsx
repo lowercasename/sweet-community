@@ -263,12 +263,14 @@ export function Home({ me, onSignOut }: HomeProps) {
         <ConfirmDialog
           open={hiding}
           title="Hide this conversation?"
-          confirmLabel={busy ? 'Hiding…' : 'Hide'}
+          confirmLabel="Hide"
           busy={busy}
           onConfirm={() => void hide()}
           onClose={() => setHiding(false)}
         >
-          <Text variant="secondary">You can bring it back from All messages. The other person is not told.</Text>
+          <Text variant="secondary">
+            You can bring it back from All messages. The other person will not be notified.
+          </Text>
         </ConfirmDialog>
         {narrow && (
           <TabBar

@@ -108,3 +108,25 @@ func TestTextAndEmpty(t *testing.T) {
 		t.Error("image-only body should not be empty")
 	}
 }
+
+// Empty paragraphs at the start and end of a body are removed when it is
+// sent (Raphael, 2026-11-08). A paragraph that holds only spaces, a
+// non-breaking space or line breaks counts as empty. Empty paragraphs between
+// two others are kept, because the author put them there as spacing.
+func TestTrimsEmptyParagraphsAtTheEdges(t *testing.T) {
+	img := `<img src="/img/019a4c5e-0000-7000-8000-000000000002" alt="a cat" width="800" height="600" data-image-id="019a4c5e-0000-7000-8000-000000000002">`
+	cases := []struct{ in, want string }{
+		{`<p></p><p>hello</p><p></p>`, `<p>hello</p>`},
+		{`<p></p><p></p><p>hello</p><p>world</p><p></p><p></p>`, `<p>hello</p><p>world</p>`},
+		{`<p>hello</p><p></p><p>world</p>`, `<p>hello</p><p></p><p>world</p>`},
+		{`<p> </p><p><br></p><p>hi</p><p>&nbsp;</p><p><br><br></p>`, `<p>hi</p>`},
+		{`<p></p>` + img + `<p></p>`, img},
+		{`<p></p><p></p>`, ``},
+		{`<p>hello</p>`, `<p>hello</p>`},
+	}
+	for _, c := range cases {
+		if got := Body(c.in); got != c.want {
+			t.Errorf("Body(%q)\n got %q\nwant %q", c.in, got, c.want)
+		}
+	}
+}

@@ -59,8 +59,8 @@ export function Verify({ token, name, onVerified }: VerifyProps) {
                 <Text as="span" variant="small">
                   <Link href="/">Sign in</Link>
                 </Text>
-                <Button type="submit" disabled={busy || !email.trim()}>
-                  {busy ? 'Sending…' : 'Send a new link'}
+                <Button type="submit" disabled={!email.trim()} busy={busy}>
+                  Send a new link
                 </Button>
               </Row>
             </Form>

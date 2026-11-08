@@ -49,7 +49,8 @@ function CommentItem({ comment, groupId, disabled, onEdit, onDelete }: CommentIt
 
   const items: MenuItem[] = []
   if (comment.can.edit) items.push({ label: 'Edit', icon: 'pencil', onSelect: () => setEditing(true) })
-  if (comment.can.delete) items.push({ label: 'Delete', icon: 'trash', onSelect: () => setConfirming(true) })
+  if (comment.can.delete)
+    items.push({ label: 'Delete', icon: 'trash', danger: true, onSelect: () => setConfirming(true) })
 
   return (
     <Box as="article">
@@ -75,7 +76,6 @@ function CommentItem({ comment, groupId, disabled, onEdit, onDelete }: CommentIt
             extensions={commentExtensions}
             size="line"
             submitLabel="Save"
-            busyLabel="Saving…"
             initialHtml={comment.body_html}
             disabled={disabled}
             onSubmit={save}
@@ -89,7 +89,8 @@ function CommentItem({ comment, groupId, disabled, onEdit, onDelete }: CommentIt
       <ConfirmDialog
         open={confirming}
         title="Delete this comment?"
-        confirmLabel={deleting ? 'Deleting…' : 'Delete'}
+        confirmLabel="Delete"
+        icon="trash"
         busy={deleting}
         onConfirm={() => void remove()}
         onClose={() => setConfirming(false)}
@@ -139,7 +140,6 @@ export function CommentThread({ postId, groupId, replyTo, disabled }: CommentThr
           size="line"
           placeholder={`Reply to ${replyTo}…`}
           submitLabel="Reply"
-          busyLabel="Replying…"
           disabled={disabled}
           onSubmit={create}
         />

@@ -73,10 +73,14 @@ test.describe('chat', () => {
     expect(Math.round(l3.y - (l2.y + l2.height))).toBe(4)
     // Hovering a message gives it a light pink background.
     await msg.getByText(third).hover()
-    await expect(msg.getByText(third).locator('xpath=ancestor::div[contains(@class,"block-message")][1]')).toHaveCSS(
-      'background-color',
-      'rgb(255, 250, 252)',
-    )
+    const hovered = msg.getByText(third).locator('xpath=ancestor::div[contains(@class,"block-message")][1]')
+    await expect(hovered).toHaveCSS('background-color', 'rgb(253, 242, 242)')
+    // The menu button fits inside the message's row: it is the compact 26px size, not the 34px one.
+    const menuBox = (await hovered.getByRole('button', { name: 'Message options' }).boundingBox())!
+    const blockBox = (await hovered.boundingBox())!
+    expect(menuBox.height).toBe(26)
+    expect(menuBox.y).toBeGreaterThanOrEqual(blockBox.y)
+    expect(menuBox.y + menuBox.height).toBeLessThanOrEqual(blockBox.y + blockBox.height)
     await kit.context.close()
   })
 })

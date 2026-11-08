@@ -64,8 +64,8 @@ export function Welcome({ settings: initial, onDone }: WelcomeProps) {
             </Row>
           ) : (
             <Row>
-              <Button variant="secondary" disabled={busy} onClick={() => void mint()}>
-                {busy ? 'Creating…' : 'Create invite link'}
+              <Button busy={busy} onClick={() => void mint()}>
+                Create invite link
               </Button>
             </Row>
           )}

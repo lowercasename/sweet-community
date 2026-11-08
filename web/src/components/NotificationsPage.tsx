@@ -86,8 +86,8 @@ export function NotificationsPage({ groups, onGo }: NotificationsPageProps) {
                 <Stack gap={1}>
                   <Row justify="between" align="center">
                     <Heading level={3}>Earlier</Heading>
-                    <Button variant="ghost" icon="trash" disabled={clearing} onClick={() => void clearSeen()}>
-                      {clearing ? 'Clearing…' : 'Clear'}
+                    <Button variant="ghost" icon="trash" busy={clearing} onClick={() => void clearSeen()}>
+                      Clear
                     </Button>
                   </Row>
                   {problem && <Alert tone="error">{problem}</Alert>}
@@ -96,8 +96,8 @@ export function NotificationsPage({ groups, onGo }: NotificationsPageProps) {
               )}
               {hasMore && (
                 <Row>
-                  <Button variant="secondary" disabled={loading} onClick={loadMore}>
-                    {loading ? 'Loading…' : 'Load more'}
+                  <Button variant="secondary" busy={loading} onClick={loadMore}>
+                    Load more
                   </Button>
                 </Row>
               )}

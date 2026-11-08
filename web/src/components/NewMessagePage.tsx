@@ -59,9 +59,9 @@ export function NewMessagePage({ me, onOpened }: NewMessagePageProps) {
                   />
                 </Field>
                 {error && <Alert tone="error">{error}</Alert>}
-                <Row>
-                  <Button type="submit" disabled={busy || !to}>
-                    {busy ? 'Opening…' : 'Start'}
+                <Row justify="end">
+                  <Button type="submit" disabled={!to} busy={busy}>
+                    Message
                   </Button>
                 </Row>
               </Form>

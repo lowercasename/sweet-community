@@ -52,7 +52,7 @@ export function MessageGroup({ messages, onDelete }: MessageGroupProps) {
               m.can.delete ? (
                 <Menu
                   label="Message options"
-                  items={[{ label: 'Delete', icon: 'trash', onSelect: () => setConfirming(m.id) }]}
+                  items={[{ label: 'Delete', icon: 'trash', danger: true, onSelect: () => setConfirming(m.id) }]}
                   reveal="message"
                 />
               ) : undefined
@@ -65,7 +65,8 @@ export function MessageGroup({ messages, onDelete }: MessageGroupProps) {
       <ConfirmDialog
         open={confirming !== null}
         title="Delete this message?"
-        confirmLabel={deleting ? 'Deleting…' : 'Delete'}
+        confirmLabel="Delete"
+        icon="trash"
         busy={deleting}
         onConfirm={() => void remove()}
         onClose={() => setConfirming(null)}

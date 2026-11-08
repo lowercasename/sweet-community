@@ -88,8 +88,8 @@ export function Join({ code, community }: JoinProps) {
           </Field>
           {error && <Alert tone="error">{error}</Alert>}
           <Row justify="end" align="center">
-            <Button type="submit" disabled={busy || !invitedBy || !username || !email || !password}>
-              {busy ? 'Joining…' : `Join ${name}`}
+            <Button type="submit" disabled={!invitedBy || !username || !email || !password} busy={busy}>
+              Join {name}
             </Button>
           </Row>
         </Form>

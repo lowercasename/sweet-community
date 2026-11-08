@@ -43,7 +43,7 @@ export function ProfilePage({ name, me, onGo }: ProfilePageProps) {
               <Stack gap={2}>
                 <Text variant="secondary">There is no user with that name.</Text>
                 <Row>
-                  <Button variant="secondary" icon="people" onClick={() => onGo('/people')}>
+                  <Button variant="secondary" onClick={() => onGo('/people')}>
                     People
                   </Button>
                 </Row>
@@ -103,7 +103,6 @@ function Loaded({ profile, me, onGo }: { profile: Profile; me: User; onGo: (path
                     size="line"
                     placeholder="A few words about yourself…"
                     submitLabel="Save"
-                    busyLabel="Saving…"
                     initialHtml={profile.bio_html}
                     disabled={offline}
                     allowEmpty
@@ -113,7 +112,7 @@ function Loaded({ profile, me, onGo }: { profile: Profile; me: User; onGo: (path
                 ) : profile.bio_html ? (
                   <Body html={profile.bio_html} />
                 ) : profile.can.edit ? (
-                  <Text variant="secondary">Nothing about you yet.</Text>
+                  <Text variant="secondary">You don't have a bio yet. Silent type, are we?</Text>
                 ) : null}
                 {problem && <Alert tone="error">{problem}</Alert>}
                 <Row gap={2}>
@@ -123,7 +122,7 @@ function Loaded({ profile, me, onGo }: { profile: Profile; me: User; onGo: (path
                     </Button>
                   )}
                   {profile.can.edit && (
-                    <Button variant="secondary" icon="settings" onClick={() => onGo('/settings')}>
+                    <Button variant="ghost" icon="settings" onClick={() => onGo('/settings')}>
                       Settings
                     </Button>
                   )}
@@ -146,8 +145,8 @@ function Loaded({ profile, me, onGo }: { profile: Profile; me: User; onGo: (path
               ))}
               {hasMore && (
                 <Row>
-                  <Button variant="secondary" disabled={loading} onClick={loadMore}>
-                    {loading ? 'Loading…' : 'Load more'}
+                  <Button variant="secondary" busy={loading} onClick={loadMore}>
+                    Load more
                   </Button>
                 </Row>
               )}

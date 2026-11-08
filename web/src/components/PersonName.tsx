@@ -55,7 +55,7 @@ function PersonCard({ person, me }: { person: Member | User; me: User | null | u
       {error && <Alert tone="error">{error}</Alert>}
       {standing && (
         <Row gap={2}>
-          <Button variant="secondary" icon="people" onClick={() => navigate(profilePath(person.username))}>
+          <Button variant="ghost" icon="user" onClick={() => navigate(profilePath(person.username))}>
             View profile
           </Button>
           {me && me.id !== person.id && (

@@ -79,7 +79,7 @@ describe('ProfilePage', () => {
     vi.mocked(getProfile).mockResolvedValue(profile(raphael, { bio_html: '', can: { edit: true } }))
     vi.mocked(setBio).mockResolvedValue(profile(raphael, { bio_html: paragraph('Hello'), can: { edit: true } }))
     const onGo = await draw('raphael')
-    await screen.findByText('Nothing about you yet.')
+    await screen.findByText("You don't have a bio yet. Silent type, are we?")
     expect(screen.queryByRole('button', { name: 'Message' })).toBeNull()
     fireEvent.click(screen.getByRole('button', { name: 'Write a bio' }))
     expect(document.querySelector('.ProseMirror')).toBeTruthy()

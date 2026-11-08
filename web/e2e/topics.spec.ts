@@ -20,7 +20,7 @@ test.describe('topics', () => {
     await open(o.page, '/community')
     await o.page.getByLabel('Topic name').fill(name)
     await o.page.getByLabel('Short description').fill('What is working, what is not.')
-    await o.page.getByRole('button', { name: 'Add topic' }).click()
+    await o.page.getByRole('button', { name: 'Create topic' }).click()
     await expect(o.page.getByRole('listitem').filter({ hasText: name })).toContainText('0 posts')
 
     // Home shows Everything. The composer has no topic control. To post in a topic, select it in the

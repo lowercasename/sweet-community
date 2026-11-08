@@ -9,6 +9,8 @@ interface FilePickerProps {
   icon?: IconName
   label: string
   disabled?: boolean
+  /** True while the chosen file uploads. */
+  busy?: boolean
   /** Allow choosing several files at once. */
   multiple?: boolean
   onPick: (files: File[]) => void
@@ -22,6 +24,7 @@ export function FilePicker({
   icon,
   label,
   disabled,
+  busy,
   multiple,
   onPick,
   children,
@@ -43,7 +46,14 @@ export function FilePicker({
           if (files.length > 0) onPick(files)
         }}
       />
-      <Button variant={variant} icon={icon} label={label} disabled={disabled} onClick={() => input.current?.click()}>
+      <Button
+        variant={variant}
+        icon={icon}
+        label={label}
+        disabled={disabled}
+        busy={busy}
+        onClick={() => input.current?.click()}
+      >
         {children}
       </Button>
     </>

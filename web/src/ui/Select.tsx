@@ -11,7 +11,7 @@ interface SelectProps<T extends string> {
 export function Select<T extends string>({ value, options, onChange, label, disabled }: SelectProps<T>) {
   return (
     <select
-      className="rounded-[4px] border border-line bg-card px-3 py-1.5 text-ink transition-colors focus:border-pink focus:outline-none disabled:text-mute"
+      className="rounded-[4px] border border-input bg-card px-3 py-1.5 text-ink transition-colors focus:border-pink focus:outline-none disabled:text-mute"
       value={value}
       aria-label={label}
       disabled={disabled}

@@ -54,9 +54,9 @@ export function NewGroupPage({ onCreated }: NewGroupPageProps) {
                   <Select value={mode} options={MODES} onChange={setMode} />
                 </Field>
                 {error && <Alert tone="error">{error}</Alert>}
-                <Row>
-                  <Button type="submit" disabled={busy || !name.trim()}>
-                    {busy ? 'Creating…' : 'Create room'}
+                <Row justify="end">
+                  <Button type="submit" disabled={!name.trim()} busy={busy}>
+                    Create room
                   </Button>
                 </Row>
               </Form>

@@ -32,7 +32,7 @@ export function Input({
 }: InputProps) {
   return (
     <input
-      className="w-full rounded-[4px] border border-line bg-card px-3 py-1.5 text-ink transition-colors read-only:text-mute focus:border-pink focus:outline-none"
+      className="w-full rounded-[4px] border border-input bg-card px-3 py-1.5 text-ink transition-colors read-only:text-mute focus:border-pink focus:outline-none"
       type={type}
       name={name}
       value={value}

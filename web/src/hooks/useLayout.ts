@@ -6,7 +6,8 @@ export type Layout = 'both' | 'posts' | 'chat'
 const KEY = 'sweet.layout'
 const SPLIT_KEY = 'sweet.split'
 const NAV_KEY = 'sweet.nav'
-const NARROW = '(max-width: 799px)'
+/** The phone layout: one pane and a tab bar. */
+export const NARROW = '(max-width: 799px)'
 
 function read(key: string): string | null {
   try {

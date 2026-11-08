@@ -57,8 +57,8 @@ export function Setup({ token, onSetUp }: SetupProps) {
         </Field>
         {error && <Alert tone="error">{error}</Alert>}
         <Row justify="end" align="center">
-          <Button type="submit" disabled={busy || !username || !email || !password}>
-            {busy ? 'Setting up…' : 'Set up'}
+          <Button type="submit" disabled={!username || !email || !password} busy={busy}>
+            Set up
           </Button>
         </Row>
       </Form>

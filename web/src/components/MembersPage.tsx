@@ -3,6 +3,8 @@ import { uploadImage, type Group, type GroupMode, type Membership, type User } f
 import { IMAGE_ACCEPT } from '../editor/images'
 import { useGroupActions, useMembers, useSetRole, useUsers } from '../data/hooks'
 import {
+  ActionRow,
+  ActionRows,
   Alert,
   Button,
   Card,
@@ -60,20 +62,26 @@ export function MembersPage({ group, me, onLeft }: MembersPageProps) {
   const [name, setName] = useState(group.name)
   const [mode, setMode] = useState<GroupMode>(group.mode)
   const [confirm, setConfirm] = useState<
-    { kind: 'handover'; to: Membership } | { kind: 'leave' } | { kind: 'delete' } | null
+    | { kind: 'handover'; to: Membership }
+    | { kind: 'remove'; who: Membership }
+    | { kind: 'leave' }
+    | { kind: 'delete' }
+    | null
   >(null)
-  const [busy, setBusy] = useState(false)
+  // Which action is running, so only its button shows the spinner. Every button is disabled while any runs.
+  const [working, setWorking] = useState<string | null>(null)
+  const busy = working !== null
   const [problem, setProblem] = useState<string | null>(null)
 
-  const run = async (fn: () => Promise<void>) => {
-    setBusy(true)
+  const run = async (which: string, fn: () => Promise<void>) => {
+    setWorking(which)
     setProblem(null)
     try {
       await fn()
     } catch (e) {
       setProblem(e instanceof Error ? e.message : 'Something went wrong')
     } finally {
-      setBusy(false)
+      setWorking(null)
       setConfirm(null)
     }
   }
@@ -94,17 +102,21 @@ export function MembersPage({ group, me, onLeft }: MembersPageProps) {
     if (group.can.set_roles)
       out.push({
         label: m.role === 'moderator' ? 'Make member' : 'Make moderator',
-        onSelect: () => void run(() => setRole(m.user.id, m.role === 'moderator' ? 'member' : 'moderator')),
+        onSelect: () => void run('role', () => setRole(m.user.id, m.role === 'moderator' ? 'member' : 'moderator')),
       })
     if (group.can.transfer) out.push({ label: 'Make owner', onSelect: () => setConfirm({ kind: 'handover', to: m }) })
     if (group.can.remove_members)
       out.push({
         label: 'Remove',
         icon: 'remove',
-        onSelect: () => void run(() => actions.removeMember(group.id, m.user.id)),
+        danger: true,
+        onSelect: () => setConfirm({ kind: 'remove', who: m }),
       })
     return out
   }
+  // The last card: the room's destructive actions, least to most consequential (architecture.md, Interface, pattern 3).
+  // The owner cannot leave, so in practice it holds Leave room for everyone else and Delete room for the owner.
+  const ending = group.can.leave || group.can.delete
 
   return (
     <Pane>
@@ -116,7 +128,7 @@ export function MembersPage({ group, me, onLeft }: MembersPageProps) {
                 <Stack gap={2}>
                   <Heading level={2}>Room settings</Heading>
                   {group.can.rename && (
-                    <Row gap={3} align="center">
+                    <Row gap={2} align="center">
                       <Tile name={group.name} picture={group.picture} size="md" />
                       <FilePicker
                         accept={IMAGE_ACCEPT}
@@ -124,15 +136,18 @@ export function MembersPage({ group, me, onLeft }: MembersPageProps) {
                         icon="image"
                         label="Choose a picture"
                         disabled={busy}
-                        onPick={(files) => void run(() => choosePicture(files[0]))}
+                        busy={working === 'picture'}
+                        onPick={(files) => void run('picture', () => choosePicture(files[0]))}
                       >
-                        {busy ? 'Uploading…' : 'Choose a picture'}
+                        Choose a picture
                       </FilePicker>
                       {group.picture && (
                         <Button
-                          variant="ghost"
+                          variant="danger"
+                          icon="remove"
                           disabled={busy}
-                          onClick={() => void run(() => actions.setPicture(group.id, null))}
+                          busy={working === 'unpicture'}
+                          onClick={() => void run('unpicture', () => actions.setPicture(group.id, null))}
                         >
                           Remove picture
                         </Button>
@@ -152,11 +167,12 @@ export function MembersPage({ group, me, onLeft }: MembersPageProps) {
                       <Select value={mode} options={MODES} onChange={setMode} />
                     </Field>
                   )}
-                  <Row gap={3} align="center">
+                  <Row justify="end">
                     <Button
-                      disabled={busy || !dirty || !name.trim()}
+                      disabled={!dirty || !name.trim() || (busy && working !== 'save')}
+                      busy={working === 'save'}
                       onClick={() =>
-                        void run(() =>
+                        void run('save', () =>
                           actions.update(group.id, {
                             ...(group.can.rename && name.trim() !== group.name ? { name: name.trim() } : {}),
                             ...(group.can.set_mode && mode !== group.mode ? { mode } : {}),
@@ -166,16 +182,6 @@ export function MembersPage({ group, me, onLeft }: MembersPageProps) {
                     >
                       Save
                     </Button>
-                    {group.can.delete && (
-                      <Button
-                        variant="ghost"
-                        icon="trash"
-                        disabled={busy}
-                        onClick={() => setConfirm({ kind: 'delete' })}
-                      >
-                        Delete room
-                      </Button>
-                    )}
                   </Row>
                 </Stack>
               </Card>
@@ -206,10 +212,11 @@ export function MembersPage({ group, me, onLeft }: MembersPageProps) {
                     />
                     <Button
                       variant="secondary"
-                      disabled={busy || !pick}
-                      onClick={() => void run(() => actions.add(group.id, pick).then(() => setPick('')))}
+                      disabled={!pick || (busy && working !== 'add')}
+                      busy={working === 'add'}
+                      onClick={() => void run('add', () => actions.add(group.id, pick).then(() => setPick('')))}
                     >
-                      Add
+                      Add to room
                     </Button>
                   </Row>
                 )}
@@ -235,29 +242,57 @@ export function MembersPage({ group, me, onLeft }: MembersPageProps) {
                     )
                   })}
                 </List>
-                {group.can.leave && (
-                  <Row gap={2}>
-                    <Button
-                      variant="secondary"
-                      icon="logout"
-                      disabled={busy}
-                      onClick={() => setConfirm({ kind: 'leave' })}
-                    >
-                      Leave room
-                    </Button>
-                  </Row>
-                )}
               </Stack>
             </Card>
+            {ending && (
+              <Card>
+                <ActionRows>
+                  {group.can.leave && (
+                    <ActionRow
+                      action={
+                        <Button
+                          variant="danger"
+                          icon="logout"
+                          disabled={busy}
+                          onClick={() => setConfirm({ kind: 'leave' })}
+                        >
+                          Leave room
+                        </Button>
+                      }
+                    >
+                      You will need to be added by an existing room member if you want to rejoin.
+                    </ActionRow>
+                  )}
+                  {group.can.delete && (
+                    <ActionRow
+                      action={
+                        <Button
+                          variant="danger"
+                          icon="trash"
+                          disabled={busy}
+                          onClick={() => setConfirm({ kind: 'delete' })}
+                        >
+                          Delete room
+                        </Button>
+                      }
+                    >
+                      Its posts and chat will be deleted for everyone.
+                    </ActionRow>
+                  )}
+                </ActionRows>
+              </Card>
+            )}
           </Stack>
         </Measure>
       </ScrollArea>
       <ConfirmDialog
         open={confirm?.kind === 'handover'}
         title={confirm?.kind === 'handover' ? `Make ${confirm.to.user.username} the owner?` : ''}
-        confirmLabel="Switch ownership"
+        confirmLabel="Make owner"
         busy={busy}
-        onConfirm={() => confirm?.kind === 'handover' && void run(() => setRole(confirm.to.user.id, 'owner'))}
+        onConfirm={() =>
+          confirm?.kind === 'handover' && void run('handover', () => setRole(confirm.to.user.id, 'owner'))
+        }
         onClose={() => setConfirm(null)}
       >
         <Text variant="secondary">
@@ -265,21 +300,38 @@ export function MembersPage({ group, me, onLeft }: MembersPageProps) {
         </Text>
       </ConfirmDialog>
       <ConfirmDialog
-        open={confirm?.kind === 'leave'}
-        title="Leave this room?"
-        confirmLabel="Leave"
+        open={confirm?.kind === 'remove'}
+        title={confirm?.kind === 'remove' ? `Remove ${confirm.who.user.username} from this room?` : ''}
+        confirmLabel="Remove"
+        icon="remove"
         busy={busy}
-        onConfirm={() => void run(() => actions.leave(group.id, me.id).then(onLeft))}
+        onConfirm={() =>
+          confirm?.kind === 'remove' && void run('remove', () => actions.removeMember(group.id, confirm.who.user.id))
+        }
         onClose={() => setConfirm(null)}
       >
-        <Text variant="secondary">Someone in it will have to add you again.</Text>
+        <Text variant="secondary">
+          They will no longer see the room. Anyone who can add members can add them again.
+        </Text>
+      </ConfirmDialog>
+      <ConfirmDialog
+        open={confirm?.kind === 'leave'}
+        title="Leave this room?"
+        confirmLabel="Leave room"
+        icon="logout"
+        busy={busy}
+        onConfirm={() => void run('leave', () => actions.leave(group.id, me.id).then(onLeft))}
+        onClose={() => setConfirm(null)}
+      >
+        <Text variant="secondary">You will need to be added by an existing room member if you want to rejoin.</Text>
       </ConfirmDialog>
       <ConfirmDialog
         open={confirm?.kind === 'delete'}
         title="Delete this room?"
-        confirmLabel="Delete"
+        confirmLabel="Delete room"
+        icon="trash"
         busy={busy}
-        onConfirm={() => void run(() => actions.remove(group.id).then(onLeft))}
+        onConfirm={() => void run('delete', () => actions.remove(group.id).then(onLeft))}
         onClose={() => setConfirm(null)}
       >
         <Text variant="secondary">Its posts and chat will be deleted for everyone. This action cannot be undone.</Text>

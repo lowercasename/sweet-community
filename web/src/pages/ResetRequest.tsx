@@ -63,8 +63,8 @@ export function ResetRequest({ name }: ResetRequestProps) {
             <Text as="span" variant="small">
               <Link href="/">Back to sign in</Link>
             </Text>
-            <Button type="submit" disabled={busy || !email.trim()}>
-              {busy ? 'Sending…' : 'Send a link'}
+            <Button type="submit" disabled={!email.trim()} busy={busy}>
+              Send a link
             </Button>
           </Row>
         </Form>

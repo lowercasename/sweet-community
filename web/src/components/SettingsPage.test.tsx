@@ -39,12 +39,14 @@ describe('SettingsPage', () => {
     )
     fireEvent.click(await screen.findByRole('button', { name: 'Remove my account' }))
     expect(removeUser).not.toHaveBeenCalled()
-    fireEvent.click(within(screen.getByRole('dialog', { hidden: true })).getByRole('button', { name: 'Remove' }))
+    fireEvent.click(
+      within(screen.getByRole('dialog', { hidden: true })).getByRole('button', { name: 'Remove my account' }),
+    )
     expect(removeUser).toHaveBeenCalledWith('kit')
     await vi.waitFor(() => expect(qc.getQueryData(['me'])).toBeNull())
     cleanup()
     renderWithQuery(<SettingsPage me={user('raphael')} root={group(ROOT, 'owner')} onSignOut={() => {}} />)
-    await screen.findByText('You run this community. Hand it over to someone else first.')
+    await screen.findByText('You run this community. Hand it over to someone else before you leave.')
     expect(screen.queryByRole('button', { name: 'Remove my account' })).toBeNull()
   })
 
@@ -55,7 +57,7 @@ describe('SettingsPage', () => {
     await screen.findByText('kit@example.test')
     fireEvent.change(screen.getByLabelText('New email address'), { target: { value: 'new@example.test' } })
     fireEvent.change(screen.getByLabelText('Your password'), { target: { value: 'longenough' } })
-    fireEvent.click(screen.getByRole('button', { name: 'Send a link there' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Change email address' }))
     expect(changeEmail).toHaveBeenCalledWith('new@example.test', 'longenough')
     await screen.findByText(/A link has been sent to new@example.test/)
     // The old address stays in use until the link is opened.

@@ -87,8 +87,8 @@ export function AccountCard() {
             </Field>
             {emailError && <Alert tone="error">{emailError}</Alert>}
             <Row justify="end">
-              <Button type="submit" variant="secondary" disabled={emailBusy || !email.trim() || !emailPassword}>
-                {emailBusy ? 'Sending…' : 'Send a link there'}
+              <Button type="submit" disabled={!email.trim() || !emailPassword} busy={emailBusy}>
+                Change email address
               </Button>
             </Row>
           </Form>
@@ -119,8 +119,8 @@ export function AccountCard() {
             <Text variant="small">At least 8 characters. Every other device will be signed out.</Text>
             {passwordNote && <Alert tone={passwordNote.tone}>{passwordNote.text}</Alert>}
             <Row justify="end">
-              <Button type="submit" variant="secondary" disabled={passwordBusy || !current || password.length < 8}>
-                {passwordBusy ? 'Saving…' : 'Change password'}
+              <Button type="submit" disabled={!current || password.length < 8} busy={passwordBusy}>
+                Change password
               </Button>
             </Row>
           </Form>

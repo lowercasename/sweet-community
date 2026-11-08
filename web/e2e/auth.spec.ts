@@ -87,7 +87,7 @@ test.describe('signing in and joining', () => {
     await expect(page.getByText(`typo-${emailOf(name)}`)).toBeVisible()
     await page.getByRole('button', { name: 'Use a different address' }).click()
     await page.getByLabel('Email address').fill(emailOf(name))
-    await page.getByRole('button', { name: 'Send the link there' }).click()
+    await page.getByRole('button', { name: 'Send a new link' }).click()
     await expect(page.getByText('Sent again')).toBeVisible()
     await page.goto(mailLink(emailOf(name), 'verify'))
     await expect(page.getByRole('navigation', { name: 'Main' })).toBeVisible()
@@ -122,7 +122,7 @@ test.describe('signing in and joining', () => {
     await expect(page.getByText(/a link to choose a new password has been sent/)).toBeVisible()
     await page.goto(mailLink(emailOf(m.username), 'reset'))
     await page.getByLabel('New password').fill('anotherlongone')
-    await page.getByRole('button', { name: 'Set the password' }).click()
+    await page.getByRole('button', { name: 'Save' }).click()
     await expect(page.getByRole('navigation', { name: 'Main' })).toBeVisible()
     // The earlier session has ended.
     await m.page.reload()
@@ -131,7 +131,7 @@ test.describe('signing in and joining', () => {
     // signed-in user who opens a reset link sees Home.
     await m.page.goto(mailLink(emailOf(m.username), 'reset'))
     await m.page.getByLabel('New password').fill('yetanotherone')
-    await m.page.getByRole('button', { name: 'Set the password' }).click()
+    await m.page.getByRole('button', { name: 'Save' }).click()
     await expect(m.page.getByText(/used or has expired/)).toBeVisible()
     await ctx.close()
     await m.context.close()
@@ -148,7 +148,7 @@ test.describe('signing in and joining', () => {
     const next = `new-${emailOf(m.username)}`
     await m.page.getByLabel('New email address').fill(next)
     await m.page.getByLabel('Your password').fill('longenough')
-    await m.page.getByRole('button', { name: 'Send a link there' }).click()
+    await m.page.getByRole('button', { name: 'Change email address' }).click()
     await expect(m.page.getByText(`A link has been sent to ${next}`)).toBeVisible()
     await expect(m.page.getByText(emailOf(m.username), { exact: true })).toBeVisible()
     await m.page.goto(mailLink(next, 'verify'))
@@ -163,12 +163,12 @@ test.describe('signing in and joining', () => {
     await m.context.close()
   })
 
-  test('Sign out here returns to the sign-in page, and a reload stays on the sign-in page', async ({
+  test('Sign out returns to the sign-in page, and a reload stays on the sign-in page', async ({
     browser,
   }, testInfo) => {
     const m = await member(browser, testInfo)
     await open(m.page, '/settings')
-    await m.page.getByRole('button', { name: 'Sign out here' }).click()
+    await m.page.getByRole('button', { name: 'Sign out', exact: true }).click()
     await expect(m.page.getByRole('button', { name: 'Sign in' })).toBeVisible()
     await m.page.reload()
     await expect(m.page.getByRole('button', { name: 'Sign in' })).toBeVisible()

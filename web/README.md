@@ -31,4 +31,4 @@ Run the backend from the repository root with `make dev-backend` alongside `pnpm
 
 ## Buttons
 
-There are three variants: `primary` (filled pink), `secondary` (outlined) and `ghost` (no border, also used for toggles with `pressed`). `design/buttons.md` at the repository root proposes a fourth variant and rules for when to use each. It is not built yet.
+There are four variants: `primary` (filled red, the main action), `secondary` (outlined), `ghost` (no border, also used for toggles with `pressed`) and `danger` (outlined in red, for removing things). The rules for when to use each, and the eight layout patterns every surface follows, are in the Interface section of `architecture.md`.

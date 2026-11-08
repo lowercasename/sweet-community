@@ -32,7 +32,7 @@ export function PostPage({ postId, groups, onGo }: PostPageProps) {
               <Stack gap={2}>
                 <Text variant="secondary">This post has been deleted, or it is in a room you are not a member of.</Text>
                 <Row>
-                  <Button variant="secondary" icon="home" onClick={() => onGo('/')}>
+                  <Button variant="secondary" onClick={() => onGo('/')}>
                     Home
                   </Button>
                 </Row>

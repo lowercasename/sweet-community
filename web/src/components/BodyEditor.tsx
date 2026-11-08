@@ -29,7 +29,6 @@ interface BodyEditorProps {
    */
   images?: 'inline' | 'attached'
   submitLabel: string
-  busyLabel: string
   /** True while offline. Disables submit. */
   disabled: boolean
   /** Resolves on success. Rejects with an Error, and the error's message is shown under the editor. */
@@ -64,7 +63,6 @@ export function BodyEditor({
   enterSubmits = false,
   images = 'inline',
   submitLabel,
-  busyLabel,
   disabled,
   onSubmit,
   initialHtml,
@@ -218,8 +216,8 @@ export function BodyEditor({
                 Cancel
               </Button>
             )}
-            <Button type="submit" disabled={!canSubmit}>
-              {busy ? busyLabel : submitLabel}
+            <Button type="submit" disabled={!canSubmit && !busy} busy={busy}>
+              {submitLabel}
             </Button>
           </Row>
         </Row>

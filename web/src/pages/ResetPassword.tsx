@@ -52,8 +52,8 @@ export function ResetPassword({ token, name, onReset }: ResetPasswordProps) {
           <Text as="span" variant="small">
             <Link href={RESET}>Ask for a new link</Link>
           </Text>
-          <Button type="submit" disabled={busy || password.length < 8}>
-            {busy ? 'Saving…' : 'Set the password'}
+          <Button type="submit" disabled={password.length < 8} busy={busy}>
+            Save
           </Button>
         </Row>
       </Form>

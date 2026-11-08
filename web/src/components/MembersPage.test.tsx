@@ -64,14 +64,18 @@ describe('MembersPage', () => {
     const picker = screen.getByLabelText('Add someone')
     expect(within(picker).queryByText('mo')).toBeNull()
     fireEvent.change(picker, { target: { value: 'jo' } })
-    fireEvent.click(screen.getByRole('button', { name: 'Add' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Add to room' }))
     expect(addMember).toHaveBeenCalledWith('club', 'jo')
     await screen.findByText('jo')
     fireEvent.click(within(rowOf('mo')).getByRole('button', { name: 'Options for mo' }))
     fireEvent.click(screen.getByRole('menuitem', { name: 'Remove' }))
+    // Removing a member confirms first (architecture.md, Interface, pattern 4).
+    expect(removeMember).not.toHaveBeenCalled()
+    fireEvent.click(within(screen.getByRole('dialog', { hidden: true })).getByRole('button', { name: 'Remove' }))
     expect(removeMember).toHaveBeenCalledWith('club', 'mo')
     // The removed user is no longer in the list and is offered for adding again.
-    await vi.waitFor(() => expect(within(screen.getByRole('list')).queryByText('mo')).toBeNull())
+    // The first list is the members list. The last card's action rows are a list too.
+    await vi.waitFor(() => expect(within(screen.getAllByRole('list')[0]).queryByText('mo')).toBeNull())
     expect(within(screen.getByLabelText('Add someone')).getByText('mo')).toBeTruthy()
   })
 
@@ -92,7 +96,7 @@ describe('MembersPage', () => {
     fireEvent.click(screen.getByRole('menuitem', { name: 'Make owner' }))
     expect(setMemberRole).not.toHaveBeenCalledWith('club', 'mo', 'owner')
     const dialog = screen.getByRole('dialog', { hidden: true })
-    fireEvent.click(within(dialog).getByRole('button', { name: 'Switch ownership' }))
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Make owner' }))
     expect(setMemberRole).toHaveBeenCalledWith('club', 'mo', 'owner')
   })
 
@@ -116,14 +120,14 @@ describe('MembersPage', () => {
     expect(updateGroup).toHaveBeenCalledWith('club', { name: 'Knitting', mode: 'chat' })
   })
 
-  it('shows a member only the list and the Leave button', async () => {
+  it('shows a member the list and a Leave room row in the last card, which confirms', async () => {
     const { removeMember } = await import('../api')
     const onLeft = await page('member')
     expect(screen.queryByLabelText('Add someone')).toBeNull()
     expect(screen.queryByRole('button', { name: /^Options for/ })).toBeNull()
     expect(screen.queryByLabelText('Name')).toBeNull()
     fireEvent.click(screen.getByRole('button', { name: 'Leave room' }))
-    fireEvent.click(within(screen.getByRole('dialog', { hidden: true })).getByRole('button', { name: 'Leave' }))
+    fireEvent.click(within(screen.getByRole('dialog', { hidden: true })).getByRole('button', { name: 'Leave room' }))
     expect(removeMember).toHaveBeenCalledWith('club', 'mo')
     await vi.waitFor(() => expect(onLeft).toHaveBeenCalled())
   })

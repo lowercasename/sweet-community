@@ -62,8 +62,8 @@ export function CommunityForm({ settings, submitLabel, onSaved }: CommunityFormP
         </Field>
         {note && <Alert tone={note.tone}>{note.text}</Alert>}
         <Row justify="end">
-          <Button type="submit" disabled={busy || name.trim() === ''}>
-            {busy ? 'Saving…' : submitLabel}
+          <Button type="submit" disabled={name.trim() === ''} busy={busy}>
+            {submitLabel}
           </Button>
         </Row>
       </Stack>

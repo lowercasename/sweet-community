@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react'
+import { GHOST_HOVER } from './Button'
 
 interface ListRowProps {
   /** The row's accessible name. Names what the row opens. */
@@ -13,7 +14,7 @@ export function ListRow({ label, onClick, children }: ListRowProps) {
     <button
       type="button"
       aria-label={label}
-      className="flex w-full cursor-pointer items-center gap-3 rounded-[4px] px-2 py-2 text-left text-ink transition-colors hover:bg-field focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-pink"
+      className={`flex w-full cursor-pointer items-center gap-3 rounded-[4px] px-2 py-2 text-left text-ink transition-colors ${GHOST_HOVER} focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-pink`}
       onClick={onClick}
     >
       {children}

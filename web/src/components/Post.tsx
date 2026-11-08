@@ -101,7 +101,7 @@ export function Post({
   // The server decides what this user can do and sends it as the post's can flags.
   const items: MenuItem[] = []
   if (post.can.edit) items.push({ label: 'Edit', icon: 'pencil', onSelect: startEditing })
-  if (post.can.delete) items.push({ label: 'Delete', icon: 'trash', onSelect: () => setConfirming(true) })
+  if (post.can.delete) items.push({ label: 'Delete', icon: 'trash', danger: true, onSelect: () => setConfirming(true) })
 
   const when = (
     <>
@@ -156,7 +156,6 @@ export function Post({
               extensions={postExtensions}
               size="post"
               submitLabel="Save"
-              busyLabel="Saving…"
               initialHtml={post.body_html}
               disabled={disabled}
               onSubmit={save}
@@ -189,7 +188,8 @@ export function Post({
       <ConfirmDialog
         open={confirming}
         title="Delete this post?"
-        confirmLabel={deleting ? 'Deleting…' : 'Delete'}
+        confirmLabel="Delete"
+        icon="trash"
         busy={deleting}
         onConfirm={() => void remove()}
         onClose={() => setConfirming(false)}

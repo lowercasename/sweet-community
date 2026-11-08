@@ -24,7 +24,7 @@ export function Textarea({
 }: TextareaProps) {
   return (
     <textarea
-      className="w-full resize-none rounded-[4px] border border-line bg-card px-3 py-1.5 text-ink transition-colors placeholder:text-mute focus:border-pink focus:outline-none"
+      className="w-full resize-none rounded-[4px] border border-input bg-card px-3 py-1.5 text-ink transition-colors placeholder:text-mute focus:border-pink focus:outline-none"
       value={value}
       placeholder={placeholder}
       autoFocus={autoFocus}

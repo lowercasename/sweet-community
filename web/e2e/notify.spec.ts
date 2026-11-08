@@ -15,7 +15,7 @@ test.describe('notification settings', () => {
     await open(kit.page, '/settings')
     const on = kit.page.getByRole('button', { name: 'Weekly digest on' })
     await expect(on).toHaveAttribute('aria-pressed', 'true')
-    await kit.page.getByText(/on this device when someone/).scrollIntoViewIfNeeded()
+    await kit.page.getByText('Push notifications', { exact: true }).scrollIntoViewIfNeeded()
     await kit.page.screenshot({ path: `test-results/notify-${testInfo.project.name}-settings.png` })
     await on.hover()
     await expect(kit.page.getByRole('button', { name: 'Turn weekly digest off' })).toBeVisible()
@@ -50,7 +50,7 @@ test.describe('notification settings', () => {
     await kit.context.grantPermissions(['notifications'])
     await open(kit.page, '/settings')
     await expect(kit.page.getByRole('button', { name: 'Weekly digest on' })).toBeVisible()
-    await kit.page.getByText(/on this device when someone/).scrollIntoViewIfNeeded()
+    await kit.page.getByText('Push notifications', { exact: true }).scrollIntoViewIfNeeded()
     const overflow = await kit.page.evaluate(
       () =>
         [...document.querySelectorAll('main *')].filter((el) => {

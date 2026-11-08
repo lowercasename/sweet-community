@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import type { Group, Invite, Member, User } from '../api'
 import { useGroupActions, useInviteActions, useInvites, useRemoveUser, useSetRole, useUsers } from '../data/hooks'
+import { NARROW, useMediaQuery } from '../hooks/useLayout'
 import {
   Alert,
   Button,
@@ -49,7 +50,7 @@ function InviteRow({ invite, onRevoke }: { invite: Invite; onRevoke: () => void 
         <Button variant="secondary" onClick={() => void copy()}>
           {copied ? 'Copied' : 'Copy'}
         </Button>
-        <Button variant="ghost" onClick={onRevoke}>
+        <Button variant="danger" icon="remove" onClick={onRevoke}>
           Revoke
         </Button>
         <Row push="end">
@@ -84,12 +85,18 @@ export function PeoplePage({ me, root, onOpenGroup }: PeoplePageProps) {
   const [error, setError] = useState<string | null>(null)
   const [removing, setRemoving] = useState<Member | null>(null)
   const [busy, setBusy] = useState(false)
+  const [creating, setCreating] = useState(false)
+  // On a phone, Message in a row keeps its icon and drops its label, so a long username has room.
+  const narrow = useMediaQuery(NARROW)
 
   const invite = async () => {
+    setCreating(true)
     try {
       await create()
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Could not create an invite')
+    } finally {
+      setCreating(false)
     }
   }
   const change = async (u: Member) => {
@@ -128,7 +135,7 @@ export function PeoplePage({ me, root, onOpenGroup }: PeoplePageProps) {
         label: u.role === 'moderator' ? 'Make member' : 'Make moderator',
         onSelect: () => void change(u),
       })
-    if (u.can.remove) out.push({ label: 'Remove', icon: 'remove', onSelect: () => setRemoving(u) })
+    if (u.can.remove) out.push({ label: 'Remove', icon: 'remove', danger: true, onSelect: () => setRemoving(u) })
     return out
   }
 
@@ -146,7 +153,9 @@ export function PeoplePage({ me, root, onOpenGroup }: PeoplePageProps) {
                     need to.
                   </Text>
                   <Row>
-                    <Button onClick={() => void invite()}>Create invite link</Button>
+                    <Button busy={creating} onClick={() => void invite()}>
+                      Create invite link
+                    </Button>
                   </Row>
                   {inviteError && <Text variant="secondary">{inviteError.message}</Text>}
                   {invites.map((inv) => (
@@ -170,8 +179,13 @@ export function PeoplePage({ me, root, onOpenGroup }: PeoplePageProps) {
                         </Row>
                         <Row gap={1} align="center" shrink={false}>
                           {u.id !== me.id && (
-                            <Button variant="ghost" icon="chat" onClick={() => void message(u)}>
-                              Message
+                            <Button
+                              variant="ghost"
+                              icon="chat"
+                              label={`Message ${u.username}`}
+                              onClick={() => void message(u)}
+                            >
+                              {narrow ? undefined : 'Message'}
                             </Button>
                           )}
                           {u.id !== me.id && items(u).length > 0 && (
@@ -190,7 +204,8 @@ export function PeoplePage({ me, root, onOpenGroup }: PeoplePageProps) {
       <ConfirmDialog
         open={removing !== null}
         title={removing ? `Remove ${removing.username} from this community?` : ''}
-        confirmLabel={busy ? 'Removing…' : 'Remove'}
+        confirmLabel="Remove"
+        icon="remove"
         busy={busy}
         onConfirm={() => void remove()}
         onClose={() => setRemoving(null)}

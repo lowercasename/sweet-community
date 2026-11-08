@@ -61,7 +61,7 @@ test.describe('roles', () => {
     await kit.page.getByRole('button', { name: 'Create room' }).click()
     await kit.page.getByRole('button', { name: 'Members and settings' }).click()
     await kit.page.getByLabel('Add someone').selectOption({ label: mo.username })
-    await kit.page.getByRole('button', { name: 'Add', exact: true }).click()
+    await kit.page.getByRole('button', { name: 'Add to room', exact: true }).click()
     await expect(kit.page.getByRole('list').getByText(mo.username)).toBeVisible()
     await open(kit.page)
     await open(mo.page)
@@ -94,7 +94,7 @@ test.describe('roles', () => {
     // Mo removes themselves from Settings, after a confirmation.
     await open(mo.page, '/settings')
     await mo.page.getByRole('button', { name: 'Remove my account' }).click()
-    await confirm(mo.page, 'Remove')
+    await confirm(mo.page, 'Remove my account')
     await expect(mo.page.getByRole('button', { name: 'Sign in' })).toBeVisible()
     await open(o.page, '/people')
     await expect(o.page.getByRole('listitem').filter({ hasText: mo.username })).toHaveCount(0)

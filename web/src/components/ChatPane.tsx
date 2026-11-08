@@ -114,8 +114,8 @@ export function ChatPane({ groupId, side = 'full', watching }: ChatPaneProps) {
           <Stack gap={3}>
             {hasEarlier && (
               <Row>
-                <Button variant="secondary" disabled={loading} onClick={() => void earlier()}>
-                  {loading ? 'Loading…' : 'Load earlier'}
+                <Button variant="secondary" busy={loading} onClick={() => void earlier()}>
+                  Load earlier
                 </Button>
               </Row>
             )}
@@ -136,7 +136,6 @@ export function ChatPane({ groupId, side = 'full', watching }: ChatPaneProps) {
               enterSubmits
               images="attached"
               submitLabel="Send"
-              busyLabel="Sending…"
               disabled={status === 'offline'}
               onSubmit={send}
             />

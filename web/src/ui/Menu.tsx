@@ -26,6 +26,8 @@ export interface MenuItem {
   detail?: string
   /** For a choice among several items. The chosen item is marked with a check. */
   checked?: boolean
+  /** An item that removes something. Shown in red. */
+  danger?: boolean
   onSelect: () => void
 }
 
@@ -110,7 +112,7 @@ export function Menu({
   const triggerRef = useMergeRefs([refs.setReference, tip.ref])
   const triggerClass =
     trigger === 'icon'
-      ? `${buttonClass('ghost', true)} ${reveal && !open ? REVEAL[reveal] : ''}`
+      ? `${buttonClass('ghost', true, false, reveal === 'message')} ${reveal && !open ? REVEAL[reveal] : ''}`
       : pillClass(quiet ? 'quiet' : 'topic', size)
 
   return (
@@ -159,7 +161,7 @@ export function Menu({
                   role={item.checked === undefined ? 'menuitem' : 'menuitemradio'}
                   aria-checked={item.checked}
                   tabIndex={activeIndex === i ? 0 : -1}
-                  className={`flex w-full cursor-pointer items-center gap-2 px-3 py-1.5 text-left hover:bg-field focus:bg-field focus:outline-none ${item.checked ? 'text-sweet' : 'text-ink'}`}
+                  className={`flex w-full cursor-pointer items-center gap-2 px-3 py-1.5 text-left hover:bg-field focus:bg-field focus:outline-none ${item.checked || item.danger ? 'text-sweet' : 'text-ink'}`}
                   {...getItemProps({
                     onClick() {
                       setOpen(false)

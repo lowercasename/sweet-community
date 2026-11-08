@@ -31,13 +31,13 @@ describe('Login', () => {
     expect(screen.getByText('kit@example.test')).toBeTruthy()
     expect(onSignedIn).not.toHaveBeenCalled()
 
-    fireEvent.click(screen.getByRole('button', { name: 'Send it again' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Send a new link' }))
     expect(resendVerification).toHaveBeenCalledWith('kit@example.test')
     await screen.findByText(/Sent again/)
 
     fireEvent.click(screen.getByRole('button', { name: 'Use a different address' }))
     fireEvent.change(screen.getByLabelText('Email address'), { target: { value: 'right@example.test' } })
-    fireEvent.click(screen.getByRole('button', { name: 'Send the link there' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Send a new link' }))
     expect(changeUnverifiedEmail).toHaveBeenCalledWith('kit', 'longenough', 'right@example.test')
     await screen.findByText('right@example.test')
 

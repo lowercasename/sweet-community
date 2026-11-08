@@ -6,12 +6,10 @@ import { RESET } from '../routes'
 import { Alert, Button, Field, Form, Input, Link, Row, Text } from '../ui'
 
 interface LoginProps {
-  /** The community, as anyone may read it; undefined while it loads. */
   community?: Settings
   onSignedIn: (me: User) => void
 }
 
-/** Sign in by username or email address. An account whose address is unverified is sent back to its mail. */
 export function Login({ community, onSignedIn }: LoginProps) {
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
@@ -68,11 +66,10 @@ export function Login({ community, onSignedIn }: LoginProps) {
             <Text as="span" variant="small">
               <Link href={RESET}>Forgot your password?</Link>
             </Text>
-            <Button type="submit" disabled={busy || !username || !password}>
-              {busy ? 'Signing in…' : 'Sign in'}
+            <Button type="submit" disabled={!username || !password} busy={busy}>
+              Sign in
             </Button>
           </Row>
-          <Text variant="small">No account? Ask someone here for an invite link.</Text>
         </Form>
       )}
     </AuthFrame>

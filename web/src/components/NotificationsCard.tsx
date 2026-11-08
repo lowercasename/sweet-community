@@ -1,19 +1,20 @@
 import { useEffect, useState } from 'react'
 import { useMySettings, useSetMySettings } from '../data/hooks'
 import { pushState, turnPushOff, turnPushOn, type PushState } from '../push'
-import { Alert, Button, Card, Heading, Row, Stack, Text } from '../ui'
+import { ActionRow, ActionRows, Alert, Button, Card, Heading, Stack } from '../ui'
 
 /**
  * The settings for notifications sent while the user is away (architecture.md,
  * Notifications). These are the weekly email summarising what the user
  * missed, which is on until the user turns it off, and push notifications to
- * this device for mentions and replies to the user's posts. Each toggle shows
- * its state, and shows its action on hover.
+ * this device for mentions, replies to the user's posts and messages. Each is
+ * an action row (architecture.md, Interface, pattern 2). Each toggle shows its state,
+ * and shows its action on hover.
  */
 export function NotificationsCard() {
   const { data: settings, error } = useMySettings()
   const setSettings = useSetMySettings()
-  const [busy, setBusy] = useState(false)
+  const [working, setWorking] = useState<'digest' | 'device' | null>(null)
   const [overDigest, setOverDigest] = useState(false)
   const [overDevice, setOverDevice] = useState(false)
   const [problem, setProblem] = useState<string | null>(null)
@@ -29,23 +30,32 @@ export function NotificationsCard() {
     }
   }, [])
 
-  const run = async (fn: () => Promise<void>) => {
-    setBusy(true)
+  const run = async (which: 'digest' | 'device', fn: () => Promise<void>) => {
+    setWorking(which)
     setProblem(null)
     try {
       await fn()
     } catch (e) {
       setProblem(e instanceof Error ? e.message : 'Something went wrong')
     } finally {
-      setBusy(false)
+      setWorking(null)
     }
   }
   const digestOn = settings?.digest === 'weekly'
-  const toggleDigest = () => run(() => setSettings({ digest: digestOn ? 'off' : 'weekly' }))
+  const toggleDigest = () => run('digest', () => setSettings({ digest: digestOn ? 'off' : 'weekly' }))
   const toggleDevice = () =>
-    run(async () => {
+    run('device', async () => {
       setDevice(await (device === 'on' ? turnPushOff() : turnPushOn()))
     })
+  // Why this device cannot be notified, when it cannot. The row then shows this and no button.
+  const deviceReason =
+    device === 'unsupported'
+      ? 'This browser cannot show notifications.'
+      : device === 'install-first'
+        ? 'On an iPhone or iPad, add Sweet to your home screen first, then come back here.'
+        : device === 'denied'
+          ? 'This browser is blocking notifications from Sweet. Allow them in its site settings, then come back here.'
+          : null
 
   return (
     <Card>
@@ -53,59 +63,55 @@ export function NotificationsCard() {
         <Heading level={2}>Notifications</Heading>
         {error && <Alert tone="error">{error.message}</Alert>}
         {problem && <Alert tone="error">{problem}</Alert>}
-        <Stack gap={1}>
-          <Heading level={3}>Weekly digest</Heading>
-          <Text variant="small">
-            An email sent when you haven't visited for a week with a summary of what you missed.
-          </Text>
-          <Row>
-            {settings && (
-              <Button
-                variant="ghost"
-                icon="mail"
-                pressed={digestOn}
-                disabled={busy}
-                onClick={() => void toggleDigest()}
-                onHoverChange={setOverDigest}
-              >
-                {digestOn ? (overDigest ? 'Turn weekly digest off' : 'Weekly digest on') : 'Send me a weekly digest'}
-              </Button>
-            )}
-          </Row>
-        </Stack>
-        <Stack gap={1}>
-          <Heading level={3}>Push notifications</Heading>
-          <Text variant="small">
-            Receive notifications on this device when someone mentions you or replies to your post.
-          </Text>
-          {device === 'unsupported' && <Text variant="small">This browser cannot show notifications.</Text>}
-          {device === 'install-first' && (
-            <Text variant="small">On an iPhone or iPad, add Sweet to your home screen first, then come back here.</Text>
-          )}
-          {device === 'denied' && (
-            <Text variant="small">
-              This browser is blocking notifications from Sweet. Allow them in its site settings, then come back here.
-            </Text>
-          )}
-          {(device === 'on' || device === 'off') && (
-            <Row>
-              <Button
-                variant="ghost"
-                icon={device === 'on' ? (overDevice ? 'bell-off' : 'bell-ring') : 'bell'}
-                pressed={device === 'on'}
-                disabled={busy}
-                onClick={() => void toggleDevice()}
-                onHoverChange={setOverDevice}
-              >
-                {device === 'on'
-                  ? overDevice
-                    ? 'Stop notifying this device'
-                    : 'Notifying this device'
-                  : 'Notify this device'}
-              </Button>
-            </Row>
-          )}
-        </Stack>
+        <ActionRows>
+          <ActionRow
+            title="Weekly digest"
+            action={
+              settings && (
+                <Button
+                  variant="ghost"
+                  icon="mail"
+                  pressed={digestOn}
+                  disabled={working !== null}
+                  busy={working === 'digest'}
+                  onClick={() => void toggleDigest()}
+                  onHoverChange={setOverDigest}
+                  labels={['Send me a weekly digest', 'Weekly digest on', 'Turn weekly digest off']}
+                >
+                  {digestOn ? (overDigest ? 'Turn weekly digest off' : 'Weekly digest on') : 'Send me a weekly digest'}
+                </Button>
+              )
+            }
+          >
+            An email sent when you haven't visited for a week, with a summary of what you missed.
+          </ActionRow>
+          <ActionRow
+            title="Push notifications"
+            action={
+              (device === 'on' || device === 'off') && (
+                <Button
+                  variant="ghost"
+                  icon={device === 'on' ? (overDevice ? 'bell-off' : 'bell-ring') : 'bell'}
+                  pressed={device === 'on'}
+                  disabled={working !== null}
+                  busy={working === 'device'}
+                  onClick={() => void toggleDevice()}
+                  onHoverChange={setOverDevice}
+                  labels={['Notify this device', 'Notifying this device', 'Stop notifying this device']}
+                >
+                  {device === 'on'
+                    ? overDevice
+                      ? 'Stop notifying this device'
+                      : 'Notifying this device'
+                    : 'Notify this device'}
+                </Button>
+              )
+            }
+          >
+            {deviceReason ??
+              'Receive notifications on this device when someone mentions you, replies to your post or messages you.'}
+          </ActionRow>
+        </ActionRows>
       </Stack>
     </Card>
   )

@@ -42,7 +42,7 @@ test.describe('groups', () => {
     await expect(kit.page.getByRole('heading', { name })).toBeVisible()
     await expect(kit.page.getByRole('button', { name: `Back to ${name}` })).toBeVisible()
     await kit.page.getByLabel('Add someone').selectOption({ label: mo.username })
-    await kit.page.getByRole('button', { name: 'Add', exact: true }).click()
+    await kit.page.getByRole('button', { name: 'Add to room', exact: true }).click()
     await expect(kit.page.getByRole('list').getByText(mo.username)).toBeVisible()
     await nav(mo.page).getByRole('button', { name }).click()
     await expect(article(mo.page, post)).toBeVisible()
@@ -55,7 +55,7 @@ test.describe('groups', () => {
     // Mo leaves. The group is removed from mo's nav, and mo is removed from the members list.
     await mo.page.getByRole('button', { name: 'Members and settings' }).click()
     await mo.page.getByRole('button', { name: 'Leave room' }).click()
-    await confirm(mo.page, 'Leave')
+    await confirm(mo.page, 'Leave room')
     await expect(mo.page).toHaveURL(/\/$/)
     await expect(nav(mo.page).getByRole('button', { name })).toHaveCount(0)
     await expect(kit.page.getByRole('list').getByText(mo.username)).toHaveCount(0)
@@ -101,7 +101,7 @@ test.describe('groups', () => {
     await kit.page.getByRole('button', { name: 'Create room' }).click()
     await kit.page.getByRole('button', { name: 'Members and settings' }).click()
     await kit.page.getByLabel('Add someone').selectOption({ label: mo.username })
-    await kit.page.getByRole('button', { name: 'Add', exact: true }).click()
+    await kit.page.getByRole('button', { name: 'Add to room', exact: true }).click()
     const moRow = kit.page.getByRole('listitem').filter({ hasText: mo.username })
     await expect(moRow).toBeVisible()
     // The owner has no Leave button. Mo can be made moderator, then owner after a confirmation.
@@ -113,7 +113,7 @@ test.describe('groups', () => {
     const action = await moRow.getByRole('button', { name: `Options for ${mo.username}` }).boundingBox()
     expect(face && action && action.y < face.y + face.height && action.y + action.height > face.y).toBeTruthy()
     await pick(kit.page, moRow, `Options for ${mo.username}`, 'Make owner')
-    await confirm(kit.page, 'Switch ownership')
+    await confirm(kit.page, 'Make owner')
     await expect(moRow).toContainText('owner')
     await expect(moRow).toContainText(/joined (just now|\d+m ago)/)
     await expect(kit.page.getByRole('listitem').filter({ hasText: kit.username })).toContainText(
@@ -129,10 +129,10 @@ test.describe('groups', () => {
     await expect(mo.page.getByRole('button', { name: 'Leave room' })).toHaveCount(0)
     // Kit leaves, then mo deletes the room, and the room is removed from mo's nav.
     await kit.page.getByRole('button', { name: 'Leave room' }).click()
-    await confirm(kit.page, 'Leave')
+    await confirm(kit.page, 'Leave room')
     await expect(nav(kit.page).getByRole('button', { name })).toHaveCount(0)
     await mo.page.getByRole('button', { name: 'Delete room' }).click()
-    await confirm(mo.page, 'Delete')
+    await confirm(mo.page, 'Delete room')
     await expect(mo.page).toHaveURL(/\/$/)
     await expect(nav(mo.page).getByRole('button', { name })).toHaveCount(0)
     await kit.context.close()

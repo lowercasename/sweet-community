@@ -92,6 +92,8 @@ export function PostsPane({ groupId, side = 'full', watching, topicId = null }: 
                           disabled={following || offline}
                           onClick={() => void follow()}
                           onHoverChange={setOverBell}
+
+                          labels={['Subscribe', 'Subscribed', 'Unsubscribe']}
                         >
                           {topic.following ? (overBell ? 'Unsubscribe' : 'Subscribed') : 'Subscribe'}
                         </Button>
@@ -110,7 +112,6 @@ export function PostsPane({ groupId, side = 'full', watching, topicId = null }: 
                   size="post"
                   placeholder={topic ? `Say something in ${topic.name}…` : undefined}
                   submitLabel="Post"
-                  busyLabel="Posting…"
                   disabled={offline}
                   onSubmit={post}
                 />
@@ -131,8 +132,8 @@ export function PostsPane({ groupId, side = 'full', watching, topicId = null }: 
               {error && <Alert tone="error">{error.message}</Alert>}
               {hasMore && (
                 <Row>
-                  <Button variant="secondary" disabled={loading} onClick={loadMore}>
-                    {loading ? 'Loading…' : 'Load more'}
+                  <Button variant="secondary" busy={loading} onClick={loadMore}>
+                    Load more
                   </Button>
                 </Row>
               )}

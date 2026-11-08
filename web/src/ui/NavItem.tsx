@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react'
+import { GHOST_CURRENT, GHOST_HOVER } from './Button'
 import { Dotted } from './Dotted'
 import { Icon, type IconName } from './Icon'
 import { useTooltip } from './Tooltip'
@@ -42,7 +43,7 @@ export function NavItem({ icon, mark, label, expanded, current, size = 'md', dot
         type="button"
         aria-current={current ? 'page' : undefined}
         aria-label={name === label && expanded ? undefined : name}
-        className={`flex cursor-pointer items-center gap-3 rounded-[4px] text-mute transition-colors hover:bg-field hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-pink aria-[current=page]:bg-blush aria-[current=page]:text-sweet ${size === 'sm' ? 'h-8 text-sm' : 'h-10'} ${expanded ? 'px-3' : 'justify-center'}`}
+        className={`flex cursor-pointer items-center gap-3 rounded-[4px] text-mute transition-colors ${GHOST_HOVER} focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-pink ${GHOST_CURRENT} ${size === 'sm' ? 'h-8 text-sm' : 'h-10'} ${expanded ? 'px-3' : 'justify-center'}`}
         {...tip.props({ onClick })}
       >
         <Dotted shown={dot}>{glyph}</Dotted>

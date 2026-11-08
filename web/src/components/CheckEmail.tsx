@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { resendVerification } from '../api'
-import { Alert, Button, Field, Form, Heading, Input, Row, Stack, Text } from '../ui'
+import { Alert, Button, Field, Form, Heading, Input, Link, Row, Stack, Text } from '../ui'
 
 interface CheckEmailProps {
   /** The address the link was sent to. */
@@ -79,31 +79,29 @@ export function CheckEmail({ email, onChangeAddress, backLabel, onBack }: CheckE
               required
             />
           </Field>
-          <Row justify="between" align="center">
+          <Row justify="end" gap={2}>
             <Button variant="ghost" disabled={busy} onClick={() => setChanging(false)}>
               Cancel
             </Button>
-            <Button type="submit" disabled={busy || !address.trim()}>
-              {busy ? 'Sending…' : 'Send the link there'}
+            <Button type="submit" disabled={!address.trim()} busy={busy}>
+              Send a new link
             </Button>
           </Row>
         </Form>
       ) : (
-        <Row gap={3} align="center">
-          <Button variant="secondary" disabled={busy} onClick={() => void resend()}>
-            {busy ? 'Sending…' : 'Send it again'}
-          </Button>
+        <Row gap={2} align="center">
           <Button variant="ghost" disabled={busy} onClick={() => setChanging(true)}>
             Use a different address
+          </Button>
+          <Button variant="secondary" busy={busy} onClick={() => void resend()}>
+            Send a new link
           </Button>
         </Row>
       )}
       {error && <Alert tone="error">{error}</Alert>}
-      <Row>
-        <Button variant="ghost" onClick={onBack}>
-          {backLabel}
-        </Button>
-      </Row>
+      <Text variant="small">
+        <Link onClick={onBack}>{backLabel}</Link>
+      </Text>
     </Stack>
   )
 }

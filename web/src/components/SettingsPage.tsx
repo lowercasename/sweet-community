@@ -6,6 +6,9 @@ import { IMAGE_ACCEPT } from '../editor/images'
 import { AccountCard } from './AccountCard'
 import { NotificationsCard } from './NotificationsCard'
 import {
+  ActionRow,
+  ActionRows,
+  Alert,
   Avatar,
   Button,
   Card,
@@ -55,12 +58,13 @@ export function SettingsPage({ me, root, onSignOut }: SettingsPageProps) {
   }
   const live = useAuthor(me)
   const setPicture = useSetPicture()
-  const [busy, setBusy] = useState(false)
-  const [pictureBusy, setPictureBusy] = useState(false)
+  const [signingOut, setSigningOut] = useState(false)
+  const [everywhereOpen, setEverywhereOpen] = useState(false)
+  const [pictureBusy, setPictureBusy] = useState<'choose' | 'remove' | null>(null)
   const [pictureError, setPictureError] = useState<string | null>(null)
 
   const choosePicture = async (file: File) => {
-    setPictureBusy(true)
+    setPictureBusy('choose')
     setPictureError(null)
     try {
       const img = await uploadImage(file)
@@ -68,20 +72,23 @@ export function SettingsPage({ me, root, onSignOut }: SettingsPageProps) {
     } catch (e) {
       setPictureError(e instanceof Error ? e.message : 'Could not set the picture')
     } finally {
-      setPictureBusy(false)
+      setPictureBusy(null)
     }
   }
 
   const removePicture = async () => {
-    setPictureBusy(true)
+    setPictureBusy('remove')
+    setPictureError(null)
     try {
       await setPicture(null)
+    } catch (e) {
+      setPictureError(e instanceof Error ? e.message : 'Could not remove the picture')
     } finally {
-      setPictureBusy(false)
+      setPictureBusy(null)
     }
   }
   const everywhere = async () => {
-    setBusy(true)
+    setSigningOut(true)
     await logoutEverywhere()
     onSignOut()
   }
@@ -93,72 +100,103 @@ export function SettingsPage({ me, root, onSignOut }: SettingsPageProps) {
             <Card>
               <Stack gap={2}>
                 <Heading level={2}>Profile picture</Heading>
-                <Row gap={3} align="center">
+                <Row gap={2} align="center">
                   <Avatar name={live.username} picture={live.picture} />
                   <FilePicker
                     accept={IMAGE_ACCEPT}
                     variant="secondary"
                     icon="image"
                     label="Choose a picture"
-                    disabled={pictureBusy}
+                    disabled={pictureBusy !== null}
+                    busy={pictureBusy === 'choose'}
                     onPick={(files) => void choosePicture(files[0])}
                   >
-                    {pictureBusy ? 'Uploading…' : 'Choose a picture'}
+                    Choose a picture
                   </FilePicker>
                   {live.picture && (
-                    <Button variant="ghost" disabled={pictureBusy} onClick={() => void removePicture()}>
+                    <Button
+                      variant="danger"
+                      icon="remove"
+                      disabled={pictureBusy !== null}
+                      busy={pictureBusy === 'remove'}
+                      onClick={() => void removePicture()}
+                    >
                       Remove picture
                     </Button>
                   )}
                 </Row>
-                {pictureError && <Text variant="secondary">{pictureError}</Text>}
+                {pictureError && <Alert tone="error">{pictureError}</Alert>}
               </Stack>
             </Card>
             <AccountCard />
             <NotificationsCard />
             <Card>
               <Stack gap={2}>
-                <Heading level={2}>Sign out</Heading>
-                <Text variant="secondary">
-                  If you have lost a device or think someone else has access to your account, use Sign out everywhere.
-                  It signs you out on every device, including this one.
-                </Text>
-                <Row>
-                  <Button variant="secondary" disabled={busy} icon="logout" onClick={onSignOut}>
-                    Sign out here
-                  </Button>
-                  <Button variant="secondary" disabled={busy} icon="devices" onClick={() => void everywhere()}>
-                    {busy ? 'Signing out…' : 'Sign out everywhere'}
-                  </Button>
-                </Row>
-              </Stack>
-            </Card>
-            <Card>
-              <Stack gap={2}>
-                <Heading level={2}>Leave this community</Heading>
-                <Text variant="secondary">
-                  Removing your account takes you off this community for good. Your posts, comments and messages stay,
-                  under a removed name. Rooms you own pass to their longest-serving moderator, or member.
-                </Text>
-                {root.role === 'owner' ? (
-                  <Text variant="secondary">You run this community. Hand it over to someone else first.</Text>
-                ) : (
-                  <Row>
-                    <Button variant="secondary" icon="remove" disabled={removeBusy} onClick={() => setRemoving(true)}>
-                      Remove my account
-                    </Button>
-                  </Row>
-                )}
-                {removeError && <Text variant="secondary">{removeError}</Text>}
+                <Heading level={2}>Sign out and leave</Heading>
+                {removeError && <Alert tone="error">{removeError}</Alert>}
+                <ActionRows>
+                  <ActionRow
+                    title="This device"
+                    action={
+                      <Button variant="secondary" icon="logout" disabled={signingOut} onClick={onSignOut}>
+                        Sign out
+                      </Button>
+                    }
+                  >
+                    Sign out of Sweet in this browser.
+                  </ActionRow>
+                  <ActionRow
+                    title="Every device"
+                    action={
+                      <Button
+                        variant="danger"
+                        icon="devices"
+                        disabled={signingOut}
+                        onClick={() => setEverywhereOpen(true)}
+                      >
+                        Sign out everywhere
+                      </Button>
+                    }
+                  >
+                    Sign out everywhere, including this browser. Use this if you have lost a device or think someone
+                    else has your password.
+                  </ActionRow>
+                  <ActionRow
+                    title="Leave this community"
+                    action={
+                      root.role === 'owner' ? undefined : (
+                        <Button variant="danger" icon="remove" disabled={removeBusy} onClick={() => setRemoving(true)}>
+                          Remove my account
+                        </Button>
+                      )
+                    }
+                  >
+                    {root.role === 'owner'
+                      ? 'You run this community. Hand it over to someone else before you leave.'
+                      : 'Your account is removed for good. Your posts, comments and messages stay, under a removed name. Rooms you own are handed to another member.'}
+                  </ActionRow>
+                </ActionRows>
               </Stack>
             </Card>
           </Stack>
         </Measure>
       </ScrollArea>
       <ConfirmDialog
+        open={everywhereOpen}
+        title="Sign out everywhere?"
+        confirmLabel="Sign out everywhere"
+        icon="devices"
+        busy={signingOut}
+        onConfirm={() => void everywhere()}
+        onClose={() => setEverywhereOpen(false)}
+      >
+        <Text variant="secondary">Every device signed in to your account will be signed out, including this one.</Text>
+      </ConfirmDialog>
+      <ConfirmDialog
         open={removing}
         title="Remove your account?"
-        confirmLabel={removeBusy ? 'Removing…' : 'Remove'}
+        confirmLabel="Remove my account"
+        icon="remove"
         busy={removeBusy}
         onConfirm={() => void removeMe()}
         onClose={() => setRemoving(false)}

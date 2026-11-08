@@ -80,7 +80,7 @@ export function MessagesPage({ me, onGo }: MessagesPageProps) {
                 <Stack gap={2}>
                   <Text variant="secondary">No messages yet. Start one from the People page.</Text>
                   <Row>
-                    <Button variant="secondary" icon="people" onClick={() => onGo('/people')}>
+                    <Button variant="secondary" onClick={() => onGo('/people')}>
                       People
                     </Button>
                   </Row>

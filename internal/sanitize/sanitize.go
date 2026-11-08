@@ -68,10 +68,23 @@ func newBodyPolicy() *bluemonday.Policy {
 // MaxBodyBytes is the maximum size of an incoming body before sanitisation.
 const MaxBodyBytes = 200 * 1024
 
+// emptyParagraph matches a paragraph that holds nothing visible: only
+// whitespace, non-breaking spaces (literal or as entities) or line breaks.
+const emptyParagraph = `<p>(?:\s|\x{00a0}|&nbsp;|&#160;|<br\s*/?>)*</p>`
+
+var (
+	leadingEmpty  = regexp.MustCompile(`^(?:\s*` + emptyParagraph + `)+`)
+	trailingEmpty = regexp.MustCompile(`(?:` + emptyParagraph + `\s*)+$`)
+)
+
 // Body sanitises TipTap HTML for storage. The result is trusted by all code
-// after this point.
+// after this point. Empty paragraphs at the start and end are removed
+// (Raphael, 2026-11-08). Empty paragraphs between others are kept as spacing.
 func Body(in string) string {
-	return strings.TrimSpace(body.Sanitize(in))
+	s := strings.TrimSpace(body.Sanitize(in))
+	s = leadingEmpty.ReplaceAllString(s, "")
+	s = trailingEmpty.ReplaceAllString(s, "")
+	return strings.TrimSpace(s)
 }
 
 // Text returns the plain text of a sanitised body, for search and excerpts.
