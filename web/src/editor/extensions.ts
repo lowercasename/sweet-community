@@ -31,11 +31,20 @@ export const SweetImage = Image.extend({
   },
 }).configure({ inline: false, allowBase64: false })
 
-const placeholder = Placeholder.configure({ placeholder: 'What would you like to say?' })
+/** The placeholder of an editor that is not given one. */
+export const DEFAULT_PLACEHOLDER = 'What would you like to say?'
 
-/** The same extensions with a different placeholder. A reply box names the user it replies to. */
-export function withPlaceholder(extensions: Extensions, text: string): Extensions {
-  return [...extensions.filter((e) => e.name !== 'placeholder'), Placeholder.configure({ placeholder: text })]
+const placeholder = Placeholder.configure({ placeholder: DEFAULT_PLACEHOLDER })
+
+/**
+ * The same extensions with a different placeholder. A reply box names the user it replies to. A function is called
+ * each time the placeholder is drawn, so the text can change after the editor is created.
+ */
+export function withPlaceholder(extensions: Extensions, text: string | (() => string)): Extensions {
+  return [
+    ...extensions.filter((e) => e.name !== 'placeholder'),
+    Placeholder.configure({ placeholder: typeof text === 'string' ? text : () => text() }),
+  ]
 }
 
 /**

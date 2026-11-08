@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { useEditor, useEditorState, type Extensions } from '@tiptap/react'
-import { withPlaceholder } from '../editor/extensions'
+import { DEFAULT_PLACEHOLDER, withPlaceholder } from '../editor/extensions'
 import { mentionSuggestionKey, withMentions } from '../editor/mentions'
 import { useMembers } from '../data/hooks'
 import type { Topic } from '../api'
@@ -93,9 +93,14 @@ export function BodyEditor({
   const { members } = useMembers(groupId)
   const peopleRef = useRef(members)
   peopleRef.current = members
+  // TipTap reads its extensions once, when the editor is created. The placeholder reads the latest prop through a
+  // ref, and the effect below redraws it when the prop changes, for example when Home's composer changes topic.
+  const placeholderRef = useRef(placeholder)
+  placeholderRef.current = placeholder
   const editor = useEditor({
-    extensions: withMentions(placeholder ? withPlaceholder(extensions, placeholder) : extensions, () =>
-      peopleRef.current.map((m) => m.user),
+    extensions: withMentions(
+      withPlaceholder(extensions, () => placeholderRef.current ?? DEFAULT_PLACEHOLDER),
+      () => peopleRef.current.map((m) => m.user),
     ),
     content: initialHtml ?? '',
     autofocus: editing ? 'end' : false,
@@ -142,6 +147,10 @@ export function BodyEditor({
   useEffect(() => {
     if (focus) editor?.commands.focus('end')
   }, [focus, editor])
+  // An empty transaction makes the editor draw its decorations again, which reads the new placeholder.
+  useEffect(() => {
+    if (editor && !editor.isDestroyed) editor.view.dispatch(editor.state.tr)
+  }, [placeholder, editor])
 
   const addImagesRef = useRef<(files: File[]) => void>(() => {})
   addImagesRef.current = (files: File[]) => {
