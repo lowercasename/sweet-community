@@ -1,7 +1,7 @@
-// Package version names the running binary. There is one version of Sweet in
-// one place, the binary itself, so its name is a hash of its own bytes: two
-// builds of the same source share it, any other build differs, and nothing
-// has to be stamped in at build time.
+// Package version identifies the running binary. The binary is the only
+// artefact with a version, so the version is a hash of the binary's own
+// bytes. Two builds of the same source have the same version, any other
+// build has a different one, and nothing has to be set at build time.
 package version
 
 import (
@@ -12,8 +12,8 @@ import (
 	"sync"
 )
 
-// Of returns the twelve-hex-character name of the running executable, or
-// "dev" when it cannot be read.
+// Of returns the first twelve hex characters of the SHA-256 hash of the
+// running executable, or "dev" when the executable cannot be read.
 var Of = sync.OnceValue(func() string {
 	exe, err := os.Executable()
 	if err != nil {

@@ -165,9 +165,9 @@ type ListPostsRow struct {
 	CommentCount    int64
 }
 
-// Posts live in a group. The handler has already checked the viewer's
-// membership of the group it lists; who may edit or delete is perm's call,
-// made after GetPostOwners. The queries themselves do not check.
+// Posts belong to a group. The handler has already checked the viewer's
+// membership of the group it lists. perm decides who can edit or delete,
+// after GetPostOwners. The queries do not check permissions.
 func (q *Queries) ListPosts(ctx context.Context, arg ListPostsParams) ([]ListPostsRow, error) {
 	rows, err := q.db.QueryContext(ctx, listPosts,
 		arg.GroupID,
@@ -241,7 +241,8 @@ type ListPostsByAuthorRow struct {
 	CommentCount    int64
 }
 
-// One person's posts, as a viewer may see them: only from groups the viewer is present in.
+// One user's posts that a viewer can see. Only posts in groups that the
+// viewer is in, and has not hidden, are returned.
 func (q *Queries) ListPostsByAuthor(ctx context.Context, arg ListPostsByAuthorParams) ([]ListPostsByAuthorRow, error) {
 	rows, err := q.db.QueryContext(ctx, listPostsByAuthor,
 		arg.ViewerID,

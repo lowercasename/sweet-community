@@ -1,7 +1,8 @@
--- 023: what reaches a person away from the app (architecture.md,
--- Notifications). A person's own settings, as the instance has its own:
--- the digest on or off for now. When the weekly digest last went to them.
--- Each device a person asked to be notified on, as the browser describes it.
+-- 023: notifications sent to a user outside the app (architecture.md,
+-- Notifications). This adds per-user settings, like the instance's own
+-- settings. For now the only one turns the digest on or off. It adds the time
+-- the weekly digest was last sent to each user. It adds each device a user
+-- subscribed for push, as the browser describes it.
 CREATE TABLE user_settings (
     user_id TEXT NOT NULL REFERENCES users(id),
     key     TEXT NOT NULL,

@@ -2,7 +2,7 @@ import type { ReactNode } from 'react'
 
 interface BarProps {
   as?: 'div' | 'header' | 'footer'
-  /** `header` is the app bar with Sweet's pink rule; `footer` sits under a scroll area. */
+  /** `header` is the app bar with Sweet's pink rule under it. `footer` sits under a scroll area. */
   edge: 'header' | 'footer'
   children?: ReactNode
 }

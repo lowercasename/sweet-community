@@ -102,7 +102,7 @@ interface IconProps {
   size?: 14 | 16 | 18 | 20 | 22
 }
 
-/** A Lucide icon in the current text colour. Decorative; the control around it carries the label. */
+/** A Lucide icon in the current text colour. Decorative. The control around it carries the label. */
 export function Icon({ name, size = 18 }: IconProps) {
   const Glyph = ICONS[name]
   return <Glyph size={size} strokeWidth={2} aria-hidden="true" focusable="false" />

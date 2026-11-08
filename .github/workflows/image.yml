@@ -1,5 +1,5 @@
-# Tests, then the image: every push to main publishes
-# ghcr.io/lowercasename/sweet-community:latest (and :sha-<commit>), a tag v* also :<version>.
+# Runs the tests, then builds and publishes the image. Every push to main publishes
+# ghcr.io/lowercasename/sweet-community:latest and :sha-<commit>. A tag v* also publishes :<version>.
 name: Image
 
 on:

@@ -1,9 +1,9 @@
 import type { Group } from './api'
 
 /**
- * Where things live (architecture.md, Layout). To people a group is a
- * room: the root group is Home at `/`, every other group is a room at
- * `/r/<id>` (a DM too), and a new one is made at `/rooms/new`.
+ * The app's paths (architecture.md, Layout). To users a group is a room.
+ * The root group is Home at `/`. Every other group, including a DM, is a
+ * room at `/r/<id>`. A new room is created at `/rooms/new`.
  */
 export function groupPath(id: string, rootId?: string): string {
   return id === rootId ? '/' : `/r/${encodeURIComponent(id)}`
@@ -11,29 +11,29 @@ export function groupPath(id: string, rootId?: string): string {
 
 export const NEW_ROOM = '/rooms/new'
 
-/** The full list of my conversations, and where a new one starts. */
+/** The list of the user's conversations, and the page for starting a new one. */
 export const MESSAGES = '/messages'
 export const NEW_MESSAGE = '/messages/new'
 
-/** What matches what I typed (architecture.md, Search): `?q=` carries the words. */
+/** The search page (architecture.md, Search). The `?q=` parameter carries the query. */
 export const SEARCH = '/search'
 
-/** What was done to me (architecture.md, Notifications). */
+/** The notifications page (architecture.md, Notifications). */
 export const NOTIFICATIONS = '/notifications'
 
-/** Forgot the password (architecture.md, Accounts): `/reset` asks for a link, `/reset/<token>` is where it leads. */
+/** Password reset (architecture.md, Accounts). `/reset` requests a link, and `/reset/<token>` is the page the link opens. */
 export const RESET = '/reset'
 
-/** The owner's page for the community itself (architecture.md, Admin tools): name, description, who may create rooms. */
+/** The owner's settings page for the community (architecture.md, Admin tools). Name, description, and who may create rooms. */
 export const COMMUNITY = '/community'
 
-/** The community's feed showing one topic (architecture.md, Topics). */
+/** The community's feed filtered to one topic (architecture.md, Topics). */
 export const topicPath = (id: string) => `/?topic=${encodeURIComponent(id)}`
 
-/** A person's page (architecture.md, Accounts). */
+/** A user's profile page (architecture.md, Accounts). */
 export const profilePath = (name: string) => `/u/${encodeURIComponent(name)}`
 
-/** A post's own address (architecture.md, Posts). */
+/** A post's own page (architecture.md, Posts). */
 export const postPath = (id: string) => `/p/${encodeURIComponent(id)}`
 
 /** A room's members page. */

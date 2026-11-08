@@ -15,7 +15,7 @@ import (
 	"sweet/internal/store"
 )
 
-// Image is the wire shape of an upload; the body references it by url.
+// Image is the wire shape of an uploaded image. A body references it by URL.
 type Image struct {
 	ID     string `json:"id"`
 	URL    string `json:"url"`
@@ -25,7 +25,7 @@ type Image struct {
 
 func imageURL(id string) string { return "/img/" + id }
 
-// pictureURL turns a nullable picture_id into the Avatar's url, or nil for the donut.
+// pictureURL converts a nullable picture_id to the picture's URL, or nil when the default donut avatar is shown.
 func pictureURL(id sql.NullString) *string {
 	if !id.Valid {
 		return nil
@@ -34,7 +34,7 @@ func pictureURL(id sql.NullString) *string {
 	return &u
 }
 
-// uploadImage takes multipart field "file", processes it and stores it.
+// uploadImage reads the multipart field "file", processes the image and stores it.
 func (s *Server) uploadImage(w http.ResponseWriter, r *http.Request) {
 	if s.Images == nil {
 		writeErr(w, http.StatusNotImplemented, "Image storage is not configured")
@@ -77,8 +77,8 @@ func (s *Server) uploadImage(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusCreated, Image{ID: id.String(), URL: imageURL(id.String()), Width: int64(p.Width), Height: int64(p.Height)})
 }
 
-// serveImage streams a stored image to a signed-in member. Ids are unique
-// forever, so the browser may cache for a year.
+// serveImage streams a stored image to a signed-in member. Ids are never
+// reused, so the browser may cache the image for a year.
 func (s *Server) serveImage(w http.ResponseWriter, r *http.Request) {
 	if s.Images == nil {
 		http.NotFound(w, r)
@@ -94,8 +94,9 @@ func (s *Server) serveImage(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusInternalServerError, err.Error())
 		return
 	}
-	// CanSee for images (architecture.md, Images): the uploader, a profile
-	// picture, or a live body in one of the viewer's groups references it.
+	// The visibility rule for images (architecture.md, Images). The viewer
+	// may see an image when they uploaded it, when it is a profile picture,
+	// or when a live body in one of the viewer's groups references it.
 	me, _ := userFrom(r.Context())
 	visible, err := s.q().ImageVisibleTo(r.Context(), store.ImageVisibleToParams{ImageID: id, ViewerID: me.ID})
 	if err != nil {
@@ -123,8 +124,8 @@ func (s *Server) serveImage(w http.ResponseWriter, r *http.Request) {
 	io.Copy(w, rc)
 }
 
-// setPicture points the signed-in person's avatar at an uploaded image; a
-// null image_id goes back to the donut.
+// setPicture sets the signed-in user's picture to an uploaded image. A null
+// image_id resets it to the default donut avatar.
 func (s *Server) setPicture(w http.ResponseWriter, r *http.Request) {
 	var in struct {
 		ImageID *string `json:"image_id"`
@@ -136,7 +137,7 @@ func (s *Server) setPicture(w http.ResponseWriter, r *http.Request) {
 	}
 	me, _ := userFrom(r.Context())
 	// A "user" event carries the whole user, so every open page can redraw
-	// their avatar wherever it appears.
+	// the user's picture wherever it appears.
 	s.logged(w, r, "user", db.Now(), func(qtx *store.Queries) (any, int, error) {
 		var pic sql.NullString
 		if in.ImageID != nil {

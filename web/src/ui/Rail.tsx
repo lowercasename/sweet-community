@@ -6,12 +6,12 @@ interface RailProps {
   side: 'left' | 'right'
   icon: IconName
   label: string
-  /** Something unread in the folded pane: a dot, and "unread" in its name. */
+  /** Whether the collapsed pane has unread content. Shows a dot and adds "unread" to the accessible name. */
   dot?: boolean
   onOpen: () => void
 }
 
-/** A collapsed pane: a thin vertical strip with the pane's icon and name, one click to reopen. */
+/** A collapsed pane. A thin vertical strip with the pane's icon and name. One click reopens the pane. */
 export function Rail({ side, icon, label, dot = false, onOpen }: RailProps) {
   const border = side === 'left' ? 'border-r' : 'border-l'
   return (

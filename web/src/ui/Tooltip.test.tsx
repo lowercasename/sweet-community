@@ -4,7 +4,7 @@ import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { Button } from './Button'
 import { NavItem } from './NavItem'
 
-/** A control whose name is hidden says it in a tooltip, not in the browser's title. */
+/** A control whose name is not visible shows it in a tooltip, not in the browser's title attribute. */
 afterEach(cleanup)
 
 const hover = (el: HTMLElement) => {
@@ -24,14 +24,14 @@ describe('tooltips', () => {
     await vi.waitFor(() => expect(screen.queryByRole('tooltip')).toBeNull())
   })
 
-  it('an expanded nav item has no tooltip: its name is beside it', async () => {
+  it('an expanded nav item has no tooltip, because its name is shown beside it', async () => {
     render(<NavItem icon="home" label="Home" expanded />)
     hover(screen.getByRole('button', { name: 'Home' }))
     await new Promise((r) => setTimeout(r, 500))
     expect(screen.queryByRole('tooltip')).toBeNull()
   })
 
-  it('an icon button shows its label; a button with words does not', async () => {
+  it('an icon button shows its label in a tooltip, and a button with text does not', async () => {
     render(
       <>
         <Button variant="ghost" icon="trash" label="Delete" />

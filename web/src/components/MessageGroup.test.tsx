@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, screen, within } from '@testing-library/react'
 import { message, nobody, renderWithQuery, user } from '../test-utils'
 
-/** A chat message offers Delete exactly when its can flag says so, and asks first. */
+/** A chat message offers Delete only when its can flag allows it, and asks for confirmation first. */
 vi.mock('../api', () => ({
   getMe: vi.fn(() => Promise.resolve({ id: 'kit', username: 'kit', picture: null })),
   listMembers: vi.fn(() => Promise.resolve({ members: [] })),

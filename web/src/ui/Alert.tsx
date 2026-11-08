@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react'
 
 interface AlertProps {
-  /** `notice` is quiet news (connecting); `warning` is a limit (offline); `error` is something that failed. */
+  /** `notice` is low-key information (connecting). `warning` is a limitation (offline). `error` is a failure. */
   tone?: 'notice' | 'warning' | 'error'
   children?: ReactNode
 }
@@ -13,9 +13,9 @@ const TONES: Record<NonNullable<AlertProps['tone']>, string> = {
 }
 
 /**
- * A notice set apart from the content around it: a short strip with its own
- * ground, for a connection's state, a limit or a failure. One shape for all
- * of them, so a notice is always told from the thing it is about.
+ * A notice set apart from the content around it. A short strip with its own
+ * background, for a connection state, a limitation or a failure. All three use
+ * one shape, so a notice is always distinguishable from the content it is about.
  */
 export function Alert({ tone = 'notice', children }: AlertProps) {
   return (

@@ -1,8 +1,8 @@
--- 019: email (architecture.md, Accounts). An account has an address, verified
--- before it may be used; a change takes effect once the new address is
--- verified, so the old one stays until then. Tokens for verifying and for
--- resetting a password are stored by hash, expire, and are used once. The
--- owner made on first run has no address until they set one.
+-- 019: email (architecture.md, Accounts). An account has an address, which
+-- is verified before it can be used. A change takes effect once the new
+-- address is verified, so the old one stays until then. Tokens for verifying
+-- and for resetting a password are stored by hash, expire, and are used once.
+-- The owner created on first run has no address until they set one.
 ALTER TABLE users ADD COLUMN email TEXT;
 ALTER TABLE users ADD COLUMN email_verified_at INTEGER;
 ALTER TABLE users ADD COLUMN pending_email TEXT;

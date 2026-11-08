@@ -25,8 +25,8 @@ type Message struct {
 	Can       Can    `json:"can"`
 }
 
-// listMessages returns the newest page first, like posts; the client reverses
-// it for display. ?before= pages backwards through history.
+// listMessages returns the newest page first, like posts, and the client
+// reverses it for display. ?before= pages backwards through history.
 func (s *Server) listMessages(w http.ResponseWriter, r *http.Request) {
 	g, a := groupFrom(r.Context())
 	before, limit := pageParams(r, 50, 200)
@@ -70,8 +70,9 @@ func (s *Server) createMessage(w http.ResponseWriter, r *http.Request) {
 	}
 	author, _ := userFrom(r.Context())
 	now := db.Now()
-	// The message, a notification to each person it mentions, and in a conversation
-	// one to the other person, in one transaction.
+	// The message, a notification to each user it mentions, and in a
+	// conversation a notification to the other member, are written in one
+	// transaction.
 	s.loggedMany(w, r, now, func(qtx *store.Queries) ([]events.Entry, any, int, error) {
 		if err := qtx.CreateMessage(r.Context(), store.CreateMessageParams{ID: id.String(), GroupID: g.ID, AuthorID: author.ID, BodyHtml: clean, BodyText: sanitize.Text(clean), CreatedAt: now}); err != nil {
 			return nil, nil, http.StatusInternalServerError, err
@@ -93,7 +94,7 @@ func (s *Server) createMessage(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// deleteMessage soft-deletes a message (perm.DeleteMessage says who may).
+// deleteMessage soft-deletes a message. perm.DeleteMessage decides who may.
 func (s *Server) deleteMessage(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
 	me, _ := userFrom(r.Context())

@@ -24,9 +24,9 @@ import { PersonName } from './PersonName'
 
 interface PeoplePageProps {
   me: User
-  /** The instance as a group: its can flags say whether I invite and set roles. */
+  /** The root group, which represents the instance. Its can flags say whether the user can invite and set roles. */
   root: Group
-  /** Show a group's view: after starting a DM with someone. */
+  /** Opens a group's view. Called after starting a DM with a user. */
   onOpenGroup: (id: string) => void
 }
 
@@ -39,7 +39,7 @@ function InviteRow({ invite, onRevoke }: { invite: Invite; onRevoke: () => void 
       setCopied(true)
       window.setTimeout(() => setCopied(false), 2000)
     } catch {
-      // clipboard unavailable (http, permissions); the field is selectable
+      // The clipboard is unavailable, for example over http or without permission. The field is still selectable.
     }
   }
   return (
@@ -55,7 +55,7 @@ function InviteRow({ invite, onRevoke }: { invite: Invite; onRevoke: () => void 
         <Row push="end">
           <Text variant="small">
             Expires <Time at={invite.expires_at} />
-            {invite.uses > 0 && ` · ${invite.uses} joined through it`}
+            {invite.uses > 0 && ` · ${invite.uses} joined with this link`}
           </Text>
         </Row>
       </Row>
@@ -70,8 +70,9 @@ const ROLE_WORD: Record<Member['role'], string> = {
 }
 
 /**
- * Everyone on the instance: the root group's members. Its staff mint invite
- * links here; its owner sets roles. Both come from the root group's can flags.
+ * Lists every user on the instance, who are the root group's members. Staff
+ * create invite links here and the owner sets roles. Both permissions come
+ * from the root group's can flags.
  */
 export function PeoplePage({ me, root, onOpenGroup }: PeoplePageProps) {
   const { data: users } = useUsers()
@@ -98,14 +99,14 @@ export function PeoplePage({ me, root, onOpenGroup }: PeoplePageProps) {
       setError(e instanceof Error ? e.message : 'Could not change the role')
     }
   }
-  // Who may be removed is the server's call, on each person (architecture.md, Admin tools).
+  // The server decides for each user whether they can be removed (architecture.md, Admin tools).
   const remove = async () => {
     if (!removing) return
     setBusy(true)
     try {
       await removeUser(removing.id)
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Could not remove them')
+      setError(e instanceof Error ? e.message : 'Could not remove this person')
     } finally {
       setBusy(false)
       setRemoving(null)
@@ -119,7 +120,7 @@ export function PeoplePage({ me, root, onOpenGroup }: PeoplePageProps) {
     }
   }
 
-  // Staff's doings to one person, behind a three-dot menu on their row; Message stays in the open.
+  // Staff actions on one user, in a three-dot menu on their row. The Message button stays outside the menu.
   const items = (u: Member): MenuItem[] => {
     const out: MenuItem[] = []
     if (root.can.set_roles && u.role !== 'owner')

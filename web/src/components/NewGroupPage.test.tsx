@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, screen } from '@testing-library/react'
 import { group, renderWithQuery } from '../test-utils'
 
-/** Making a group: a name and a mode, nothing else to decide. */
+/** Creating a group requires only a name and a mode. */
 vi.mock('../api', () => ({
   createGroup: vi.fn((name: string, mode: string) =>
     Promise.resolve(group('new', 'owner', { name, mode: mode as 'both' })),
@@ -13,7 +13,7 @@ vi.mock('../api', () => ({
 afterEach(cleanup)
 
 describe('NewGroupPage', () => {
-  it('creates a group from a name and a mode and hands it back', async () => {
+  it('creates a group from a name and a mode and passes it to onCreated', async () => {
     const { createGroup } = await import('../api')
     const { NewGroupPage } = await import('./NewGroupPage')
     const onCreated = vi.fn()

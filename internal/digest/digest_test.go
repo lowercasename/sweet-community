@@ -17,7 +17,7 @@ import (
 	"sweet/internal/store"
 )
 
-// A sender that keeps what it was given.
+// memo is a mail.Sender that records the messages it is given.
 type memo struct{ sent []mail.Message }
 
 func (m *memo) Send(_ context.Context, msg mail.Message) error {
@@ -53,7 +53,7 @@ func open(t *testing.T) *fixture {
 
 func (f *fixture) ms(d time.Duration) int64 { return f.now.Add(d).UnixMilli() }
 
-// person makes a verified member who joined and was last seen at the given times ago.
+// person creates a member who joined joinedAgo before now and was last seen seenAgo before now. verified sets whether their email is verified.
 func (f *fixture) person(name string, joinedAgo, seenAgo time.Duration, verified bool) string {
 	f.t.Helper()
 	id := uuid.NewString()
@@ -100,15 +100,15 @@ func TestDigestGoesToTheAwayWithSomethingToTell(t *testing.T) {
 	f := open(t)
 	day := 24 * time.Hour
 	practice := f.topic("Practice")
-	kit := f.person("kit", 30*day, 8*day, true)  // away for eight days
-	mo := f.person("mo", 30*day, 1*day, true)    // here yesterday
-	jo := f.person("jo", 30*day, 9*day, false)   // never verified
-	ade := f.person("ade", 30*day, 10*day, true) // away, but turned it off
+	kit := f.person("kit", 30*day, 8*day, true)  // absent for eight days
+	mo := f.person("mo", 30*day, 1*day, true)    // seen yesterday
+	jo := f.person("jo", 30*day, 9*day, false)   // email never verified
+	ade := f.person("ade", 30*day, 10*day, true) // absent, but has the digest turned off
 	if err := f.q.SetUserSetting(f.ctx, store.SetUserSettingParams{UserID: ade, Key: "digest", Value: "off"}); err != nil {
 		t.Fatal(err)
 	}
-	// Kit read the feed nine days ago. Since then: two posts by mo (one in Practice), one by kit (not counted),
-	// a reply by mo on kit's post, and sam joined.
+	// Kit read the feed nine days ago. Since then there have been two posts by mo (one in Practice), one post
+	// by kit (not counted), a reply by mo on kit's post, and sam has joined.
 	if err := f.q.SetMarker(f.ctx, store.SetMarkerParams{UserID: kit, Stream: "feed:" + perm.Root, ReadAt: f.ms(-9 * day)}); err != nil {
 		t.Fatal(err)
 	}
@@ -163,16 +163,16 @@ func TestDigestGoesToTheAwayWithSomethingToTell(t *testing.T) {
 	if m.HTML == "" {
 		t.Error("the digest is the same message in HTML too")
 	}
-	// A second run the same week sends nothing more.
+	// A second run in the same week sends nothing.
 	if n, _ := Run(f.ctx, f.d, out, "https://sweet.test", f.now.Add(time.Hour)); n != 0 || len(out.sent) != 1 {
 		t.Fatalf("sent again: %d", n)
 	}
-	// A week later: kit, still away, has nothing new since the last digest and hears nothing. Mo, away nine
-	// days by now, hears of what happened since they read the feed.
+	// A week later, kit is still absent but has nothing new since the last digest, so kit receives nothing.
+	// Mo has now been absent for nine days and receives a digest of what happened since mo read the feed.
 	if n, _ := Run(f.ctx, f.d, out, "https://sweet.test", f.now.Add(8*day)); n != 1 || out.sent[len(out.sent)-1].To != "mo@example.test" {
 		t.Fatalf("second week: sent %d, last to %s", n, out.sent[len(out.sent)-1].To)
 	}
-	// Something new after that: kit hears again, and so does sam, who joined and then stayed away.
+	// After a new post, kit receives a digest again, and so does sam, who joined and then did not return.
 	f.post(mo, -(8*day + time.Hour), "")
 	n, _ = Run(f.ctx, f.d, out, "https://sweet.test", f.now.Add(8*day+2*time.Hour))
 	var to []string
@@ -215,7 +215,7 @@ func TestWordsForNumbersAndNames(t *testing.T) {
 	}
 }
 
-// conversation is the two people's conversation, as the API makes it.
+// conversation creates the conversation between two users, with the same rows the API creates.
 func (f *fixture) conversation(a, b string) string {
 	f.t.Helper()
 	id := uuid.NewString()

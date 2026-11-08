@@ -1,7 +1,8 @@
 -- 020: search by any part of a word (architecture.md, Search). The index is
--- rebuilt with the trigram tokeniser, so "armalade" finds marmalade; the
--- triggers from 018 stay, they only name the table. Words of fewer than three
--- characters cannot be matched by it; the query drops them.
+-- rebuilt with the trigram tokeniser, so "armalade" finds marmalade. The
+-- triggers from 018 stay, because they only refer to the table by name. The
+-- tokeniser cannot match words of fewer than three characters, so the query
+-- drops them.
 DROP TABLE search;
 CREATE VIRTUAL TABLE search USING fts5(
     text,

@@ -15,7 +15,7 @@ interface FilePickerProps {
   children?: ReactNode
 }
 
-/** A button that opens the file chooser; the input itself stays hidden. */
+/** A button that opens the file chooser. The file input itself is hidden. */
 export function FilePicker({
   accept,
   variant = 'ghost',

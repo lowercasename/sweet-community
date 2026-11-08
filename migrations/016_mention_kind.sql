@@ -1,5 +1,5 @@
 -- 016: a third kind of notification, mention (architecture.md, Posts,
--- Notifications). SQLite cannot widen a CHECK, so the table is rebuilt.
+-- Notifications). SQLite cannot extend a CHECK constraint, so the table is rebuilt.
 CREATE TABLE notifications_new (
     id         TEXT PRIMARY KEY,
     user_id    TEXT NOT NULL REFERENCES users(id),

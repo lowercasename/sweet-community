@@ -1,4 +1,5 @@
-// Command sweet is one Sweet instance: HTTP server, SQLite, embedded frontend.
+// Command sweet runs one Sweet instance. It is the HTTP server, the SQLite
+// database and the embedded frontend.
 package main
 
 import (
@@ -27,8 +28,9 @@ import (
 	"sweet/internal/web"
 )
 
-// imageStore picks S3 when SWEET_S3_ENDPOINT and SWEET_S3_BUCKET are set
-// (R2: <account>.r2.cloudflarestorage.com, region auto), else a directory.
+// imageStore returns an S3 store when SWEET_S3_ENDPOINT and SWEET_S3_BUCKET
+// are set (for R2, the endpoint is <account>.r2.cloudflarestorage.com and the
+// region is auto). Otherwise it returns a local directory store.
 func imageStore(dir string) (images.Store, error) {
 	if ep, bucket := os.Getenv("SWEET_S3_ENDPOINT"), os.Getenv("SWEET_S3_BUCKET"); ep != "" && bucket != "" {
 		return images.NewS3(images.S3Config{
@@ -87,8 +89,8 @@ func main() {
 	}
 	defer d.Close()
 
-	// go:embed can't reach ../../migrations, so main.go lives beside a copy;
-	// see the Makefile, which syncs migrations/ into cmd/sweet/migrations/.
+	// go:embed cannot reference ../../migrations, so a copy is kept next to
+	// main.go. The Makefile syncs migrations/ into cmd/sweet/migrations/.
 	migrations, err := fs.Sub(migrationsFS, "migrations")
 	if err != nil {
 		log.Fatal(err)
@@ -98,8 +100,9 @@ func main() {
 	}
 
 	base := strings.TrimRight(*baseURL, "/")
-	// The owner: scripted with a password, or, on a fresh instance, whoever
-	// opens the setup link (architecture.md, New-instance lifecycle).
+	// The owner is created from the password when one is given. Otherwise,
+	// on a new instance, the owner is whoever opens the setup link
+	// (architecture.md, New-instance lifecycle).
 	if *ownerPassword != "" {
 		if _, err := api.EnsureOwner(ctx, d, *owner, *ownerPassword); err != nil {
 			log.Fatalf("owner: %v", err)
@@ -120,17 +123,18 @@ func main() {
 		log.Fatalf("images: %v", err)
 	}
 
-	// Unreferenced images go after a day: long enough for any draft.
+	// Unreferenced images are deleted after a day, which is long enough for
+	// any draft.
 	go images.SweepEvery(ctx, d, imgStore, time.Hour, 24*time.Hour, log.Printf)
 
 	sender := mail.FromEnv(*mailDir)
-	// The weekly digest for anyone who has not visited (architecture.md, Notifications): looked at every hour.
+	// The weekly digest for users who have not visited (architecture.md, Notifications) is checked every hour.
 	go digest.Every(ctx, d, sender, base, time.Hour, log.Printf)
 
 	hub := events.NewHub(d)
 	hub.Version = version.Of()
 	srv := &api.Server{DB: d, Hub: hub, Images: imgStore, Mail: sender, BaseURL: base, TrustProxy: *trustProxy}
-	// Web push (architecture.md, Notifications): the instance's VAPID keys, made on first start.
+	// Web push (architecture.md, Notifications) uses the instance's VAPID keys, which are generated on first start.
 	if keys, err := push.LoadKeys(ctx, d); err != nil {
 		log.Printf("push: %v (push is off)", err)
 	} else {
@@ -146,7 +150,7 @@ func main() {
 		Addr:              *addr,
 		Handler:           api.Protect(mux),
 		ReadHeaderTimeout: 10 * time.Second,
-		// No WriteTimeout: SSE connections are long-lived by design.
+		// There is no WriteTimeout, because SSE connections are long-lived by design.
 	}
 
 	go func() {

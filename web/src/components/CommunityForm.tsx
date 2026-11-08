@@ -5,9 +5,9 @@ import { Alert, Button, Field, Form, Input, Row, Select, Stack, Textarea } from 
 
 interface CommunityFormProps {
   settings: Settings
-  /** What the button says. */
+  /** The submit button's label. */
   submitLabel: string
-  /** After a successful save. */
+  /** Called after a successful save. */
   onSaved?: () => void
 }
 
@@ -17,9 +17,10 @@ const CREATION: { value: Settings['group_creation']; label: string }[] = [
 ]
 
 /**
- * The community's own settings (architecture.md, Admin tools): its name,
- * what it is for, who may make rooms. One form for the welcome page and the
- * Community page, so the two cannot disagree on what a community has.
+ * The form for the community's settings (architecture.md, Admin tools). The
+ * settings are its name, its description and who may create groups. The
+ * welcome page and the Community page use this one form, so the two cannot
+ * differ on which settings a community has.
  */
 export function CommunityForm({ settings, submitLabel, onSaved }: CommunityFormProps) {
   const setSettings = useSetSettings()

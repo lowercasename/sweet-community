@@ -6,16 +6,16 @@ import { MESSAGES, NEW_MESSAGE, groupPath } from '../routes'
 import { Avatar, NavItem, NavSection } from '../ui'
 import { groupLabel } from './GroupView'
 
-/** How many conversations the nav shows: the latest five, and the open one. */
+/** How many conversations the nav shows. It shows the latest five, plus the open one. */
 export const SHOWN = 5
 
-/** The other person of a conversation, as they are now: the conversation's face. */
+/** Returns the other user in a conversation, with their current data. Their avatar is the conversation's avatar. */
 export function other(group: Group, me: User, users?: Map<string, User>): User | undefined {
   const u = (group.members ?? []).find((x) => x.id !== me.id)
   return u && (users?.get(u.id) ?? u)
 }
 
-/** A conversation's mark, in the slot a room's tile takes: the other person's face. */
+/** A conversation's icon, shown where a group's tile would be. It is the other user's avatar. */
 export function ConversationFace({ group, me }: { group: Group; me: User }) {
   const { data: users } = useUsers()
   const them = other(group, me, users)
@@ -25,21 +25,23 @@ export function ConversationFace({ group, me }: { group: Group; me: User }) {
 interface ConversationsSectionProps {
   groups: Group[]
   me: User
-  /** The current path, when the column marks the page being viewed. */
+  /** The current path, set when the nav column highlights the page being viewed. */
   location?: string
-  /** The places with something unread, by group id. */
+  /** Each group's unread state, keyed by group id. */
   places: Map<string, UnreadPlace>
   expanded: boolean
   onGo: (path: string) => void
 }
 
 /**
- * The Messages section of the nav (architecture.md, Layout): New message as
- * its own control, the five conversations with the latest message, the open
- * one too if it is older, each named by its other person and marked by
- * their face, and All messages at the foot when there is more than it
- * shows (Raphael, 2026-11-06: with five or fewer it was a row for nothing). A conversation is a room
- * without a name, so it sits with the rooms, drawn the same way.
+ * The Messages section of the nav (architecture.md, Layout). It has a New
+ * message control of its own and the five conversations with the latest
+ * messages. The open conversation is also listed if it is older. Each
+ * conversation is labelled with the other user's name and shown with their
+ * avatar. An All messages link is shown at the bottom when there are more
+ * conversations than the section lists. With five or fewer, the link was a
+ * row with no purpose (Raphael, 2026-11-06). A conversation is a group
+ * without a name, so its rows are drawn the same way as room rows.
  */
 export function ConversationsSection({ groups, me, location, places, expanded, onGo }: ConversationsSectionProps) {
   const all = conversationsOf(groups)
@@ -48,7 +50,8 @@ export function ConversationsSection({ groups, me, location, places, expanded, o
     : undefined
   const shown = all.slice(0, SHOWN)
   if (open && !shown.includes(open)) shown.push(open)
-  // All messages earns its place only when the section does not show everything: more than the five, or hidden ones to bring back; never on the collapsed bar.
+  // Show All messages only when the section does not list every conversation. That is the case when there are more
+  // than five, or when there are hidden conversations to restore. Never show it on the collapsed bar.
   const more = expanded && (all.length > SHOWN || hiddenOf(groups).length > 0)
   return (
     <NavSection

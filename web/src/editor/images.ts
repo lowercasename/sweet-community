@@ -3,14 +3,15 @@ import { uploadImage, type UploadedImage } from '../api'
 
 export const IMAGE_ACCEPT = 'image/jpeg,image/png,image/webp,image/gif'
 
-/** An uploaded image with its alt text so far. */
+/** An uploaded image with the alt text entered so far. */
 export interface AttachedImage extends UploadedImage {
   alt: string
 }
 
 /**
- * Upload files in parallel, keeping the chosen order. The ones that
- * succeed come back; `error` describes the failures, if any.
+ * Uploads files in parallel, keeping the order they were chosen in. Returns
+ * the images that uploaded successfully. `error` describes the failures, if
+ * there were any.
  */
 export async function uploadImages(files: File[]): Promise<{ images: AttachedImage[]; error?: string }> {
   const results = await Promise.allSettled(files.map((f) => uploadImage(f)))
@@ -24,7 +25,7 @@ export async function uploadImages(files: File[]): Promise<{ images: AttachedIma
   return { images, error: files.length === 1 ? why : `${failed} of ${files.length} images not added: ${why}` }
 }
 
-/** Upload files and insert them at the cursor as image nodes. Throws after inserting if any failed. */
+/** Uploads files and inserts them at the cursor as image nodes. Throws after inserting if any upload failed. */
 export async function insertImages(editor: Editor, files: File[]): Promise<void> {
   const { images, error } = await uploadImages(files)
   if (images.length > 0) {
@@ -37,7 +38,7 @@ export async function insertImages(editor: Editor, files: File[]): Promise<void>
   if (error) throw new Error(error)
 }
 
-/** The <img> elements for images attached above a message, as the editor would serialise them. */
+/** The <img> elements for the images attached above a message, serialised as the editor would serialise them. */
 export function imagesHtml(images: AttachedImage[]): string {
   return images
     .map((img) => {
@@ -48,12 +49,12 @@ export function imagesHtml(images: AttachedImage[]): string {
     .join('')
 }
 
-/** Attribute order matches TipTap's serialisation and the server's fixtures. */
+/** The attribute order matches TipTap's serialisation and the server's fixtures. */
 function imageAttrs(img: AttachedImage) {
   return { src: img.url, alt: img.alt, width: img.width, height: img.height, 'data-image-id': img.id }
 }
 
-/** The image files in a paste or drop, if any. */
+/** The image files in a paste or drop, if there are any. */
 export function imageFiles(dt: DataTransfer | null): File[] {
   if (!dt) return []
   return Array.from(dt.files).filter((f) => f.type.startsWith('image/'))

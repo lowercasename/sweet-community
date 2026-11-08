@@ -119,9 +119,10 @@ type UseInviteParams struct {
 	Now  int64
 }
 
-// Never mix bare ? with sqlc.arg() in one query: SQLite numbers a bare ?
+// Never mix bare ? with sqlc.arg() in one query. SQLite numbers a bare ?
 // as (highest index so far + 1), so a ? after a named ?3 becomes ?4.
-// A link is good for its seven days however many come through it; used_at stays NULL.
+// An invite link is valid for seven days, however many users join through
+// it. used_at stays NULL.
 func (q *Queries) UseInvite(ctx context.Context, arg UseInviteParams) (int64, error) {
 	result, err := q.db.ExecContext(ctx, useInvite, arg.Code, arg.Now)
 	if err != nil {

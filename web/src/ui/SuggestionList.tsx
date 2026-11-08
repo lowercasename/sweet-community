@@ -8,9 +8,10 @@ export interface SuggestionListHandle {
 }
 
 /**
- * The list under an @ in an editor: the people whose names start with what
- * was typed, moved through with the arrow keys, picked with Enter or Tab or
- * a click. Positioned by the editor's mention extension; this is the box.
+ * The list shown under an @ in an editor. It lists the users whose names
+ * start with the typed text. The arrow keys move the selection, and Enter,
+ * Tab or a click picks one. The editor's mention extension positions it.
+ * This component is only the list itself.
  */
 export const SuggestionList = forwardRef<SuggestionListHandle, SuggestionProps<User>>(function SuggestionList(
   { items, command },

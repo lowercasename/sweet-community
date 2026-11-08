@@ -24,8 +24,8 @@ type CountConversationsWithNewMessagesParams struct {
 	Since  interface{}
 }
 
-// The person's conversations with others' live messages newer than where
-// they have read to (or their joining) and than the last digest.
+// Counts the user's conversations that have live messages from other users
+// newer than both the user's read position (or join time) and the last digest.
 func (q *Queries) CountConversationsWithNewMessages(ctx context.Context, arg CountConversationsWithNewMessagesParams) (int64, error) {
 	row := q.db.QueryRowContext(ctx, countConversationsWithNewMessages, arg.UserID, arg.Since)
 	var count int64
@@ -51,7 +51,7 @@ type CountPostsSinceByTopicRow struct {
 	N       int64
 }
 
-// Others' live posts on the community's feed since a time, by topic (NULL for none).
+// Counts other users' live posts on the community's feed since a time, by topic (NULL for no topic).
 func (q *Queries) CountPostsSinceByTopic(ctx context.Context, arg CountPostsSinceByTopicParams) ([]CountPostsSinceByTopicRow, error) {
 	rows, err := q.db.QueryContext(ctx, countPostsSinceByTopic, arg.Root, arg.UserID, arg.Since)
 	if err != nil {
@@ -85,7 +85,7 @@ type CountRepliesSinceParams struct {
 	Since  int64
 }
 
-// Others' live comments on the person's posts since a time.
+// Counts other users' live comments on the user's posts since a time.
 func (q *Queries) CountRepliesSince(ctx context.Context, arg CountRepliesSinceParams) (int64, error) {
 	row := q.db.QueryRowContext(ctx, countRepliesSince, arg.UserID, arg.Since)
 	var count int64
@@ -129,7 +129,7 @@ type DeletePushSubscriptionParams struct {
 	UserID   interface{}
 }
 
-// A device is dropped by whoever owns it, or by the sender when the push service says it is gone.
+// A device subscription is deleted by its owner, or by the sender when the push service reports it as gone.
 func (q *Queries) DeletePushSubscription(ctx context.Context, arg DeletePushSubscriptionParams) error {
 	_, err := q.db.ExecContext(ctx, deletePushSubscription, arg.Endpoint, arg.UserID)
 	return err
@@ -154,9 +154,9 @@ type GetUserSettingParams struct {
 	Key    string
 }
 
-// What reaches a person away from the app (architecture.md, Notifications):
-// their own settings, the weekly digest's counts, and the devices they
-// asked to be notified on.
+// Notifications sent to a user outside the app (architecture.md,
+// Notifications). These queries cover the user's own settings, the weekly
+// digest's counts, and the devices the user subscribed for push.
 func (q *Queries) GetUserSetting(ctx context.Context, arg GetUserSettingParams) (string, error) {
 	row := q.db.QueryRowContext(ctx, getUserSetting, arg.UserID, arg.Key)
 	var value string
@@ -192,10 +192,11 @@ type ListDigestCandidatesRow struct {
 	Since    int64
 }
 
-// Who may be due a digest: in the community, a verified address, the digest
-// not turned off, not seen for a while and not written to for a while. The
-// handler decides the rest. since is where their feed reading stands, or
-// the last digest if that is later, so a week's counts are never repeated.
+// Users who may be due a digest. A candidate is in the community, has a
+// verified address, has not turned the digest off, has not been seen for a
+// while, and has not been sent a digest for a while. The handler decides the
+// rest. since is the user's feed read position, or the time of the last
+// digest if that is later, so a week's counts are never repeated.
 func (q *Queries) ListDigestCandidates(ctx context.Context, arg ListDigestCandidatesParams) ([]ListDigestCandidatesRow, error) {
 	rows, err := q.db.QueryContext(ctx, listDigestCandidates, arg.Root, arg.IdleBefore, arg.SentBefore)
 	if err != nil {
@@ -237,7 +238,7 @@ type ListJoinedSinceParams struct {
 	UserID string
 }
 
-// Who joined the community since a time, other than the person.
+// Users who joined the community since a time, excluding the user.
 func (q *Queries) ListJoinedSince(ctx context.Context, arg ListJoinedSinceParams) ([]string, error) {
 	rows, err := q.db.QueryContext(ctx, listJoinedSince, arg.Root, arg.Since, arg.UserID)
 	if err != nil {

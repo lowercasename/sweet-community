@@ -7,22 +7,26 @@ import { PostsPane } from './PostsPane'
 
 interface GroupViewProps {
   group: Group
-  /** Hidden behind another page, but kept mounted so drafts survive. */
+  /** True while the view is behind another page. The view stays mounted so drafts are kept. */
   hidden: boolean
-  /** The community's feed showing one topic (architecture.md, Topics). */
+  /** The topic that the community's feed is filtered to (architecture.md, Topics). */
   topicId?: string | null
 }
 
-/** What to call a group in the nav and at the top of its view: a conversation is its other person. */
+/**
+ * The label for a group in the nav and at the top of its view. A conversation
+ * is labelled with the other user's name.
+ */
 export function groupLabel(g: Group, me: User): string {
   if (g.kind !== 'dm') return g.name
   return (g.members ?? []).find((u) => u.id !== me.id)?.username ?? 'Just you'
 }
 
 /**
- * A group's panes: posts and chat side by side when its mode is both, drawn
- * exactly as the root group is; one pane across the whole width otherwise.
- * The bar above them (GroupBar) is Home's, since it outlives the view.
+ * A group's panes. When the group's mode is both, the posts and chat panes are
+ * shown side by side, laid out exactly as for the root group. Otherwise one
+ * pane takes the whole width. Home renders the bar above the panes (GroupBar),
+ * because the bar stays mounted after the view unmounts.
  */
 export function GroupView({ group, hidden, topicId = null }: GroupViewProps) {
   const { layout, narrow, ratio, setLayout, setRatio } = useLayout()

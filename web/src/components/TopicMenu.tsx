@@ -3,24 +3,27 @@ import { Menu, type MenuItem, type PillSize } from '../ui'
 
 interface TopicMenuProps {
   topics: Topic[]
-  /** The topic chosen, or null for none. */
+  /** The chosen topic's id, or null for no topic. */
   value: string | null
   onChange: (topicId: string | null) => void
-  /** What none is called in the list: "No topic" on a post, "Everything" in the bar. */
+  /** The label of the no-topic item in the list. It is "No topic" on a post and "Everything" in the bar. */
   noneLabel: string
-  /** What the trigger says while none is chosen, when that differs ("Set topic" beside Post). */
+  /**
+   * The trigger's text while no topic is chosen, when it differs from
+   * noneLabel. For example "Set topic" beside Post.
+   */
   emptyLabel?: string
   /** Accessible name of the trigger. */
   label: string
-  /** A control among controls (md, the default) or a label among content (sm). */
+  /** The pill size. `md`, the default, is a control among controls. `sm` is a label among content. */
   size?: PillSize
   disabled?: boolean
 }
 
 /**
- * The one menu of topics (architecture.md, Topics), wherever a topic is
- * chosen: at the head of the feed, beside Post, in the editor. Its trigger
- * is a pill reading the chosen topic's name, or what none is called.
+ * The single topic menu (architecture.md, Topics), used wherever a topic is
+ * chosen. That is at the top of the feed, beside Post, and in the editor. Its
+ * trigger is a pill showing the chosen topic's name, or the no-topic label.
  */
 export function TopicMenu({
   topics,

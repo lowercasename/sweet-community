@@ -2,17 +2,18 @@ import type { ReactNode } from 'react'
 
 interface NavBarProps {
   expanded: boolean
-  /** Top of the column: the wordmark. */
+  /** Content at the top of the column. This is the wordmark. */
   head: ReactNode
-  /** Bottom of the column: the account row and the expand control. */
+  /** Content at the bottom of the column. This is the account row and the expand control. */
   foot: ReactNode
   children?: ReactNode
 }
 
 /**
- * The vertical navigation column. Narrow shows icons; expanded adds labels.
- * On a short window the places and tools scroll between the wordmark and
- * the foot, which stay where they are: the column never outgrows the window.
+ * The vertical navigation column. When collapsed it shows icons only. When
+ * expanded it also shows labels. On a short window the items scroll between
+ * the head and the foot, which stay fixed, so the column never outgrows the
+ * window.
  */
 export function NavBar({ expanded, head, foot, children }: NavBarProps) {
   return (

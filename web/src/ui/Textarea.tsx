@@ -7,7 +7,7 @@ interface TextareaProps {
   rows?: number
   /** Enter (without Shift) calls this instead of inserting a newline. */
   onSubmit?: () => void
-  /** Escape. */
+  /** Called on Escape. */
   onCancel?: () => void
 }
 

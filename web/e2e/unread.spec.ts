@@ -3,13 +3,13 @@ import { expect, member, open, owner, test, uniq, view } from './helpers'
 const ROOT = '00000000-0000-7000-8000-000000000000'
 
 test.describe('chat unread', () => {
-  test('messages I have not seen count on their room in the nav, and clear when I look', async ({
+  test('unseen messages mark their room as unread in the nav, and the mark is cleared when the messages are viewed', async ({
     browser,
   }, testInfo) => {
     const kit = await member(browser, testInfo, 'kit')
     const mo = await member(browser, testInfo, 'mo')
     const boss = await owner(browser, testInfo)
-    // Kit is elsewhere: the root's chat is mounted behind People, not watched.
+    // Kit is on another page. The root group's chat is mounted behind People, but it is not being viewed.
     await open(kit.page, '/people')
     await open(mo.page)
     const nav = kit.page.getByRole('navigation', { name: 'Main' })
@@ -21,19 +21,20 @@ test.describe('chat unread', () => {
     const home = nav.getByRole('button', { name: 'Home, unread' })
     await expect(home).toBeVisible()
     await expect(home).not.toContainText('2')
-    // Mo's own words are not unread to mo.
+    // Mo's own messages are not unread for mo.
     await expect(
       mo.page.getByRole('navigation', { name: 'Main' }).getByRole('button', { name: 'Home', exact: true }),
     ).toBeVisible()
 
-    // Looking is reading, and it holds across a reload.
+    // Viewing the chat marks its messages read, and they stay read after a reload.
     await home.click()
     await expect(kit.page.getByText(second)).toBeVisible()
     await expect(nav.getByRole('button', { name: 'Home', exact: true })).toBeVisible()
     await kit.page.reload()
     await expect(nav.getByRole('button', { name: 'Home', exact: true })).toBeVisible()
 
-    // A room: joining counts from the join; a message after it counts; opening the room clears it.
+    // A room. Unread messages are counted from the time the user joined. A message sent after the join is unread,
+    // and opening the room clears it.
     const name = uniq('Wool')
     const room = await boss.context.request.post('/api/groups', { data: { kind: 'group', name, mode: 'both' } })
     const gid = ((await room.json()) as { id: string }).id
@@ -51,7 +52,8 @@ test.describe('chat unread', () => {
     await expect(kit.page.getByText(fresh)).toBeVisible()
     await expect(nav.getByRole('button', { name, exact: true })).toBeVisible()
 
-    // A post counts on the room too; folded, the posts rail carries it, and opening the pane reads it.
+    // A new post also marks the room as unread. While the posts pane is collapsed, the posts rail shows the dot,
+    // and opening the pane marks the post read.
     await kit.page.getByRole('separator', { name: 'Resize panes' }).focus()
     await kit.page.keyboard.press('Home')
     await expect(kit.page.getByRole('button', { name: 'Show posts', exact: true })).toBeVisible()
@@ -66,7 +68,7 @@ test.describe('chat unread', () => {
     await boss.context.close()
   })
 
-  test('@phone the Chat view carries a dot while the room has unread; the Home tab too, away from Home; the menu counts it', async ({
+  test('@phone unread messages show a dot on the Chat view button, on the Home tab while another page is open, and on Home in the menu', async ({
     browser,
   }, testInfo) => {
     const kit = await member(browser, testInfo, 'kit')
@@ -84,7 +86,7 @@ test.describe('chat unread', () => {
     await view(kit.page, 'Chat, unread').click()
     await expect(kit.page.getByText(word)).toBeVisible()
     await expect(view(kit.page, 'Chat')).toBeVisible()
-    // Read is read: going back to Posts does not bring the dot back, nor does a reload.
+    // Read messages stay read. Going back to Posts does not bring the dot back, and neither does a reload.
     await view(kit.page, 'Posts').click()
     await kit.page.waitForTimeout(1500)
     await expect(view(kit.page, 'Chat')).toBeVisible()
@@ -92,7 +94,7 @@ test.describe('chat unread', () => {
     await expect(view(kit.page, 'Chat')).toBeVisible()
     await tabs.getByRole('button', { name: 'Menu' }).click()
     await expect(kit.page.getByRole('button', { name: 'Home', exact: true }).first()).toBeVisible()
-    // Posts have their own dot in the bar, lit while I am on Chat.
+    // The Posts view button in the bar has its own dot, which is shown while the Chat view is open.
     await tabs.getByRole('button', { name: 'Home' }).click()
     await view(kit.page, 'Chat').click()
     await mo.context.request.post(`/api/groups/${ROOT}/posts`, { data: { body_html: `<p>${uniq('phone post ')}</p>` } })

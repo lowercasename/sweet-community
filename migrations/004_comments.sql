@@ -1,5 +1,5 @@
--- Flat comments under a post. Quote-replies are a blockquote in the body,
--- not a column: there is no tree.
+-- Flat comments under a post. A quote-reply is a blockquote in the body, not
+-- a column, so comments do not form a tree.
 CREATE TABLE comments (
     id         TEXT PRIMARY KEY,
     post_id    TEXT NOT NULL REFERENCES posts(id),

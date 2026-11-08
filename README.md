@@ -1,6 +1,6 @@
 # Sweet v2
 
-A small social network for one group: one feed of long posts, one chat room, side by side, run as one binary. Proof of concept.
+A small social network for one community. Each community has a feed of posts and a chat, private rooms with their own posts and chat, and private conversations between two people. One instance is one binary with one SQLite database.
 
 Design notes: `architecture.md`.
 
@@ -40,7 +40,7 @@ docker compose -f compose.proxied.yml pull
 docker compose -f compose.proxied.yml up -d
 ```
 
-Send the domain to that port from your proxy. It must pass `X-Forwarded-For` and `X-Forwarded-Proto`, which Caddy, nginx and Traefik do by default. In a Caddyfile:
+Configure your proxy to forward requests for the domain to that port. The proxy must set `X-Forwarded-For` and `X-Forwarded-Proto`. Caddy, nginx and Traefik set both by default. In a Caddyfile:
 
 ```
 sweet.example.org {
@@ -54,7 +54,7 @@ If your proxy is itself a container, it cannot reach `127.0.0.1`. Set `SWEET_BIN
 
 Fill in the `SWEET_SMTP_` settings and `SWEET_MAIL_FROM` in `.env`, then `docker compose up -d`. For Mailgun: host `smtp.mailgun.org` (`smtp.eu.mailgun.org` for an EU domain), port `587`, and the user and password from the domain's SMTP credentials. The from-address must be on a domain the provider lets you send from.
 
-Until then, every email Sweet would have sent is a file in the data volume. `docker compose exec sweet ls /data/mail` lists them and `docker compose exec sweet cat /data/mail/<file>` shows one.
+Without SMTP settings, Sweet writes each email to a file in the data volume instead of sending it. `docker compose exec sweet ls /data/mail` lists them and `docker compose exec sweet cat /data/mail/<file>` shows one.
 
 ### The bucket: images and backups
 
@@ -81,7 +81,7 @@ docker compose pull
 docker compose up -d
 ```
 
-`git pull` brings any change to the compose files, and `docker compose pull` the new image. Before changing the database's structure, Sweet keeps a copy of it beside it in the volume as `sweet.db.before-upgrade`. Open tabs reload themselves.
+`git pull` updates the compose files, and `docker compose pull` downloads the new image. Before a migration changes the database schema, Sweet copies the database to `sweet.db.before-upgrade` in the same volume. Open browser tabs reload automatically when the new version starts.
 
 ### Restoring
 
@@ -120,14 +120,18 @@ Backend: `go test ./...`. After changing a query or migration, `make generate` (
 cmd/sweet/          main. migrations/ is copied here by make (go:embed can't reach ../)
 deploy/             the compose stack: compose.yml (with Caddy), compose.proxied.yml, the Caddyfile,
                     Litestream's config and the container's entrypoint. Dockerfile is at the root
-internal/auth       password hashing, tokens, username rules
-internal/db         SQLite open (WAL, busy_timeout, BEGIN IMMEDIATE), migrations
-internal/store      sqlc: queries/*.sql in, typed Go out (make generate, never edit the .go files)
-internal/sanitize   the one bluemonday policy every body passes through
+internal/api        HTTP handlers, wire shapes (wire.go) and their tests
+internal/auth       password hashing, tokens, username and email validation
+internal/db         SQLite open (WAL, busy_timeout, BEGIN IMMEDIATE) and migrations
+internal/digest     the weekly email digest
 internal/events     event log, in-process pub/sub, SSE handler
-internal/images     upload processing (magic bytes in, bounded JPEG/PNG out) and storage drivers (local dir, S3/R2)
-internal/api        handlers: sessions and invites (auth.go, invites.go), posts, messages, users. Tests in api_test.go
-internal/version    the binary's name: a hash of its own bytes, sent first on the stream
+internal/images     upload processing (checks magic bytes, writes bounded JPEG/PNG) and storage (local directory or S3/R2)
+internal/mail       the email template and the SMTP or file sender
+internal/perm       permission rules: who may do what
+internal/push       web push notifications
+internal/sanitize   the bluemonday policy that every body passes through, and text extraction
+internal/store      sqlc: queries/*.sql are the input, typed Go is generated (make generate, never edit the .go files)
+internal/version    the binary's version: a hash of its own bytes, sent first on the event stream
 internal/web        embeds the frontend build
 migrations/         *.sql, forward-only
 web/                React + TipTap. See web/README.md

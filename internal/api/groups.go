@@ -18,32 +18,36 @@ import (
 	"sweet/internal/store"
 )
 
-// Group is the wire shape of a group as one viewer sees it: with their role
-// in it and what they may do to it (architecture.md, Groups).
+// Group is the wire shape of a group as one viewer sees it. It includes the
+// viewer's role in the group and the actions they may perform on it
+// (architecture.md, Groups).
 type Group struct {
 	ID   string `json:"id"`
 	Kind string `json:"kind"`
 	Name string `json:"name"`
-	// Mode is the group's one setting: posts, chat or both. A DM is chat.
+	// Mode is the group's only setting. It is posts, chat or both. A DM is always chat.
 	Mode      string `json:"mode"`
 	CreatedAt int64  `json:"created_at"`
-	// Picture is the room's picture's url, or null for the tile with its initial.
+	// Picture is the URL of the room's picture, or null when the tile with the room's initial is shown.
 	Picture *string `json:"picture"`
-	// LastMessageAt is the time of the group's newest live message, or null:
-	// computed on the way out, never stored, so the Messages page can order
-	// DMs by latest activity (architecture.md, Layout).
+	// LastMessageAt is the time of the group's newest live message, or null.
+	// It is computed when the response is built and never stored. The
+	// Messages page uses it to order DMs by latest activity (architecture.md,
+	// Layout).
 	LastMessageAt *int64   `json:"last_message_at"`
 	Role          string   `json:"role,omitempty"`
 	Can           GroupCan `json:"can"`
-	// Members is set for a DM only: a DM is named by its people, present or away.
+	// Members is set for a DM only. A DM is named after its members, whether
+	// or not they have hidden it.
 	Members []User `json:"members,omitempty"`
-	// HiddenAt is set while the viewer has hidden this conversation: it is
-	// listed for them under Hidden, and nothing else of it is.
+	// HiddenAt is set while the viewer has hidden this conversation. The
+	// conversation is then listed for them under Hidden and nowhere else.
 	HiddenAt *int64 `json:"hidden_at,omitempty"`
 }
 
-// GroupCan is what the viewer may do to a group. CreateGroups is meaningful
-// on the root group only: it carries the instance's group_creation setting.
+// GroupCan holds the actions the viewer may perform on a group. CreateGroups
+// is meaningful on the root group only. It reflects the instance's
+// group_creation setting.
 type GroupCan struct {
 	AddMembers    bool `json:"add_members"`
 	RemoveMembers bool `json:"remove_members"`
@@ -54,17 +58,18 @@ type GroupCan struct {
 	Delete        bool `json:"delete"`
 	Leave         bool `json:"leave"`
 	CreateGroups  bool `json:"create_groups,omitempty"`
-	// ManageInstance is meaningful on the root group only: the owner edits instance settings.
+	// ManageInstance is meaningful on the root group only. The owner may edit instance settings.
 	ManageInstance bool `json:"manage_instance,omitempty"`
 }
 
-// Settings is the instance's settings on the wire (architecture.md, Feature
-// flags; Admin tools): what the owner sets about the community, read by
-// everyone, signed in or not, since the sign-in and join pages wear its name.
-// OwnerSet is state, not a setting: false until the setup link has been used.
+// Settings is the wire shape of the instance's settings (architecture.md,
+// Feature flags, Admin tools). The owner sets them. Everyone can read them,
+// signed in or not, because the sign-in and join pages show the community's
+// name. OwnerSet is state rather than a setting. It is false until the setup
+// link has been used.
 type Settings struct {
 	GroupCreation string `json:"group_creation"`
-	// Name is the community's; empty until the owner has named it, which is onboarding.
+	// Name is the community's name. It is empty until the owner sets it during onboarding.
 	Name        string `json:"name"`
 	Description string `json:"description"`
 	OwnerSet    bool   `json:"owner_set"`
@@ -115,13 +120,13 @@ func settingsOf(ctx context.Context, q *store.Queries) (Settings, error) {
 	return st, nil
 }
 
-// Membership is one person's place in a group.
+// Membership is one user's membership of a group.
 type Membership struct {
 	GroupID  string `json:"group_id"`
 	User     User   `json:"user"`
 	Role     string `json:"role"`
 	JoinedAt int64  `json:"joined_at"`
-	// HiddenAt is set while this person has hidden a conversation; sent to that person only.
+	// HiddenAt is set while this user has hidden a conversation. It is sent to that user only.
 	HiddenAt *int64 `json:"hidden_at"`
 }
 
@@ -129,7 +134,7 @@ func groupFor(a perm.Actor, g Group, st Settings) Group {
 	pg := perm.Group{Kind: g.Kind}
 	g.Role = a.Role
 	g.Can = GroupCan{
-		// In the root group adding is an invite link and nobody is removed (member removal comes with admin tools); nobody is added to a conversation.
+		// In the root group, members are added by invite link and nobody is removed (member removal comes with admin tools). Nobody is added to a conversation.
 		AddMembers:    perm.AddMembers(a, pg),
 		RemoveMembers: perm.RemoveMembers(a) && g.Kind == perm.KindGroup,
 		SetRoles:      a.Role == perm.Owner,
@@ -146,8 +151,8 @@ func groupFor(a perm.Actor, g Group, st Settings) Group {
 	return g
 }
 
-// actorIn is the user as perm sees them in one group: their role there, or
-// none. Not being a member is not an error; it is an answer.
+// actorIn returns the user's Actor in one group, with their role there or no
+// role. Not being a member is a valid result, not an error.
 func actorIn(ctx context.Context, q *store.Queries, u User, groupID string) (perm.Actor, error) {
 	row, err := q.GetMembership(ctx, store.GetMembershipParams{GroupID: groupID, UserID: u.ID})
 	if errors.Is(err, sql.ErrNoRows) {
@@ -159,9 +164,9 @@ func actorIn(ctx context.Context, q *store.Queries, u User, groupID string) (per
 	return perm.Actor{ID: u.ID, Role: row.Role}, nil
 }
 
-// requireGroup is requireAuth plus membership of the group in the path. A
-// non-member gets 404, never 403: to them the group does not exist. The
-// group and the actor go in the context.
+// requireGroup is requireAuth plus a membership check for the group in the
+// path. A non-member gets 404, never 403, so that the group's existence is
+// not revealed. The group and the actor are put in the context.
 func (s *Server) requireGroup(next http.HandlerFunc) http.HandlerFunc {
 	return s.requireAuth(func(w http.ResponseWriter, r *http.Request) {
 		me, _ := userFrom(r.Context())
@@ -212,7 +217,7 @@ func (s *Server) listGroups(w http.ResponseWriter, r *http.Request) {
 	}
 	out := make([]Group, 0, len(rows))
 	for _, row := range rows {
-		// The list's row is the group's row plus my role; TestRepliesAndEventsMatchTheRow holds list and fetch to the same shape.
+		// The list row is the group row plus the viewer's role. TestRepliesAndEventsMatchTheRow checks that list and fetch produce the same shape.
 		g, err := wireGroup(r.Context(), s.q(), store.GetGroupRow{ID: row.ID, Kind: row.Kind, Name: row.Name, Mode: row.Mode, CreatedAt: row.CreatedAt, PictureID: row.PictureID, LastMessageAt: row.LastMessageAt})
 		if err != nil {
 			writeErr(w, http.StatusInternalServerError, err.Error())
@@ -229,9 +234,10 @@ func (s *Server) getGroup(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, g)
 }
 
-// createGroup makes a named group with the caller as owner, or a DM: an
-// unnamed group of the caller and the given people, all equals. A DM with
-// exactly those people already is answered with that one (200, not 201).
+// createGroup creates a named group with the caller as owner, or a DM, which
+// is an unnamed group of the caller and the given users with equal roles.
+// When a DM with exactly those users already exists, it is returned with 200
+// instead of 201.
 func (s *Server) createGroup(w http.ResponseWriter, r *http.Request) {
 	var in struct {
 		Kind    string   `json:"kind"`
@@ -280,7 +286,7 @@ func (s *Server) createGroup(w http.ResponseWriter, r *http.Request) {
 		for _, id := range in.Members {
 			people[id] = true
 		}
-		// A conversation is two people (architecture.md, Groups); more is a room.
+		// A conversation has two members (architecture.md, Groups). A group with more is a room.
 		if len(people) != 2 {
 			writeErr(w, http.StatusBadRequest, "A conversation is between two people. For more people, make a room.")
 			return
@@ -295,11 +301,12 @@ func (s *Server) createGroup(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// openConversation is the conversation of exactly these two people
-// (architecture.md, Groups): one per pair, keyed by the sorted ids, found or
-// made inside one transaction so two openings cannot make two. The viewer
-// is one of them; having hidden it, it shows again, which is a membership
-// event. The reply is the group, 200 found or 201 made.
+// openConversation returns the conversation of exactly these two users
+// (architecture.md, Groups). There is one per pair, keyed by the sorted ids.
+// It is found or created inside one transaction, so two concurrent requests
+// cannot create two. The viewer is one of the two. If the viewer had hidden
+// the conversation, it is unhidden, which produces a membership event. The
+// response is the group, with 200 when found or 201 when created.
 func (s *Server) openConversation(w http.ResponseWriter, r *http.Request, me User, people []string, now int64) {
 	sort.Strings(people)
 	key := sql.NullString{String: strings.Join(people, ","), Valid: true}
@@ -370,8 +377,9 @@ func (s *Server) openConversation(w http.ResponseWriter, r *http.Request, me Use
 
 func validMode(m string) bool { return m == perm.ModePosts || m == perm.ModeChat || m == perm.ModeBoth }
 
-// The reply and the events are read back from the rows after the writes;
-// loggedMany personalises the reply for the creator's role in the new group.
+// createGroupWith creates a group and its memberships. The response and the
+// events are read back from the rows after the writes. loggedMany
+// personalises the response for the creator's role in the new group.
 func (s *Server) createGroupWith(w http.ResponseWriter, r *http.Request, kind, name, mode string, now int64, people map[string]string) {
 	id, err := uuid.NewV7()
 	if err != nil {
@@ -393,7 +401,7 @@ func (s *Server) createGroupWith(w http.ResponseWriter, r *http.Request, kind, n
 				return nil, nil, http.StatusInternalServerError, err
 			}
 		}
-		// Written; now read back what was written, and that is what everyone receives.
+		// Read back the written rows. The response and the events are built from them.
 		row, err := qtx.GetGroup(r.Context(), gid)
 		if err != nil {
 			return nil, nil, http.StatusInternalServerError, err
@@ -414,9 +422,10 @@ func (s *Server) createGroupWith(w http.ResponseWriter, r *http.Request, kind, n
 	})
 }
 
-// setGroupPicture points a room's picture at an uploaded image, or back at
-// its initial with a null image_id. The owner's call, as renaming is
-// (perm.Rename); a conversation has no picture, it is its other person.
+// setGroupPicture sets a room's picture to an uploaded image, or resets it to
+// the room's initial with a null image_id. Only the owner may, as with
+// renaming (perm.Rename). A conversation has no picture of its own. It shows
+// the other member's picture.
 func (s *Server) setGroupPicture(w http.ResponseWriter, r *http.Request) {
 	var in struct {
 		ImageID *string `json:"image_id"`
@@ -453,7 +462,7 @@ func (s *Server) setGroupPicture(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// updateGroup sets a group's name and its mode (perm.Rename, perm.SetMode).
+// updateGroup sets a group's name and mode (perm.Rename, perm.SetMode).
 func (s *Server) updateGroup(w http.ResponseWriter, r *http.Request) {
 	var in struct {
 		Name *string `json:"name"`
@@ -530,7 +539,7 @@ func (s *Server) listMembers(w http.ResponseWriter, r *http.Request) {
 	out := make([]Membership, 0, len(rows))
 	for _, row := range rows {
 		m := wireMembership(g.ID, store.GetMemberRow(row))
-		// Whether someone has hidden a conversation is their business alone.
+		// Whether a user has hidden a conversation is sent to that user only.
 		if m.User.ID != viewer.ID {
 			m.HiddenAt = nil
 		}
@@ -572,7 +581,7 @@ func (s *Server) addMember(w http.ResponseWriter, r *http.Request) {
 		}
 		m := wireMembership(g.ID, row)
 		entries := []events.Entry{{Kind: "membership", Payload: m}}
-		// The one added hears about it (architecture.md, Notifications); the membership event alone makes no sound.
+		// The added user is notified (architecture.md, Notifications). The membership event alone does not produce a notification.
 		if told, err := notify(r, qtx, NotifyAdded, in.UserID, a.ID, g.ID, nil, now); err != nil {
 			return nil, nil, http.StatusInternalServerError, err
 		} else if told != nil {
@@ -582,7 +591,8 @@ func (s *Server) addMember(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// setMemberRole: the group's owner makes someone a member or a moderator.
+// setMemberRole lets the group's owner set a member's role to member or
+// moderator, or transfer ownership.
 func (s *Server) setMemberRole(w http.ResponseWriter, r *http.Request) {
 	var in struct {
 		Role string `json:"role"`
@@ -608,13 +618,13 @@ func (s *Server) setMemberRole(w http.ResponseWriter, r *http.Request) {
 		if !perm.CanSee(target) {
 			return nil, nil, http.StatusNotFound, errors.New("Not a member")
 		}
-		// member reads a membership back after its role was written: the same row, new role, joined time intact.
+		// member reads a membership back after its role was written. It is the same row with the new role and the original joined time.
 		member := func(userID string) (Membership, error) {
 			row, err := qtx.GetMember(r.Context(), store.GetMemberParams{GroupID: g.ID, UserID: userID})
 			return wireMembership(g.ID, row), err
 		}
 		if in.Role == perm.Owner {
-			// Handing over: the target becomes owner, the owner a moderator. Two memberships change.
+			// Ownership transfer. The target becomes owner and the current owner becomes a moderator. Two memberships change.
 			if !perm.Transfer(a, target) {
 				return nil, nil, http.StatusForbidden, errors.New("Not allowed")
 			}
@@ -648,8 +658,9 @@ func (s *Server) setMemberRole(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// removeMember: staff remove anyone but the owner; anyone may remove
-// themselves, which is leaving. Neither applies to the root group.
+// removeMember lets staff remove any member except the owner, and lets any
+// member remove themselves, which is leaving. Neither applies to the root
+// group.
 func (s *Server) removeMember(w http.ResponseWriter, r *http.Request) {
 	g, a := groupFrom(r.Context())
 	uid := r.PathValue("uid")
@@ -673,8 +684,9 @@ func (s *Server) removeMember(w http.ResponseWriter, r *http.Request) {
 			return nil, nil, http.StatusForbidden, errors.New("Not allowed")
 		}
 		if g.Kind == perm.KindDM {
-			// Hiding a conversation: the row stays, hidden_at is set, and opening the
-			// conversation again shows it (architecture.md, Groups).
+			// Leaving a conversation hides it. The membership row remains, hidden_at
+			// is set, and opening the conversation again unhides it (architecture.md,
+			// Groups).
 			if err := qtx.HideMembership(r.Context(), store.HideMembershipParams{HiddenAt: sql.NullInt64{Int64: db.Now(), Valid: true}, GroupID: g.ID, UserID: uid}); err != nil {
 				return nil, nil, http.StatusInternalServerError, err
 			}
@@ -682,7 +694,7 @@ func (s *Server) removeMember(w http.ResponseWriter, r *http.Request) {
 			if err != nil {
 				return nil, nil, http.StatusInternalServerError, err
 			}
-			// The reply is the membership too, so the hider's own page lists the conversation under Hidden at once.
+			// The response is the membership too, so the user's own page lists the conversation under Hidden immediately.
 			mm := wireMembership(g.ID, m)
 			return []events.Entry{{Kind: "membership", Payload: mm}}, mm, http.StatusOK, nil
 		}
@@ -691,7 +703,7 @@ func (s *Server) removeMember(w http.ResponseWriter, r *http.Request) {
 		}
 		gone := map[string]string{"group_id": g.ID, "user_id": uid}
 		entries := []events.Entry{{Kind: "membership_delete", Payload: gone}}
-		// The last one out turns off the lights: an empty group is deleted.
+		// A group whose last member leaves is deleted.
 		if n, err := qtx.CountMembers(r.Context(), g.ID); err != nil {
 			return nil, nil, http.StatusInternalServerError, err
 		} else if n == 0 {
@@ -705,9 +717,9 @@ func (s *Server) removeMember(w http.ResponseWriter, r *http.Request) {
 }
 
 // events is the SSE endpoint, filtered and personalised for the signed-in
-// viewer (architecture.md, Realtime). The connection keeps the viewer's
-// role per group, updated by their own membership events, so an event for
-// a group they are not in is never written.
+// viewer (architecture.md, Realtime). The connection tracks the viewer's
+// role in each group and updates it from the viewer's own membership events,
+// so an event for a group they are not in is never written.
 func (s *Server) events(w http.ResponseWriter, r *http.Request) {
 	viewer, _ := userFrom(r.Context())
 	rows, err := s.q().ListMyGroups(r.Context(), viewer.ID)
@@ -731,7 +743,8 @@ func (s *Server) events(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// getSettings and setSettings: the instance's settings, the root owner's.
+// getSettings and setSettings read and write the instance's settings. Only
+// the root group's owner may write them.
 func (s *Server) getSettings(w http.ResponseWriter, r *http.Request) {
 	st, err := s.settings(r.Context())
 	if err != nil {
@@ -772,13 +785,13 @@ func (s *Server) setSettings(w http.ResponseWriter, r *http.Request) {
 				return nil, http.StatusInternalServerError, err
 			}
 		}
-		// What the row says, which is what everyone else receives.
+		// Read the settings back from the rows. The event payload is built from them.
 		st, err := settingsOf(r.Context(), qtx)
 		return st, http.StatusOK, err
 	})
 }
 
-// filterEvent decides whether one viewer gets one event, and personalises it.
+// filterEvent decides whether one viewer receives one event, and personalises it.
 func filterEvent(viewer User, roles map[string]string, st *Settings, e events.Event) (events.Event, bool) {
 	inGroup := func(gid string) (perm.Actor, bool) {
 		role, ok := roles[gid]
@@ -851,7 +864,8 @@ func filterEvent(viewer User, roles map[string]string, st *Settings, e events.Ev
 			return e, false
 		}
 		if m.User.ID == viewer.ID {
-			// My own: in, or hidden. Either way I hear it.
+			// The viewer's own membership, either joined or hidden. The viewer
+			// receives it in both cases.
 			if m.HiddenAt != nil {
 				delete(roles, m.GroupID)
 			} else {
@@ -859,7 +873,7 @@ func filterEvent(viewer User, roles map[string]string, st *Settings, e events.Ev
 			}
 			return e, true
 		}
-		// Someone else hiding a conversation is their business alone.
+		// Another user hiding a conversation is sent to that user only.
 		if m.HiddenAt != nil {
 			return e, false
 		}
@@ -887,13 +901,13 @@ func filterEvent(viewer User, roles map[string]string, st *Settings, e events.Ev
 		}
 		return e, true
 	case "notification", "notification_delete", "marker":
-		// Mine alone: a notification is for its person, a marker is where they have read to.
+		// Sent to the owning user only. A notification belongs to its recipient, and a marker records how far its user has read.
 		var own struct {
 			UserID string `json:"user_id"`
 		}
 		return e, json.Unmarshal(e.Payload, &own) == nil && own.UserID == viewer.ID
 	default:
-		// user, and anything instance-wide: everyone on the instance sees it.
+		// A user event, or any other instance-wide event, is sent to every user on the instance.
 		return e, true
 	}
 }

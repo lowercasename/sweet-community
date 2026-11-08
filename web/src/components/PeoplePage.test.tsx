@@ -4,9 +4,10 @@ import { cleanup, fireEvent, screen, within } from '@testing-library/react'
 import { ROOT, group, member, renderWithQuery, user } from '../test-utils'
 
 /**
- * The root group's owner assigns roles from the People page: member or
- * moderator, for anyone but themselves. What they may do comes from the
- * root group's can flags, never from a role check here.
+ * The root group's owner assigns roles from the People page. The roles are
+ * member and moderator, and the owner can assign them to any user except
+ * themselves. The allowed actions come from the root group's can flags, never
+ * from a role check in the component.
  */
 vi.mock('../api', () => ({
   getMe: vi.fn(() => Promise.resolve({ id: 'raphael', username: 'raphael', picture: null })),
@@ -35,7 +36,7 @@ beforeEach(async () => {
 const rowOf = (name: string) => screen.getByText(name).closest('li')!
 
 describe('PeoplePage', () => {
-  it('starts a DM from a person, never from myself', async () => {
+  it('starts a DM with another user, never with the viewer', async () => {
     const { openDM } = await import('../api')
     const { dm } = await import('../test-utils')
     vi.mocked(openDM).mockResolvedValue(dm('d1', [user('kit'), user('raphael')]))
@@ -49,13 +50,14 @@ describe('PeoplePage', () => {
     await vi.waitFor(() => expect(onOpenGroup).toHaveBeenCalledWith('d1'))
   })
 
-  it('lets the owner promote and demote anyone but themselves', async () => {
+  it('lets the owner promote and demote any user except themselves', async () => {
     const { setMemberRole } = await import('../api')
     const { PeoplePage } = await import('./PeoplePage')
     renderWithQuery(<PeoplePage me={user('raphael')} root={group(ROOT, 'owner')} onOpenGroup={() => {}} />)
     await screen.findByText('mo')
     expect(within(rowOf('raphael')).queryByRole('button', { name: /Message|Options/ })).toBeNull()
-    // A role change refetches the list, since who may remove whom moves with it; the server would answer with the new role.
+    // A role change refetches the list, because it changes which users can remove which others. The server would
+    // respond with the new role.
     const { listUsers } = await import('../api')
     vi.mocked(listUsers).mockResolvedValue({
       users: [member('raphael', 'owner'), member('kit', 'moderator', true), member('mo', 'moderator', true)],
@@ -71,7 +73,7 @@ describe('PeoplePage', () => {
     expect(setMemberRole).toHaveBeenCalledWith(ROOT, 'mo', 'member')
   })
 
-  it('offers Remove where the server says so, never on myself, and removes after a confirm', async () => {
+  it('offers Remove where the server allows it, never for the viewer, and removes after a confirmation', async () => {
     const { removeUser } = await import('../api')
     const { PeoplePage } = await import('./PeoplePage')
     renderWithQuery(<PeoplePage me={user('raphael')} root={group(ROOT, 'owner')} onOpenGroup={() => {}} />)
@@ -84,7 +86,7 @@ describe('PeoplePage', () => {
     expect(within(dialog).getByText('Remove kit from this community?')).toBeTruthy()
     fireEvent.click(within(dialog).getByRole('button', { name: 'Remove' }))
     expect(removeUser).toHaveBeenCalledWith('kit')
-    // Gone from the list at once.
+    // The user is removed from the list immediately.
     await vi.waitFor(() => expect(screen.queryByText('kit')).toBeNull())
   })
 
@@ -93,7 +95,7 @@ describe('PeoplePage', () => {
     renderWithQuery(<PeoplePage me={user('mo')} root={group(ROOT, 'moderator')} onOpenGroup={() => {}} />)
     await screen.findByText('kit')
     expect(screen.getByText('Invite someone')).toBeTruthy()
-    // A moderator may remove a member, not set roles: the row's menu holds Remove alone.
+    // A moderator can remove a member but cannot set roles. The row's menu contains only Remove.
     fireEvent.click(screen.getByRole('button', { name: 'Options for kit' }))
     expect(screen.getAllByRole('menuitem').map((b) => b.textContent)).toEqual(['Remove'])
   })

@@ -5,8 +5,9 @@ import { ROOT, group, paragraph, post, renderWithQuery, user } from '../test-uti
 import type { Profile } from '../api'
 
 /**
- * A person's page (architecture.md, Accounts): who they are, a bio they
- * alone edit, a way to message them, and their posts from the rooms I share.
+ * A user's profile page (architecture.md, Accounts). It shows the user's
+ * details, a bio that only they can edit, a Message button, and their posts
+ * from the groups the viewer shares with them.
  */
 vi.mock('../api', async (importOriginal) => ({
   ApiError: (await importOriginal<typeof import('../api')>()).ApiError,
@@ -55,7 +56,7 @@ async function draw(name = 'kit') {
 }
 
 describe('ProfilePage', () => {
-  it("shows who they are, their bio, Message, and their posts with each post's room", async () => {
+  it("shows the user's details, their bio, Message, and their posts with each post's group", async () => {
     const { openDM } = await import('../api')
     vi.mocked(openDM).mockResolvedValue(group('d1', 'member', { kind: 'dm' }))
     const onGo = await draw()
@@ -73,7 +74,7 @@ describe('ProfilePage', () => {
     await vi.waitFor(() => expect(onGo).toHaveBeenCalledWith('/r/d1'))
   })
 
-  it('on my own page: edit the bio, and Settings is here', async () => {
+  it("on the viewer's own profile, lets the viewer edit the bio and links to Settings", async () => {
     const { getProfile, setBio } = await import('../api')
     vi.mocked(getProfile).mockResolvedValue(profile(raphael, { bio_html: '', can: { edit: true } }))
     vi.mocked(setBio).mockResolvedValue(profile(raphael, { bio_html: paragraph('Hello'), can: { edit: true } }))
@@ -86,10 +87,10 @@ describe('ProfilePage', () => {
     expect(onGo).toHaveBeenCalledWith('/settings')
   })
 
-  it('says so when there is nobody of that name', async () => {
+  it('shows a not-found message when no user has that name', async () => {
     const { getProfile, ApiError } = await import('../api')
     vi.mocked(getProfile).mockRejectedValue(new ApiError(404, 'no such person'))
     await draw('nobody')
-    await screen.findByText(/nobody here by that name/)
+    await screen.findByText(/no user with that name/)
   })
 })

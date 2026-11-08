@@ -1,6 +1,6 @@
-// Package api holds the HTTP handlers: sessions and invites, posts, comments,
-// chat messages, the event stream. Everything but sign-in, join and healthz
-// requires a session (see auth.go). SQL lives in internal/store (sqlc).
+// Package api holds the HTTP handlers for sessions, invites, posts, comments,
+// chat messages and the event stream. Every endpoint except sign-in, join and
+// healthz requires a session (see auth.go). SQL is in internal/store (sqlc).
 package api
 
 import (
@@ -28,25 +28,27 @@ import (
 type User struct {
 	ID       string `json:"id"`
 	Username string `json:"username"`
-	// Picture is the avatar's url, or null for the donut.
+	// Picture is the URL of the user's picture, or null when the default
+	// donut avatar is shown.
 	Picture *string `json:"picture"`
 }
 
-// Can is what the requesting user may do to a resource, computed by perm on
-// the way out. The frontend shows controls from these and holds no rules.
+// Can holds the actions the requesting user may perform on a resource. It is
+// computed by perm when the response is built. The frontend shows controls
+// based on these flags and holds no rules of its own.
 type Can struct {
 	Edit   bool `json:"edit"`
 	Delete bool `json:"delete"`
-	// SetTopic is a post's alone (architecture.md, Topics): the author or the root staff file it.
+	// SetTopic is set only on a post (architecture.md, Topics). The author or the root group's staff may set its topic.
 	SetTopic bool `json:"set_topic,omitempty"`
 }
 
-// Post is the wire shape. It carries no event sequence: the SSE "id:" line
-// is the sequence, and the feed paginates by created_at.
+// Post is the wire shape of a post. It carries no event sequence, because the
+// SSE "id:" line is the sequence and the feed paginates by created_at.
 type Post struct {
 	ID      string `json:"id"`
 	GroupID string `json:"group_id"`
-	// TopicID is the topic the post is filed under, or null (architecture.md, Topics).
+	// TopicID is the id of the post's topic, or null (architecture.md, Topics).
 	TopicID      *string `json:"topic_id"`
 	Author       User    `json:"author"`
 	BodyHTML     string  `json:"body_html"`
@@ -58,8 +60,8 @@ type Post struct {
 }
 
 // forViewer fills in the viewer's can flags on a post, comment, message or
-// group, given the viewer as perm sees them in that thing's group. Anything
-// else passes through. Used on every response and on the stream.
+// group. a is the viewer's Actor in that resource's group. Any other value is
+// returned unchanged. It is used on every response and on the stream.
 func forViewer(a perm.Actor, v any, st Settings) any {
 	switch x := v.(type) {
 	case *Group:
@@ -86,8 +88,9 @@ func forViewer(a perm.Actor, v any, st Settings) any {
 	return v
 }
 
-// groupIDOf is the group a logged resource belongs to, for personalising a
-// reply to the actor; "" for things that are not in a group.
+// groupIDOf returns the id of the group a logged resource belongs to, which is
+// used to personalise the response for the actor. It returns "" for a resource
+// that is not in a group.
 func groupIDOf(v any) string {
 	switch x := v.(type) {
 	case *Post:
@@ -105,24 +108,25 @@ func groupIDOf(v any) string {
 type Server struct {
 	DB  *sql.DB
 	Hub *events.Hub
-	// Images is nil when no storage is configured; uploads then 501.
+	// Images is nil when no storage is configured. Uploads then return 501.
 	Images images.Store
-	// Mail sends verification and reset links; BaseURL is where they point.
+	// Mail sends verification and reset links. BaseURL is the URL they point to.
 	Mail    mail.Sender
 	BaseURL string
-	// TrustProxy: requests come through a reverse proxy that sets
-	// X-Forwarded-For, and its first address is the client's.
+	// TrustProxy means requests come through a reverse proxy that sets
+	// X-Forwarded-For, and the first address in that header is the client's.
 	TrustProxy bool
-	// Push tells a person's devices of a mention or a reply (architecture.md,
-	// Notifications); nil when push is not set up. PushKey is the public VAPID key.
+	// Push sends a push notification to a user's devices for a mention or a
+	// reply (architecture.md, Notifications). It is nil when push is not set
+	// up. PushKey is the public VAPID key.
 	Push    *push.Pusher
 	PushKey string
 
 	limiter loginLimiter
-	// mailLimiter paces the endpoints that send a link to any address asked for.
+	// mailLimiter rate-limits the endpoints that send a link to any requested address.
 	mailLimiter loginLimiter
-	// registerLimiter limits guessing at invite codes. Like the login limiter, it
-	// is charged only for a failed attempt (a bad code), never for a successful
+	// registerLimiter rate-limits attempts to guess invite codes. Like the login
+	// limiter, it counts only a failed attempt (a bad code), never a successful
 	// registration.
 	registerLimiter loginLimiter
 }
@@ -137,8 +141,9 @@ func nullInt(v sql.NullInt64) *int64 {
 }
 
 // EnsureOwner makes sure the instance has its owner account. On first run it
-// creates the user; whenever the owner has no password yet and one is given,
-// it sets it. A password given later is ignored: change it in the app.
+// creates the user. When the owner has no password yet and one is given, it
+// sets the password. A password given after that is ignored, and the owner
+// changes it in the app.
 func EnsureOwner(ctx context.Context, d *sql.DB, username, password string) (User, error) {
 	q := store.New(d)
 	u := User{Username: username}
@@ -184,7 +189,7 @@ func EnsureOwner(ctx context.Context, d *sql.DB, username, password string) (Use
 func (s *Server) Routes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, r *http.Request) { io.WriteString(w, "ok") })
 
-	// Public: the way in.
+	// Public endpoints for signing in and registering.
 	mux.HandleFunc("POST /api/login", s.login)
 	mux.HandleFunc("GET /api/invites/{code}", s.getInvite)
 	mux.HandleFunc("POST /api/register", s.register)
@@ -194,7 +199,7 @@ func (s *Server) Routes(mux *http.ServeMux) {
 	mux.HandleFunc("POST /api/reset", s.requestReset)
 	mux.HandleFunc("POST /api/reset/{token}", s.resetPassword)
 
-	// Members.
+	// Endpoints that require a session.
 	mux.HandleFunc("GET /api/me", s.requireAuth(s.me))
 	mux.HandleFunc("GET /api/me/account", s.requireAuth(s.getAccount))
 	mux.HandleFunc("PUT /api/me/email", s.requireAuth(s.changeEmail))
@@ -247,19 +252,19 @@ func (s *Server) Routes(mux *http.ServeMux) {
 	mux.HandleFunc("PUT /api/notifications/{id}/read", s.requireAuth(s.readNotification))
 	mux.HandleFunc("GET /api/markers", s.requireAuth(s.listMarkers))
 	mux.HandleFunc("PUT /api/markers/{stream}", s.requireAuth(s.setMarker))
-	mux.HandleFunc("GET /api/settings", s.getSettings) // public: the sign-in page wears the name
+	mux.HandleFunc("GET /api/settings", s.getSettings) // public, because the sign-in page shows the community's name
 	mux.HandleFunc("POST /api/setup", s.setup)
 	mux.HandleFunc("PUT /api/settings", s.requireRoot(perm.ManageInstance, s.setSettings))
 	mux.HandleFunc("POST /api/images", s.requireAuth(s.uploadImage))
 	mux.HandleFunc("GET /img/{id}", s.requireAuth(s.serveImage))
 	mux.HandleFunc("PUT /api/me/picture", s.requireAuth(s.setPicture))
 
-	// Anything else under /api/ is a 404 in JSON, never the SPA page.
+	// Any other path under /api/ returns a JSON 404, never the SPA page.
 	mux.HandleFunc("/api/", func(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusNotFound, "No such endpoint: "+r.Method+" "+r.URL.Path)
 	})
 
-	// The root group's staff: an invite link adds someone to the root group.
+	// Invite endpoints for the root group's staff. An invite link adds a user to the root group.
 	mux.HandleFunc("GET /api/invites", s.requireRoot(perm.Invite, s.listInvites))
 	mux.HandleFunc("POST /api/invites", s.requireRoot(perm.Invite, s.createInvite))
 	mux.HandleFunc("DELETE /api/invites/{code}", s.requireRoot(perm.Invite, s.deleteInvite))
@@ -275,7 +280,7 @@ func writeErr(w http.ResponseWriter, status int, msg string) {
 	writeJSON(w, status, map[string]string{"error": msg})
 }
 
-// pageParams reads ?before= and ?limit= for the newest-first feeds.
+// pageParams reads ?before= and ?limit= for the feeds ordered newest first.
 func pageParams(r *http.Request, defaultLimit, maxLimit int) (before int64, limit int) {
 	limit = defaultLimit
 	if v, err := strconv.Atoi(r.URL.Query().Get("limit")); err == nil && v > 0 && v <= maxLimit {
@@ -291,7 +296,7 @@ func pageParams(r *http.Request, defaultLimit, maxLimit int) (before int64, limi
 func (s *Server) listPosts(w http.ResponseWriter, r *http.Request) {
 	g, a := groupFrom(r.Context())
 	before, limit := pageParams(r, 20, 100)
-	// ?topic= narrows the community's feed to one topic (architecture.md, Topics).
+	// ?topic= filters the community's feed to one topic (architecture.md, Topics).
 	var topic any
 	if t := r.URL.Query().Get("topic"); t != "" {
 		topic = t
@@ -315,9 +320,9 @@ func (s *Server) listPosts(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{"posts": posts, "next_before": next})
 }
 
-// getPost is one post by its address (architecture.md, Posts): the post page
-// fetches it when the feed it belongs to is not loaded. 404 when the viewer
-// is not in its group, as everywhere.
+// getPost returns one post by id (architecture.md, Posts). The post page
+// fetches it when the feed it belongs to is not loaded. As on every endpoint,
+// the response is 404 when the viewer is not a member of the post's group.
 func (s *Server) getPost(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
 	_, a, status, err := s.postActor(r, s.q(), id)
@@ -334,8 +339,8 @@ func (s *Server) getPost(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, forViewer(a, &p, Settings{}))
 }
 
-// readBody decodes {body_html}, sanitises it, and writes the 400 itself when
-// the body is malformed or empty. ok is false after a 400.
+// readBody decodes {body_html} and sanitises it. When the body is malformed
+// or empty, it writes the 400 response itself and returns ok false.
 func readBody(w http.ResponseWriter, r *http.Request) (clean string, ok bool) {
 	var in struct {
 		BodyHTML string `json:"body_html"`
@@ -353,7 +358,7 @@ func readBody(w http.ResponseWriter, r *http.Request) (clean string, ok bool) {
 	return clean, true
 }
 
-// readPostBody is readBody plus the post's optional topic_id.
+// readPostBody is readBody with the post's optional topic_id.
 func readPostBody(w http.ResponseWriter, r *http.Request) (clean string, topicID *string, ok bool) {
 	var in struct {
 		BodyHTML string  `json:"body_html"`
@@ -375,10 +380,10 @@ func readPostBody(w http.ResponseWriter, r *http.Request) (clean string, topicID
 	return clean, in.TopicID, true
 }
 
-// logged runs fn inside a write transaction, logs the one event it returns,
-// commits, broadcasts, and replies with the payload personalised for the
-// actor. fn returns the resource as it is, without can flags; the log keeps
-// it that way and every reader adds their own view.
+// logged runs fn inside a write transaction, logs the one event fn returns,
+// commits, broadcasts the event, and responds with the payload personalised
+// for the actor. fn returns the resource without can flags. The log stores it
+// that way and every reader adds their own view.
 func (s *Server) logged(w http.ResponseWriter, r *http.Request, kind string, now int64, fn func(qtx *store.Queries) (payload any, status int, err error)) {
 	s.loggedMany(w, r, now, func(qtx *store.Queries) ([]events.Entry, any, int, error) {
 		payload, status, err := fn(qtx)
@@ -389,8 +394,8 @@ func (s *Server) logged(w http.ResponseWriter, r *http.Request, kind string, now
 	})
 }
 
-// loggedMany is logged for a write that is several events (a new group and
-// its memberships). The reply is the given response, personalised.
+// loggedMany is logged for a write that produces several events, such as a
+// new group and its memberships. The response is the given value, personalised.
 func (s *Server) loggedMany(w http.ResponseWriter, r *http.Request, now int64, fn func(qtx *store.Queries) (entries []events.Entry, response any, status int, err error)) {
 	ctx := r.Context()
 	tx, err := s.DB.BeginTx(ctx, nil) // BEGIN IMMEDIATE via _txlock
@@ -415,7 +420,8 @@ func (s *Server) loggedMany(w http.ResponseWriter, r *http.Request, now int64, f
 		logged = append(logged, ev)
 	}
 	me, _ := userFrom(ctx)
-	// The actor's own view of what they wrote, looked up while the tx is open.
+	// Look up the actor's own view of the written resource while the
+	// transaction is open.
 	a := perm.Actor{ID: me.ID}
 	st := Settings{}
 	if gid := groupIDOf(response); gid != "" {
@@ -477,7 +483,7 @@ func (s *Server) createPost(w http.ResponseWriter, r *http.Request) {
 	}
 	author, _ := userFrom(r.Context())
 	now := db.Now()
-	// The post, a notification to each person it mentions and to each follower of its topic, in one transaction.
+	// The post, a notification to each user it mentions, and a notification to each follower of its topic are written in one transaction.
 	s.loggedMany(w, r, now, func(qtx *store.Queries) ([]events.Entry, any, int, error) {
 		if status, err := topicExists(r, qtx, topicID); err != nil {
 			return nil, nil, status, err
@@ -545,16 +551,17 @@ func (s *Server) editPost(w http.ResponseWriter, r *http.Request) {
 		}); err != nil {
 			return nil, http.StatusInternalServerError, err
 		}
-		// An edit mentions nobody anew.
+		// An edit does not create new mention notifications.
 		row, err := qtx.GetPost(r.Context(), id)
 		p := wirePost(row)
 		return &p, http.StatusOK, err
 	})
 }
 
-// deletePost soft-deletes a post (perm.DeletePost says who may). Its comments
-// go with it (they are reached through the post) and its images are left to
-// the sweep (images.Sweep). The event carries the id and the group.
+// deletePost soft-deletes a post. perm.DeletePost decides who may. Its
+// comments are deleted with it, because they are reached through the post.
+// Its images are left for the sweep (images.Sweep). The event carries the
+// post's id and group id.
 func (s *Server) deletePost(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
 	me, _ := userFrom(r.Context())

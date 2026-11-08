@@ -26,19 +26,22 @@ import { PersonName } from './PersonName'
 
 interface PostProps {
   post: PostData
-  /** The time links to the post's own page; false on that page. */
+  /** Whether the time links to the post's own page. False on that page. */
   linked?: boolean
-  /** Start with the thread open (the post's page). */
+  /** Start with the comment thread open, as on the post's page. */
   expanded?: boolean
-  /** The room it was said in, when the list mixes rooms (a person's page, the post's page): drawn as a header, as old Sweet drew it. */
+  /**
+   * The group the post was made in, for lists that mix groups, such as a
+   * profile page or the post's page. It is shown as a header, as in old Sweet.
+   */
   place?: { id: string; name: string; picture?: string | null }
-  /** True while offline; disables saving. */
+  /** True while offline. Disables saving. */
   disabled: boolean
   /** Resolves when the server has stored the new body. */
   onEdit: (bodyHtml: string) => Promise<void>
-  /** Resolves when the server has deleted the post; the cache drops it. */
+  /** Resolves when the server has deleted the post. The post is then removed from the query cache. */
   onDelete: () => Promise<void>
-  /** Files the post under a topic, or none (architecture.md, Topics), from the editor when the author saves. */
+  /** Sets the post's topic, or clears it (architecture.md, Topics). Called from the editor when the author saves. */
   onSetTopic?: (topicId: string | null) => Promise<void>
 }
 
@@ -53,7 +56,7 @@ export function Post({
   onSetTopic,
 }: PostProps) {
   const author = useAuthor(post.author)
-  // The topic is named from the topics cache, so a rename reaches every pill at once.
+  // The topic name is read from the topics cache, so a rename updates every pill at once.
   const { topics } = useTopics()
   const topic = topics.find((t) => t.id === post.topic_id)
   const [draftTopic, setDraftTopic] = useState<string | null>(post.topic_id)
@@ -73,9 +76,9 @@ export function Post({
     setEditing(true)
   }
 
-  // The pill (architecture.md, Topics) follows the time in the author line, who, when, where, and opens the topic,
-  // for everyone. The card's right edge is the menu's, which is out of sight until hovered. The topic is changed
-  // while editing the post.
+  // The topic pill (architecture.md, Topics) comes after the time in the author line, which shows who, when and
+  // where. For every user, the pill links to the topic. The card's right edge holds the menu, which is hidden until
+  // hovered. The topic is changed while editing the post.
   const pill = topic ? (
     <Pill href={topicPath(topic.id)} label={`Topic: ${topic.name}`}>
       {topic.name}
@@ -95,7 +98,7 @@ export function Post({
     }
   }
 
-  // What this person may do is the server's call, carried on the post.
+  // The server decides what this user can do and sends it as the post's can flags.
   const items: MenuItem[] = []
   if (post.can.edit) items.push({ label: 'Edit', icon: 'pencil', onSelect: startEditing })
   if (post.can.delete) items.push({ label: 'Delete', icon: 'trash', onSelect: () => setConfirming(true) })
@@ -146,7 +149,7 @@ export function Post({
             {items.length > 0 && !editing && !disabled && <Menu label="Post options" items={items} reveal="post" />}
           </Row>
           {editing ? (
-            // The stored HTML is the editor's input: no separate document format.
+            // The stored HTML is passed to the editor as its input. There is no separate document format.
             <BodyEditor
               groupId={post.group_id}
               key={post.edited_at ?? 0}

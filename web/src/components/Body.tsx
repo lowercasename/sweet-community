@@ -11,10 +11,10 @@ interface BodyProps {
 }
 
 /**
- * A rendered body (architecture.md, Posts): the sanitised HTML with its
- * mentions named as their people are now and linked to their pages; those
- * anchors are routed in the app, so a tap on a name is a page change, not a
- * page load.
+ * Renders a body (architecture.md, Posts). It shows the sanitised HTML, with
+ * each mention showing the mentioned user's current name and linking to their
+ * profile. The app's router handles those links, so tapping a name changes
+ * the route without a full page load.
  */
 export function Body({ html, size }: BodyProps) {
   const { data: users } = useUsers()

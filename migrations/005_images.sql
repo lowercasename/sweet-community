@@ -1,4 +1,4 @@
--- Uploaded images: one row per stored file; bodies reference them by id in
+-- Uploaded images, one row per stored file. Bodies reference them by id in
 -- <img src="/img/<id>">. Profile pictures are images too.
 CREATE TABLE images (
     id           TEXT PRIMARY KEY,

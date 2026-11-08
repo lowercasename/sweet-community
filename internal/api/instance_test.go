@@ -15,7 +15,8 @@ import (
 	"sweet/internal/mail"
 )
 
-// newFreshServer is a server as a new instance starts: no owner, a setup link.
+// newFreshServer starts a server in the state of a new instance. It has no
+// owner, and the function returns a setup link.
 func newFreshServer(t *testing.T) (*httptest.Server, string) {
 	t.Helper()
 	d, err := db.Open(filepath.Join(t.TempDir(), "fresh.db"))
@@ -42,9 +43,10 @@ func newFreshServer(t *testing.T) (*httptest.Server, string) {
 	return ts, link
 }
 
-// The lifecycle (architecture.md, New-instance lifecycle): the setup link
-// makes the owner, verified by holding it; the community is unnamed until
-// the owner names it, which everyone can read, signed in or not.
+// The instance lifecycle (architecture.md, New-instance lifecycle). The setup
+// link creates the owner, whose address counts as verified because they hold
+// the link. The community has no name until the owner sets one. Every client
+// can read the name, logged in or not.
 func TestSetupLinkMakesTheOwner(t *testing.T) {
 	ts, link := newFreshServer(t)
 	if !strings.HasPrefix(link, "http://sweet.test/setup/") {
@@ -52,7 +54,7 @@ func TestSetupLinkMakesTheOwner(t *testing.T) {
 	}
 	token := link[strings.LastIndex(link, "/")+1:]
 	anon := newClient(t, ts)
-	// Signed out, anyone can read that there is no owner yet and no name.
+	// A logged-out client can read that there is no owner and no name yet.
 	if st := anon.mustStatus(200, "GET", "/api/settings", nil); st["owner_set"] != false || st["name"] != "" {
 		t.Fatalf("settings before setup: %v", st)
 	}
@@ -64,7 +66,7 @@ func TestSetupLinkMakesTheOwner(t *testing.T) {
 	if res["user"].(map[string]any)["username"] != "raphael" {
 		t.Fatalf("setup: %v", res)
 	}
-	// Signed in, the owner of the root group, with a verified address; the link is spent.
+	// The new owner is logged in, owns the root group, and has a verified address. The link is used up.
 	owner.mustStatus(200, "GET", "/api/me", nil)
 	if acct := owner.mustStatus(200, "GET", "/api/me/account", nil); acct["email"] != "r@example.test" || acct["email_verified"] != true {
 		t.Fatalf("owner's account: %v", acct)
@@ -76,7 +78,7 @@ func TestSetupLinkMakesTheOwner(t *testing.T) {
 	if st := anon.mustStatus(200, "GET", "/api/settings", nil); st["owner_set"] != true {
 		t.Fatalf("settings after setup: %v", st)
 	}
-	// Onboarding: the name, which everyone then reads.
+	// During onboarding the owner sets the name, which every client can then read.
 	owner.mustStatus(400, "PUT", "/api/settings", map[string]string{"group_creation": "anyone", "name": "  "})
 	owner.mustStatus(400, "PUT", "/api/settings", map[string]string{"group_creation": "anyone", "name": strings.Repeat("x", 61)})
 	st := owner.mustStatus(200, "PUT", "/api/settings", map[string]string{"group_creation": "anyone", "name": " Knitting Circle ", "description": "Wool and gossip."})
@@ -106,7 +108,7 @@ func TestScriptedOwnerNeedsNoSetup(t *testing.T) {
 	}
 }
 
-// Each arrival through an invite link is a notification to the owner, and to nobody else.
+// Each user who joins through an invite link creates a notification for the owner and for nobody else.
 func TestOwnerHearsOfEachArrival(t *testing.T) {
 	ts, owner := newTestServer(t)
 	_, kitID := registerMember(t, ts, owner, "kit")

@@ -17,18 +17,19 @@ import (
 	"sweet/internal/store"
 )
 
-// A fresh instance (architecture.md, New-instance lifecycle): started with no
-// owner, it mints a one-time setup link and prints it; whoever opens it
-// becomes the owner, with the address they give taken as verified, since
-// holding the link is holding the box. Then onboarding: the community has no
-// name until the owner gives it one, and the client keeps them on the welcome
-// page until it does.
+// This file implements a new instance's setup (architecture.md, New-instance
+// lifecycle). An instance started with no owner creates a one-time setup
+// link and prints it. Whoever opens the link becomes the owner. The address
+// they give is treated as verified, because access to the link implies
+// access to the server. Then onboarding follows. The community has no name
+// until the owner sets one, and the client keeps the owner on the welcome
+// page until they do.
 
 const setupTokenKey = "setup_token"
 
 // SetupLink is called at start when the root group has no owner with a
-// password: it replaces any earlier token (the link in the newest log is the
-// one that works) and returns the link to print.
+// password. It replaces any earlier token, so only the link in the newest log
+// output works, and returns the link to print.
 func SetupLink(ctx context.Context, d *sql.DB, baseURL string) (string, error) {
 	token, hash, err := auth.NewToken()
 	if err != nil {
@@ -40,14 +41,15 @@ func SetupLink(ctx context.Context, d *sql.DB, baseURL string) (string, error) {
 	return baseURL + "/setup/" + token, nil
 }
 
-// NeedsSetup is whether the instance has no owner able to sign in.
+// NeedsSetup reports whether the instance has no owner able to sign in.
 func NeedsSetup(ctx context.Context, d *sql.DB) (bool, error) {
 	st, err := settingsOf(ctx, store.New(d))
 	return !st.OwnerSet, err
 }
 
-// setup is `POST /api/setup {token, username, email, password}`: the owner's
-// account, from the setup link, signed in. Once: the token goes with it.
+// setup is `POST /api/setup {token, username, email, password}`. It creates
+// the owner's account from the setup link and signs them in. It works once,
+// because the token is deleted with it.
 func (s *Server) setup(w http.ResponseWriter, r *http.Request) {
 	if !s.limiter.open(s.clientAddr(r)) {
 		writeErr(w, http.StatusTooManyRequests, "Too many attempts. Wait a moment and try again.")
@@ -114,8 +116,8 @@ func (s *Server) setup(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusInternalServerError, err.Error())
 		return
 	}
-	// An owner made by the command line without a password is taken over
-	// rather than duplicated; otherwise the account is new.
+	// An owner created at the command line without a password is reused
+	// rather than duplicated. Otherwise a new account is created.
 	ownerID, err := qtx.GetGroupOwnerID(ctx, perm.Root)
 	if err == nil {
 		row, err := qtx.GetUser(ctx, ownerID)

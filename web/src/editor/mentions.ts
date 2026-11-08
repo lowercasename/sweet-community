@@ -7,11 +7,11 @@ import type { User } from '../api'
 import { SuggestionList, type SuggestionListHandle } from '../ui'
 
 /**
- * A mention in the editor (architecture.md, Posts): typing @ offers the
- * people here, and picking one inserts a node that serialises to
- * <span data-type="mention" data-mention-id="<id>">@name</span>, the one
- * shape the server's policy keeps. The name shown later is the person's
- * current one (content/decorate.ts), so the id is what matters.
+ * A mention in the editor (architecture.md, Posts). Typing @ offers the
+ * users of the group, and picking one inserts a node that serialises to
+ * <span data-type="mention" data-mention-id="<id>">@name</span>, which is the
+ * only shape the server's sanitiser policy keeps. The name shown later is the
+ * user's current name (content/decorate.ts), so the id is the important part.
  */
 const SweetMention = Mention.extend({
   addAttributes() {
@@ -33,10 +33,10 @@ const SweetMention = Mention.extend({
   },
 })
 
-/** The suggestion plugin's key: BodyEditor asks it whether a list is open before it treats Enter as send. */
+/** The suggestion plugin's key. BodyEditor uses it to check whether a suggestion list is open before it treats Enter as send. */
 export const mentionSuggestionKey = new PluginKey('sweetMention')
 
-/** The post, comment and chat schemas with @mentions of these people. */
+/** Adds the mention extension for these users to a set of editor extensions. */
 export function withMentions(extensions: Extensions, people: () => User[]): Extensions {
   const mention = SweetMention.configure({
     HTMLAttributes: { 'data-type': 'mention' },

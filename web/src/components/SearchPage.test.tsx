@@ -4,7 +4,10 @@ import { cleanup, fireEvent, screen, within } from '@testing-library/react'
 import { ROOT, group, renderWithQuery, user } from '../test-utils'
 import type { Hit } from '../api'
 
-/** Search (architecture.md, Search): the words in the URL, the hits drawn with what, where, who and the matches in bold. */
+/**
+ * The search page (architecture.md, Search). The query is stored in the URL.
+ * Each hit shows its kind, location and author, with the matches in bold.
+ */
 vi.mock('../api', () => ({
   search: vi.fn(),
   listMembers: vi.fn(() => Promise.resolve({ members: [] })),
@@ -46,7 +49,7 @@ async function draw(query: string) {
 }
 
 describe('SearchPage', () => {
-  it('asks for nothing until words are given, then puts them in the URL', async () => {
+  it('sends no request until a query is entered, then puts the query in the URL', async () => {
     const { search } = await import('../api')
     const onGo = await draw('')
     expect(search).not.toHaveBeenCalled()
@@ -55,7 +58,7 @@ describe('SearchPage', () => {
     expect(onGo).toHaveBeenCalledWith('/search?q=marmalade')
   })
 
-  it('draws each hit with what and where, who and when, the match in bold, and opens it', async () => {
+  it('shows each hit with its kind, location, author and time, with the match in bold, and opens it', async () => {
     const { search } = await import('../api')
     const onGo = await draw('marmalade')
     expect(search).toHaveBeenCalledWith('marmalade')
@@ -66,7 +69,7 @@ describe('SearchPage', () => {
       'Message in Knitting by kit: the marmalade is ready',
     ])
     expect(within(rows[0]).getByText('marmalade').className).toContain('font-medium')
-    // The line above the excerpt: who, then what and where, then when (Raphael, 2026-11-06).
+    // The line above the excerpt shows the author, then the kind and location, then the time (Raphael, 2026-11-06).
     expect(rows[2].textContent).toMatch(/^kit · Message in Knitting · /)
     fireEvent.click(rows[1])
     expect(onGo).toHaveBeenCalledWith('/p/p1')
@@ -74,7 +77,7 @@ describe('SearchPage', () => {
     expect(onGo).toHaveBeenCalledWith('/r/knit')
   })
 
-  it('says so when nothing matches', async () => {
+  it('shows a message when nothing matches', async () => {
     const { search } = await import('../api')
     vi.mocked(search).mockResolvedValue({ hits: [] })
     await draw('quince')

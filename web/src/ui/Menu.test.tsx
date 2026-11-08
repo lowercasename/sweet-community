@@ -4,10 +4,11 @@ import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { Menu } from './Menu'
 
 /**
- * A menu lives inside the pane that holds its button, so it scrolls with
- * it and is clipped by the pane's edge. A scroll, including the one a
- * browser makes to bring the button into view just before it is clicked,
- * must not close it: that is how a menu closed one frame after opening.
+ * A menu is rendered inside the pane that contains its button, so it scrolls
+ * with the button and is clipped by the pane's edge. A scroll must not close
+ * it. This includes the scroll a browser makes to bring the button into view
+ * just before it is clicked, which once closed a menu one frame after it
+ * opened.
  */
 afterEach(cleanup)
 

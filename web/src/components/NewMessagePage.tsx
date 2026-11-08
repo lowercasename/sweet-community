@@ -5,14 +5,15 @@ import { Alert, Button, Card, Field, Form, Measure, Pane, Row, ScrollArea, Selec
 
 interface NewMessagePageProps {
   me: User
-  /** The conversation with the person chosen: the one that exists, or a new one. */
+  /** Called with the conversation with the chosen user, either the existing one or a new one. */
   onOpened: (group: Group) => void
 }
 
 /**
- * New message, the Messages section's own control (architecture.md,
- * Layout): one person, and Start opens the conversation with them, found or
- * made. A conversation is two people; for more, make a room.
+ * The New message page, opened from the Messages section's own control
+ * (architecture.md, Layout). The user chooses one other user, and Start opens
+ * the conversation with them, either the existing one or a new one. A
+ * conversation has two users. For more users, the user creates a group.
  */
 export function NewMessagePage({ me, onOpened }: NewMessagePageProps) {
   const { data: users } = useUsers()

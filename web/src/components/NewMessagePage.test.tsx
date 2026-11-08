@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, screen, within } from '@testing-library/react'
 import { dm, member, renderWithQuery, user } from '../test-utils'
 
-/** New message takes one person and opens the conversation with them: the one that exists, or a new one. */
+/** New message takes one user and opens the conversation with them, either the existing one or a new one. */
 vi.mock('../api', () => ({
   listMembers: vi.fn(() => Promise.resolve({ members: [] })),
   listUsers: vi.fn(),
@@ -19,7 +19,7 @@ beforeEach(async () => {
 })
 
 describe('NewMessagePage', () => {
-  it('offers everyone but me, one at a time, and starts with the one chosen', async () => {
+  it('offers every user except the viewer, one at a time, and opens a conversation with the chosen user', async () => {
     const { openDM } = await import('../api')
     const { NewMessagePage } = await import('./NewMessagePage')
     const onOpened = vi.fn()

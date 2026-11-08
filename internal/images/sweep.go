@@ -8,11 +8,12 @@ import (
 	"sweet/internal/store"
 )
 
-// Sweep deletes images uploaded before `before` that nothing references:
-// not a profile picture, not in a live post, comment or message. Uploads
-// happen on insert, so a draft that was never posted, an image removed
-// while editing, and the pictures of a deleted post all end up here.
-// Returns how many were removed. The DB row goes only after the file.
+// Sweep deletes images uploaded before `before` that nothing references. An
+// image is referenced when it is a profile picture or appears in a live post,
+// comment or message. An image is stored as soon as it is uploaded, so the
+// unreferenced images are those from drafts that were never posted, images
+// removed while editing, and images from deleted posts. Sweep returns the
+// number of images removed. The database row is deleted only after the file.
 func Sweep(ctx context.Context, q *store.Queries, st Store, before int64) (int, error) {
 	rows, err := q.ListUnreferencedImages(ctx, before)
 	if err != nil {
@@ -31,9 +32,9 @@ func Sweep(ctx context.Context, q *store.Queries, st Store, before int64) (int, 
 	return n, nil
 }
 
-// SweepEvery runs Sweep now and then every interval until ctx is done,
-// sparing anything younger than grace so a draft in progress keeps its
-// pictures. Errors are logged, not fatal: the next run tries again.
+// SweepEvery runs Sweep immediately and then once per interval until ctx is
+// done. Images younger than grace are skipped, so a draft in progress keeps
+// its images. Errors are logged and not fatal, and the next run tries again.
 func SweepEvery(ctx context.Context, d *sql.DB, st Store, interval, grace time.Duration, logf func(string, ...any)) {
 	q := store.New(d)
 	run := func() {

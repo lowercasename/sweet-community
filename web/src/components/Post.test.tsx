@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, screen } from '@testing-library/react'
 import { mine, nobody, post, renderWithQuery, user } from '../test-utils'
 
-/** A post's menu shows exactly what its can flags allow; nothing is decided here. */
+/** A post's menu shows exactly the actions its can flags allow. The component makes no permission decisions. */
 vi.mock('../api', () => ({
   getMe: vi.fn(() => Promise.resolve({ id: 'kit', username: 'kit', picture: null })),
   listMembers: vi.fn(() => Promise.resolve({ members: [] })),
@@ -49,7 +49,7 @@ async function render(flags: { edit: boolean; delete: boolean }) {
 }
 
 describe('Post page link', () => {
-  it("links its time to the post's own page, unless told it is already there", async () => {
+  it("links its time to the post's own page, unless linked is false because it is already on that page", async () => {
     const { Post } = await import('./Post')
     const draw = (linked?: boolean) =>
       renderWithQuery(
@@ -75,7 +75,7 @@ describe('Post menu', () => {
     fireEvent.click(screen.getByLabelText('Post options'))
     expect(screen.getAllByRole('menuitem').map((b) => b.textContent)).toEqual(['Edit', 'Delete'])
   })
-  it('offers only Delete to someone who may delete but not edit', async () => {
+  it('offers only Delete to a user who can delete but not edit', async () => {
     await render({ edit: false, delete: true })
     fireEvent.click(screen.getByLabelText('Post options'))
     expect(screen.getAllByRole('menuitem').map((b) => b.textContent)).toEqual(['Delete'])
@@ -86,7 +86,10 @@ describe('Post menu', () => {
   })
 })
 
-/** The topic pill (architecture.md, Topics): a way in for a reader, the way to file it for its author and the staff. */
+/**
+ * The topic pill (architecture.md, Topics). For every user, it links to the
+ * topic. The author changes a post's topic in the edit form.
+ */
 describe('Post topic pill', () => {
   async function drawFiled(flags: { edit: boolean; delete: boolean; set_topic?: boolean }) {
     const { Post } = await import('./Post')
@@ -103,14 +106,14 @@ describe('Post topic pill', () => {
     return onSetTopic
   }
 
-  it('opens the topic for a reader', async () => {
+  it('links to the topic for a reader', async () => {
     await drawFiled(nobody)
     const pill = await screen.findByRole('link', { name: 'Topic: Practice' })
     expect(pill.getAttribute('href')).toBe('/?topic=t1')
     expect(pill.textContent).toBe('Practice')
   })
 
-  it('is a link for its author too, who changes the topic while editing', async () => {
+  it('is also a link for the author, who changes the topic while editing the post', async () => {
     const onSetTopic = await drawFiled({ ...mine, set_topic: true })
     expect((await screen.findByRole('link', { name: 'Topic: Practice' })).getAttribute('href')).toBe('/?topic=t1')
     fireEvent.click(screen.getByLabelText('Post options'))

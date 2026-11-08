@@ -2,7 +2,7 @@ import { EditorContent, type Editor } from '@tiptap/react'
 
 interface EditorSurfaceProps {
   editor: Editor | null
-  /** `post` is a tall box; `line` starts one line high and grows. */
+  /** `post` is a tall box. `line` starts one line high and grows with its content. */
   size?: 'post' | 'line'
 }
 

@@ -1,7 +1,7 @@
 import { article, expect, member, open, sendMessage, test, uniq, writePost } from './helpers'
 
 test.describe('search', () => {
-  test('finds posts, comments and messages by their words, from the rooms I am in; a hit opens its thing', async ({
+  test('search finds posts, comments and messages by their text in the groups I am a member of, and a result opens the item it matched', async ({
     browser,
   }, testInfo) => {
     const kit = await member(browser, testInfo, 'kit')
@@ -32,11 +32,11 @@ test.describe('search', () => {
     await expect(rows).toHaveCount(3)
     await expect(mo.page.getByText('secret')).toHaveCount(0)
     await expect(rows.filter({ hasText: 'Post' }).first()).toContainText(word)
-    // The start of a word is enough.
+    // A prefix of a word also matches.
     await mo.page.getByRole('textbox', { name: 'Search' }).fill(word.slice(0, -2))
     await mo.page.keyboard.press('Enter')
     await expect(rows).toHaveCount(3)
-    // Reload keeps the search; a hit opens its post.
+    // A reload keeps the search. A result opens its post.
     await mo.page.reload()
     await expect(mo.page.getByRole('list').getByRole('button')).toHaveCount(3)
     await mo.page.getByRole('list').getByRole('button').filter({ hasText: 'Comment' }).click()
@@ -46,7 +46,7 @@ test.describe('search', () => {
     await mo.context.close()
   })
 
-  test('@phone the Search tab opens the page', async ({ browser }, testInfo) => {
+  test('@phone the Search tab opens the search page', async ({ browser }, testInfo) => {
     const kit = await member(browser, testInfo)
     await open(kit.page)
     await kit.page.locator('nav').last().getByRole('button', { name: 'Search' }).click()

@@ -1,14 +1,14 @@
 import { anyView, article, expect, member, open, owner, postEditor, test, uniq } from './helpers'
 
 /**
- * Topics (architecture.md, Topics): the owner adds one on the Community
- * page, a post is filed under it from the button beside Post, its pill
- * opens the topic, the author changes it while editing, the feed's head
- * wears the same pill, subscribing brings a notification, and a
- * deleted topic leaves its posts without one.
+ * Topics (architecture.md, Topics). The owner adds a topic on the Community
+ * page. A new post gets the topic the feed is filtered to. A post's
+ * topic pill opens the topic. The author changes the topic while editing the
+ * post. The feed header shows the same pill. A subscriber gets a notification
+ * for a new post in the topic. Deleting a topic leaves its posts without a topic.
  */
 test.describe('topics', () => {
-  test('from the owner adding one to a subscriber being told, and the author unfiling', async ({
+  test('the owner adds a topic, a subscriber gets a notification, and the author removes the topic from a post', async ({
     browser,
   }, testInfo) => {
     const o = await owner(browser, testInfo)
@@ -16,7 +16,7 @@ test.describe('topics', () => {
     const mo = await member(browser, testInfo, 'mo')
     const name = uniq('Practice ')
 
-    // The owner adds a topic. Until one exists, nothing about topics shows anywhere.
+    // The owner adds a topic. Until a topic exists, nothing about topics is shown anywhere.
     await open(o.page, '/community')
     await o.page.getByLabel('Topic name').fill(name)
     await o.page.getByLabel('Short description').fill('What is working, what is not.')
@@ -39,11 +39,12 @@ test.describe('topics', () => {
     await o.page.getByRole('button', { name: 'Post', exact: true }).click()
     const mine = article(o.page, text)
     await expect(mine).toBeVisible()
-    // The pill opens the topic for everyone, the author included.
+    // The pill opens the topic for every user, including the author.
     await expect(mine.getByRole('link', { name: `Topic: ${name}` })).toBeVisible()
     await o.page.screenshot({ path: `test-results/topics-${testInfo.project.name}-feed.png`, fullPage: true })
 
-    // A reader's pill opens the topic: the URL names it, the feed's head reads it.
+    // The pill also opens the topic for another user. The URL contains the topic, and the feed header shows its
+    // name.
     await open(kit.page)
     const theirs = article(kit.page, text)
     const pill = theirs.getByRole('link', { name: `Topic: ${name}` })
@@ -53,18 +54,19 @@ test.describe('topics', () => {
     await expect(kit.page.getByRole('button', { name: 'Showing' })).toContainText(name)
     await expect(kit.page.getByText('What is working, what is not.')).toBeVisible()
     await expect(article(kit.page, text)).toBeVisible()
-    // Subscribing: the button says so from then on.
+    // Subscribe. From then on, the button shows the subscribed state.
     await kit.page.getByRole('button', { name: 'Subscribe' }).click()
-    // Under the pointer the toggle offers its action, Unsubscribe. Away from it, it shows its state.
+    // While the pointer is over the toggle, it shows its action, Unsubscribe. Otherwise it shows its state.
     await expect(kit.page.getByRole('button', { name: 'Unsubscribe' })).toHaveAttribute('aria-pressed', 'true')
     await kit.page.mouse.move(8, 8)
     const subscribed = kit.page.getByRole('button', { name: 'Subscribed' })
     await expect(subscribed).toHaveAttribute('aria-pressed', 'true')
-    // Pressed looks pressed: Sweet red.
+    // The pressed state is shown in Sweet red.
     await expect(subscribed).toHaveCSS('color', 'rgb(206, 23, 23)')
     await kit.page.screenshot({ path: `test-results/topics-${testInfo.project.name}-topic.png`, fullPage: true })
 
-    // Inside the topic a post goes where you are: no chooser beside Post. Mo posts there; kit, subscribed, is told.
+    // While a topic is shown, a new post gets that topic, and there is no topic chooser beside Post. Mo posts in the
+    // topic, and kit, who is subscribed, gets a notification.
     const url = kit.page.url()
     await mo.page.goto(url)
     await expect(mo.page.getByRole('navigation', { name: 'Main' })).toBeVisible()
@@ -79,18 +81,19 @@ test.describe('topics', () => {
     await expect(article(kit.page, second)).toBeVisible()
     await open(kit.page, '/notifications')
     await expect(kit.page.getByText(`${mo.username} posted in ${name}`)).toBeVisible()
-    // The author is not told of their own post.
+    // The author does not get a notification for their own post.
     await open(mo.page, '/notifications')
     await expect(mo.page.getByText(`posted in ${name}`)).toHaveCount(0)
 
-    // Everything, from the feed's head, is the way back.
+    // Choosing Everything in the feed header returns to the unfiltered feed.
     await open(kit.page, url)
     await kit.page.getByRole('button', { name: 'Showing' }).click()
     await kit.page.getByRole('menuitemradio', { name: 'Everything' }).click()
     await expect(kit.page).toHaveURL(/\/$/)
     await expect(kit.page.getByRole('button', { name: 'Showing' })).toContainText('Everything')
 
-    // Mo unfiles their post while editing it: No topic, Save. The pill goes, for everyone.
+    // Mo removes the topic from their post while editing it, by choosing No topic and then Save. The pill is
+    // removed for every user.
     await open(mo.page)
     const moPost = article(mo.page, second)
     await moPost.getByRole('button', { name: 'Post options' }).click()
@@ -102,7 +105,7 @@ test.describe('topics', () => {
     await expect(moPost.getByRole('link', { name: `Topic: ${name}` })).toHaveCount(0)
     await expect(article(kit.page, second).getByRole('link', { name: `Topic: ${name}` })).toHaveCount(0)
 
-    // Deleting the topic: the dialog says what happens, the owner's post stays, unfiled.
+    // Delete the topic. The dialog says what will happen. The owner's post stays, without a topic.
     await open(o.page, '/community')
     await o.page.getByRole('button', { name: `Options for ${name}` }).click()
     await o.page.getByRole('menuitem', { name: 'Delete' }).click()
@@ -120,11 +123,9 @@ test.describe('topics', () => {
     await o.context.close()
   })
 
-  test('@phone the pills at the head of the feed, beside Post and on a post fit the small screen', async ({
-    browser,
-  }, testInfo) => {
+  test('@phone the pills in the feed header and on a post fit the small screen', async ({ browser }, testInfo) => {
     const o = await owner(browser, testInfo)
-    // The longest a name and a description can be, since that is where a layout breaks.
+    // Use the longest allowed name and description, because the longest content is what breaks a layout.
     const name = uniq('Seed swaps and saving for spring ').slice(0, 40)
     const made = await o.context.request.post('/api/topics', {
       data: {
@@ -146,7 +147,7 @@ test.describe('topics', () => {
     const mine = article(o.page, text)
     await expect(mine.getByRole('link', { name: `Topic: ${name}` })).toBeVisible()
     await expect(mine.getByRole('button', { name: 'Post options' })).toBeVisible()
-    // Nothing wider than the screen, in the composer or on the post, not even clipped.
+    // No element in the composer or on the post is wider than the screen, including elements that are clipped.
     const overflow = await o.page.evaluate(
       () =>
         [...document.querySelectorAll('form *, article *')].filter((el) => {
@@ -155,7 +156,7 @@ test.describe('topics', () => {
         }).length,
     )
     expect(overflow).toBe(0)
-    // The author's name is on one line, and the pill's icon kept its size.
+    // The author's name is on one line, and the pill's icon keeps its size.
     const nameBox = await mine.getByRole('button', { name: 'raphael' }).boundingBox()
     expect(nameBox!.height).toBeLessThan(40)
     const iconBox = await mine

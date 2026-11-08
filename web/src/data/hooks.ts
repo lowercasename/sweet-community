@@ -68,9 +68,9 @@ import { ROOT_ID, keys } from './keys'
 import { NOTIFICATIONS, unreadPlaces, type UnreadPlace } from './notifications'
 
 /*
- * Reads are queries; writes call the API and then feed the reply through
- * applyEvent, the same path the stream uses, so the cache never has two
- * ways of changing. Components keep no server data of their own.
+ * Reads are queries. Writes call the API and then pass the reply through
+ * applyEvent, the same path the stream uses, so the cache has only one way
+ * of changing. Components keep no server data of their own.
  */
 
 /** The signed-in user, or null when nobody is. */
@@ -90,13 +90,13 @@ export function useSession() {
     },
     async signOut() {
       await logout()
-      // "Me" first, so the observer that renders the app learns it; then the
-      // rest. Clearing the whole cache first would leave that observer holding
-      // the removed query and its old answer.
+      // Set "me" to null first, so the observer that renders the app sees it,
+      // and then remove the rest. Clearing the whole cache first would leave
+      // that observer holding the removed query and its old data.
       qc.setQueryData<User | null>(keys.me, null)
       qc.removeQueries({ predicate: (q) => q.queryKey[0] !== 'me' })
     },
-    /** Off the instance (my account removed): the session is already gone on the server; nothing of mine stays here. */
+    /** The user's account was removed from the instance. The server has already ended the session. Clears the cache. */
     gone() {
       qc.setQueryData<User | null>(keys.me, null)
       qc.removeQueries({ predicate: (q) => q.queryKey[0] !== 'me' })
@@ -104,7 +104,7 @@ export function useSession() {
   }
 }
 
-/** Removing someone from the instance (architecture.md, Admin tools): staff from People, anyone themselves from Settings. */
+/** Removes a user from the instance (architecture.md, Admin tools). Staff do this from People, and any user does it to themselves from Settings. */
 export function useRemoveUser() {
   const qc = useQueryClient()
   return async (userId: string) => {
@@ -115,18 +115,18 @@ export function useRemoveUser() {
 
 const byId = (r: { users: Member[] }) => new Map(r.users.map((u) => [u.id, u]))
 
-/** Everyone on the instance, by id. */
+/** Every user on the instance, by id. */
 export function useUsers() {
   return useQuery({ queryKey: keys.users, queryFn: listUsers, select: byId })
 }
 
-/** A person as they are now: the users cache first, the snapshot that came with the content as fallback. */
+/** The current state of a user. Reads the users cache first, and falls back to the author snapshot that came with the content. */
 export function useAuthor(author: User): User {
   const { data: users } = useUsers()
   return users?.get(author.id) ?? author
 }
 
-/** The groups I am in, the root first. */
+/** The groups the user is in, with the root group first. */
 export function useGroups() {
   const q = useQuery({ queryKey: keys.groups, queryFn: listGroups })
   return { groups: q.data?.groups ?? [], loading: q.isPending, error: q.error }
@@ -159,9 +159,10 @@ export function usePosts(groupId: string, topicId: string | null = null) {
 }
 
 /**
- * One post, for its page. A loaded feed's copy is the starting point, so a
- * post opened from the feed draws at once; the server's is fetched behind
- * it. applyEvent keeps this query in step with the feed from then on.
+ * One post, for its page. A loaded feed's copy is the initial data, so a
+ * post opened from the feed renders at once, and the server's copy is fetched
+ * in the background. applyEvent keeps this query in sync with the feed from
+ * then on.
  */
 export function usePost(id: string, enabled = true) {
   const qc = useQueryClient()
@@ -171,7 +172,7 @@ export function usePost(id: string, enabled = true) {
     initialData: () => findPost(qc, id),
     initialDataUpdatedAt: 0,
     enabled,
-    // Not here is an answer, not a hiccup: no second try.
+    // A 404 is a definite answer, not a transient failure, so it is not retried.
     retry: (n, e) => n < 1 && !(e instanceof ApiError && e.status === 404),
   })
   return { post: q.data, loading: q.isPending, error: q.error }
@@ -186,7 +187,7 @@ export function usePostActions(groupId: string) {
     async edit(id: string, html: string) {
       applyEvent(qc, 'post', await updatePost(id, html))
     },
-    /** Files a post under a topic, or none (architecture.md, Topics). */
+    /** Sets a post's topic, or clears it with null (architecture.md, Topics). */
     async setTopic(id: string, topicId: string | null) {
       applyEvent(qc, 'post', await setPostTopic(id, topicId))
     },
@@ -218,7 +219,7 @@ export function useCommentActions(postId: string, groupId: string) {
   }
 }
 
-/** A room, oldest first. Pages arrive newest first and older ones are fetched backwards. */
+/** A group's messages, oldest first. Pages arrive newest first, and older pages are fetched backwards. */
 export function useMessages(groupId: string) {
   const q = useInfiniteQuery({
     queryKey: keys.messages(groupId),
@@ -274,12 +275,13 @@ export function useInviteActions() {
   }
 }
 
-/** The owner sets member or moderator, or hands the group over with role owner. */
+/** The owner sets a member's role to member or moderator, or transfers ownership with role owner. */
 export function useSetRole(groupId: string) {
   const qc = useQueryClient()
   return async (userId: string, role: Role) => {
     applyEvent(qc, 'membership', await setMemberRole(groupId, userId, role))
-    // Handing over changed my own membership too; the server logged both, and the stream will bring mine.
+    // A transfer of ownership changed the viewer's own membership too. The server logged both changes, and the
+    // stream will deliver the viewer's.
     if (role === 'owner') void qc.invalidateQueries({ queryKey: keys.groups })
   }
 }
@@ -314,13 +316,13 @@ export function useGroupActions() {
       await removeMember(groupId, userId)
       applyEvent(qc, 'membership_delete', { group_id: groupId, user_id: userId })
     },
-    /** Leaving a room removes me; hiding a conversation is a membership, hidden. */
+    /** Leaving a room deletes the membership. Leaving a conversation hides it, and returns the hidden membership. */
     async leave(groupId: string, meId: string) {
       const m = await removeMember(groupId, meId)
       if (m) applyEvent(qc, 'membership', m)
       else applyEvent(qc, 'membership_delete', { group_id: groupId, user_id: meId })
     },
-    /** The conversation with one person: the existing one, or a new one; either way it is in my groups now. */
+    /** Opens the conversation with one user. Returns the existing conversation or creates a new one. Either way it is now in the groups list. */
     async openDM(userId: string): Promise<Group> {
       const g = await openDM(userId)
       applyEvent(qc, 'group', g)
@@ -329,7 +331,7 @@ export function useGroupActions() {
   }
 }
 
-/** What was done to me, newest first, paged. */
+/** The user's notifications, newest first, paged. */
 export function useNotifications() {
   const q = useInfiniteQuery({
     queryKey: keys.notifications,
@@ -351,7 +353,7 @@ export function useNotifications() {
   }
 }
 
-/** Opening a notification reads it: the cache moves at once, the server's row follows through the same path. */
+/** Marks a notification read when it is opened. The cache is updated at once, and the server's reply is applied through the same path. */
 export function useReadNotification() {
   const qc = useQueryClient()
   return (n: Notification) => {
@@ -364,7 +366,7 @@ export function useReadNotification() {
   }
 }
 
-/** Clearing the ones I have opened: the reply goes through the cache's one write path. */
+/** Clears the user's opened notifications. The reply goes through the cache's one write path. */
 export function useClearNotifications() {
   const qc = useQueryClient()
   return async () => {
@@ -372,32 +374,32 @@ export function useClearNotifications() {
   }
 }
 
-/** How far I have read each stream. `loaded` says the answer is in, not merely empty. */
+/** The user's read markers for each stream. `loaded` is true once the query has data, as opposed to an empty default. */
 export function useMarkers() {
   const q = useQuery({ queryKey: keys.markers, queryFn: listMarkers })
   return { markers: q.data?.markers ?? [], loaded: q.data !== undefined }
 }
 
-/** Is anything on the notifications stream newer than where I have read to? The bell's dot. */
+/** Whether the notifications stream has unread notifications. Shown as the dot on the Notifications nav item. */
 export function useUnreadNotifications(): boolean {
   const { markers } = useMarkers()
   return (markers.find((m) => m.stream === NOTIFICATIONS)?.unread ?? 0) > 0
 }
 
-/** The places with something unread, by group id, and in which stream: the dots in the nav and inside a room. */
+/** The groups with unread content, by group id, and which stream is unread. Shown as the dots in the nav and inside a room. */
 export function useUnreadPlaces(): Map<string, UnreadPlace> {
   const { markers } = useMarkers()
   return unreadPlaces(markers)
 }
 
-/** PUTs waiting to go, one per stream: the latest time wins. */
+/** Debounced marker PUTs that have not been sent yet, one per stream. The latest time wins. */
 const pendingMarks = new Map<string, ReturnType<typeof setTimeout>>()
 
 /**
- * I have read a stream up to a time: the cache moves at once, the server's
- * answer follows through the same path. A chat marks with a debounce (the
- * document's "updated from the client with a debounce"), so a busy room is
- * one PUT, not one per message.
+ * Marks a stream read up to a time. The cache is updated at once, and the
+ * server's reply is applied through the same path. A chat marks with a
+ * debounce (architecture.md says "updated from the client with a debounce"),
+ * so a busy room sends one PUT, not one per message.
  */
 export function useMarkRead() {
   const qc = useQueryClient()
@@ -418,7 +420,7 @@ export function useMarkRead() {
   }
 }
 
-/** A person's page: who they are, their standing, their bio. */
+/** A user's profile. Their user record, their role, and their bio. */
 export function useProfile(name: string) {
   const q = useQuery({
     queryKey: keys.profile(name),
@@ -428,7 +430,7 @@ export function useProfile(name: string) {
   return { profile: q.data, loading: q.isPending, error: q.error }
 }
 
-/** A person's posts, newest first, from the rooms I am in; applyEvent keeps the list current. */
+/** A user's posts, newest first, from the groups the viewer is in. applyEvent keeps the list current. */
 export function useUserPosts(name: string) {
   const q = useInfiniteQuery({
     queryKey: keys.userPosts(name),
@@ -450,13 +452,13 @@ export function useUserPosts(name: string) {
   }
 }
 
-/** What matches what I typed; nothing is asked for an empty query. */
+/** Search results for the query. Nothing is fetched for an empty query. */
 export function useSearch(q: string) {
   const query = useQuery({ queryKey: keys.search(q), queryFn: () => search(q), enabled: q.trim() !== '' })
   return { hits: query.data?.hits ?? [], loading: query.isPending && q.trim() !== '', error: query.error }
 }
 
-/** My bio: the reply is my profile, applied as the stream would apply it. */
+/** Sets the user's bio. The reply is the user's profile, applied as a stream event would be. */
 export function useSetBio() {
   const qc = useQueryClient()
   return async (html: string) => {
@@ -464,9 +466,9 @@ export function useSetBio() {
   }
 }
 
-/** The instance's settings; only the root owner may ask. */
-/** The community's settings: its name above all, which every page wears. Public, so the sign-in page reads them too. */
-/** The community's topics, alphabetical, with whether I follow each (architecture.md, Topics). */
+/** The instance's settings. Only the root owner may request them. */
+/** The community's settings, mainly its name, which every page shows. Public, so the sign-in page reads them too. */
+/** The community's topics, alphabetical, each with whether the user follows it (architecture.md, Topics). */
 export function useTopics(): { topics: Topic[]; loading: boolean; error: Error | null } {
   const q = useQuery({ queryKey: keys.topics, queryFn: listTopics })
   return { topics: q.data?.topics ?? [], loading: q.isPending, error: q.error }
@@ -510,7 +512,7 @@ export function useSetPicture() {
   }
 }
 
-/** My account's address and its state, for Settings. */
+/** The user's account email address and its verification state, for Settings. */
 export function useMySettings() {
   return useQuery({ queryKey: keys.mySettings, queryFn: getMySettings })
 }
@@ -524,7 +526,7 @@ export function useAccount() {
   return useQuery({ queryKey: keys.account, queryFn: getAccount })
 }
 
-/** A new address: pending until its link is opened; the server's answer is the account as it now stands. */
+/** Sets a new email address. It is pending until its verification link is opened. The reply is the current account state. */
 export function useChangeEmail() {
   const qc = useQueryClient()
   return async (email: string, password: string) => {

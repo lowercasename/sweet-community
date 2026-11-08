@@ -10,14 +10,15 @@ import (
 	"sweet/internal/store"
 )
 
-// NotifyMention is a notification's kind for being mentioned.
+// NotifyMention is the notification kind for a mention.
 const NotifyMention = "mention"
 
-// mentionEvents writes a mention notification for each person a body
-// mentions who is in the group and is not the author (nor already told of
-// this write another way: `skip`), and returns their events
-// (architecture.md, Posts: extraction; Notifications). A mention of someone
-// outside the group is just text: they could not see it anyway.
+// mentionEvents writes a mention notification for each user the body
+// mentions who is a member of the group, is not the author, and is not
+// `skip`, which is a user already notified of this write another way. It
+// returns the notification events (architecture.md, Posts: extraction;
+// Notifications). A mention of a user outside the group is left as text,
+// because that user could not see the body anyway.
 func mentionEvents(r *http.Request, qtx *store.Queries, body, author, groupID string, postID *string, now int64, skip string) ([]events.Entry, error) {
 	var out []events.Entry
 	for _, uid := range sanitize.Mentions(body) {

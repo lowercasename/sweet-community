@@ -4,9 +4,10 @@ import (
 	"testing"
 )
 
-// Mentions (architecture.md, Posts, Notifications): a body's mention spans
-// name people by id; each one in the group, other than the author, is told,
-// in a post, a comment or a message; an edit tells nobody anew.
+// Mentions (architecture.md, Posts, Notifications). A mention span in a body
+// identifies a user by id. Each mentioned user who is in the group, other
+// than the author, is notified. This applies to posts, comments and
+// messages. An edit sends no new notifications.
 func TestMentions(t *testing.T) {
 	ts, owner := newTestServer(t)
 	kit, kitID := registerMember(t, ts, owner, "kit")
@@ -23,7 +24,7 @@ func TestMentions(t *testing.T) {
 		return out
 	}
 
-	// A post in a room jo is not in mentions mo (in it), jo (not), and kit (the author): mo alone is told.
+	// A post in a room that jo is not in mentions mo (a member), jo (not a member) and kit (the author). Only mo is notified.
 	room := kit.mustStatus(201, "POST", "/api/groups", map[string]any{"kind": "group", "name": "Knitting", "mode": "both"})
 	gid := room["id"].(string)
 	kit.mustStatus(201, "POST", "/api/groups/"+gid+"/members", map[string]string{"user_id": moID})
@@ -37,13 +38,13 @@ func TestMentions(t *testing.T) {
 	if len(list(jo)) != 0 || len(list(kit)) != 0 {
 		t.Fatalf("jo or kit told: %v %v", list(jo), list(kit))
 	}
-	// An edit tells nobody anew.
+	// An edit sends no new notifications.
 	kit.mustStatus(200, "PUT", "/api/posts/"+pid, map[string]string{"body_html": body + "<p>more</p>"})
 	if len(list(mo)) != 2 {
 		t.Fatalf("an edit mentioned mo again: %v", list(mo))
 	}
 
-	// A comment mentioning the post's author tells them once, as a comment; one mentioning a third member tells them as a mention.
+	// A comment that mentions the post's author notifies them once, as a comment. A comment that mentions a third member notifies them as a mention.
 	mo.mustStatus(201, "POST", "/api/posts/"+pid+"/comments", map[string]string{"body_html": "<p>" + mention(kitID, "kit") + " yes</p>"})
 	if got := list(kit); len(got) != 1 || got[0]["kind"] != "comment" {
 		t.Fatalf("kit, mentioned in a comment on kit's own post: %v", got)
@@ -54,7 +55,7 @@ func TestMentions(t *testing.T) {
 		t.Fatalf("jo, mentioned in a comment: %v", got)
 	}
 
-	// A message mentioning someone tells them, with the room and no post.
+	// A message that mentions a user notifies them, with the room's group id and no post id.
 	mo.mustStatus(201, "POST", "/api/groups/"+gid+"/messages", map[string]string{"body_html": "<p>" + mention(joID, "jo") + " chat?</p>"})
 	if got := list(jo); len(got) != 3 || got[0]["kind"] != "mention" || got[0]["post_id"] != nil || got[0]["group_id"] != gid {
 		t.Fatalf("jo, mentioned in chat: %v", got)

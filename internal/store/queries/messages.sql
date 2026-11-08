@@ -1,4 +1,4 @@
--- Chat messages live in a group's room. Membership is the handler's check.
+-- Chat messages belong to a group's chat. The handler checks membership.
 
 -- name: ListMessages :many
 SELECT m.id, m.group_id, m.body_html, m.body_text, m.created_at,

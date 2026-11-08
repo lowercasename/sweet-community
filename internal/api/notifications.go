@@ -15,60 +15,65 @@ import (
 	"sweet/internal/store"
 )
 
-// Notification is one thing done to one person (architecture.md,
-// Notifications): a comment on their post, being added to a room. Written in
-// the same transaction as the thing, by the handler that writes it, and told
-// to that person alone. It is read by being opened (read_at), one at a
-// time; the page alone reads nothing.
+// Notification records one action that affects one user (architecture.md,
+// Notifications), such as a comment on their post or being added to a room.
+// The handler that writes the action writes the notification in the same
+// transaction, and the notification is sent to that user only. A
+// notification is marked read (read_at) when the user opens it, one at a
+// time. Opening the notifications page does not mark anything read.
 type Notification struct {
 	ID     string `json:"id"`
 	UserID string `json:"user_id"`
 	Kind   string `json:"kind"`
 	Actor  User   `json:"actor"`
-	// GroupID is where it happened; PostID the post, for a comment.
+	// GroupID is the group the action happened in. PostID is the post, for a comment.
 	GroupID string  `json:"group_id"`
 	PostID  *string `json:"post_id"`
-	// TopicID is the topic, for a post in one I follow.
+	// TopicID is the topic, for a post in a topic the user follows.
 	TopicID   *string `json:"topic_id"`
 	CreatedAt int64   `json:"created_at"`
-	// ReadAt is when its person opened it; null until then.
+	// ReadAt is when the user opened the notification. It is null until then.
 	ReadAt *int64 `json:"read_at"`
 }
 
 const (
 	NotifyComment = "comment"
 	NotifyAdded   = "added"
-	// NotifyJoined tells the owner someone came in through an invite link.
+	// NotifyJoined notifies the owner that a user joined through an invite link.
 	NotifyJoined = "joined"
-	// NotifyTopicPost tells a topic's followers of a post in it (architecture.md, Topics).
+	// NotifyTopicPost notifies a topic's followers of a post in it (architecture.md, Topics).
 	NotifyTopicPost = "topic_post"
-	// NotifyMessage: a message in a conversation (DM). At most one unread row per
-	// conversation. Marked read when the conversation's chat marker moves past it
-	// (architecture.md, Notifications, 2026-11-08). Room chat does not notify.
+	// NotifyMessage is a message in a conversation (DM). There is at most one
+	// unread row per conversation. It is marked read when the conversation's
+	// chat marker moves past it (architecture.md, Notifications, 2026-11-08).
+	// Room chat does not produce notifications.
 	NotifyMessage = "message"
 )
 
-// Marker is how far along a stream a person has read: the newest time they
-// have seen. One per person per stream, forward only, theirs alone.
+// Marker records how far a user has read a stream, as the newest time they
+// have seen. There is one per user per stream. It only moves forward and is
+// sent to that user only.
 type Marker struct {
 	UserID string `json:"user_id"`
 	Stream string `json:"stream"`
 	ReadAt int64  `json:"read_at"`
-	// Unread is how much of the stream is newer than ReadAt: others' live
-	// messages in a chat, notifications on that stream. The server's count.
+	// Unread is the number of items in the stream newer than ReadAt. For a
+	// chat it counts other users' live messages. For the notifications stream
+	// it counts notifications. The server computes it.
 	Unread int64 `json:"unread"`
 }
 
-// The streams a marker can be on: a group's chat and its feed. The
-// notifications stream is listed with its unread count but is never marked;
-// a notification is read by opening it.
+// Prefixes of the streams a marker can be set on, which are a group's chat
+// and its feed. The notifications stream is listed with its unread count but
+// cannot be marked. A notification is marked read by opening it.
 const (
 	streamChatPrefix = "chat:"
 	streamFeedPrefix = "feed:"
 )
 
 // notify writes one notification inside the caller's transaction and returns
-// its event. Nobody is told about their own doing: to == actor is no row.
+// its event. A user is not notified of their own action. When to == actor,
+// no row is written.
 func notify(r *http.Request, qtx *store.Queries, kind, to, actor, groupID string, postID *string, now int64) (*events.Entry, error) {
 	return notifyIn(r, qtx, kind, to, actor, groupID, postID, nil, now)
 }
@@ -127,7 +132,7 @@ func readMessageNotifications(r *http.Request, qtx *store.Queries, me, groupID s
 	return read, nil
 }
 
-// notifyIn is notify with the topic a topic_post is about.
+// notifyIn is notify with the topic of a topic_post notification.
 func notifyIn(r *http.Request, qtx *store.Queries, kind, to, actor, groupID string, postID, topicID *string, now int64) (*events.Entry, error) {
 	if to == actor {
 		return nil, nil
@@ -156,7 +161,7 @@ func notifyIn(r *http.Request, qtx *store.Queries, kind, to, actor, groupID stri
 	return &events.Entry{Kind: "notification", Payload: wireNotification(row)}, nil
 }
 
-// listNotifications is mine, newest first, paged like the feed.
+// listNotifications returns the user's notifications, newest first, paged like the feed.
 func (s *Server) listNotifications(w http.ResponseWriter, r *http.Request) {
 	me, _ := userFrom(r.Context())
 	before, limit := pageParams(r, 30, 100)
@@ -178,8 +183,9 @@ func (s *Server) listNotifications(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{"notifications": out, "next_before": next})
 }
 
-// readNotification marks one of mine read, by opening it (architecture.md,
-// Notifications). The reply and the event are the row, read.
+// readNotification marks one of the user's notifications read when they open
+// it (architecture.md, Notifications). The response and the event are the
+// updated row.
 func (s *Server) readNotification(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
 	me, _ := userFrom(r.Context())
@@ -203,15 +209,15 @@ func (s *Server) readNotification(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// Cleared says which of my notifications are gone: every read one up to Before.
+// Cleared is the payload of a notification_delete event. It says that every read notification of the user up to Before has been deleted.
 type Cleared struct {
 	UserID string `json:"user_id"`
 	Before int64  `json:"before"`
 }
 
-// clearNotifications deletes the ones I have opened, for good
-// (architecture.md, Notifications). One event names the set rather than
-// each row: the read ones up to now.
+// clearNotifications permanently deletes the user's read notifications
+// (architecture.md, Notifications). One event describes the deleted set, the
+// read notifications up to now, rather than one event per row.
 func (s *Server) clearNotifications(w http.ResponseWriter, r *http.Request) {
 	me, _ := userFrom(r.Context())
 	now := db.Now()
@@ -223,7 +229,7 @@ func (s *Server) clearNotifications(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// listMarkers is a row for every stream of mine, read or not, each with its unread count.
+// listMarkers returns a row for every stream of the user, whether or not they have read it, each with its unread count.
 func (s *Server) listMarkers(w http.ResponseWriter, r *http.Request) {
 	me, _ := userFrom(r.Context())
 	rows, err := s.q().ListMarkers(r.Context(), me.ID)
@@ -238,9 +244,10 @@ func (s *Server) listMarkers(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{"markers": out})
 }
 
-// setMarker moves my marker on one stream forward to read_at (held to now,
-// never backwards). The stream is `chat:<group>` or `feed:<group>` for a
-// group I am in; a group I am not in does not exist to me.
+// setMarker moves the user's marker on one stream forward to read_at. The
+// value is capped at now and never moves backwards. The stream is
+// `chat:<group>` or `feed:<group>` for a group the user is in. A group the
+// user is not in returns 404.
 func (s *Server) setMarker(w http.ResponseWriter, r *http.Request) {
 	var in struct {
 		ReadAt int64 `json:"read_at"`
@@ -256,10 +263,12 @@ func (s *Server) setMarker(w http.ResponseWriter, r *http.Request) {
 	if in.ReadAt > now {
 		in.ReadAt = now
 	}
-	// One transaction: the marker, and for a chat stream the message notifications
-	// that the new marker position marks as read (architecture.md, Notifications).
+	// The marker and, for a chat stream, the message notifications that the
+	// new marker position marks as read (architecture.md, Notifications) are
+	// written in one transaction.
 	s.loggedMany(w, r, now, func(qtx *store.Queries) ([]events.Entry, any, int, error) {
-		// The row re-read after the write, as its stream's query lists it.
+		// reread returns the marker row after the write, as the stream's
+		// list query returns it.
 		var reread func() (store.ListMarkersRow, error)
 		var read []events.Entry
 		switch {

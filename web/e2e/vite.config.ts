@@ -1,4 +1,4 @@
-// The dev server as Raphael runs it, pointed at the e2e backend on 8098.
+// The dev server configured as Raphael runs it, with the proxy pointed at the e2e backend on port 8098.
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
@@ -8,7 +8,7 @@ const backend = 'http://127.0.0.1:8098'
 export default defineConfig({
   plugins: [react(), tailwindcss()],
   server: {
-    // Playwright probes 127.0.0.1; Vite's default "localhost" may bind only ::1.
+    // Playwright checks 127.0.0.1. Vite's default host "localhost" may bind only to ::1.
     host: '127.0.0.1',
     port: 5199,
     strictPort: true,

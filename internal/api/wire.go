@@ -9,17 +9,17 @@ import (
 	"sweet/internal/store"
 )
 
-// The builders: the only way a resource becomes its wire shape. Each takes
-// the store's row for that resource and nothing else, so a reply or an
-// event cannot be assembled by hand with a field left out (which is how a
-// group once lacked its flags, a DM its people, and a membership its
-// joined time). Handlers write, re-read the row inside the same
-// transaction, and hand the row here; list handlers convert their list
-// rows to the same type, which the compiler checks field for field.
-// Personalising for a viewer (can flags, role) is forViewer's job, on the
-// way out, never here.
+// This file holds the builders, which are the only way a resource becomes its
+// wire shape. Each builder takes the store's row for that resource and nothing
+// else, so a response or an event cannot be assembled by hand with a field
+// missing. That is how a group once lacked its flags, a DM its members, and a
+// membership its joined time. A handler writes, re-reads the row inside the
+// same transaction, and passes the row to the builder. A list handler
+// converts its list rows to the same row type, which the compiler checks
+// field by field. Personalising for a viewer (can flags, role) is done by
+// forViewer when the response is built, never here.
 
-// nullStr is the wire's nullable string.
+// nullStr converts a sql.NullString to the wire's nullable string.
 func nullStr(v sql.NullString) *string {
 	if !v.Valid {
 		return nil
@@ -102,9 +102,10 @@ func wireMembership(groupID string, row store.GetMemberRow) Membership {
 	return Membership{GroupID: groupID, User: wireUser(row.ID, row.Username, row.PictureID), Role: row.Role, JoinedAt: row.JoinedAt, HiddenAt: nullInt(row.HiddenAt)}
 }
 
-// wireGroup builds a group from its row: a DM carries its people, every
-// group the time of its newest live message. It reads through q so that a
-// group made in a transaction is complete before that transaction commits.
+// wireGroup builds a group from its row. A DM includes its members. Every
+// group includes the time of its newest live message. It reads through q so
+// that a group created in a transaction is complete before that transaction
+// commits.
 func wireGroup(ctx context.Context, q *store.Queries, row store.GetGroupRow) (Group, error) {
 	g := Group{ID: row.ID, Kind: row.Kind, Name: row.Name, Mode: row.Mode, CreatedAt: row.CreatedAt, Picture: pictureURL(row.PictureID), LastMessageAt: lastAt(row.LastMessageAt)}
 	if g.Kind != perm.KindDM {
@@ -122,8 +123,8 @@ func wireGroup(ctx context.Context, q *store.Queries, row store.GetGroupRow) (Gr
 	return g, nil
 }
 
-// lastAt turns the driver's MAX(created_at) (an int64, or nil when there is
-// no live message) into the wire's nullable time.
+// lastAt converts the driver's MAX(created_at) value, which is an int64 or nil
+// when there is no live message, to the wire's nullable time.
 func lastAt(v any) *int64 {
 	if n, ok := v.(int64); ok {
 		return &n

@@ -6,10 +6,11 @@ import (
 	"golang.org/x/net/html"
 )
 
-// Extraction over a sanitised body (architecture.md, Posts): a loop over the
-// parsed tree for mention ids. Hashtags wait on the tags-or-topics call.
+// This file extracts data from a sanitised body (architecture.md, Posts). It
+// walks the parsed tree for mention ids. Hashtag extraction is not written
+// until the decision between tags and topics is made.
 
-// Mentions returns the ids of the people mentioned in a sanitised body, each once, in order.
+// Mentions returns the ids of the users mentioned in a sanitised body, each once, in document order.
 func Mentions(sanitised string) []string {
 	root, err := html.Parse(strings.NewReader(sanitised))
 	if err != nil {

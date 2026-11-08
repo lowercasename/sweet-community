@@ -3,21 +3,21 @@ import { Icon, type IconName } from './Icon'
 import { useTooltip } from './Tooltip'
 
 interface ButtonProps {
-  /** `primary` is filled pink; `secondary` is outlined; `ghost` is bare text or an icon. */
+  /** `primary` is filled pink. `secondary` is outlined. `ghost` is bare text or an icon. */
   variant?: 'primary' | 'secondary' | 'ghost'
   type?: 'button' | 'submit'
   disabled?: boolean
-  /** Toggles: the state is on (aria-pressed). */
+  /** For a toggle button. Whether the toggle is on (aria-pressed). */
   pressed?: boolean
-  /** The control for the page being viewed (aria-current), for a section's own control in the nav. */
+  /** Whether this button opens the page being viewed (aria-current). Used for a nav section's action control. */
   current?: boolean
-  /** Accessible name; required when the button has no text. */
+  /** Accessible name. Required when the button has no text. */
   label?: string
   icon?: IconName
-  /** A small number after the icon, as old Sweet's post toolbar showed comment counts. Hidden when 0. */
+  /** A small number shown after the icon, as old Sweet's post toolbar showed comment counts. Hidden when 0. */
   count?: number
   onClick?: () => void
-  /** The pointer entering or leaving: a toggle shows its action (Unsubscribe) over its state (Subscribed) while hovered. */
+  /** Called when the pointer enters or leaves. A toggle shows its action (Unsubscribe) instead of its state (Subscribed) while hovered. */
   onHoverChange?: (hovered: boolean) => void
   children?: ReactNode
 }
@@ -37,7 +37,7 @@ const VARIANTS: Record<NonNullable<ButtonProps['variant']>, string> = {
     'aria-pressed:bg-blush aria-pressed:text-sweet aria-[current=page]:bg-blush aria-[current=page]:text-sweet disabled:text-line disabled:hover:bg-transparent',
 }
 
-/** The classes of a button, for the rare element that must be a button but not this component (a menu trigger). */
+/** The classes of a button, for the rare element that must look like a button but is not this component (a menu trigger). */
 export function buttonClass(variant: NonNullable<ButtonProps['variant']>, iconOnly: boolean): string {
   return `${BASE} ${VARIANTS[variant]} ${iconOnly ? 'p-1.5' : 'px-3 py-1'}`
 }
@@ -56,9 +56,9 @@ export function Button({
   children,
 }: ButtonProps) {
   const iconOnly = icon !== undefined && children === undefined && !count
-  // No words of its own: the label is its name, whether or not a count shows.
+  // A button with no text uses the label as its accessible name, whether or not a count is shown.
   const wordless = children === undefined && label !== undefined
-  // A wordless button says its name in a tooltip.
+  // A button with no text shows its name in a tooltip.
   const tip = useTooltip(label ?? '', wordless)
   return (
     <>

@@ -4,9 +4,10 @@ import { cleanup, fireEvent, screen, within } from '@testing-library/react'
 import { ROOT, dm, group, nameOf, renderWithQuery, user } from '../test-utils'
 
 /**
- * The phone's menu holds what the nav column holds, in the same blocks,
- * with the account first and Sign out last. Search and Notifications are tabs, so
- * they are not here; DMs are behind Messages, as in the column.
+ * The phone menu contains the same items as the nav column, in the same
+ * sections, with the account first and Sign out last. Search and
+ * Notifications are tabs, so they are not in the menu. DMs are under
+ * Messages, as in the nav column.
  */
 vi.mock('../api', () => ({
   listMembers: vi.fn(() => Promise.resolve({ members: [] })),
@@ -23,7 +24,7 @@ const kit = user('kit')
 afterEach(cleanup)
 
 describe('MenuPage', () => {
-  it('lists me, Home, the Rooms section, the Messages section, then People, then Sign out', async () => {
+  it('lists the user, Home, the Rooms section, the Messages section, People and Sign out, in that order', async () => {
     const { MenuPage } = await import('./MenuPage')
     const onGo = vi.fn()
     const onLogout = vi.fn()

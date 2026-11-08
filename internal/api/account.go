@@ -15,31 +15,32 @@ import (
 	"sweet/internal/store"
 )
 
-// Accounts (architecture.md, Accounts): an address, verified before the
-// account may be used; a password reset by a link; a change of address
-// that takes effect once the new one is verified; a change of password
-// with the old one in hand. Tokens are stored by hash, expire, and are
-// used once. Nothing here says whether an address is known: the answer to
-// "send me a link" is the same either way.
+// This file implements accounts (architecture.md, Accounts). An email address
+// must be verified before the account can be used. A password is reset by a
+// link. A change of address takes effect once the new address is verified. A
+// change of password requires the current password. Tokens are stored by
+// hash, expire, and can be used once. No endpoint here reveals whether an
+// address is registered. A request to send a link gets the same response
+// either way.
 
 const (
 	TokenVerify = "verify"
 	TokenReset  = "reset"
 	verifyTTL   = 24 * time.Hour
 	resetTTL    = time.Hour
-	// A person gets at most this many of a kind of link an hour.
+	// tokensPerHour is the maximum number of links of one kind sent to a user per hour.
 	tokensPerHour = 5
 )
 
-// Account is what the signed-in person sees of their own account.
+// Account is the signed-in user's view of their own account.
 type Account struct {
 	Email         *string `json:"email"`
 	EmailVerified bool    `json:"email_verified"`
 	PendingEmail  *string `json:"pending_email"`
 }
 
-// sendToken makes a token of a kind for a person and an address, stores its
-// hash, and mails the link. Rate limited per person and kind.
+// sendToken creates a token of the given kind for a user and an address,
+// stores its hash, and emails the link. It is rate limited per user and kind.
 func (s *Server) sendToken(ctx context.Context, q *store.Queries, userID, kind, email string) error {
 	now := db.Now()
 	n, err := q.CountRecentEmailTokens(ctx, store.CountRecentEmailTokensParams{UserID: userID, Kind: kind, Since: now - time.Hour.Milliseconds()})
@@ -47,7 +48,7 @@ func (s *Server) sendToken(ctx context.Context, q *store.Queries, userID, kind, 
 		return err
 	}
 	if n >= tokensPerHour {
-		return nil // quietly: the limit is not the asker's business
+		return nil // Return without error. The client is not told that the limit was reached.
 	}
 	token, hash, err := auth.NewToken()
 	if err != nil {
@@ -60,7 +61,7 @@ func (s *Server) sendToken(ctx context.Context, q *store.Queries, userID, kind, 
 	if err := q.CreateEmailToken(ctx, store.CreateEmailTokenParams{Hash: hash, UserID: userID, Kind: kind, Email: email, CreatedAt: now, ExpiresAt: now + ttl.Milliseconds()}); err != nil {
 		return err
 	}
-	// Every email names the community it comes from, or Sweet before it has a name.
+	// Every email names the community it comes from, or Sweet when the community has no name yet.
 	community := "Sweet"
 	if st, err := settingsOf(ctx, q); err == nil && st.Name != "" {
 		community = st.Name
@@ -90,9 +91,10 @@ func (s *Server) sendToken(ctx context.Context, q *store.Queries, userID, kind, 
 	return s.Mail.Send(ctx, m)
 }
 
-// useToken finds a live token of a kind by the token the client holds and
-// spends it, inside the caller's transaction. Not found, expired and spent
-// are the same answer: not valid.
+// useToken finds an unexpired, unused token of the given kind by the token
+// string the client holds, and marks it used, inside the caller's
+// transaction. A token that is not found, expired or already used returns
+// errNotFound in every case.
 func useToken(ctx context.Context, q *store.Queries, token, kind string) (store.GetEmailTokenRow, error) {
 	row, err := q.GetEmailToken(ctx, auth.HashToken(token))
 	if errors.Is(err, sql.ErrNoRows) || (err == nil && row.Kind != kind) {
@@ -111,9 +113,9 @@ func useToken(ctx context.Context, q *store.Queries, token, kind string) (store.
 	return row, nil
 }
 
-// verify is `POST /api/verify {token}`: the address the token was sent to
-// becomes the account's verified one (a first address, or a change), and
-// the person is signed in.
+// verify is `POST /api/verify {token}`. The address the token was sent to
+// becomes the account's verified address, whether it is the first address or
+// a change, and the user is signed in.
 func (s *Server) verify(w http.ResponseWriter, r *http.Request) {
 	var in struct {
 		Token string `json:"token"`
@@ -165,8 +167,9 @@ func (s *Server) verify(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{"user": wireUser(u.ID, u.Username, u.PictureID), "token": token})
 }
 
-// resendVerification is `POST /api/verify/resend {email}`: a new link to an
-// address that belongs to an unverified account; the same 202 either way.
+// resendVerification is `POST /api/verify/resend {email}`. It sends a new
+// link when the address belongs to an unverified account. The response is 202
+// whether or not it does.
 func (s *Server) resendVerification(w http.ResponseWriter, r *http.Request) {
 	if !s.mailLimiter.allow(s.clientAddr(r)) {
 		writeErr(w, http.StatusTooManyRequests, "Too many attempts. Wait a moment and try again.")
@@ -190,10 +193,11 @@ func (s *Server) resendVerification(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusAccepted)
 }
 
-// changeUnverifiedEmail is `POST /api/verify/change {username, password, email}`:
-// the "didn't get it? change the address" of a person whose account has
-// never been verified. Their password stands in for a session. The old
-// address was never theirs for certain, so the new one simply replaces it.
+// changeUnverifiedEmail is `POST /api/verify/change {username, password, email}`.
+// It lets a user whose account has never been verified change the address the
+// verification link is sent to. The password is used in place of a session.
+// The old address was never confirmed as the user's, so the new one replaces
+// it directly.
 func (s *Server) changeUnverifiedEmail(w http.ResponseWriter, r *http.Request) {
 	if !s.mailLimiter.allow(s.clientAddr(r)) {
 		writeErr(w, http.StatusTooManyRequests, "Too many attempts. Wait a moment and try again.")
@@ -252,8 +256,8 @@ func (s *Server) changeUnverifiedEmail(w http.ResponseWriter, r *http.Request) {
 
 // tellAddressTaken emails an address that someone tried to register or claim
 // while it already belongs to an account. The requester gets the same response
-// as for a free address, so the API never reveals whether an address is
-// registered. The account's owner is told about the attempt.
+// as for an unregistered address, so the API never reveals whether an address
+// is registered. The account's owner is notified of the attempt.
 func (s *Server) tellAddressTaken(ctx context.Context, email string) error {
 	if s.Mail == nil {
 		return nil
@@ -284,8 +288,9 @@ func (s *Server) tellAddressTaken(ctx context.Context, email string) error {
 	return s.Mail.Send(ctx, m)
 }
 
-// requestReset is `POST /api/reset {email}`: a link to choose a new password,
-// if the address belongs to a verified account; the same 202 either way.
+// requestReset is `POST /api/reset {email}`. It sends a link to choose a new
+// password when the address belongs to a verified account. The response is
+// 202 whether or not it does.
 func (s *Server) requestReset(w http.ResponseWriter, r *http.Request) {
 	if !s.mailLimiter.allow(s.clientAddr(r)) {
 		writeErr(w, http.StatusTooManyRequests, "Too many attempts. Wait a moment and try again.")
@@ -309,8 +314,8 @@ func (s *Server) requestReset(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusAccepted)
 }
 
-// resetPassword is `POST /api/reset/{token} {password}`: the new password,
-// every other session ended, and this one signed in.
+// resetPassword is `POST /api/reset/{token} {password}`. It sets the new
+// password, deletes every other session, and signs in the current client.
 func (s *Server) resetPassword(w http.ResponseWriter, r *http.Request) {
 	var in struct {
 		Password string `json:"password"`
@@ -371,7 +376,7 @@ func (s *Server) resetPassword(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{"user": wireUser(u.ID, u.Username, u.PictureID), "token": token})
 }
 
-// getAccount is `GET /api/me/account`: my address and whether it is verified, and one waiting to be.
+// getAccount is `GET /api/me/account`. It returns the user's address, whether it is verified, and any pending address.
 func (s *Server) getAccount(w http.ResponseWriter, r *http.Request) {
 	me, _ := userFrom(r.Context())
 	row, err := s.q().GetAccount(r.Context(), me.ID)
@@ -395,9 +400,10 @@ func accountOf(row store.GetAccountRow) Account {
 	return a
 }
 
-// changeEmail is `PUT /api/me/email {email, password}`: the new address
-// waits as pending and gets a verification link; the old one stays until
-// the new is verified. The password, so a stolen session cannot take the account.
+// changeEmail is `PUT /api/me/email {email, password}`. The new address is
+// stored as pending and sent a verification link. The old address remains
+// until the new one is verified. The password is required so that a stolen
+// session cannot take over the account.
 func (s *Server) changeEmail(w http.ResponseWriter, r *http.Request) {
 	var in struct {
 		Email    string `json:"email"`
@@ -439,8 +445,8 @@ func (s *Server) changeEmail(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, accountOf(row))
 }
 
-// changePassword is `PUT /api/me/password {current, password}`: the new one
-// with the old one in hand; every other session ends.
+// changePassword is `PUT /api/me/password {current, password}`. It requires
+// the current password, sets the new one, and deletes every other session.
 func (s *Server) changePassword(w http.ResponseWriter, r *http.Request) {
 	var in struct {
 		Current  string `json:"current"`

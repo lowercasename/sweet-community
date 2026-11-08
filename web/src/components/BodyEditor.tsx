@@ -10,45 +10,52 @@ import { EditorToolbar, promptLink } from './EditorToolbar'
 import { TopicMenu } from './TopicMenu'
 
 interface BodyEditorProps {
-  /** The group this text is written in. The @ suggestion list offers this group's members only (architecture.md, Posts). */
+  /**
+   * The group this text is written in. The @ suggestion list offers this
+   * group's members only (architecture.md, Posts).
+   */
   groupId: string
   extensions: Extensions
-  /** What the empty box says; the extension's default when unset. */
+  /** Placeholder text for the empty editor. When unset, the extension's default is used. */
   placeholder?: string
-  /** `post` is a tall box; `line` starts one line high and grows. */
+  /** `post` is a tall editor. `line` starts one line high and grows. */
   size: 'post' | 'line'
-  /** Enter submits (chat). Otherwise Enter is a newline and Mod+Enter submits. */
+  /** When true, Enter submits, as in chat. Otherwise Enter inserts a newline and Mod+Enter submits. */
   enterSubmits?: boolean
   /**
-   * `inline`: images are nodes in the text, placed where the cursor is
-   * (posts, comments). `attached`: images stack above the text field and
-   * are sent as a block before it (chat).
+   * With `inline`, used for posts and comments, images are nodes in the text,
+   * inserted at the cursor. With `attached`, used for chat, images are stacked
+   * above the text field and sent as a block before the text.
    */
   images?: 'inline' | 'attached'
   submitLabel: string
   busyLabel: string
-  /** True while offline; disables submit. */
+  /** True while offline. Disables submit. */
   disabled: boolean
-  /** Resolves on success; rejects with an Error whose message is shown under the editor. */
+  /** Resolves on success. Rejects with an Error, and the error's message is shown under the editor. */
   onSubmit: (bodyHtml: string) => Promise<void>
   /**
-   * Edit mode: seed the editor with this stored HTML and keep it after a
-   * successful submit (the parent swaps the editor out). Create mode clears.
+   * In edit mode, the editor starts with this stored HTML and keeps it after a
+   * successful submit, because the parent replaces the editor. In create mode,
+   * the editor is cleared after a successful submit.
    */
   initialHtml?: string
-  /** Edit mode only: shown as a Cancel button and bound to Escape. */
+  /** Edit mode only. Shown as a Cancel button and also called on Escape. */
   onCancel?: () => void
-  /** An empty body may be submitted (a bio, cleared). */
+  /** Allows submitting an empty body, for example a cleared bio. */
   allowEmpty?: boolean
   /**
-   * Posts on the community's feed (architecture.md, Topics): the topic the
-   * post will carry, a pill after the toolbar: a property of the post, with
-   * the formatting, apart from the actions. Nothing is shown while no topics exist.
+   * The topic control in the post edit form, for posts on the community's feed (architecture.md, Topics). It is a
+   * pill after the toolbar, with the formatting controls and apart from Cancel and Save. The composer for new posts
+   * does not pass it. Nothing is shown while no topics exist.
    */
   topic?: { topics: Topic[]; value: string | null; onChange: (topicId: string | null) => void }
 }
 
-/** The one editor: posts, chat and comments differ only in schema, size, submit key and where images go. */
+/**
+ * The single editor component. Posts, chat and comments differ only in
+ * schema, size, submit key and image placement.
+ */
 export function BodyEditor({
   groupId,
   extensions,
@@ -70,12 +77,12 @@ export function BodyEditor({
   const [error, setError] = useState<string | null>(null)
   const [attached, setAttached] = useState<AttachedImage[]>([])
 
-  // The keydown handler is created once by TipTap; read the latest callbacks via refs.
+  // TipTap creates the keydown handler once, so the handler reads the latest callbacks through refs.
   const submitRef = useRef<() => void>(() => {})
   const cancelRef = useRef<(() => void) | undefined>(onCancel)
   cancelRef.current = onCancel
 
-  // The people the @ list can offer: the group's members, read from the cache when the list opens.
+  // The users the @ list can suggest. These are the group's members, read from the query cache when the list opens.
   const { members } = useMembers(groupId)
   const peopleRef = useRef(members)
   peopleRef.current = members
@@ -87,7 +94,8 @@ export function BodyEditor({
     autofocus: editing ? 'end' : false,
     editorProps: {
       handleKeyDown(view, event) {
-        // While an @ list is open, Enter picks from it (the suggestion plugin's keydown runs after this one).
+        // While an @ list is open, Enter selects from the list. The suggestion
+        // plugin's keydown handler runs after this one.
         if (event.key === 'Enter' && mentionSuggestionKey.getState(view.state)?.active) return false
         const modKey = event.metaKey || event.ctrlKey
         if (event.key === 'Enter' && (enterSubmits ? !event.shiftKey : modKey)) {

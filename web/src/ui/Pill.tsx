@@ -5,10 +5,11 @@ import { Icon } from './Icon'
 export type PillSize = 'sm' | 'md'
 
 /**
- * The classes of a pill, for the one control that must be a pill but not
- * this component (a Menu's trigger). `topic` is a named topic, in Sweet's
- * blush; `quiet` is a pill with nothing chosen. `sm` is a label on content,
- * the height of its small text; `md` is a control, the height of a button.
+ * The classes of a pill, for the one control that must look like a pill but
+ * is not this component (a Menu's trigger). `topic` is a chosen topic, in
+ * Sweet's blush colour. `quiet` is a pill with nothing chosen. `sm` is a label
+ * on content, the height of its small text. `md` is a control, the height of
+ * a button.
  */
 export function pillClass(tone: 'topic' | 'quiet', size: PillSize): string {
   const base =
@@ -22,17 +23,17 @@ export function pillClass(tone: 'topic' | 'quiet', size: PillSize): string {
   return `${base} ${dims} ${look}`
 }
 
-/** The icon sizes that go with each pill size: the tag, and the chevron of one that opens. */
+/** The icon sizes for each pill size. The tag icon, and the chevron of a pill that opens a menu. */
 export const PILL_ICON: Record<PillSize, { tag: 14 | 16; chevron: 14 | 16 }> = {
   sm: { tag: 14, chevron: 14 },
   md: { tag: 16, chevron: 16 },
 }
 
 interface PillProps {
-  /** A path in the app: the pill is a link there. Else a button, or plain text when nothing happens. */
+  /** A path in the app. When set, the pill is a link to it. Otherwise the pill is a button if `onClick` is set, or plain text. */
   href?: string
   onClick?: () => void
-  /** Accessible name, when the text alone does not say what it does ("Topic: Practice"). */
+  /** Accessible name, for when the text alone does not describe the pill, for example "Topic: Practice". */
   label?: string
   tone?: 'topic' | 'quiet'
   size?: PillSize
@@ -40,10 +41,11 @@ interface PillProps {
 }
 
 /**
- * A topic in a small rounded label (architecture.md, Topics): the one shape a
- * topic ever takes, on a post, at the head of the feed, beside Post. The tag
- * icon is part of the shape, so a topic is known at a glance. A pill that
- * opens a menu is a Menu with the pill trigger, drawn with the same classes.
+ * A topic as a small rounded label (architecture.md, Topics). This is the only
+ * shape a topic takes, on a post, at the top of the feed, and beside the Post
+ * button. The tag icon is part of the shape, so a topic is recognisable at a
+ * glance. A pill that opens a menu is a Menu with the pill trigger, which uses
+ * the same classes.
  */
 export function Pill({ href, onClick, label, tone = 'topic', size = 'sm', children }: PillProps) {
   const inner = (
@@ -76,9 +78,9 @@ export function Pill({ href, onClick, label, tone = 'topic', size = 'sm', childr
 }
 
 /**
- * A line under a control pill that belongs to it (a topic's description):
- * small and quiet, nudged a few pixels in from the pill's rounded edge so
- * it sits under the pill's text rather than hugging the card's edge.
+ * A line of text under a control pill, such as a topic's description. Small
+ * and muted, indented a few pixels from the pill's rounded edge so that it
+ * sits under the pill's text rather than against the card's edge.
  */
 export function PillCaption({ children }: { children?: ReactNode }) {
   return <p className="m-0 pl-2 text-sm leading-snug text-mute [overflow-wrap:anywhere]">{children}</p>

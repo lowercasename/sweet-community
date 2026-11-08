@@ -14,17 +14,17 @@ import { PostList } from './PostList'
 import { TopicMenu } from './TopicMenu'
 
 interface PostsPaneProps {
-  /** The group whose feed this is. */
+  /** The group whose feed this pane shows. */
   groupId: string
-  /** Which outer edge is padded; `left`/`right` inside a Split. */
+  /** Which outer edge is padded. `left` or `right` is used inside a Split. */
   side?: 'left' | 'right' | 'full'
-  /** Being looked at: open, and not behind another page. Looking is reading. */
+  /** True while the pane is open and not behind another page. A visible pane marks its feed as read. */
   watching: boolean
-  /** The community's feed showing one topic (architecture.md, Topics), from the URL. */
+  /** The topic that the community's feed is filtered to (architecture.md, Topics), read from the URL. */
   topicId?: string | null
 }
 
-/** A feed marks itself read this long after the newest post it showed. */
+/** The delay after the newest shown post before the feed is marked read. */
 const READ_DEBOUNCE_MS = 800
 
 export function PostsPane({ groupId, side = 'full', watching, topicId = null }: PostsPaneProps) {
@@ -32,7 +32,7 @@ export function PostsPane({ groupId, side = 'full', watching, topicId = null }: 
   const { posts, loading, error, hasMore, loadMore } = usePosts(groupId, topicId)
   const { create, edit, remove, setTopic } = usePostActions(groupId)
   const offline = status === 'offline'
-  // Topics are the community's feed's alone. The composer starts with the topic showing.
+  // Only the community's feed has topics. A new post gets the topic the feed is filtered to.
   const { topics } = useTopics()
   const topical = groupId === ROOT_ID && topics.length > 0
   const topic = topical ? topics.find((t) => t.id === topicId) : undefined
@@ -54,8 +54,9 @@ export function PostsPane({ groupId, side = 'full', watching, topicId = null }: 
     await create(html, topical ? (topic?.id ?? null) : null)
   }
 
-  // Looking is reading (architecture.md, Notifications): while watched and
-  // the page is in front, my marker on this feed follows its newest post.
+  // A visible feed is marked read (architecture.md, Notifications). While the
+  // pane is watched and the page is in the foreground, the user's read marker
+  // on this feed moves to its newest post.
   const { markers, loaded } = useMarkers()
   const markRead = useMarkRead()
   const visible = usePageVisible()

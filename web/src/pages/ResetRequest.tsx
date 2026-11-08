@@ -8,7 +8,7 @@ interface ResetRequestProps {
   name?: string
 }
 
-/** Forgot the password: an address, and a link goes there if it has an account. The answer never says which. */
+/** The forgotten password page. The user enters an email address, and a reset link is sent if the address has an account. The response never reveals whether it does. */
 export function ResetRequest({ name }: ResetRequestProps) {
   const [email, setEmail] = useState('')
   const [busy, setBusy] = useState(false)
@@ -39,7 +39,7 @@ export function ResetRequest({ name }: ResetRequestProps) {
             <Text as="span" weight="bold">
               {email.trim()}
             </Text>{' '}
-            has an account here, a link to choose a new password is on its way. It works for an hour.
+            has an account here, a link to choose a new password has been sent. The link expires in an hour.
           </Text>
           <Text variant="small">
             <Link href="/">Back to sign in</Link>

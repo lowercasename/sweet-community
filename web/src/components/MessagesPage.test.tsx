@@ -4,9 +4,9 @@ import { cleanup, fireEvent, screen, within } from '@testing-library/react'
 import { ROOT, dm, group, renderWithQuery, user } from '../test-utils'
 
 /**
- * The Messages page (architecture.md, Layout): my DMs and nothing else,
- * the one with the latest word first, each named by its people. With none,
- * it says where a conversation starts.
+ * The Messages page (architecture.md, Layout) lists only the user's DMs, with
+ * the most recent message first. Each DM is labelled with the names of its
+ * other members. With no DMs, the page shows where to start a conversation.
  */
 vi.mock('../api', () => ({
   listGroups: vi.fn(),
@@ -44,7 +44,7 @@ async function draw() {
 }
 
 describe('MessagesPage', () => {
-  it('lists my DMs only, latest word first, named by the other people', async () => {
+  it('lists only DMs, latest message first, labelled with the names of the other members', async () => {
     const onGo = await draw()
     const rows = within(await screen.findByRole('list')).getAllByRole('button')
     expect(rows.map((b) => b.getAttribute('aria-label'))).toEqual(['jo', 'kit', 'mo'])
@@ -53,7 +53,7 @@ describe('MessagesPage', () => {
     expect(onGo).toHaveBeenCalledWith('/r/d1')
   })
 
-  it('lists the conversations I have hidden below the others; opening one brings it back', async () => {
+  it('lists hidden conversations below the others, and opening one unhides it', async () => {
     const { listGroups, openDM } = await import('../api')
     vi.mocked(listGroups).mockResolvedValue({
       groups: [group(ROOT, 'member'), dm('d1', [kit, raphael]), dm('d2', [mo, raphael], { hidden_at: 5 })],
@@ -88,7 +88,7 @@ describe('MessagesPage', () => {
     expect(screen.getByRole('button', { name: 'jo' })).toBeTruthy()
   })
 
-  it('says where a conversation starts when there are none', async () => {
+  it('shows where to start a conversation when there are none', async () => {
     const { listGroups } = await import('../api')
     vi.mocked(listGroups).mockResolvedValue({ groups: [group(ROOT, 'member')] })
     const onGo = await draw()

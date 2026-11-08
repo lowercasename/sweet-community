@@ -7,9 +7,9 @@ import (
 	"sweet/internal/perm"
 )
 
-// Topics (architecture.md, Topics): a label a post can carry, at most one,
-// kept by the root group's staff, followed by whoever wants to hear of
-// posts in it.
+// Topics (architecture.md, Topics). A topic is a label on a post, and a post
+// has at most one. The root group's staff manage topics. Any user can follow
+// a topic to be notified of posts in it.
 
 func makeModerator(t *testing.T, owner *client, uid string) {
 	t.Helper()
@@ -29,7 +29,7 @@ func TestTopicsAreKeptByStaff(t *testing.T) {
 	kit, _ := registerMember(t, ts, owner, "kit")
 	mo, moID := registerMember(t, ts, owner, "mo")
 
-	// Nobody but the staff makes one. A moderator is staff.
+	// Only staff can create a topic. A moderator is staff.
 	kit.mustStatus(403, "POST", "/api/topics", map[string]string{"name": "Practice"})
 	practice := owner.mustStatus(201, "POST", "/api/topics", map[string]string{"name": " Practice ", "description": " What is working. "})
 	if practice["name"] != "Practice" || practice["description"] != "What is working." || practice["post_count"] != float64(0) || practice["following"] != false {
@@ -39,18 +39,18 @@ func TestTopicsAreKeptByStaff(t *testing.T) {
 	mo.mustStatus(201, "POST", "/api/topics", map[string]string{"name": "reading"})
 	owner.mustStatus(201, "POST", "/api/topics", map[string]string{"name": "Hangout"})
 
-	// Names are unique, case aside, and bounded.
+	// Names are unique, ignoring case, and have a maximum length.
 	owner.mustStatus(409, "POST", "/api/topics", map[string]string{"name": "PRACTICE"})
 	owner.mustStatus(400, "POST", "/api/topics", map[string]string{"name": "   "})
 	owner.mustStatus(400, "POST", "/api/topics", map[string]string{"name": "A name of more than forty characters is too long"})
 
-	// Everyone reads the list, alphabetical whatever the case.
+	// Every user can read the list. It is sorted alphabetically, ignoring case.
 	got := topicIDs(kit.mustStatus(200, "GET", "/api/topics", nil))
 	if !reflect.DeepEqual(got, []string{"Hangout", "Practice", "reading"}) {
 		t.Fatalf("list: %v", got)
 	}
 
-	// Rename and describe. The reply, the fetch and the event agree.
+	// Rename the topic and set its description. The response, the GET and the event are equal.
 	pid := practice["id"].(string)
 	renamed := owner.mustStatus(200, "PUT", "/api/topics/"+pid, map[string]string{"name": "Practice notes", "description": ""})
 	kit.mustStatus(403, "PUT", "/api/topics/"+pid, map[string]string{"name": "x"})
@@ -73,7 +73,7 @@ func TestTopicsAreKeptByStaff(t *testing.T) {
 		t.Fatalf("topic event %v differs from fetch %v", event, fetched)
 	}
 
-	// Delete: the topic's posts stay, without it. Everyone hears topic_delete.
+	// Deleting a topic keeps its posts, with no topic. Every user receives topic_delete.
 	post := kit.mustStatus(201, "POST", rootPath+"/posts", map[string]any{"body_html": "<p>filed</p>", "topic_id": pid})
 	kit.mustStatus(403, "DELETE", "/api/topics/"+pid, nil)
 	owner.mustStatus(200, "DELETE", "/api/topics/"+pid, nil)
@@ -103,7 +103,7 @@ func TestAPostCarriesAtMostOneTopic(t *testing.T) {
 	practice := owner.mustStatus(201, "POST", "/api/topics", map[string]string{"name": "Practice"})["id"].(string)
 	reading := owner.mustStatus(201, "POST", "/api/topics", map[string]string{"name": "Reading"})["id"].(string)
 
-	// Filed on creation, or not. A topic that does not exist is refused; a room has no topics.
+	// A post can be given a topic when it is created, or none. A topic that does not exist is rejected. A room has no topics.
 	filed := kit.mustStatus(201, "POST", rootPath+"/posts", map[string]any{"body_html": "<p>a</p>", "topic_id": practice})
 	plain := kit.mustStatus(201, "POST", rootPath+"/posts", map[string]any{"body_html": "<p>b</p>"})
 	if filed["topic_id"] != practice || plain["topic_id"] != nil {
@@ -113,7 +113,7 @@ func TestAPostCarriesAtMostOneTopic(t *testing.T) {
 	room := owner.mustStatus(201, "POST", "/api/groups", map[string]any{"kind": "group", "name": "Knitting", "mode": "both"})["id"].(string)
 	owner.mustStatus(400, "POST", "/api/groups/"+room+"/posts", map[string]any{"body_html": "<p>d</p>", "topic_id": practice})
 
-	// The feed shows everything, or one topic.
+	// The feed shows all posts, or the posts in one topic.
 	all := kit.mustStatus(200, "GET", rootPath+"/posts", nil)["posts"].([]any)
 	only := kit.mustStatus(200, "GET", rootPath+"/posts?topic="+practice, nil)["posts"].([]any)
 	if len(all) != 2 || len(only) != 1 || only[0].(map[string]any)["id"] != filed["id"] {
@@ -123,7 +123,7 @@ func TestAPostCarriesAtMostOneTopic(t *testing.T) {
 		t.Fatalf("reading: %v", none)
 	}
 
-	// Who may file a post: its author and the root staff, and the flag says so.
+	// The post's author and the root group's staff can set a post's topic, and the set_topic flag shows this.
 	fid := filed["id"].(string)
 	if filed["can"].(map[string]any)["set_topic"] != true {
 		t.Fatalf("author's flag: %v", filed["can"])
@@ -147,7 +147,7 @@ func TestAPostCarriesAtMostOneTopic(t *testing.T) {
 	if cleared["topic_id"] != nil {
 		t.Fatalf("cleared: %v", cleared)
 	}
-	// Editing the body leaves the topic alone, in a room too.
+	// Editing the body does not change the topic. The same applies in a room.
 	kit.mustStatus(200, "PUT", "/api/posts/"+fid+"/topic", map[string]any{"topic_id": practice})
 	edited := kit.mustStatus(200, "PUT", "/api/posts/"+fid, map[string]string{"body_html": "<p>a2</p>"})
 	if edited["topic_id"] != practice {
@@ -174,7 +174,7 @@ func TestFollowingATopicTellsYouOfPostsInIt(t *testing.T) {
 		return out
 	}
 
-	// Following is mine alone, and the list says so for me.
+	// Following is per user, and the list shows it only to that user.
 	followed := kit.mustStatus(200, "PUT", "/api/topics/"+practice+"/follow", nil)
 	if followed["following"] != true || followed["follower_count"] != float64(1) {
 		t.Fatalf("followed: %v", followed)
@@ -185,7 +185,7 @@ func TestFollowingATopicTellsYouOfPostsInIt(t *testing.T) {
 		}
 	}
 
-	// A post in the topic tells its followers, never its author. One without tells nobody.
+	// A post in the topic notifies its followers, never its author. A post without a topic notifies nobody.
 	post := mo.mustStatus(201, "POST", rootPath+"/posts", map[string]any{"body_html": "<p>in practice</p>", "topic_id": practice})
 	plain := mo.mustStatus(201, "POST", rootPath+"/posts", map[string]any{"body_html": "<p>plain</p>"})
 	got := mine(kit, NotifyTopicPost)
@@ -195,18 +195,18 @@ func TestFollowingATopicTellsYouOfPostsInIt(t *testing.T) {
 	if len(mine(mo, NotifyTopicPost)) != 0 || len(mine(owner, NotifyTopicPost)) != 0 {
 		t.Fatal("the author or a non-follower was told")
 	}
-	// Moving a post into the topic tells them too. Filing it again where it is does not.
+	// Moving a post into the topic also notifies them. Setting the same topic again does not.
 	mo.mustStatus(200, "PUT", "/api/posts/"+plain["id"].(string)+"/topic", map[string]any{"topic_id": practice})
 	mo.mustStatus(200, "PUT", "/api/posts/"+plain["id"].(string)+"/topic", map[string]any{"topic_id": practice})
 	if got := mine(kit, NotifyTopicPost); len(got) != 2 {
 		t.Fatalf("after a move: %v", got)
 	}
-	// The follower's own post in the topic is not news to them.
+	// A follower is not notified of their own post in the topic.
 	kit.mustStatus(201, "POST", rootPath+"/posts", map[string]any{"body_html": "<p>mine</p>", "topic_id": practice})
 	if got := mine(kit, NotifyTopicPost); len(got) != 2 {
 		t.Fatalf("told of my own post: %v", got)
 	}
-	// The event reaches the follower alone.
+	// The notification event is sent to the follower only.
 	told := 0
 	for _, e := range kit.readEvents(120) {
 		if e["kind"] == "notification" && e["payload"].(map[string]any)["kind"] == NotifyTopicPost {
@@ -217,7 +217,7 @@ func TestFollowingATopicTellsYouOfPostsInIt(t *testing.T) {
 		t.Fatalf("kit heard %d topic_post events", told)
 	}
 
-	// Unfollow: quiet from then on. The count follows.
+	// After unfollowing, the user gets no more topic notifications. The follower count updates.
 	unfollowed := kit.mustStatus(200, "DELETE", "/api/topics/"+practice+"/follow", nil)
 	if unfollowed["following"] != false || unfollowed["follower_count"] != float64(0) {
 		t.Fatalf("unfollowed: %v", unfollowed)

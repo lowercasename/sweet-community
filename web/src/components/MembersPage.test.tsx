@@ -4,9 +4,10 @@ import { cleanup, fireEvent, screen, within } from '@testing-library/react'
 import { group, member, renderWithQuery, user } from '../test-utils'
 
 /**
- * A group's members page shows exactly what the group's can flags allow:
- * the owner adds, removes, sets roles and hands over (with a confirm);
- * a member sees the list and Leave. Nothing here reasons about roles.
+ * A group's members page shows exactly the controls that the group's can
+ * flags allow. The owner can add and remove members, set roles, and transfer
+ * ownership after a confirmation. A member sees the list and the Leave
+ * button. The component has no role logic of its own.
  */
 vi.mock('../api', () => ({
   setGroupPicture: vi.fn(),
@@ -56,10 +57,10 @@ async function page(role: 'owner' | 'member', me = role === 'owner' ? kit : mo) 
 }
 
 describe('MembersPage', () => {
-  it('lets the owner add someone who is not yet in, and remove someone who is', async () => {
+  it('lets the owner add a user who is not a member, and remove a member', async () => {
     const { addMember, removeMember } = await import('../api')
     await page('owner')
-    // Only people not already in the group are offered.
+    // Only users who are not already members are offered.
     const picker = screen.getByLabelText('Add someone')
     expect(within(picker).queryByText('mo')).toBeNull()
     fireEvent.change(picker, { target: { value: 'jo' } })
@@ -69,12 +70,12 @@ describe('MembersPage', () => {
     fireEvent.click(within(rowOf('mo')).getByRole('button', { name: 'Options for mo' }))
     fireEvent.click(screen.getByRole('menuitem', { name: 'Remove' }))
     expect(removeMember).toHaveBeenCalledWith('club', 'mo')
-    // Gone from the list; back among the people who can be added.
+    // The removed user is no longer in the list and is offered for adding again.
     await vi.waitFor(() => expect(within(screen.getByRole('list')).queryByText('mo')).toBeNull())
     expect(within(screen.getByLabelText('Add someone')).getByText('mo')).toBeTruthy()
   })
 
-  it('lets the owner set roles and hand over, the latter after a confirm', async () => {
+  it('lets the owner set roles and transfer ownership, the latter after a confirmation', async () => {
     const { setMemberRole } = await import('../api')
     await page('owner')
     expect(within(rowOf('kit')).queryByRole('button', { name: 'Options for kit' })).toBeNull()
@@ -95,7 +96,7 @@ describe('MembersPage', () => {
     expect(setMemberRole).toHaveBeenCalledWith('club', 'mo', 'owner')
   })
 
-  it('lets the owner set and remove the room picture; a member sees no such control', async () => {
+  it('lets the owner set and remove the group picture, and shows a member no picture control', async () => {
     const { setGroupPicture } = await import('../api')
     vi.mocked(setGroupPicture).mockResolvedValue(group('club', 'owner', { name: 'Club', picture: '/img/x' }))
     await page('owner')
@@ -115,7 +116,7 @@ describe('MembersPage', () => {
     expect(updateGroup).toHaveBeenCalledWith('club', { name: 'Knitting', mode: 'chat' })
   })
 
-  it('shows a member the list and Leave, nothing else', async () => {
+  it('shows a member only the list and the Leave button', async () => {
     const { removeMember } = await import('../api')
     const onLeft = await page('member')
     expect(screen.queryByLabelText('Add someone')).toBeNull()

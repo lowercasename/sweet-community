@@ -14,7 +14,7 @@ import (
 )
 
 // TestS3RoundTrip runs against a real bucket when SWEET_S3_ENDPOINT and
-// SWEET_S3_BUCKET are set (make test exports .env); otherwise it skips. It
+// SWEET_S3_BUCKET are set (make test exports .env). Otherwise it skips. It
 // writes under its own prefix and removes what it wrote.
 func TestS3RoundTrip(t *testing.T) {
 	ep, bucket := os.Getenv("SWEET_S3_ENDPOINT"), os.Getenv("SWEET_S3_BUCKET")

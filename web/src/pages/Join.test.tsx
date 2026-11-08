@@ -2,7 +2,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, render, screen } from '@testing-library/react'
 
-/** The join page is about the community: who invited you, to what, and what it is for. */
+/** The join page shows the community. Who invited the visitor, to which community, and what it is for. */
 vi.mock('../api', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../api')>()),
   getInvite: vi.fn(() => Promise.resolve({ invited_by: 'raphael' })),

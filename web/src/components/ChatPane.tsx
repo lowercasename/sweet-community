@@ -11,18 +11,18 @@ import { ConnectionStatus } from './ConnectionStatus'
 import { MessageGroup } from './MessageGroup'
 
 interface ChatPaneProps {
-  /** The group whose room this is. */
+  /** The group whose chat this pane shows. */
   groupId: string
-  /** Which outer edge is padded; `left`/`right` inside a Split. */
+  /** Which outer edge is padded. `left` or `right` is used inside a Split. */
   side?: 'left' | 'right' | 'full'
-  /** Being looked at: open, and not behind another page. Looking is reading. */
+  /** True while the pane is open and not behind another page. A visible pane marks its chat as read. */
   watching: boolean
 }
 
 const GROUP_WINDOW_MS = 5 * 60_000
 const STICK_THRESHOLD_PX = 80
 
-/** Runs of messages by one person within GROUP_WINDOW_MS of the previous one. */
+/** Splits messages into runs by one user, each message within GROUP_WINDOW_MS of the previous one. */
 function group(list: MessageData[]): MessageData[][] {
   const groups: MessageData[][] = []
   for (const m of list) {
@@ -34,7 +34,7 @@ function group(list: MessageData[]): MessageData[][] {
   return groups
 }
 
-/** A chat marks itself read this long after the last message it showed, so a busy room is one PUT. */
+/** The delay after the last shown message before the chat is marked read, so a busy chat sends one PUT. */
 const READ_DEBOUNCE_MS = 800
 
 export function ChatPane({ groupId, side = 'full', watching }: ChatPaneProps) {
@@ -42,8 +42,9 @@ export function ChatPane({ groupId, side = 'full', watching }: ChatPaneProps) {
   const { messages, loading, error, hasEarlier, loadEarlier } = useMessages(groupId)
   const { send: sendMessage, remove } = useMessageActions(groupId)
 
-  // Looking is reading (architecture.md, Notifications): while watched and
-  // the page is in front, my marker on this chat follows its newest message.
+  // A visible chat is marked read (architecture.md, Notifications). While the
+  // pane is watched and the page is in the foreground, the user's read marker
+  // on this chat moves to its newest message.
   const { markers, loaded } = useMarkers()
   const markRead = useMarkRead()
   const visible = usePageVisible()
@@ -55,9 +56,9 @@ export function ChatPane({ groupId, side = 'full', watching }: ChatPaneProps) {
   }, [watching, visible, loaded, newest, readAt, groupId, markRead])
 
   const scrollRef = useRef<HTMLDivElement>(null)
-  // Follow new messages only while the viewer is already at the bottom.
+  // Scroll to new messages only while the user is already at the bottom.
   const stickRef = useRef(true)
-  // Height before an older page was prepended, so the view doesn't jump.
+  // The scroll height before an older page was prepended, used to keep the view from jumping.
   const prependRef = useRef<number | null>(null)
   // Last known scroll position, restored after the pane was hidden.
   const topRef = useRef(0)
@@ -75,15 +76,16 @@ export function ChatPane({ groupId, side = 'full', watching }: ChatPaneProps) {
 
   const onScroll = () => {
     const el = scrollRef.current
-    if (!el || el.clientHeight === 0) return // hidden: nothing to measure
+    if (!el || el.clientHeight === 0) return // The pane is hidden, so there is nothing to measure.
     stickRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < STICK_THRESHOLD_PX
     topRef.current = el.scrollTop
   }
 
-  // The pane is hidden (display: none) while closed or behind another page,
-  // which loses the browser's scroll position. When it gets a size again,
-  // or the divider changes its width, put the view back: at the bottom if it
-  // was following, else where it was.
+  // The pane is hidden with display: none while closed or behind another
+  // page, and the browser loses its scroll position. When the pane has a size
+  // again, or the divider changes its width, restore the view. Scroll to the
+  // bottom if the view was following new messages, otherwise to the saved
+  // position.
   useEffect(() => {
     const el = scrollRef.current
     if (!el) return
@@ -101,7 +103,7 @@ export function ChatPane({ groupId, side = 'full', watching }: ChatPaneProps) {
   }
 
   const send = async (bodyHtml: string) => {
-    stickRef.current = true // your own message always scrolls into view
+    stickRef.current = true // The user's own message always scrolls into view.
     await sendMessage(bodyHtml)
   }
 

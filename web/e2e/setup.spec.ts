@@ -3,13 +3,14 @@ import { join } from 'node:path'
 import { FRESH_MAIL_DIR, emailOf, expect, mailLink, prepare, test, uniq } from './helpers'
 
 /**
- * A new instance, end to end (architecture.md, New-instance lifecycle): the
- * setup link in the log makes the owner; the welcome page names the
- * community and hands out an invite link; the name is then everywhere, the
- * link brings people in, and the owner hears of each.
+ * A new instance, tested end to end (architecture.md, New-instance lifecycle).
+ * The setup link in the log creates the owner. The welcome page sets the
+ * community's name and creates an invite link. The name is then shown
+ * everywhere, new users register through the link, and the owner gets a
+ * notification for each of them.
  */
 test.describe('a fresh instance', () => {
-  test('the setup link, the welcome page, the first invite @fresh', async ({ browser }, testInfo) => {
+  test('the setup link, the welcome page and the first invite @fresh', async ({ browser }, testInfo) => {
     test.slow()
     const baseURL = testInfo.project.use.baseURL as string
     const log = readFileSync(join(process.cwd(), '..', 'data', 'e2e-fresh.log'), 'utf8')
@@ -17,7 +18,7 @@ test.describe('a fresh instance', () => {
     expect(m, 'the setup link in the log').toBeTruthy()
     const setupPath = new URL(m![1]).pathname
 
-    // Before setup, the sign-in page says so and the setup page is the way in.
+    // Before setup, the sign-in page says that the instance is not set up, and the setup page is how the owner gets in.
     const ctx = await browser.newContext({ baseURL })
     const page = await ctx.newPage()
     await prepare(page)
@@ -30,12 +31,12 @@ test.describe('a fresh instance', () => {
     await page.getByLabel('Password').fill('correct horse')
     await page.getByRole('button', { name: 'Set up' }).click()
 
-    // Onboarding: the name, then an invite link.
+    // Onboarding sets the community name and then creates an invite link.
     await expect(page.getByRole('heading', { name: 'Community settings' })).toBeVisible()
     await page.getByLabel('Community name').fill('Knitting Circle')
     await page.getByLabel('Short community description').fill('Wool and gossip.')
     await page.getByRole('button', { name: 'Next' }).click()
-    await expect(page.getByRole('heading', { name: 'Invite your first people' })).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Invite people' })).toBeVisible()
     await page.getByRole('button', { name: 'Create invite link' }).click()
     const url = await page.getByLabel('Invite link').inputValue()
     expect(url).toMatch(/\/join\//)
@@ -43,12 +44,13 @@ test.describe('a fresh instance', () => {
     await expect(page.getByRole('navigation', { name: 'Main' })).toBeVisible()
     await expect(page.getByRole('navigation', { name: 'Main' })).toContainText('Knitting Circle')
     await expect(page).toHaveTitle('Knitting Circle')
-    // A reload lands on Home, not the welcome page again.
+    // A reload opens Home, not the welcome page again.
     await page.reload()
     await expect(page.getByRole('navigation', { name: 'Main' })).toBeVisible()
     await expect(page.getByRole('heading', { name: 'Community settings' })).toHaveCount(0)
 
-    // The link brings two people in; each is joining Knitting Circle; the owner hears of both.
+    // Two users register through the link. The join page names Knitting Circle for each of them. The owner gets a
+    // notification for both.
     const joinPath = new URL(url).pathname
     const names = [uniq('ann'), uniq('bo')]
     for (const name of names) {
@@ -73,9 +75,10 @@ test.describe('a fresh instance', () => {
       .click()
     for (const name of names) await expect(page.getByText(`${name} joined the community`)).toBeVisible()
     await page.getByRole('navigation', { name: 'Main' }).getByRole('button', { name: 'People' }).click()
-    await expect(page.getByText('2 joined through it')).toBeVisible()
+    await expect(page.getByText('2 joined with this link')).toBeVisible()
 
-    // The Community page, in the nav for the owner: a rename reaches the corner at once.
+    // The owner has a Community button in the nav. Renaming the community updates the name at the top of the nav
+    // immediately.
     await page.getByRole('navigation', { name: 'Main' }).getByRole('button', { name: 'Community' }).click()
     await expect(page).toHaveURL(/\/community$/)
     await page.getByLabel('Community name').fill('The Circle')

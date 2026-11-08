@@ -3,21 +3,23 @@ import { resendVerification } from '../api'
 import { Alert, Button, Field, Form, Heading, Input, Row, Stack, Text } from '../ui'
 
 interface CheckEmailProps {
-  /** Where the link went. */
+  /** The address the link was sent to. */
   email: string
   /**
-   * Replace the address (architecture.md, Accounts: "didn't get it? resend,
-   * or change the address"). Resolves once a link is on its way to the new one.
+   * Changes the address (architecture.md, Accounts: "didn't get it? resend,
+   * or change the address"). Resolves once a link has been sent to the new
+   * address.
    */
   onChangeAddress: (email: string) => Promise<void>
-  /** Back to where this came from: the sign-in page, or the join form. */
+  /** Returns to the previous screen, which is the sign-in page or the join form. */
   backLabel: string
   onBack: () => void
 }
 
 /**
- * The screen after joining, and after a sign-in refused for an unverified
- * address: the link is in the mail; send it again, or send it somewhere else.
+ * The screen shown after joining, and after a sign-in is refused because the
+ * address is unverified. It says the link was sent by email, and lets the
+ * user resend it or send it to a different address.
  */
 export function CheckEmail({ email, onChangeAddress, backLabel, onBack }: CheckEmailProps) {
   const [sent, setSent] = useState<string | null>(null)
@@ -57,11 +59,11 @@ export function CheckEmail({ email, onChangeAddress, backLabel, onBack }: CheckE
     <Stack gap={3}>
       <Heading level={2}>Check your email</Heading>
       <Text>
-        A link is on its way to{' '}
+        A link has been sent to{' '}
         <Text as="span" weight="bold">
           {sent ?? email}
         </Text>
-        . Open it to verify your address and sign in. It works for a day.
+        . Open it to verify your address and sign in. The link expires in a day.
       </Text>
       {sent && <Alert>Sent again. Check your spam folder if it does not arrive.</Alert>}
       {changing ? (

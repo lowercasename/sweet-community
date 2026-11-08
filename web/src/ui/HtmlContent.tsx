@@ -4,9 +4,9 @@ import { wrapGalleries } from '../content/galleries'
 interface HtmlContentProps {
   /** HTML that has ALREADY been sanitised by the server (bluemonday). */
   html: string
-  /** `small` is a comment: a size under the post it answers. */
+  /** `small` is for a comment. A smaller font size than the post it replies to. */
   size?: 'body' | 'small'
-  /** A click anywhere in the body: Body routes the anchors it made (mentions) without a page load. */
+  /** Called on a click anywhere in the body. Body uses it to route the mention anchors it created without a page load. */
   onClick?: (e: MouseEvent<HTMLDivElement>) => void
 }
 
@@ -16,7 +16,7 @@ interface HtmlContentProps {
  *
  * This is the ONE component in the codebase allowed to use dangerouslySetInnerHTML.
  * It is safe only because every body passes through the server's bluemonday policy
- * before storage; nothing client-generated may be passed here unsanitised.
+ * before storage. Nothing client-generated may be passed here unsanitised.
  * `pnpm check:atomic` fails if dangerouslySetInnerHTML appears anywhere else.
  */
 export function HtmlContent({ html, size = 'body', onClick }: HtmlContentProps) {

@@ -7,17 +7,17 @@ import { Button, Heading, Input, Row, Stack, Text } from '../ui'
 
 interface WelcomeProps {
   settings: Settings
-  /** Onboarding is over: to the community. */
+  /** Called when onboarding is finished. Navigates to the community. */
   onDone: () => void
 }
 
 /**
- * Onboarding (architecture.md, New-instance lifecycle): the owner, just set
- * up, names the community and says what it is for, then gets a link to
- * invite the first people with. Ends on Home.
+ * Onboarding (architecture.md, New-instance lifecycle). The newly set up
+ * owner names the community and describes what it is for, then gets an
+ * invite link for the first users. Ends on Home.
  */
 export function Welcome({ settings: initial, onDone }: WelcomeProps) {
-  // The name as it now stands: the form's save lands in the cache before the step turns.
+  // The current name. The form's save reaches the cache before the step changes.
   const { settings: live } = useSettings()
   const settings = live ?? initial
   const [named, setNamed] = useState(initial.name !== '')
@@ -42,7 +42,7 @@ export function Welcome({ settings: initial, onDone }: WelcomeProps) {
       setCopied(true)
       window.setTimeout(() => setCopied(false), 2000)
     } catch {
-      // clipboard unavailable; the field is selectable
+      // The clipboard is unavailable. The field is still selectable.
     }
   }
 
@@ -50,7 +50,7 @@ export function Welcome({ settings: initial, onDone }: WelcomeProps) {
     <AuthFrame name={settings.name}>
       {named ? (
         <Stack gap={3}>
-          <Heading level={2}>Invite your first people</Heading>
+          <Heading level={2}>Invite people</Heading>
           <Text>
             Anyone with this link can join {settings.name} for the next seven days. After that, you can create a new
             link from the People page. You will receive a notification each time someone joins.

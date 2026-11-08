@@ -20,7 +20,7 @@ import {
 } from '../ui'
 
 interface SearchPageProps {
-  /** The words from the URL. */
+  /** The search query from the URL. */
   query: string
   groups: Group[]
   onGo: (path: string) => void
@@ -29,12 +29,13 @@ interface SearchPageProps {
 const KIND_WORD: Record<Hit['kind'], string> = { post: 'Post', comment: 'Comment', message: 'Message' }
 
 /**
- * Search (architecture.md, Search): the words go in the URL, so a search
- * can be kept or sent; the hits are posts, comments and messages from the
- * rooms I am in, best match first, each saying what and where it is, who
- * said it and when, with the matching words marked. A hit opens its post,
- * or its room for a message. The box is the whole width and Enter searches:
- * a search box needs no label and no button beside it (Raphael, 2026-11-06).
+ * The search page (architecture.md, Search). The query is stored in the URL,
+ * so a search can be bookmarked or shared. The hits are posts, comments and
+ * messages from the groups the user is in, best match first. Each hit shows
+ * its kind, its location, its author and its time, with the matching words
+ * marked. A hit opens its post, or its group for a message. The search input
+ * takes the whole width and Enter submits the search. A search input needs no
+ * label and no button beside it (Raphael, 2026-11-06).
  */
 export function SearchPage({ query, groups, onGo }: SearchPageProps) {
   const [typed, setTyped] = useState(query)
@@ -81,7 +82,7 @@ export function SearchPage({ query, groups, onGo }: SearchPageProps) {
   )
 }
 
-/** One hit: who, what and where, when; and the excerpt with its matches in bold. */
+/** One hit row. It shows the author, kind, location and time, then the excerpt with its matches in bold. */
 function HitRow({ hit, place, onOpen }: { hit: Hit; place?: string; onOpen: () => void }) {
   const author = useAuthor(hit.author)
   const plain = hit.excerpt.replace(/[\x01\x02]/g, '')

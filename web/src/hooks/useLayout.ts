@@ -20,7 +20,7 @@ function write(key: string, value: string) {
   try {
     localStorage.setItem(key, value)
   } catch {
-    // per-viewer convenience only
+    // The stored layout is a per-viewer convenience only, so a failed write is ignored.
   }
 }
 
@@ -44,9 +44,10 @@ interface LayoutState {
   navExpanded: boolean
 }
 
-// One store for the whole page (architecture.md, Layout): the tab bar in one
-// component changes the layout, the panes in another follow. Two hook calls
-// keeping their own state once left the Posts tab lit with chat still showing.
+// One store for the whole page (architecture.md, Layout). The tab bar in one
+// component changes the layout, and the panes in another component follow.
+// Two hook calls that each kept their own state once left the Posts tab
+// highlighted while the chat pane was still showing.
 let state: LayoutState | null = null
 const listeners = new Set<() => void>()
 
@@ -77,7 +78,8 @@ function subscribe(l: () => void) {
 
 /**
  * Which panes are open, how wide the posts pane is, and whether the nav is
- * expanded. All persist per browser; on a narrow screen only one pane shows, so `both` resolves to chat.
+ * expanded. All three persist per browser. On a narrow screen only one pane
+ * shows, so `both` resolves to chat.
  */
 export function useLayout(): {
   layout: Layout

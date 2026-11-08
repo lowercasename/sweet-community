@@ -1,5 +1,6 @@
--- Groups and memberships (architecture.md, Groups). Roles live here, not
--- on users. Who may do what is perm's call; the queries do not check.
+-- Groups and memberships (architecture.md, Groups). Roles are stored on
+-- memberships, not on users. perm decides who can do what. The queries do
+-- not check permissions.
 
 -- name: GetGroup :one
 SELECT g.id, g.kind, g.name, g.mode, g.created_at, g.picture_id,
@@ -7,12 +8,13 @@ SELECT g.id, g.kind, g.name, g.mode, g.created_at, g.picture_id,
 FROM groups g WHERE g.id = sqlc.arg(id) AND g.deleted_at IS NULL;
 
 -- name: GetMembership :one
--- Being in a group: a room's row, or a conversation's row while present.
+-- A user's membership of a group. For a room it is the row. For a
+-- conversation it is the row while the user has not hidden it.
 SELECT role, joined_at FROM memberships WHERE group_id = sqlc.arg(group_id) AND user_id = sqlc.arg(user_id) AND hidden_at IS NULL;
 
 -- name: ListMyGroups :many
--- Every group I have a row in, the conversations I have stepped out of
--- included, with my hidden_at so the client can tell them apart.
+-- Every group the user has a row in, including conversations they have
+-- hidden. It returns hidden_at so the client can tell them apart.
 SELECT g.id, g.kind, g.name, g.mode, g.created_at, g.picture_id, m.role, m.hidden_at,
        (SELECT MAX(created_at) FROM messages WHERE group_id = g.id AND deleted_at IS NULL) AS last_message_at
 FROM memberships m JOIN groups g ON g.id = m.group_id
@@ -29,7 +31,8 @@ FROM memberships m JOIN users u ON u.id = m.user_id
 WHERE m.group_id = sqlc.arg(group_id) AND m.user_id = sqlc.arg(user_id);
 
 -- name: ListMembers :many
--- A group's people: a room's members, a conversation's whole set, hidden by some or not.
+-- A group's members. For a room these are its members. For a conversation
+-- these are all its users, whether or not some of them have hidden it.
 SELECT u.id, u.username, u.picture_id, m.role, m.joined_at, m.hidden_at
 FROM memberships m JOIN users u ON u.id = m.user_id
 WHERE m.group_id = sqlc.arg(group_id)
@@ -40,7 +43,8 @@ INSERT INTO groups (id, kind, name, mode, created_at, people_key)
 VALUES (sqlc.arg(id), sqlc.arg(kind), sqlc.arg(name), sqlc.arg(mode), sqlc.arg(created_at), sqlc.arg(people_key));
 
 -- name: GetDMByPeople :one
--- The conversation of exactly these people, by its key; the same columns as GetGroup.
+-- The conversation with exactly these users, found by its people_key. It
+-- returns the same columns as GetGroup.
 SELECT g.id, g.kind, g.name, g.mode, g.created_at, g.picture_id,
        (SELECT MAX(created_at) FROM messages WHERE group_id = g.id AND deleted_at IS NULL) AS last_message_at
 FROM groups g WHERE g.kind = 'dm' AND g.people_key = sqlc.arg(people_key) AND g.deleted_at IS NULL;
@@ -52,12 +56,13 @@ UPDATE groups SET name = sqlc.arg(name), mode = sqlc.arg(mode) WHERE id = sqlc.a
 UPDATE groups SET picture_id = sqlc.arg(picture_id) WHERE id = sqlc.arg(id) AND deleted_at IS NULL;
 
 -- name: ListUserMemberships :many
--- Every live group a person is in, with their role and the group's kind.
+-- Every live group a user is in, with their role and the group's kind.
 SELECT m.group_id, m.role, g.kind FROM memberships m JOIN groups g ON g.id = m.group_id
 WHERE m.user_id = sqlc.arg(user_id) AND g.deleted_at IS NULL;
 
 -- name: NextOwner :one
--- Succession by seniority (architecture.md, Groups): the longest-serving moderator, else the longest-serving member.
+-- Succession by seniority (architecture.md, Groups). The next owner is the
+-- longest-serving moderator, or else the longest-serving member.
 SELECT user_id FROM memberships WHERE group_id = sqlc.arg(group_id) AND user_id != sqlc.arg(user_id)
 ORDER BY role = 'moderator' DESC, joined_at ASC LIMIT 1;
 
@@ -77,13 +82,11 @@ UPDATE memberships SET role = sqlc.arg(role) WHERE group_id = sqlc.arg(group_id)
 DELETE FROM memberships WHERE group_id = sqlc.arg(group_id) AND user_id = sqlc.arg(user_id);
 
 -- name: HideMembership :exec
--- Hiding a conversation: the row stays, hidden_at is set.
+-- Hiding a conversation keeps the row and sets hidden_at.
 UPDATE memberships SET hidden_at = sqlc.arg(hidden_at) WHERE group_id = sqlc.arg(group_id) AND user_id = sqlc.arg(user_id);
 
 -- name: ShowMembership :exec
 UPDATE memberships SET hidden_at = NULL WHERE group_id = sqlc.arg(group_id) AND user_id = sqlc.arg(user_id);
-
--- The viewer's DMs with their member ids, for find-or-create in Go.
 
 -- name: GetGroupOwnerID :one
 SELECT user_id FROM memberships WHERE group_id = sqlc.arg(group_id) AND role = 'owner';

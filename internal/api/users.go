@@ -11,10 +11,10 @@ import (
 	"sweet/internal/store"
 )
 
-// listUsers returns everyone on the instance, which is the root group's
-// membership: each person with their instance role, when they joined, and
-// whether the viewer may remove them. Private community: any member may
-// see the list.
+// listUsers returns every user on the instance, which is the root group's
+// membership. Each entry has the user's instance role, when they joined, and
+// whether the viewer may remove them. The community is private, so any
+// member may see the list.
 func (s *Server) listUsers(w http.ResponseWriter, r *http.Request) {
 	me, _ := userFrom(r.Context())
 	a, err := actorIn(r.Context(), s.q(), me, perm.Root)
@@ -48,18 +48,20 @@ func (s *Server) listUsers(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{"users": out})
 }
 
-// removedName is what a removed account is called: the tail of its id,
-// which is the random part of a UUIDv7 (the head is the time, shared by ids
-// made in the same instant), and which nobody can register
-// (auth.ValidateUsername).
+// removedName returns the username given to a removed account. It uses the
+// last eight characters of the id, which are the random part of a UUIDv7.
+// The first part is the time and is shared by ids made in the same instant.
+// Nobody can register a name with this prefix (auth.ValidateUsername).
 func removedName(id string) string { return "removed-" + id[len(id)-8:] }
 
-// removeUser takes someone off the instance (architecture.md, Admin
-// tools), by staff from People or by themselves from Settings. Their posts, comments and messages
-// stay under a removed name; each room they own passes by seniority, or
-// closes if they were alone; their conversations keep their place in the
-// set; their sessions end. The name goes out first, so every open page
-// renames their posts, comments and messages before their membership goes.
+// removeUser removes a user from the instance (architecture.md, Admin
+// tools). Staff do this from People, or the user does it themselves from
+// Settings. The user's posts, comments and messages remain under a removed
+// name. Each room they own passes to the next most senior member, or is
+// deleted if they were the only member. Their conversation memberships are
+// hidden rather than deleted. Their sessions are deleted. The user event is
+// logged first, so every open page renames their posts, comments and
+// messages before their memberships are removed.
 func (s *Server) removeUser(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	me, _ := userFrom(ctx)
@@ -94,7 +96,8 @@ func (s *Server) removeUser(w http.ResponseWriter, r *http.Request) {
 		}
 		for _, m := range rows {
 			if m.Kind == perm.KindDM {
-				// A conversation is its people; theirs is hidden, and the name says they are gone.
+				// A conversation is identified by its members, so the membership is
+				// hidden rather than deleted. The removed name shows that the user is gone.
 				if err := qtx.HideMembership(ctx, store.HideMembershipParams{HiddenAt: sql.NullInt64{Int64: now, Valid: true}, GroupID: m.GroupID, UserID: uid}); err != nil {
 					return nil, nil, http.StatusInternalServerError, err
 				}

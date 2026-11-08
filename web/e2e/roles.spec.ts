@@ -1,7 +1,7 @@
 import { article, confirm, expect, member, open, owner, pick, test, uniq, writePost } from './helpers'
 
 test.describe('roles', () => {
-  test('the owner promotes a member from People; a moderator deletes anything and edits nothing of others', async ({
+  test('the owner promotes a member from People, and a moderator can delete anything but cannot edit anything by other users', async ({
     browser,
   }, testInfo) => {
     const o = await owner(browser, testInfo)
@@ -12,26 +12,26 @@ test.describe('roles', () => {
     await writePost(mo.page, text)
 
     await open(kit.page)
-    // A member has no menu on someone else's post.
+    // A member has no menu on another user's post.
     await expect(article(kit.page, text).getByRole('button', { name: 'Post options' })).toHaveCount(0)
 
     await open(o.page, '/people')
     const row = o.page.getByRole('listitem').filter({ hasText: kit.username })
     await pick(o.page, row, `Options for ${kit.username}`, 'Make moderator')
     await expect(row).toContainText('moderator')
-    // The membership keeps its joined time, and the actions stay on the name's line at this width.
+    // The membership keeps its joined time, and the menu button stays on the same line as the name at this width.
     await expect(row).toContainText(/joined (just now|\d+m ago)/)
     await expect(row).not.toContainText('1970')
     const face = await row.getByRole('img').boundingBox()
     const action = await row.getByRole('button', { name: `Options for ${kit.username}` }).boundingBox()
     expect(face && action && action.y < face.y + face.height && action.y + action.height > face.y).toBeTruthy()
 
-    // Kit's open page learns of the new role: the menu appears, with Delete and without Edit.
+    // Kit's open page receives the role change. The menu appears, with Delete and without Edit.
     await article(kit.page, text).getByRole('button', { name: 'Post options' }).click()
     await expect(kit.page.getByRole('menuitem', { name: 'Delete' })).toBeVisible()
     await expect(kit.page.getByRole('menuitem', { name: 'Edit' })).toHaveCount(0)
     await kit.page.keyboard.press('Escape')
-    // And invites: a moderator now has the tools.
+    // Invites. A moderator now has the invite controls.
     await open(kit.page, '/people')
     await expect(kit.page.getByRole('button', { name: 'Create invite link' })).toBeVisible()
     await expect(kit.page.getByRole('button', { name: /Make / })).toHaveCount(0)
@@ -45,7 +45,9 @@ test.describe('roles', () => {
     await mo.context.close()
   })
 
-  test('removing someone: by the owner from People, and by themselves from Settings', async ({ browser }, testInfo) => {
+  test('a user is removed by the owner from People, or removes themselves from Settings', async ({
+    browser,
+  }, testInfo) => {
     const o = await owner(browser, testInfo)
     const kit = await member(browser, testInfo, 'kit')
     const mo = await member(browser, testInfo, 'mo')
@@ -64,31 +66,32 @@ test.describe('roles', () => {
     await open(kit.page)
     await open(mo.page)
 
-    // The owner removes kit from People, after a confirm.
+    // The owner removes kit from People, after a confirmation.
     await open(o.page, '/people')
     const row = o.page.getByRole('listitem').filter({ hasText: kit.username })
     await pick(o.page, row, `Options for ${kit.username}`, 'Remove')
     await confirm(o.page, 'Remove')
     await expect(o.page.getByRole('listitem').filter({ hasText: kit.username })).toHaveCount(0)
-    // Kit's open page signs itself out; the account cannot sign in again.
+    // Kit's open page signs itself out. The account cannot sign in again.
     await expect(kit.page.getByRole('button', { name: 'Sign in' })).toBeVisible()
     await kit.page.getByLabel('Username').fill(kit.username)
     await kit.page.getByLabel('Password').fill('longenough')
     await kit.page.getByRole('button', { name: 'Sign in' }).click()
     await expect(kit.page.getByRole('button', { name: 'Sign in' })).toBeVisible()
     await expect(kit.page.getByRole('navigation', { name: 'Main' })).toHaveCount(0)
-    // Kit's post stays on the feed, under a removed name, on a page that was open and after a fresh load.
+    // Kit's post stays in the feed under a removed- name. This holds on a page that was already open and after a
+    // fresh load.
     await expect(article(mo.page, text)).toContainText(/removed-/)
     await open(o.page)
     await expect(article(o.page, text)).toContainText(/removed-/)
     await expect(article(o.page, text)).not.toContainText(kit.username)
-    // The room passed to mo.
+    // Ownership of the room passed to mo.
     await mo.page.getByRole('navigation', { name: 'Main' }).getByRole('button', { name }).click()
     await mo.page.getByRole('button', { name: 'Members and settings' }).click()
     await expect(mo.page.getByRole('listitem').filter({ hasText: mo.username })).toContainText('owner')
     await expect(mo.page.getByRole('listitem').filter({ hasText: kit.username })).toHaveCount(0)
 
-    // Mo removes themselves from Settings, after a confirm.
+    // Mo removes themselves from Settings, after a confirmation.
     await open(mo.page, '/settings')
     await mo.page.getByRole('button', { name: 'Remove my account' }).click()
     await confirm(mo.page, 'Remove')

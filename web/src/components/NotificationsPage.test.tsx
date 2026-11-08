@@ -4,10 +4,11 @@ import { cleanup, fireEvent, screen, within } from '@testing-library/react'
 import { ROOT, group, notification, renderWithQuery, user } from '../test-utils'
 
 /**
- * The Notifications page (architecture.md, Notifications): mine, newest
- * first, in two sections: New, the ones not yet opened, and Earlier, the
- * opened ones, which Clear deletes. Looking at the page reads nothing;
- * opening a notification does.
+ * The Notifications page (architecture.md, Notifications) lists the user's
+ * notifications, newest first, in two sections. New holds the unopened
+ * notifications. Earlier holds the opened ones, and Clear deletes them.
+ * Viewing the page marks nothing as read. Opening a notification marks it as
+ * read.
  */
 vi.mock('../api', () => ({
   listNotifications: vi.fn(),
@@ -47,7 +48,7 @@ async function draw() {
 }
 
 describe('NotificationsPage', () => {
-  it('lists the unopened under New and the opened under Earlier; looking reads nothing', async () => {
+  it('lists unopened ones under New and opened ones under Earlier, and viewing marks none read', async () => {
     const { readNotification } = await import('../api')
     await draw()
     await screen.findByRole('heading', { name: 'New' })
@@ -67,7 +68,7 @@ describe('NotificationsPage', () => {
     expect(readNotification).not.toHaveBeenCalled()
   })
 
-  it('opening one reads it and goes to its thing; it moves to Earlier', async () => {
+  it('opening a notification marks it read, navigates to its target, and moves it to Earlier', async () => {
     const { readNotification } = await import('../api')
     const onGo = await draw()
     fireEvent.click(await screen.findByRole('button', { name: 'mo added you to Knitting, new' }))
@@ -80,7 +81,7 @@ describe('NotificationsPage', () => {
     expect(readNotification).toHaveBeenCalledTimes(1)
   })
 
-  it('a message notification reads "messaged you" and opens the conversation', async () => {
+  it('shows "messaged you" for a message notification and opens the conversation', async () => {
     const { listNotifications, readNotification } = await import('../api')
     vi.mocked(listNotifications).mockResolvedValue({
       notifications: [notification('n30', 'message', mo, { group_id: 'talk' })],
@@ -95,7 +96,7 @@ describe('NotificationsPage', () => {
     await screen.findByRole('button', { name: 'mo messaged you' })
   })
 
-  it('clears the opened ones for good; the unopened stay', async () => {
+  it('permanently deletes the opened notifications and keeps the unopened ones', async () => {
     const { clearNotifications } = await import('../api')
     await draw()
     await screen.findByRole('heading', { name: 'Earlier' })
@@ -105,7 +106,7 @@ describe('NotificationsPage', () => {
     expect(screen.getByRole('button', { name: 'mo added you to Knitting, new' })).toBeTruthy()
   })
 
-  it("words a mention by where it was: a post, or the room's chat", async () => {
+  it("describes a mention by its location, which is a post or a group's chat", async () => {
     const { listNotifications } = await import('../api')
     vi.mocked(listNotifications).mockResolvedValue({
       notifications: [
@@ -122,22 +123,22 @@ describe('NotificationsPage', () => {
       'mo mentioned you in Knitting, new',
       'mo mentioned you in the chat, new',
     ])
-    // A mention in a post opens the post; one in a chat opens the room.
+    // A mention in a post opens the post. A mention in a chat opens the group.
     fireEvent.click(rows[0])
     expect(onGo).toHaveBeenCalledWith('/p/p1')
     fireEvent.click(rows[1])
     expect(onGo).toHaveBeenCalledWith('/r/knit')
   })
 
-  it('says what will show here when nothing has yet', async () => {
+  it('shows an empty state that says what will appear when there are no notifications', async () => {
     const { listNotifications } = await import('../api')
     vi.mocked(listNotifications).mockResolvedValue({ notifications: [], next_before: null })
     await draw()
-    await screen.findByText(/Nice and quiet/)
+    await screen.findByText(/No notifications yet/)
     expect(screen.queryByRole('list')).toBeNull()
   })
 
-  it('names a room I am no longer in as a room', async () => {
+  it('labels a group the user is no longer in as "a room"', async () => {
     const { listNotifications } = await import('../api')
     vi.mocked(listNotifications).mockResolvedValue({
       notifications: [notification('n20', 'added', mo, { group_id: 'gone' })],

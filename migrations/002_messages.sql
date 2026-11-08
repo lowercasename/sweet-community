@@ -1,5 +1,5 @@
--- The one chat room. A message is a short body through the same sanitiser as
--- a post; replies (reply_to) come with their UI, not before.
+-- The single chat room. A message is a short body that goes through the same
+-- sanitiser as a post. Replies (reply_to) will be added with their UI, not before.
 CREATE TABLE messages (
     id         TEXT PRIMARY KEY,
     author_id  TEXT NOT NULL REFERENCES users(id),

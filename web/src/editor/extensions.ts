@@ -6,17 +6,18 @@ import Image from '@tiptap/extension-image'
 import { ReactNodeViewRenderer } from '@tiptap/react'
 import { EditorImage } from '../ui'
 
-// The drop line between blocks while dragging an image card.
+// The drop indicator line shown between blocks while dragging an image card.
 const dropcursor = { color: '#ed5e5e', width: 2 }
 
 const link = Link.configure({ openOnClick: false, autolink: true, defaultProtocol: 'https' })
 
 /**
  * An uploaded image. Only our own /img/<id> urls survive the server's
- * sanitiser; width and height (TipTap's own) let the page reserve space
- * before the bytes arrive, and data-image-id names the upload. In the editor
- * the node is drawn by EditorImage, a card with the alt text field; getHTML()
- * still serialises the plain <img>, so stored HTML is unchanged.
+ * sanitiser. The width and height attributes (TipTap's own) let the page
+ * reserve space before the bytes arrive, and data-image-id identifies the
+ * upload. In the editor the node is rendered by EditorImage, a card with the
+ * alt text field. getHTML() still serialises a plain <img>, so stored HTML is
+ * unchanged.
  */
 export const SweetImage = Image.extend({
   addAttributes() {
@@ -32,7 +33,7 @@ export const SweetImage = Image.extend({
 
 const placeholder = Placeholder.configure({ placeholder: 'What would you like to say?' })
 
-/** The same schema with another placeholder: a reply box says whom it answers. */
+/** The same extensions with a different placeholder. A reply box names the user it replies to. */
 export function withPlaceholder(extensions: Extensions, text: string): Extensions {
   return [...extensions.filter((e) => e.name !== 'placeholder'), Placeholder.configure({ placeholder: text })]
 }
@@ -45,15 +46,16 @@ export function withPlaceholder(extensions: Extensions, text: string): Extension
 export const postExtensions = [
   StarterKit.configure({
     heading: { levels: [2, 3] },
-    // StarterKit v3 bundles its own Link; disabled so the explicit one below is used.
+    // StarterKit v3 bundles its own Link extension. It is disabled so the explicitly configured one below is used.
     link: false,
     // Not in the PoC schema.
     underline: false,
     code: false,
     codeBlock: false,
     horizontalRule: false,
-    // Would append an empty <p></p> after a trailing list/blockquote, which
-    // getHTML() would then send to the server as part of the post body.
+    // The trailing node extension would append an empty <p></p> after a trailing
+    // list or blockquote, which getHTML() would then send to the server as part of
+    // the post body.
     trailingNode: false,
     dropcursor,
   }),
@@ -63,10 +65,11 @@ export const postExtensions = [
 ]
 
 /**
- * The chat schema: a strict subset of the post schema (paragraph, bold,
- * italic, strike, link, hard break). Same server policy, smaller editor.
- * No image node: chat images are attached above the text (BodyEditor
- * `images="attached"`) and sent as a block of <img> before it.
+ * The chat schema. A strict subset of the post schema, with paragraph, bold,
+ * italic, strike, link and hard break. The server policy is the same, and
+ * the editor is smaller. There is no image node. Chat images are attached
+ * above the text (BodyEditor `images="attached"`) and sent as a block of
+ * <img> elements before it.
  */
 export const chatExtensions = [
   StarterKit.configure({
@@ -87,7 +90,7 @@ export const chatExtensions = [
   placeholder,
 ]
 
-/** The comment schema: chat plus blockquote, which is what a quote-reply is. */
+/** The comment schema. The chat schema plus blockquote, which is used for a quote-reply. */
 export const commentExtensions = [
   StarterKit.configure({
     heading: false,

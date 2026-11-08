@@ -2,8 +2,8 @@ package perm
 
 import "testing"
 
-// One row per (who, what) pair. Every actor's role is their role in the
-// group the thing is in; "outsider" is not a member of it at all.
+// One case per (actor, action) pair. Each actor's role is their role in the
+// group the resource is in. "outsider" is not a member of that group.
 func TestRules(t *testing.T) {
 	owner := Actor{ID: "owner", Role: Owner}
 	mod := Actor{ID: "mod", Role: Moderator}
@@ -13,7 +13,7 @@ func TestRules(t *testing.T) {
 	outsider := Actor{ID: "out"}
 
 	kitsPost := Post{AuthorID: "kit"}
-	mosComment := Comment{AuthorID: "mo", PostAuthorID: "kit"} // mo commenting on kit's post
+	mosComment := Comment{AuthorID: "mo", PostAuthorID: "kit"} // mo's comment on kit's post
 	mosMessage := Message{AuthorID: "mo"}
 	root := Group{Kind: KindRoot}
 	club := Group{Kind: KindGroup}

@@ -1,9 +1,10 @@
 -- 021: the instance's own name (architecture.md, New-instance lifecycle,
--- Admin tools): settings rows for name and description, read by everyone
--- and set by the owner; a setup token for a fresh instance that has no
--- owner yet. Invites are many-use for their seven days (a group moves
--- together: Raphael, 2026-11-06), with a count of who came through; and a
--- fourth kind of notification, joined, which the owner gets for each.
+-- Admin tools). This adds settings rows for name and description, which any
+-- client can read and the owner can set. (The setup token for a new instance
+-- is also a settings row, written at startup, not by this migration.) Invites can be used many times during
+-- their seven days, because a group of people joins together (Raphael,
+-- 2026-11-06). Each invite counts the users who joined through it. A fourth
+-- kind of notification, joined, is sent to the owner for each of them.
 INSERT OR IGNORE INTO settings (key, value) VALUES ('name', ''), ('description', '');
 ALTER TABLE invites ADD COLUMN uses INTEGER NOT NULL DEFAULT 0;
 

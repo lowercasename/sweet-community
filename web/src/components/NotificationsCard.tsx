@@ -4,10 +4,11 @@ import { pushState, turnPushOff, turnPushOn, type PushState } from '../push'
 import { Alert, Button, Card, Heading, Row, Stack, Text } from '../ui'
 
 /**
- * What reaches me when I am away (architecture.md, Notifications): the
- * weekly email of what I missed, on until I turn it off, and this device,
- * for mentions and replies to my posts. Each toggle shows its state and,
- * under the pointer, the action.
+ * The settings for notifications sent while the user is away (architecture.md,
+ * Notifications). These are the weekly email summarising what the user
+ * missed, which is on until the user turns it off, and push notifications to
+ * this device for mentions and replies to the user's posts. Each toggle shows
+ * its state, and shows its action on hover.
  */
 export function NotificationsCard() {
   const { data: settings, error } = useMySettings()
@@ -53,7 +54,7 @@ export function NotificationsCard() {
         {error && <Alert tone="error">{error.message}</Alert>}
         {problem && <Alert tone="error">{problem}</Alert>}
         <Stack gap={1}>
-          <Heading level={3}>Weekly Digest</Heading>
+          <Heading level={3}>Weekly digest</Heading>
           <Text variant="small">
             An email sent when you haven't visited for a week with a summary of what you missed.
           </Text>

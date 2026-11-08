@@ -4,10 +4,10 @@ import { cleanup, screen } from '@testing-library/react'
 import { ROOT, marker, message, renderWithQuery, user } from '../test-utils'
 
 /**
- * Looking at a room is reading it (architecture.md, Notifications): while
- * the pane is watched, my marker on its chat follows the newest message,
- * so its count in the nav clears. A pane behind another page, or closed,
- * reads nothing.
+ * A visible chat pane marks its group's chat as read (architecture.md,
+ * Notifications). While the pane is watched, the user's read marker on the
+ * chat moves to the newest message, so the chat's unread count in the nav is
+ * cleared. A pane that is closed or behind another page marks nothing as read.
  */
 vi.mock('../api', () => ({
   getMessages: vi.fn(),
@@ -37,15 +37,15 @@ async function draw(watching: boolean) {
   await screen.findByText('m2')
 }
 
-describe('ChatPane reading', () => {
-  it('moves my marker to the newest message while watched', async () => {
+describe('ChatPane read marker', () => {
+  it('moves the read marker to the newest message while watched', async () => {
     const { setMarker } = await import('../api')
     await draw(true)
     await vi.waitFor(() => expect(setMarker).toHaveBeenCalledWith(`chat:${ROOT}`, 20), { timeout: 3000 })
     expect(setMarker).toHaveBeenCalledTimes(1)
   })
 
-  it('reads nothing while not watched', async () => {
+  it('does not move the read marker while not watched', async () => {
     const { setMarker } = await import('../api')
     await draw(false)
     await new Promise((r) => setTimeout(r, 1200))

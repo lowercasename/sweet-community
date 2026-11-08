@@ -4,10 +4,10 @@ import { act, renderHook } from '@testing-library/react'
 import { useEventStream } from './useEventStream'
 
 /**
- * The stream's first event names the server's version. A tab keeps the one
- * it was given and reloads when a later connection reports another: the
- * frontend is embedded in the binary, so a different version is a
- * different app (architecture.md, Updates: Clients).
+ * The stream's first event carries the server's version. A tab keeps the
+ * first version it received and reloads when a later connection reports a
+ * different one. The frontend is embedded in the binary, so a different
+ * version is a different app (architecture.md, Updates: Clients).
  */
 class FakeEventSource {
   static instances: FakeEventSource[] = []
@@ -53,7 +53,7 @@ describe('useEventStream version', () => {
     act(() => latest().emit('version', '"one"'))
     expect(reload).not.toHaveBeenCalled()
 
-    // Coming back online reopens the stream (as the hook does on its own).
+    // The online event makes the hook reopen the stream.
     act(() => window.dispatchEvent(new Event('online')))
     act(() => latest().emit('version', '"one"'))
     expect(reload).not.toHaveBeenCalled()

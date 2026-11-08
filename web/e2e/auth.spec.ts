@@ -1,7 +1,7 @@
 import { emailOf, expect, mailLink, member, open, owner, test, uniq } from './helpers'
 
 test.describe('signing in and joining', () => {
-  test('a wrong password is refused, the right one lands on Home', async ({ page }) => {
+  test('a wrong password is refused, and the right password opens Home', async ({ page }) => {
     await page.goto('/')
     await page.getByLabel('Username').fill('raphael')
     await page.getByLabel('Password').fill('wrong horse')
@@ -13,7 +13,7 @@ test.describe('signing in and joining', () => {
     await expect(page).toHaveURL(/\/$/)
   })
 
-  test('an invite link made on the People page lets a stranger join, once; the link in their mail signs them in', async ({
+  test('an invite link created on the People page lets a new user register, and the verification link in their email signs them in once', async ({
     browser,
   }, testInfo) => {
     const o = await owner(browser, testInfo)
@@ -32,28 +32,30 @@ test.describe('signing in and joining', () => {
     await page.getByLabel('Email address').fill(emailOf(name))
     await page.getByLabel('Password').fill('longenough')
     await page.getByRole('button', { name: 'Join' }).click()
-    // Not in yet: the link is in the mail.
+    // The user is not signed in yet. The verification link is in the email.
     await expect(page.getByText('Check your email')).toBeVisible()
     await expect(page.getByText(emailOf(name))).toBeVisible()
     await page.goto(mailLink(emailOf(name), 'verify'))
     await expect(page.getByRole('navigation', { name: 'Main' })).toBeVisible()
     await expect(page).toHaveURL(/\/$/)
     await expect(page.getByRole('navigation', { name: 'Main' }).getByRole('button', { name })).toBeVisible()
-    // The verification link is spent too.
+    // The verification link does not work a second time.
     const twice = await browser.newContext({ baseURL: testInfo.project.use.baseURL as string })
     const p3 = await twice.newPage()
     await p3.goto(mailLink(emailOf(name), 'verify'))
     await expect(p3.getByText('This link does not work')).toBeVisible()
     await twice.close()
 
-    // The link is good for the next person too, for its week; and the owner hears of each arrival.
+    // The invite link still works for the next user during the week it is valid.
+    // The owner gets a notification for each user who joins.
     const again = await browser.newContext({ baseURL: testInfo.project.use.baseURL as string })
     const p2 = await again.newPage()
     await p2.goto(path)
     await expect(p2.getByText('raphael invited you to Sweet e2e.')).toBeVisible()
     await open(o.page, '/notifications')
     await expect(o.page.getByText(`${name} joined the community`)).toBeVisible()
-    // Revoked (here by its code: People lists every open link, the helpers' too), it is good for nobody.
+    // Revoke the invite by its code, because the People page lists every open invite link, including the
+    // ones the helpers created. A revoked invite link works for nobody.
     const revoked = await o.context.request.delete(`/api/invites/${path.split('/').pop()}`)
     expect(revoked.ok()).toBeTruthy()
     await p2.reload()
@@ -63,7 +65,7 @@ test.describe('signing in and joining', () => {
     await o.context.close()
   })
 
-  test('an unverified account is sent back to its mail at sign-in, and can send the link elsewhere', async ({
+  test('an unverified account is shown the check-your-email page at sign-in, and can send the link to a different address', async ({
     browser,
   }, testInfo) => {
     const o = await owner(browser, testInfo)
@@ -92,7 +94,7 @@ test.describe('signing in and joining', () => {
     await ctx.close()
   })
 
-  test('the email address signs in too', async ({ browser }, testInfo) => {
+  test('a user can sign in with their email address', async ({ browser }, testInfo) => {
     const m = await member(browser, testInfo)
     await m.context.close()
     const ctx = await browser.newContext({ baseURL: testInfo.project.use.baseURL as string })
@@ -105,7 +107,7 @@ test.describe('signing in and joining', () => {
     await ctx.close()
   })
 
-  test('a forgotten password is reset by a link, which ends the other sessions @phone', async ({
+  test('a forgotten password is reset through an emailed link, and the reset ends the other sessions @phone', async ({
     browser,
   }, testInfo) => {
     const m = await member(browser, testInfo)
@@ -117,15 +119,16 @@ test.describe('signing in and joining', () => {
     await expect(page).toHaveURL(/\/reset$/)
     await page.getByLabel('Email address').fill(emailOf(m.username))
     await page.getByRole('button', { name: 'Send a link' }).click()
-    await expect(page.getByText(/a link to choose a new password is on its way/)).toBeVisible()
+    await expect(page.getByText(/a link to choose a new password has been sent/)).toBeVisible()
     await page.goto(mailLink(emailOf(m.username), 'reset'))
     await page.getByLabel('New password').fill('anotherlongone')
     await page.getByRole('button', { name: 'Set the password' }).click()
     await expect(page.getByRole('navigation', { name: 'Main' })).toBeVisible()
-    // The earlier session is over.
+    // The earlier session has ended.
     await m.page.reload()
     await expect(m.page.getByRole('button', { name: 'Sign in' })).toBeVisible()
-    // The link is spent (seen from a signed-out browser: signed in, a reset link is just Home).
+    // The reset link does not work a second time. This is checked from a signed-out browser, because a
+    // signed-in user who opens a reset link sees Home.
     await m.page.goto(mailLink(emailOf(m.username), 'reset'))
     await m.page.getByLabel('New password').fill('yetanotherone')
     await m.page.getByRole('button', { name: 'Set the password' }).click()
@@ -134,10 +137,11 @@ test.describe('signing in and joining', () => {
     await m.context.close()
   })
 
-  test('Settings: a new address takes effect when its link is opened; the password is changed with the old one', async ({
+  test('on Settings, a new email address takes effect when its link is opened, and the password is changed by entering the old one', async ({
     browser,
   }, testInfo) => {
-    // That the other sessions end is TestChangePassword's, on the server: a second sign-in here would spend the suite's sign-in allowance.
+    // The server test TestChangePassword checks that the other sessions end. A second sign-in here would
+    // use up the suite's sign-in allowance.
     const m = await member(browser, testInfo)
     await open(m.page, '/settings')
     await expect(m.page.getByText(emailOf(m.username), { exact: true })).toBeVisible()
@@ -145,12 +149,12 @@ test.describe('signing in and joining', () => {
     await m.page.getByLabel('New email address').fill(next)
     await m.page.getByLabel('Your password').fill('longenough')
     await m.page.getByRole('button', { name: 'Send a link there' }).click()
-    await expect(m.page.getByText(`A link is on its way to ${next}`)).toBeVisible()
+    await expect(m.page.getByText(`A link has been sent to ${next}`)).toBeVisible()
     await expect(m.page.getByText(emailOf(m.username), { exact: true })).toBeVisible()
     await m.page.goto(mailLink(next, 'verify'))
     await expect(m.page).toHaveURL(/\/settings$/)
     await expect(m.page.getByText(next, { exact: true })).toBeVisible()
-    await expect(m.page.getByText(/A link is on its way/)).toHaveCount(0)
+    await expect(m.page.getByText(/A link has been sent/)).toHaveCount(0)
 
     await m.page.getByLabel('Current password').fill('longenough')
     await m.page.getByLabel('New password').fill('anotherlongone')
@@ -159,7 +163,9 @@ test.describe('signing in and joining', () => {
     await m.context.close()
   })
 
-  test('sign out here returns to the sign-in page; a reload stays there', async ({ browser }, testInfo) => {
+  test('Sign out here returns to the sign-in page, and a reload stays on the sign-in page', async ({
+    browser,
+  }, testInfo) => {
     const m = await member(browser, testInfo)
     await open(m.page, '/settings')
     await m.page.getByRole('button', { name: 'Sign out here' }).click()

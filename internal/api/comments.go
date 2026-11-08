@@ -14,13 +14,14 @@ import (
 	"sweet/internal/store"
 )
 
-// Comment is one flat reply under a post. A quote-reply is a blockquote in
-// the body; there is no tree. It reaches its group through its post.
+// Comment is one reply under a post. Comments are a flat list, not a tree. A
+// quote-reply is a blockquote in the body. A comment belongs to its post's
+// group.
 type Comment struct {
 	ID      string `json:"id"`
 	PostID  string `json:"post_id"`
 	GroupID string `json:"group_id"`
-	// PostAuthorID is an ownership fact perm needs: the post's author may delete any comment on it.
+	// PostAuthorID is needed by perm, because the post's author may delete any comment on the post.
 	PostAuthorID string `json:"post_author_id"`
 	Author       User   `json:"author"`
 	BodyHTML     string `json:"body_html"`
@@ -30,8 +31,8 @@ type Comment struct {
 	Can          Can    `json:"can"`
 }
 
-// postActor resolves a post's owners and the viewer as perm sees them in its
-// group. A post the viewer cannot see does not exist to them: 404.
+// postActor resolves a post's owners and the viewer's Actor in the post's
+// group. A post the viewer cannot see returns 404.
 func (s *Server) postActor(r *http.Request, q *store.Queries, postID string) (store.GetPostOwnersRow, perm.Actor, int, error) {
 	owners, err := q.GetPostOwners(r.Context(), postID)
 	if errors.Is(err, sql.ErrNoRows) {
@@ -52,7 +53,7 @@ func (s *Server) postActor(r *http.Request, q *store.Queries, postID string) (st
 }
 
 // listComments returns every comment on a post, oldest first. Threads are
-// small; there is no paging.
+// small, so there is no paging.
 func (s *Server) listComments(w http.ResponseWriter, r *http.Request) {
 	postID := r.PathValue("id")
 	_, a, status, err := s.postActor(r, s.q(), postID)
@@ -86,7 +87,7 @@ func (s *Server) createComment(w http.ResponseWriter, r *http.Request) {
 	}
 	author, _ := userFrom(r.Context())
 	now := db.Now()
-	// The comment, then its notification to the post's author (architecture.md, Notifications), in one transaction.
+	// The comment and the notification to the post's author (architecture.md, Notifications) are written in one transaction.
 	s.loggedMany(w, r, now, func(qtx *store.Queries) ([]events.Entry, any, int, error) {
 		owners, a, status, err := s.postActor(r, qtx, postID)
 		if err != nil {
@@ -113,7 +114,7 @@ func (s *Server) createComment(w http.ResponseWriter, r *http.Request) {
 		if told != nil {
 			entries = append(entries, *told)
 		}
-		// Mentions in the comment reach their people too; the post's author, already told of the comment, once only.
+		// Users mentioned in the comment are notified too. The post's author, already notified of the comment, is not notified twice.
 		skip := ""
 		if told != nil {
 			skip = owners.AuthorID
@@ -126,7 +127,7 @@ func (s *Server) createComment(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// commentActor resolves a comment's owners and the viewer in its group; 404 if unseen.
+// commentActor resolves a comment's owners and the viewer's Actor in its group. A comment the viewer cannot see returns 404.
 func (s *Server) commentActor(r *http.Request, q *store.Queries, id string) (store.GetCommentOwnersRow, perm.Actor, int, error) {
 	owners, err := q.GetCommentOwners(r.Context(), id)
 	if errors.Is(err, sql.ErrNoRows) {
@@ -172,8 +173,9 @@ func (s *Server) editComment(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// deleteComment soft-deletes a comment (perm.DeleteComment says who may).
-// The event carries the ids so pages can drop it and lower the post's count.
+// deleteComment soft-deletes a comment. perm.DeleteComment decides who may.
+// The event carries the ids so that pages can remove the comment and
+// decrement the post's comment count.
 func (s *Server) deleteComment(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
 	now := db.Now()

@@ -8,9 +8,9 @@ import { ROOT, comment, dm, group, marker, member, message, mine, notification, 
 import type { Group, Marker, Member, Notification, Post, PostPage, User } from '../api'
 
 /**
- * The event stream is the cache's write path: one upsert and one delete per
- * resource, idempotent, so a replay after a reconnect changes nothing.
- * Feeds and rooms are per group; people and groups are instance-wide.
+ * The event stream is the cache's write path. Each resource has one upsert
+ * and one delete, both idempotent, so a replay after a reconnect changes
+ * nothing. Feeds and chats are per group. Users and groups are instance-wide.
  */
 const kit = user('kit')
 const mo = user('mo')
@@ -52,7 +52,7 @@ beforeEach(() => {
 })
 
 describe('applyEvent', () => {
-  it('prepends a notification to my loaded list once, and moves a marker forward only', () => {
+  it('prepends a notification to the loaded list once, and only moves a marker forward', () => {
     const list = () =>
       (qc.getQueryData(keys.notifications) as { pages: { notifications: Notification[] }[] }).pages.flatMap(
         (p) => p.notifications,
@@ -64,7 +64,7 @@ describe('applyEvent', () => {
     applyEvent(qc, 'notification', notification('n2', 'added', mo))
     applyEvent(qc, 'notification', notification('n2', 'added', mo))
     expect(list().map((n) => n.id)).toEqual(['n2', 'n1'])
-    // Clearing names a time: the opened ones up to it are gone; an unopened one stays.
+    // A clear event carries a time. Opened notifications created before it are removed. An unopened one stays.
     applyEvent(qc, 'notification', notification('n1', 'comment', mo, { read_at: 3 }))
     applyEvent(qc, 'notification_delete', { user_id: 'raphael', before: 5 })
     expect(list().map((n) => n.id)).toEqual(['n2'])
@@ -80,7 +80,7 @@ describe('applyEvent', () => {
     ])
   })
 
-  it("counts others' new messages and notifications against my markers as they arrive; never my own, never old ones", () => {
+  it("increments the unread counts for other users' new messages and notifications as they arrive, and not for the viewer's own or for old ones", () => {
     qc.setQueryData(keys.markers, {
       markers: [marker('notifications', 5, 0), marker(`chat:${ROOT}`, 10, 0), marker(`chat:${CLUB}`, 10, 2)],
     })
@@ -92,7 +92,7 @@ describe('applyEvent', () => {
     applyEvent(qc, 'message', message('c1', mo, { group_id: CLUB, created_at: 30 }))
     expect(unread(`chat:${ROOT}`)).toBe(1)
     expect(unread(`chat:${CLUB}`)).toBe(3)
-    // A post counts on the feed the same way; an edit of one is not new.
+    // A post increments the feed's unread count the same way. An edit of a post is not new.
     qc.setQueryData(keys.markers, {
       markers: [...(qc.getQueryData(keys.markers) as { markers: Marker[] }).markers, marker(`feed:${CLUB}`, 10, 0)],
     })
@@ -100,14 +100,14 @@ describe('applyEvent', () => {
     applyEvent(qc, 'post', post('p7', mo, { group_id: CLUB, created_at: 11, edited_at: 12 }))
     applyEvent(qc, 'post', post('p8', kit, { group_id: CLUB, created_at: 13 }))
     expect(unread(`feed:${CLUB}`)).toBe(1)
-    // Notifications count while unopened; opening one (the same event, with read_at) uncounts it.
+    // A notification counts as unread while unopened. Opening it (the same event with read_at set) decrements the count.
     qc.setQueryData(keys.notifications, { pages: [{ notifications: [], next_before: null }], pageParams: [null] })
     applyEvent(qc, 'notification', notification('n6', 'comment', mo))
     applyEvent(qc, 'notification', notification('n4', 'comment', mo, { read_at: 8 }))
     expect(unread('notifications')).toBe(1)
     applyEvent(qc, 'notification', notification('n6', 'comment', mo, { read_at: 9 }))
     expect(unread('notifications')).toBe(0)
-    // Leaving a room, or hiding a conversation, takes its marker with it.
+    // Leaving a room, or hiding a conversation, removes its marker.
     applyEvent(qc, 'membership_delete', { group_id: CLUB, user_id: 'kit' })
     expect((qc.getQueryData(keys.markers) as { markers: Marker[] }).markers.map((m) => m.stream)).toEqual([
       'notifications',
@@ -115,7 +115,7 @@ describe('applyEvent', () => {
     ])
   })
 
-  it('keeps a post page in step with its feed: edits, comment counts, authors and deletion reach the post query', () => {
+  it('keeps a post page in sync with its feed, so edits, comment counts, author changes and deletion reach the post query', () => {
     qc.setQueryData(keys.post('p2'), post('p2', mo))
     const page = () => qc.getQueryData(keys.post('p2')) as Post | undefined
     applyEvent(qc, 'post', post('p2', mo, { body_html: '<p>new</p>', edited_at: 5 }))
@@ -127,14 +127,14 @@ describe('applyEvent', () => {
     expect(page()!.comment_count).toBe(0)
     applyEvent(qc, 'user', user('mo', '/img/mo'))
     expect(page()!.author.picture).toBe('/img/mo')
-    // A post page the feed does not hold is left to fetch itself.
+    // A post page query that is not loaded is not created by a post event.
     applyEvent(qc, 'post', post('p9', mo))
     expect(qc.getQueryData(keys.post('p9'))).toBeUndefined()
     applyEvent(qc, 'post_delete', { id: 'p2', group_id: ROOT })
     expect(page()).toBeUndefined()
   })
 
-  it("keeps a person's page in step: their new post joins it, an edit replaces, a deletion leaves", () => {
+  it("keeps a user's posts list in sync, so a new post is added, an edit replaces the post, and a deletion removes it", () => {
     qc.setQueryData(keys.userPosts('mo'), {
       pages: [{ posts: [post('p2', mo)], next_before: null }],
       pageParams: [null],
@@ -146,7 +146,7 @@ describe('applyEvent', () => {
     expect(page().find((p) => p.id === 'p2')!.body_html).toBe('<p>new</p>')
     applyEvent(qc, 'post_delete', { id: 'p2', group_id: ROOT })
     expect(page().map((p) => p.id)).toEqual(['p5'])
-    // A profile event is the page's whole answer.
+    // A profile event replaces the whole profile query data.
     applyEvent(qc, 'profile', { ...mo, role: 'member', joined_at: 1, bio_html: '<p>hi</p>', can: { edit: false } })
     expect((qc.getQueryData(keys.profile('mo')) as { bio_html: string }).bio_html).toBe('<p>hi</p>')
   })
@@ -171,7 +171,7 @@ describe('applyEvent', () => {
     expect(posts()).toHaveLength(2)
   })
 
-  it('adds a new comment to its thread and counts it on the post; an edit replaces without counting', () => {
+  it('adds a new comment to its thread and increments the post comment count, and an edit replaces the comment without incrementing', () => {
     applyEvent(qc, 'comment', comment('c2', 'p2', mo))
     expect((qc.getQueryData(keys.comments('p2')) as { comments: unknown[] }).comments).toHaveLength(2)
     expect(posts().find((p) => p.id === 'p2')?.comment_count).toBe(1)
@@ -183,7 +183,7 @@ describe('applyEvent', () => {
     expect(posts().find((p) => p.id === 'p3')?.comment_count).toBe(1)
   })
 
-  it('removes a deleted comment and uncounts it', () => {
+  it('removes a deleted comment and decrements the comment count', () => {
     applyEvent(qc, 'comment_delete', { id: 'c1', post_id: 'p2', group_id: ROOT })
     expect((qc.getQueryData(keys.comments('p2')) as { comments: unknown[] }).comments).toHaveLength(0)
     expect(posts().find((p) => p.id === 'p2')?.comment_count).toBe(0)
@@ -204,7 +204,7 @@ describe('applyEvent', () => {
     expect(qc.getQueryData(keys.messages('elsewhere'))).toBeUndefined()
   })
 
-  it('updates a person everywhere they are held, me included', () => {
+  it('updates a user in every place the cache holds them, including the signed-in user', () => {
     applyEvent(qc, 'user', user('kit', '/img/new'))
     expect((qc.getQueryData(keys.users) as { users: Member[] }).users.find((u) => u.id === 'kit')?.picture).toBe(
       '/img/new',
@@ -224,18 +224,18 @@ describe('applyEvent', () => {
     expect((qc.getQueryData(keys.users) as { users: Member[] }).users.map((u) => u.id)).toEqual(['kit', 'mo', 'jo'])
   })
 
-  it('my own membership change refetches my groups and everything that carries can flags in that group', () => {
+  it("a change to the viewer's own membership refetches the groups and everything that carries can flags in that group", () => {
     applyEvent(qc, 'membership', { group_id: CLUB, user: kit, role: 'moderator', joined_at: 1 })
     expect(qc.getQueryState(keys.groups)?.isInvalidated).toBe(true)
     expect(qc.getQueryState(keys.posts(CLUB))?.isInvalidated).toBe(true)
     expect(qc.getQueryState(keys.posts(ROOT))?.isInvalidated).toBe(false)
     expect(qc.getQueryState(keys.comments('p2'))?.isInvalidated).toBe(false)
-    // Someone else's change touches nothing of mine.
+    // Another user's membership change invalidates nothing of the viewer's.
     applyEvent(qc, 'membership', { group_id: ROOT, user: mo, role: 'moderator', joined_at: 1 })
     expect(qc.getQueryState(keys.posts(ROOT))?.isInvalidated).toBe(false)
   })
 
-  it('being removed from a group drops it and everything in it; someone else leaving just leaves the list', () => {
+  it('being removed from a group removes it and everything in it from the cache, and another user leaving only removes them from the members list', () => {
     applyEvent(qc, 'membership_delete', { group_id: CLUB, user_id: 'mo' })
     expect(members(CLUB).map((m) => m.user.id)).toEqual(['kit'])
     expect(groups().map((g) => g.id)).toContain(CLUB)
@@ -245,7 +245,7 @@ describe('applyEvent', () => {
     expect(qc.getQueryData(keys.members(CLUB))).toBeUndefined()
   })
 
-  it("a user event renames the person's words in loaded feeds, threads and rooms, on the people list or not", () => {
+  it('a user event updates the author in loaded feeds, threads and chats, whether or not the user is in the users list', () => {
     qc.setQueryData(keys.comments('p2'), { comments: [comment('c1', 'p2', mo)] })
     qc.setQueryData(keys.messages(ROOT), {
       pages: [{ messages: [message('m1', mo)], next_before: null }],
@@ -262,7 +262,7 @@ describe('applyEvent', () => {
     ).toBe('removed-abc')
   })
 
-  it('leaving the root group is leaving the instance: off the people list; for me, signed out with nothing kept', () => {
+  it('leaving the root group is leaving the instance, so the user is removed from the users list, and the viewer is signed out with the cache cleared', () => {
     qc.setQueryData(keys.users, { users: [member('kit'), member('mo')] })
     applyEvent(qc, 'membership_delete', { group_id: ROOT, user_id: 'mo' })
     expect((qc.getQueryData(keys.users) as { users: Member[] }).users.map((u) => u.id)).toEqual(['kit'])
@@ -271,7 +271,7 @@ describe('applyEvent', () => {
     expect(qc.getQueryData(keys.posts(ROOT))).toBeUndefined()
   })
 
-  it('a group upserts into my list; a deleted group goes with everything in it', () => {
+  it('a group event upserts into the groups list, and a deleted group is removed with everything in it', () => {
     applyEvent(qc, 'group', group(CLUB, 'member', { name: 'Renamed' }))
     expect(groups().find((g) => g.id === CLUB)?.name).toBe('Renamed')
     applyEvent(qc, 'group', group('new', 'owner'))
@@ -281,7 +281,7 @@ describe('applyEvent', () => {
     expect(qc.getQueryData(keys.posts(CLUB))).toBeUndefined()
   })
 
-  it('a settings change refetches my groups, where the root carries the setting as a flag', () => {
+  it('a settings change refetches the groups, because the root group carries the setting as a can flag', () => {
     qc.setQueryData(keys.settings, { group_creation: 'anyone' })
     applyEvent(qc, 'settings', { group_creation: 'staff' })
     expect(qc.getQueryData(keys.settings)).toEqual({ group_creation: 'staff' })
@@ -306,7 +306,7 @@ describe('applyEvent', () => {
 })
 
 describe('latest activity', () => {
-  it('my hiding a conversation keeps it listed as hidden and drops what it holds; its people do not change', () => {
+  it('hiding a conversation keeps it in the groups list marked hidden and removes its contents, and its members do not change', () => {
     qc.setQueryData(keys.groups, { groups: [group(ROOT, 'member'), dm('d1', [kit, mo])] })
     qc.setQueryData(keys.messages('d1'), { pages: [], pageParams: [] })
     qc.setQueryData(keys.members('d1'), {
@@ -326,7 +326,7 @@ describe('latest activity', () => {
     expect(qc.getQueryData(keys.members('d1'))).toBeUndefined()
   })
 
-  it("a DM's group event carries its people, so an added person is in its name at once", () => {
+  it("a DM's group event carries its members, so an added user appears in its name at once", () => {
     qc.setQueryData(keys.groups, { groups: [group(ROOT, 'member'), dm('d1', [kit, mo])] })
     applyEvent(qc, 'group', dm('d1', [kit, mo, user('jo')]))
     expect(

@@ -1,6 +1,6 @@
--- Topics (architecture.md, Topics): the community's labels for posts. Who
--- may make or change them is perm's call (root staff); who follows one is
--- that person's own business.
+-- Topics (architecture.md, Topics) are the community's labels for posts.
+-- perm decides who can create or change them (root staff). Following a topic
+-- is each user's own choice.
 
 -- name: ListTopics :many
 SELECT t.id, t.name, t.description, t.created_at,
@@ -27,7 +27,7 @@ UPDATE topics SET name = sqlc.arg(name), description = sqlc.arg(description) WHE
 DELETE FROM topics WHERE id = sqlc.arg(id);
 
 -- name: ClearPostsTopic :exec
--- A deleted topic's posts stay, without one.
+-- A deleted topic's posts are kept, with no topic.
 UPDATE posts SET topic_id = NULL WHERE topic_id = sqlc.arg(topic_id);
 
 -- name: DeleteTopicFollows :exec

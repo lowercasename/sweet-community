@@ -115,7 +115,8 @@ type GetDMByPeopleRow struct {
 	LastMessageAt interface{}
 }
 
-// The conversation of exactly these people, by its key; the same columns as GetGroup.
+// The conversation with exactly these users, found by its people_key. It
+// returns the same columns as GetGroup.
 func (q *Queries) GetDMByPeople(ctx context.Context, peopleKey sql.NullString) (GetDMByPeopleRow, error) {
 	row := q.db.QueryRowContext(ctx, getDMByPeople, peopleKey)
 	var i GetDMByPeopleRow
@@ -148,8 +149,9 @@ type GetGroupRow struct {
 	LastMessageAt interface{}
 }
 
-// Groups and memberships (architecture.md, Groups). Roles live here, not
-// on users. Who may do what is perm's call; the queries do not check.
+// Groups and memberships (architecture.md, Groups). Roles are stored on
+// memberships, not on users. perm decides who can do what. The queries do
+// not check permissions.
 func (q *Queries) GetGroup(ctx context.Context, id string) (GetGroupRow, error) {
 	row := q.db.QueryRowContext(ctx, getGroup, id)
 	var i GetGroupRow
@@ -166,11 +168,9 @@ func (q *Queries) GetGroup(ctx context.Context, id string) (GetGroupRow, error) 
 }
 
 const getGroupOwnerID = `-- name: GetGroupOwnerID :one
-
 SELECT user_id FROM memberships WHERE group_id = ?1 AND role = 'owner'
 `
 
-// The viewer's DMs with their member ids, for find-or-create in Go.
 func (q *Queries) GetGroupOwnerID(ctx context.Context, groupID string) (string, error) {
 	row := q.db.QueryRowContext(ctx, getGroupOwnerID, groupID)
 	var user_id string
@@ -226,7 +226,8 @@ type GetMembershipRow struct {
 	JoinedAt int64
 }
 
-// Being in a group: a room's row, or a conversation's row while present.
+// A user's membership of a group. For a room it is the row. For a
+// conversation it is the row while the user has not hidden it.
 func (q *Queries) GetMembership(ctx context.Context, arg GetMembershipParams) (GetMembershipRow, error) {
 	row := q.db.QueryRowContext(ctx, getMembership, arg.GroupID, arg.UserID)
 	var i GetMembershipRow
@@ -244,7 +245,7 @@ type HideMembershipParams struct {
 	UserID   string
 }
 
-// Hiding a conversation: the row stays, hidden_at is set.
+// Hiding a conversation keeps the row and sets hidden_at.
 func (q *Queries) HideMembership(ctx context.Context, arg HideMembershipParams) error {
 	_, err := q.db.ExecContext(ctx, hideMembership, arg.HiddenAt, arg.GroupID, arg.UserID)
 	return err
@@ -266,7 +267,8 @@ type ListMembersRow struct {
 	HiddenAt  sql.NullInt64
 }
 
-// A group's people: a room's members, a conversation's whole set, hidden by some or not.
+// A group's members. For a room these are its members. For a conversation
+// these are all its users, whether or not some of them have hidden it.
 func (q *Queries) ListMembers(ctx context.Context, groupID string) ([]ListMembersRow, error) {
 	rows, err := q.db.QueryContext(ctx, listMembers, groupID)
 	if err != nil {
@@ -345,8 +347,8 @@ type ListMyGroupsRow struct {
 	LastMessageAt interface{}
 }
 
-// Every group I have a row in, the conversations I have stepped out of
-// included, with my hidden_at so the client can tell them apart.
+// Every group the user has a row in, including conversations they have
+// hidden. It returns hidden_at so the client can tell them apart.
 func (q *Queries) ListMyGroups(ctx context.Context, userID string) ([]ListMyGroupsRow, error) {
 	rows, err := q.db.QueryContext(ctx, listMyGroups, userID)
 	if err != nil {
@@ -391,7 +393,7 @@ type ListUserMembershipsRow struct {
 	Kind    string
 }
 
-// Every live group a person is in, with their role and the group's kind.
+// Every live group a user is in, with their role and the group's kind.
 func (q *Queries) ListUserMemberships(ctx context.Context, userID string) ([]ListUserMembershipsRow, error) {
 	rows, err := q.db.QueryContext(ctx, listUserMemberships, userID)
 	if err != nil {
@@ -425,7 +427,8 @@ type NextOwnerParams struct {
 	UserID  string
 }
 
-// Succession by seniority (architecture.md, Groups): the longest-serving moderator, else the longest-serving member.
+// Succession by seniority (architecture.md, Groups). The next owner is the
+// longest-serving moderator, or else the longest-serving member.
 func (q *Queries) NextOwner(ctx context.Context, arg NextOwnerParams) (string, error) {
 	row := q.db.QueryRowContext(ctx, nextOwner, arg.GroupID, arg.UserID)
 	var user_id string

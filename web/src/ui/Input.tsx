@@ -7,9 +7,9 @@ interface InputProps {
   autoFocus?: boolean
   required?: boolean
   readOnly?: boolean
-  /** Select everything on focus; for copyable values. */
+  /** Select the whole value on focus. For values meant to be copied. */
   selectOnFocus?: boolean
-  /** Its name when no Field labels it (a search box). */
+  /** Accessible name for when no Field labels the input, such as a search box. */
   label?: string
   placeholder?: string
   maxLength?: number

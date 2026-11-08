@@ -3,7 +3,10 @@ interface WordmarkProps {
   expanded?: boolean
   /** The label: the community's name, or other text such as "Made with Sweet". Defaults to "Sweet". */
   label?: string
-  /** md: 32px mark and 18px bold label, used in the sidebar head. sm: 20px mark and 14px label, used for the credit under auth pages. */
+  /**
+   * md is a 32px mark and an 18px bold label, used at the top of the sidebar. sm is a 20px mark and a 14px label, used
+   * for the credit under auth pages.
+   */
   size?: 'sm' | 'md'
 }
 
@@ -12,8 +15,8 @@ interface WordmarkProps {
  * letter's cap height is about two fifths of the circle's diameter, matching
  * the app icon. The gap is 8px, the same as the nav's, so in the sidebar the
  * label starts at the same x as the nav item labels. The label is red and
- * bold at md and grey at sm, so the credit under an auth page does not
- * compete with the page heading.
+ * bold at md and grey at sm, so that the credit under an auth page is less
+ * prominent than the page heading.
  */
 const SIZES = {
   md: { box: 'h-8', mark: 'h-8 w-8 text-[19px]', words: 'text-[18px] font-bold text-sweet' },

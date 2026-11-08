@@ -3,7 +3,7 @@ import { StrictMode } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 
-/** The verification link's page: the token is spent once on arrival. */
+/** The verification link's page. The token is used once, on arrival. */
 vi.mock('../api', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../api')>()),
   verifyEmail: vi.fn(),
@@ -14,7 +14,7 @@ afterEach(cleanup)
 beforeEach(() => vi.clearAllMocks())
 
 describe('Verify', () => {
-  it('spends the token once, even under strict mode, and hands over the person', async () => {
+  it('uses the token once, even under strict mode, and calls onVerified with the user', async () => {
     const { verifyEmail } = await import('../api')
     const { Verify } = await import('./Verify')
     vi.mocked(verifyEmail).mockResolvedValue({ user: { id: 'kit', username: 'kit', picture: null }, token: 't' })
@@ -29,7 +29,7 @@ describe('Verify', () => {
     expect(verifyEmail).toHaveBeenCalledWith('abc')
   })
 
-  it('a dead link says so and offers a new one', async () => {
+  it('an invalid link shows an error and offers a new one', async () => {
     const { ApiError, verifyEmail, resendVerification } = await import('../api')
     const { Verify } = await import('./Verify')
     vi.mocked(verifyEmail).mockRejectedValue(new ApiError(404, 'This link has been used or has expired'))
@@ -38,6 +38,6 @@ describe('Verify', () => {
     fireEvent.change(screen.getByLabelText('Send a new link to'), { target: { value: 'kit@example.test' } })
     fireEvent.click(screen.getByRole('button', { name: 'Send a new link' }))
     expect(resendVerification).toHaveBeenCalledWith('kit@example.test')
-    await screen.findByText(/a new link is on its way/)
+    await screen.findByText(/a new link has been sent/)
   })
 })

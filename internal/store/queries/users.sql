@@ -8,8 +8,9 @@ SELECT id, password_hash FROM users WHERE username = ?;
 SELECT id, username, picture_id, removed_at FROM users WHERE id = ?;
 
 -- name: RemoveUser :exec
--- Anonymise (architecture.md, Admin tools): the name becomes removed-<id prefix>,
--- the password and picture go, the row and the id stay for their content.
+-- Anonymises a user (architecture.md, Admin tools). The username becomes
+-- removed-<id prefix>, and the password and picture are cleared. The row and
+-- the id stay so that the user's content keeps its author.
 UPDATE users SET username = sqlc.arg(username), password_hash = NULL, picture_id = NULL, removed_at = sqlc.arg(removed_at)
 WHERE id = sqlc.arg(id);
 
@@ -20,8 +21,9 @@ INSERT INTO users (id, username, password_hash, created_at) VALUES (?, ?, ?, ?);
 UPDATE users SET password_hash = ? WHERE id = ?;
 
 -- name: GetProfileByUsername :one
--- A person as their profile shows them: who they are, their standing in the
--- root group, and their bio. A removed account has no profile.
+-- A user's profile. It has the user's id, username and picture, their role
+-- and joined time in the root group, and their bio. A removed account has no
+-- profile.
 SELECT u.id, u.username, u.picture_id, u.bio_html, m.role, m.joined_at
 FROM users u JOIN memberships m ON m.user_id = u.id AND m.group_id = '00000000-0000-7000-8000-000000000000'
 WHERE u.username = sqlc.arg(username) AND u.removed_at IS NULL;

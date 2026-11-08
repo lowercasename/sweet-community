@@ -5,10 +5,12 @@ import type { Group } from '../api'
 import { ROOT, dm, group, marker, nameOf, notification, renderWithQuery, user } from '../test-utils'
 
 /**
- * The nav column's three blocks (architecture.md, Layout): places (Home,
- * the Rooms section with its own New room control, the Messages section
- * of my five latest conversations with All messages at its foot), tools
- * (Search, Notifications), the house (People, and me).
+ * The nav column has three blocks (architecture.md, Layout). The first block
+ * lists the groups. It has Home, the Rooms section with its own New room
+ * control, and the Messages section with the user's five latest conversations
+ * and All messages at the bottom. The second block has the tools, which are
+ * Search and Notifications. The third block has the community items, which
+ * are People and the user's own account.
  */
 vi.mock('../api', () => ({
   listMembers: vi.fn(() => Promise.resolve({ members: [] })),
@@ -48,9 +50,9 @@ const groupsSection = () => screen.getByRole('group', { name: 'Rooms' })
 const messages = () => screen.getByRole('group', { name: 'Messages' })
 
 describe('Sidebar', () => {
-  it('holds places, then tools, then the house, with a rule between each block', async () => {
+  it('shows the groups block, the tools block and the community block, with a rule between each block', async () => {
     const onGo = await draw([root(true), knitting, withKit])
-    // Expanded, the section's control is in its title row, so it comes before the groups.
+    // When expanded, the section's control is in its title row, so it comes before the groups.
     expect(names()).toEqual([
       'Home',
       'New room',
@@ -79,7 +81,7 @@ describe('Sidebar', () => {
     expect(onGo).toHaveBeenCalledWith('/r/knit')
   })
 
-  it('lists the five conversations with the latest message, the open one too, and All messages at the foot', async () => {
+  it('lists the five latest conversations, plus the open one, and All messages at the bottom', async () => {
     await draw([root(true), ...many])
     expect(within(messages()).getAllByRole('button').map(nameOf)).toEqual([
       'New message',
@@ -91,7 +93,7 @@ describe('Sidebar', () => {
       'All messages',
     ])
     cleanup()
-    // Opened from the full list, an older one joins the section while it is open, after the five.
+    // An older conversation opened from the full list is added after the five while it is open.
     await draw([root(true), ...many], '/r/d1')
     expect(within(messages()).getAllByRole('button').map(nameOf)).toEqual([
       'New message',
@@ -105,24 +107,25 @@ describe('Sidebar', () => {
     ])
     expect(within(messages()).getByRole('button', { name: 'p1' }).getAttribute('aria-current')).toBe('page')
     cleanup()
-    // No conversations yet: the section still offers to start one; All messages has nothing to add.
+    // With no conversations, the section still shows New message. All messages is not shown, because it would list
+    // nothing more.
     await draw([root(true), knitting])
     expect(within(messages()).getAllByRole('button').map(nameOf)).toEqual(['New message'])
   })
 
-  it('a conversation I have hidden is not in the nav', async () => {
+  it('a hidden conversation is not in the nav', async () => {
     await draw([root(true), withKit, dm('out', [mo, raphael], { last_message_at: 100, hidden_at: 5 })])
     expect(within(messages()).getAllByRole('button').map(nameOf)).toEqual(['New message', 'kit', 'All messages'])
   })
 
-  it('names a conversation by its other person and marks it by their face', async () => {
+  it("labels a conversation with the other user's name and shows their avatar", async () => {
     await draw([root(true), withKit, dm('d2', [mo, raphael])], '/', false)
     const item = (name: string) => screen.getByRole('button', { name })
     expect(item('kit').querySelectorAll('img').length).toBe(1)
     expect(item('mo').querySelectorAll('img').length).toBe(1)
   })
 
-  it('lists rooms alphabetically, case aside, whatever order they came in', async () => {
+  it('lists groups alphabetically, ignoring case, regardless of their input order', async () => {
     await draw([
       root(true),
       group('mods', 'member', { name: 'Mod Team' }),
@@ -137,7 +140,7 @@ describe('Sidebar', () => {
     ])
   })
 
-  it('shows the Rooms section only when it has something to show', async () => {
+  it('shows the Rooms section only when it has a group or the New room control', async () => {
     await draw([root(false), withKit])
     expect(screen.queryByRole('group', { name: 'Rooms' })).toBeNull()
     cleanup()
@@ -149,13 +152,13 @@ describe('Sidebar', () => {
     expect(within(groupsSection()).getByRole('button', { name: 'New room' })).toBeTruthy()
   })
 
-  it('marks the page being viewed: All messages for its page, a conversation for itself', async () => {
+  it('marks All messages as current on its page and a conversation as current on its route', async () => {
     const current = () =>
       screen
         .getAllByRole('button')
         .filter((b) => b.getAttribute('aria-current') === 'page')
         .map(nameOf)
-    // All messages is there to be current only when the section does not show everything.
+    // All messages is shown, and can be current, only when the section does not list every conversation.
     await draw([root(true), knitting, ...many], '/messages')
     expect(current()).toEqual(['All messages'])
     cleanup()
@@ -172,9 +175,10 @@ describe('Sidebar', () => {
     expect(current()).toEqual(['Home'])
   })
 
-  it('collapsed, keeps every name, drops the section title, and shows a group by its initial', async () => {
+  it('when collapsed, keeps every item name, hides the section titles, and shows a group by its initial', async () => {
     await draw([root(true), knitting, withKit], '/', false)
-    // Collapsed, there is no title row and no section control: a plus among the tiles took the room of a place.
+    // When collapsed, there is no title row and no section control. A plus button among the tiles took the space of
+    // a group tile.
     expect(names()).toEqual([
       'Home',
       'Knitting',
@@ -193,17 +197,17 @@ describe('Sidebar', () => {
     expect(screen.getByRole('navigation').querySelectorAll('hr').length).toBe(2)
   })
 
-  it('collapsed with no rooms and no conversations, draws no section at all', async () => {
+  it('when collapsed with no groups and no conversations, renders no section', async () => {
     await draw([root(true)], '/', false)
     expect(screen.queryByRole('group')).toBeNull()
     expect(names()).toEqual(['Home', 'Search', 'Notifications', 'People', 'Community', 'raphael', 'Expand'])
     cleanup()
-    // Expanded, each section is there to offer its control.
+    // When expanded, each section is shown so that it can offer its control.
     await draw([root(true)], '/', true)
     expect(screen.getAllByRole('group').length).toBe(2)
   })
 
-  it('the bell carries a dot while a notification is newer than my marker, and opens the page', async () => {
+  it('Notifications shows a dot while a notification is newer than the read marker, and opens its page', async () => {
     const { listNotifications, listMarkers } = await import('../api')
     vi.mocked(listNotifications).mockResolvedValue({
       notifications: [notification('n9', 'comment', kit), notification('n3', 'added', kit)],
@@ -224,7 +228,7 @@ describe('Sidebar', () => {
     expect(screen.queryByRole('button', { name: 'Notifications, unread' })).toBeNull()
   })
 
-  it('marks unread messages on Home, a room and a conversation with a dot, never a number', async () => {
+  it('marks unread messages on Home, a group and a conversation with a dot, never a number', async () => {
     const { listMarkers } = await import('../api')
     vi.mocked(listMarkers).mockResolvedValue({
       markers: [
@@ -238,7 +242,7 @@ describe('Sidebar', () => {
     await draw([root(false), knitting, withKit])
     const home = await screen.findByRole('button', { name: 'Home, unread' })
     expect(home.textContent).not.toContain('3')
-    // Either stream lights a room.
+    // Unread content in either stream marks a group as unread.
     expect(screen.getByRole('button', { name: 'Knitting, unread' })).toBeTruthy()
     expect(screen.getByRole('button', { name: 'kit, unread' }).textContent).not.toContain('12')
     cleanup()
@@ -246,7 +250,7 @@ describe('Sidebar', () => {
     await screen.findByRole('button', { name: 'Home, unread' })
   })
 
-  it('the account row at the foot is me: it opens my own page, and is current there', async () => {
+  it('the account row at the bottom is the user, opens their profile, and is current there', async () => {
     const onGo = await draw([root(false)], '/u/raphael')
     const me = screen.getByRole('button', { name: 'raphael' })
     expect(me.getAttribute('aria-current')).toBe('page')
@@ -255,7 +259,7 @@ describe('Sidebar', () => {
     expect(screen.queryByRole('button', { name: 'Settings' })).toBeNull()
   })
 
-  it('a room with a picture is marked by it; one without, by its initial', async () => {
+  it('a group with a picture shows the picture, and a group without one shows its initial', async () => {
     await draw([root(false), knitting, group('wool', 'member', { name: 'Wool', picture: '/img/wool' })])
     expect(screen.getByRole('button', { name: 'Wool' }).querySelector('img')!.getAttribute('src')).toBe('/img/wool')
     expect(screen.getByRole('button', { name: 'Knitting' }).querySelector('img')).toBeNull()

@@ -4,9 +4,9 @@ import { cleanup, fireEvent, screen } from '@testing-library/react'
 import { renderWithQuery, user } from '../test-utils'
 
 /**
- * Signing out must reach the component that asked who is signed in. The
- * trap: clearing the cache while an observer is mounted leaves it holding
- * the removed query and its old answer.
+ * Signing out must update the component that queried the signed-in user.
+ * Clearing the cache while an observer is mounted leaves the observer holding
+ * the removed query and its old data.
  */
 vi.mock('../api', () => ({
   getMe: vi.fn(() => Promise.resolve(user('kit'))),
@@ -16,7 +16,7 @@ vi.mock('../api', () => ({
 afterEach(cleanup)
 
 describe('useSession', () => {
-  it('signing out tells the signed-in observer that nobody is signed in', async () => {
+  it('signing out updates the observer of the signed-in user to null', async () => {
     const { useMe, useSession } = await import('./hooks')
     function Who() {
       const { data: me, isPending } = useMe()

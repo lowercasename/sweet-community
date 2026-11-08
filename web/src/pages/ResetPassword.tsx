@@ -11,7 +11,7 @@ interface ResetPasswordProps {
   onReset: (me: User) => void
 }
 
-/** The page a reset link opens: a new password, every other session ended, and signed in here. */
+/** The page a reset link opens. The user sets a new password, every other session is ended, and this session is signed in. */
 export function ResetPassword({ token, name, onReset }: ResetPasswordProps) {
   const [password, setPassword] = useState('')
   const [busy, setBusy] = useState(false)

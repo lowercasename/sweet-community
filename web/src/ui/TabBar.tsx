@@ -5,7 +5,7 @@ interface Tab<K extends string> {
   key: K
   icon: IconName
   label: string
-  /** Something unread behind it: a dot, never a count. */
+  /** Whether the tab has unread content. Shows a dot, never a count. */
   dot?: boolean
 }
 
@@ -16,7 +16,7 @@ interface TabBarProps<K extends string> {
   onSelect: (key: K) => void
 }
 
-/** Phone navigation: a bar at the bottom of the screen, an icon and a short label per item. */
+/** Phone navigation. A bar at the bottom of the screen with an icon and a short label per item. */
 export function TabBar<K extends string>({ tabs, active, onSelect }: TabBarProps<K>) {
   return (
     <nav aria-label="Main" className="flex flex-none border-t-2 border-pink bg-card pb-[env(safe-area-inset-bottom)]">

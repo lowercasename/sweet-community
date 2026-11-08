@@ -5,7 +5,7 @@ interface FormProps {
   children?: ReactNode
 }
 
-/** Form element; always prevents the native submit. */
+/** A form element. It always prevents the native submit. */
 export function Form({ onSubmit, children }: FormProps) {
   const handle = (e: FormEvent) => {
     e.preventDefault()

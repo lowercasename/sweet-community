@@ -23,7 +23,7 @@ const getSetting = `-- name: GetSetting :one
 SELECT value FROM settings WHERE key = ?1
 `
 
-// Instance settings: a key and a value (architecture.md, Feature flags).
+// Instance settings are key-value pairs (architecture.md, Feature flags).
 func (q *Queries) GetSetting(ctx context.Context, key string) (string, error) {
 	row := q.db.QueryRowContext(ctx, getSetting, key)
 	var value string

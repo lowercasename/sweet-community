@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, screen } from '@testing-library/react'
 import { ROOT, marker, post, renderWithQuery, user } from '../test-utils'
 
-/** Looking at a feed is reading it, as with a room's chat (architecture.md, Notifications). */
+/** A visible feed is marked read, as with a group's chat (architecture.md, Notifications). */
 vi.mock('../api', () => ({
   getPosts: vi.fn(),
   listMarkers: vi.fn(),
@@ -55,14 +55,14 @@ async function draw(watching: boolean) {
   await screen.findByText('p20')
 }
 
-describe('PostsPane reading', () => {
-  it('moves my marker to the newest post while watched', async () => {
+describe('PostsPane read marker', () => {
+  it('moves the read marker to the newest post while watched', async () => {
     const { setMarker } = await import('../api')
     await draw(true)
     await vi.waitFor(() => expect(setMarker).toHaveBeenCalledWith(`feed:${ROOT}`, 20), { timeout: 3000 })
   })
 
-  it('reads nothing while not watched', async () => {
+  it('does not move the read marker while not watched', async () => {
     const { setMarker } = await import('../api')
     await draw(false)
     await new Promise((r) => setTimeout(r, 1200))
@@ -70,9 +70,13 @@ describe('PostsPane reading', () => {
   })
 })
 
-/** Showing one topic (architecture.md, Topics): the feed narrows, its header names it, Subscribe follows it. */
-describe('PostsPane showing a topic', () => {
-  it('fetches that topic alone, names it above the composer, and follows it on Subscribe', async () => {
+/**
+ * Filtering the feed to one topic (architecture.md, Topics). The feed shows
+ * only that topic, its header shows the topic's name, and Subscribe follows
+ * the topic.
+ */
+describe('PostsPane filtered to a topic', () => {
+  it('fetches only that topic, shows its name above the composer, and follows it on Subscribe', async () => {
     const { getPosts, followTopic } = await import('../api')
     const { PostsPane } = await import('./PostsPane')
     const { fireEvent } = await import('@testing-library/react')
@@ -89,11 +93,11 @@ describe('PostsPane showing a topic', () => {
     await vi.waitFor(() =>
       expect(screen.getByRole('button', { name: 'Subscribed' }).getAttribute('aria-pressed')).toBe('true'),
     )
-    // Inside a topic the post goes where you are: no chooser beside Post.
+    // In a topic view, a new post gets the current topic, so there is no topic chooser beside Post.
     expect(screen.queryByRole('button', { name: 'Topic' })).toBeNull()
   })
 
-  it('reads Everything at the head of the feed, with nothing to subscribe to, when no topic is named', async () => {
+  it('shows Everything at the top of the feed, with no Subscribe button, when no topic is set', async () => {
     const { getPosts } = await import('../api')
     await draw(false)
     expect(getPosts).toHaveBeenCalledWith(ROOT, null, 20, null)

@@ -1,14 +1,16 @@
 import { expect, member, open, test } from './helpers'
 
 /**
- * What reaches a person away from the app (architecture.md, Notifications):
- * the weekly digest is on until they turn it off on Settings, and the
- * device toggle is offered where the browser can show notifications.
+ * Notifications that reach a user outside the app (architecture.md, Notifications).
+ * The weekly digest is on until the user turns it off on Settings. The device
+ * toggle is offered when the browser can show notifications.
  */
 test.describe('notification settings', () => {
-  test('the digest is on by default, turns off, and stays off across a reload', async ({ browser }, testInfo) => {
+  test('the digest is on by default, can be turned off, and stays off after a reload', async ({
+    browser,
+  }, testInfo) => {
     const kit = await member(browser, testInfo, 'kit')
-    // Headless Chromium denies notifications unless told otherwise; a person's browser asks them.
+    // Headless Chromium denies notifications unless the permission is granted. A user's browser asks the user.
     await kit.context.grantPermissions(['notifications'])
     await open(kit.page, '/settings')
     const on = kit.page.getByRole('button', { name: 'Weekly digest on' })
@@ -33,7 +35,7 @@ test.describe('notification settings', () => {
     // checks that one of the three texts is shown.
     const device = kit.page.getByText(/Notify this device|blocking notifications from Sweet|cannot show notifications/)
     await expect(device.first()).toBeVisible()
-    // The app is installable: a manifest and the worker that shows pushes.
+    // The app is installable. It serves a manifest and the service worker that shows push notifications.
     const manifest = await kit.context.request.get('/manifest.json')
     expect(manifest.ok()).toBeTruthy()
     expect(((await manifest.json()) as { name: string }).name).toBe('Sweet')

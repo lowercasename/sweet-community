@@ -4,7 +4,10 @@ import { render } from '@testing-library/react'
 import { makeQueryClient } from './data/client'
 import type { Comment, Group, Marker, Member, Message, Notification, Post, User } from './api'
 
-/** Render inside a fresh query cache, seeded first if asked; returns the client so tests can seed or inspect it. */
+/**
+ * Renders inside a new query cache, seeded first if `seed` is given. Returns the client so that tests can seed or
+ * inspect it.
+ */
 export function renderWithQuery(ui: ReactNode, seed?: (qc: QueryClient) => void) {
   const qc = makeQueryClient()
   seed?.(qc)
@@ -12,7 +15,10 @@ export function renderWithQuery(ui: ReactNode, seed?: (qc: QueryClient) => void)
   return { qc, ...result }
 }
 
-/** A control's name as assistive tech reads it: its aria-label, else its text without aria-hidden decoration. */
+/**
+ * A control's accessible name as assistive technology reads it. This is its aria-label, or otherwise its text
+ * without the aria-hidden decoration.
+ */
 export const nameOf = (el: HTMLElement): string =>
   el.getAttribute('aria-label') ??
   [...el.childNodes]
@@ -23,7 +29,7 @@ export const nameOf = (el: HTMLElement): string =>
 export const nobody = { edit: false, delete: false }
 export const mine = { edit: true, delete: true }
 
-/** The root group's fixed id (perm.Root on the server). */
+/** The root group's fixed ID (perm.Root on the server). */
 export const ROOT = '00000000-0000-7000-8000-000000000000'
 
 export const user = (id: string, picture: string | null = null): User => ({ id, username: id, picture })
@@ -35,7 +41,7 @@ export const member = (id: string, role: Member['role'] = 'member', remove = fal
   can: { remove },
 })
 
-/** A group as its viewer sees it: with their role and what they may do. */
+/** A group as its viewer sees it, with the viewer's role and permissions. */
 export const group = (id: string, role: Group['role'], extra: Partial<Group> = {}): Group => ({
   id,
   kind: id === ROOT ? 'root' : 'group',
@@ -60,7 +66,7 @@ export const group = (id: string, role: Group['role'], extra: Partial<Group> = {
   ...extra,
 })
 
-/** A conversation as its viewer sees it: chat only, named by its people, which are fixed. */
+/** A conversation as its viewer sees it. It is chat only and named after its members, who are fixed. */
 export const dm = (id: string, people: User[], extra: Partial<Group> = {}): Group => ({
   id,
   kind: 'dm',
@@ -84,10 +90,10 @@ export const dm = (id: string, people: User[], extra: Partial<Group> = {}): Grou
   ...extra,
 })
 
-/** A one-paragraph body, for fixtures: the markup lives here, where the atomic check allows it. */
+/** A one-paragraph body for fixtures. The markup is defined here because the atomic check allows it in this file. */
 export const paragraph = (text: string) => `<p>${text}</p>`
 
-/** A stored mention, as the server keeps it. */
+/** A mention in the form the server stores it. */
 export const mentionSpan = (id: string, name: string) =>
   `<span data-type="mention" data-mention-id="${id}">@${name}</span>`
 
@@ -154,7 +160,7 @@ export const message = (id: string, author: User, extra: Partial<Message> = {}):
   ...extra,
 })
 
-/** An EventSource stand-in whose last instance can be made to emit. */
+/** A fake EventSource. Tests can make the most recently created instance emit events. */
 export class FakeEventSource {
   static readonly CONNECTING = 0
   static readonly OPEN = 1
@@ -171,7 +177,7 @@ export class FakeEventSource {
     this.listeners.set(kind, [...(this.listeners.get(kind) ?? []), fn])
   }
   close() {}
-  /** Deliver an event as the server would: a kind, a JSON body, a sequence. */
+  /** Delivers an event in the same form as the server: a kind, a JSON body and a sequence number. */
   emit(kind: string, data: unknown, seq: number) {
     for (const fn of this.listeners.get(kind) ?? []) {
       fn(new MessageEvent<string>(kind, { data: JSON.stringify(data), lastEventId: String(seq) }))

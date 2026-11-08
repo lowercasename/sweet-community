@@ -1,23 +1,23 @@
 import type { Group, Marker, Notification, Topic } from '../api'
 import { groupPath, postPath, profilePath } from '../routes'
 
-/** The notifications stream's marker name; a room's chat and feed each have their own. */
+/** The notifications stream's marker name. A room's chat and feed each have their own stream name. */
 export const NOTIFICATIONS = 'notifications'
 export const chatStream = (groupId: string) => `chat:${groupId}`
 export const feedStream = (groupId: string) => `feed:${groupId}`
 
-/** What is unread in a place, by stream. A place is marked when either is. */
+/** Which of a group's streams have unread content. The group is marked unread when either is. */
 export interface UnreadPlace {
   chat: boolean
   feed: boolean
 }
 
-/** Where I have read a stream to, or nothing if never. */
+/** The time the user has read a stream up to, or undefined if never. */
 export function markerOf(markers: Marker[] | undefined, stream: string): number | undefined {
   return markers?.find((m) => m.stream === stream)?.read_at
 }
 
-/** The places with something unread, by group id, from my chat and feed markers. */
+/** The groups with unread content, by group id, computed from the user's chat and feed markers. */
 export function unreadPlaces(markers: Marker[]): Map<string, UnreadPlace> {
   const out = new Map<string, UnreadPlace>()
   for (const m of markers) {
@@ -32,10 +32,10 @@ export function unreadPlaces(markers: Marker[]): Map<string, UnreadPlace> {
   return out
 }
 
-/** Is anything in this community unread? */
+/** Whether either stream of a group has unread content. */
 export const anyUnread = (p: UnreadPlace | undefined) => p !== undefined && (p.chat || p.feed)
 
-/** What was done, in words after the actor's name. A room I am no longer in has no name to give. */
+/** The notification's description, shown after the actor's name. A room the user is no longer in has no name in the cache. */
 export function describe(n: Notification, groups: Group[], topics: Topic[] = []): string {
   switch (n.kind) {
     case 'topic_post': {
@@ -60,7 +60,7 @@ export function describe(n: Notification, groups: Group[], topics: Topic[] = [])
   }
 }
 
-/** Where a notification leads: anything about a post to the post's page, an arrival to the person, else to the room or conversation. */
+/** The path a notification opens. A notification about a post opens the post's page. A join opens the user's profile. Any other opens the room or conversation. */
 export function targetOf(n: Notification, rootId?: string): string {
   if (n.post_id) return postPath(n.post_id)
   if (n.kind === 'joined') return profilePath(n.actor.username)

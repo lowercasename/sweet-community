@@ -15,9 +15,10 @@ DELETE FROM invites WHERE code = ? AND used_at IS NULL;
 SELECT u.username FROM invites i JOIN users u ON u.id = i.created_by
 WHERE i.code = sqlc.arg(code) AND i.used_at IS NULL AND i.expires_at > sqlc.arg(now);
 
--- Never mix bare ? with sqlc.arg() in one query: SQLite numbers a bare ?
+-- Never mix bare ? with sqlc.arg() in one query. SQLite numbers a bare ?
 -- as (highest index so far + 1), so a ? after a named ?3 becomes ?4.
 -- name: UseInvite :execrows
--- A link is good for its seven days however many come through it; used_at stays NULL.
+-- An invite link is valid for seven days, however many users join through
+-- it. used_at stays NULL.
 UPDATE invites SET uses = uses + 1
 WHERE code = sqlc.arg(code) AND used_at IS NULL AND expires_at > sqlc.arg(now);

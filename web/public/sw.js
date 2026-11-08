@@ -1,6 +1,6 @@
-// Sweet's service worker (architecture.md, Notifications): web push only. It
-// caches nothing and serves nothing, so the app is always what the server
-// has. A push shows its title and line, and a tap opens where it points.
+// Sweet's service worker (architecture.md, Notifications). It handles web push only.
+// It caches nothing and serves nothing, so the app is always the version that the
+// server has. A push notification shows its title and body text, and a tap opens its URL.
 
 self.addEventListener('install', () => self.skipWaiting())
 self.addEventListener('activate', (event) => event.waitUntil(self.clients.claim()))

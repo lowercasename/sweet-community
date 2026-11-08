@@ -1,8 +1,8 @@
-// Package push sends web push notifications (architecture.md,
-// Notifications): a short message to each device a person asked to be
-// notified on, for a mention or a comment on their post. The browser's
-// subscription is kept as it describes it; a device the push service says
-// is gone is dropped.
+// Package push sends web push notifications (architecture.md, Notifications).
+// For a mention or a comment on the user's post, it sends a short message to
+// each device the user has subscribed. The browser's subscription is stored
+// as the browser describes it. A subscription the push service reports as
+// gone is deleted.
 package push
 
 import (
@@ -21,30 +21,32 @@ import (
 	"sweet/internal/store"
 )
 
-// Subscription is one device, as the browser's PushManager describes it.
+// Subscription is one device's push subscription, as the browser's PushManager describes it.
 type Subscription struct {
 	Endpoint string `json:"endpoint"`
 	P256dh   string `json:"p256dh"`
 	Auth     string `json:"auth"`
 }
 
-// Payload is what the service worker shows: a title, a line, and where a tap goes.
+// Payload is the content the service worker shows. It has a title, a body line, and the URL opened on tap.
 type Payload struct {
 	Title string `json:"title"`
 	Body  string `json:"body"`
 	URL   string `json:"url"`
 	// Tag groups pushes on a device. A new push with the same tag replaces the
-	// one currently shown, so a conversation produces one notification, not several.
+	// one currently shown, so a conversation produces one notification rather
+	// than several.
 	Tag string `json:"tag,omitempty"`
 }
 
 // Sender delivers one payload to one device. gone is true when the push
-// service says the device no longer exists, which drops the subscription.
+// service reports that the subscription no longer exists. The caller then
+// deletes the subscription.
 type Sender interface {
 	Send(ctx context.Context, sub Subscription, data []byte) (gone bool, err error)
 }
 
-// Keys are the instance's VAPID pair, made once and kept in settings.
+// Keys is the instance's VAPID key pair. It is generated once and stored in settings.
 type Keys struct {
 	Public, Private string
 }
@@ -54,7 +56,7 @@ const (
 	keyPrivate = "vapid_private"
 )
 
-// LoadKeys reads the instance's keys, making them on first use.
+// LoadKeys reads the instance's keys. On first use it generates and stores them.
 func LoadKeys(ctx context.Context, d *sql.DB) (Keys, error) {
 	q := store.New(d)
 	pub, err1 := q.GetSetting(ctx, keyPublic)
@@ -78,11 +80,11 @@ func LoadKeys(ctx context.Context, d *sql.DB) (Keys, error) {
 	return Keys{Public: pub, Private: priv}, nil
 }
 
-// WebPush is the real sender: the Web Push protocol with VAPID, through the
-// browser vendors' push services.
+// WebPush is the production Sender. It uses the Web Push protocol with VAPID
+// through the browser vendors' push services.
 type WebPush struct {
 	Keys Keys
-	// Subscriber is who to contact about this sender: a mailto: or the instance's address.
+	// Subscriber is the contact for this sender, either a mailto: URL or the instance's address.
 	Subscriber string
 }
 
@@ -111,18 +113,18 @@ func (w WebPush) Send(ctx context.Context, sub Subscription, data []byte) (bool,
 	return false, nil
 }
 
-// Pusher tells a person's devices. It is safe to call from a goroutine
-// after the transaction that made the notification has committed.
+// Pusher sends a payload to a user's devices. It is safe to call from a
+// goroutine after the transaction that created the notification has committed.
 type Pusher struct {
 	DB   *sql.DB
 	Send Sender
-	// Timeout bounds each delivery; zero means ten seconds.
+	// Timeout is the limit for each delivery. Zero means ten seconds.
 	Timeout time.Duration
 }
 
-// Tell sends the payload to every device of the person, dropping the ones
-// that are gone. Errors from the push service are returned joined, after
-// every device has been tried.
+// Tell sends the payload to every device of the user and deletes the
+// subscriptions that are gone. Every device is tried, and then the errors
+// from the push service are returned joined.
 func (p *Pusher) Tell(ctx context.Context, userID string, payload Payload) error {
 	q := store.New(p.DB)
 	subs, err := q.ListPushSubscriptions(ctx, userID)
@@ -158,7 +160,7 @@ func (p *Pusher) Tell(ctx context.Context, userID string, payload Payload) error
 	return errors.Join(errs...)
 }
 
-// Subscribe keeps a device for a person, replacing an older record of the same endpoint.
+// Subscribe stores a device subscription for a user, replacing an older record with the same endpoint.
 func Subscribe(ctx context.Context, d *sql.DB, userID string, sub Subscription, now int64) error {
 	id, err := uuid.NewV7()
 	if err != nil {
@@ -169,7 +171,7 @@ func Subscribe(ctx context.Context, d *sql.DB, userID string, sub Subscription, 
 	})
 }
 
-// Unsubscribe drops one device of a person.
+// Unsubscribe deletes one device subscription of a user.
 func Unsubscribe(ctx context.Context, d *sql.DB, userID, endpoint string) error {
 	return store.New(d).DeletePushSubscription(ctx, store.DeletePushSubscriptionParams{Endpoint: endpoint, UserID: userID})
 }

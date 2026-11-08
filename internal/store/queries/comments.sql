@@ -1,5 +1,5 @@
--- Comments reach their group through their post. Membership is the
--- handler's check; who may edit or delete is perm's call after GetCommentOwners.
+-- A comment belongs to a group through its post. The handler checks
+-- membership. perm decides who can edit or delete, after GetCommentOwners.
 
 -- name: ListComments :many
 SELECT c.id, c.post_id, c.body_html, c.body_text, c.created_at, c.edited_at, p.author_id AS post_author_id, p.group_id,

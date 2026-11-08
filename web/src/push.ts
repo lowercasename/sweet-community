@@ -2,8 +2,8 @@ import { getPushKey, subscribePush, unsubscribePush } from './api'
 
 /**
  * Web push on this device (architecture.md, Notifications). The browser
- * holds the subscription; the server keeps a copy so it can send. On an
- * iPhone it works only once Sweet is added to the home screen.
+ * holds the subscription, and the server keeps a copy so it can send pushes.
+ * On an iPhone push works only once Sweet is added to the home screen.
  */
 
 export type PushState = 'unsupported' | 'install-first' | 'denied' | 'off' | 'on'
@@ -14,7 +14,7 @@ export function pushSupported(): boolean {
   )
 }
 
-/** Safari on iOS allows push only to an app on the home screen. */
+/** Safari on iOS allows push only for an app added to the home screen. */
 function needsInstall(): boolean {
   const ios = /iPhone|iPad|iPod/.test(navigator.userAgent)
   const standalone = window.matchMedia('(display-mode: standalone)').matches
@@ -33,7 +33,7 @@ export async function pushState(): Promise<PushState> {
   return sub ? 'on' : 'off'
 }
 
-/** Ask the browser, then the server. Rejects with the reason when it cannot. */
+/** Requests permission from the browser, then subscribes with the server. Rejects with the reason on failure. */
 export async function turnPushOn(): Promise<PushState> {
   const { key } = await getPushKey()
   const reg = await registration()
@@ -54,7 +54,7 @@ export async function turnPushOff(): Promise<PushState> {
   return 'off'
 }
 
-/** The server's base64url key as the bytes PushManager wants. */
+/** Decodes the server's base64url key into the bytes PushManager expects. */
 function vapidKey(key: string): Uint8Array<ArrayBuffer> {
   const padded = key + '='.repeat((4 - (key.length % 4)) % 4)
   const raw = atob(padded.replace(/-/g, '+').replace(/_/g, '/'))

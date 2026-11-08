@@ -1,5 +1,5 @@
-// Package auth holds the small, security-sensitive helpers: password hashing,
-// session tokens, username rules. Nothing here touches HTTP or the database.
+// Package auth holds the security-sensitive helpers for password hashing,
+// session tokens and username rules. Nothing in it touches HTTP or the database.
 package auth
 
 import (
@@ -26,26 +26,27 @@ var (
 
 var usernameRe = regexp.MustCompile(`^[A-Za-z0-9_]{2,32}$`)
 
-// Reserved usernames: routes, roles and words that would confuse mentions.
+// reserved lists usernames that cannot be registered. They are route names,
+// role names and words that would be ambiguous in a mention.
 var reserved = map[string]bool{
 	"admin": true, "administrator": true, "owner": true, "root": true, "system": true,
 	"sweet": true, "api": true, "me": true, "everyone": true, "all": true, "here": true,
 	"support": true, "help": true, "null": true, "undefined": true, "anonymous": true,
 }
 
-// ValidateUsername checks the shape and the reserved list.
+// ValidateUsername checks the username against the pattern and the reserved list.
 func ValidateUsername(u string) error {
 	if !usernameRe.MatchString(u) {
 		return ErrUsernameInvalid
 	}
-	// removed-<id> is what a removed account is called (api.removedName).
+	// A removed account is renamed to removed-<id> (api.removedName).
 	if reserved[strings.ToLower(u)] || strings.HasPrefix(strings.ToLower(u), "removed-") {
 		return ErrUsernameReserved
 	}
 	return nil
 }
 
-// ValidatePassword enforces the one rule that matters: length.
+// ValidatePassword checks the minimum length. It is the only password rule.
 func ValidatePassword(p string) error {
 	if len(p) < 8 {
 		return ErrPasswordShort
@@ -53,8 +54,9 @@ func ValidatePassword(p string) error {
 	return nil
 }
 
-// Argon2id at the OWASP minimums (architecture.md, Accounts): 19 MiB, two
-// passes, one lane. Stored in PHC form so the parameters travel with the hash.
+// Argon2id parameters at the OWASP minimums (architecture.md, Accounts): 19 MiB
+// of memory, two passes, one lane. The hash is stored in PHC form, so the
+// parameters are stored with it.
 const (
 	argonMemory  = 19 * 1024
 	argonTime    = 2
@@ -72,9 +74,9 @@ func HashPassword(p string) (string, error) {
 		base64.RawStdEncoding.EncodeToString(salt), base64.RawStdEncoding.EncodeToString(key)), nil
 }
 
-// CheckPassword accepts an Argon2id hash, or a bcrypt one from before
-// Argon2id arrived (the owner's first password); either way in constant time
-// for the hash's own kind.
+// CheckPassword compares a password with an Argon2id hash, or with a bcrypt
+// hash created before Argon2id was adopted (the owner's first password). The
+// comparison is constant time for each hash kind.
 func CheckPassword(hash, p string) bool {
 	if strings.HasPrefix(hash, "$2a$") || strings.HasPrefix(hash, "$2b$") {
 		return bcrypt.CompareHashAndPassword([]byte(hash), []byte(p)) == nil
@@ -100,11 +102,12 @@ func CheckPassword(hash, p string) bool {
 	return subtle.ConstantTimeCompare(got, want) == 1
 }
 
-// DummyHash is checked against when there is no account, so a wrong name
-// costs the same time as a wrong password.
+// DummyHash is the hash checked when no account matches the username, so a
+// wrong username takes the same time as a wrong password.
 var DummyHash, _ = HashPassword("nothing to see")
 
-// ValidateEmail is the shape check: one @, something either side, no spaces.
+// ValidateEmail checks the format of an email address. It requires one @ with
+// text on both sides, a dot in the domain part, and no whitespace.
 func ValidateEmail(e string) error {
 	e = strings.TrimSpace(e)
 	at := strings.LastIndex(e, "@")
@@ -115,7 +118,7 @@ func ValidateEmail(e string) error {
 }
 
 // NewToken returns a random URL-safe token and the hash under which it is
-// stored. Clients hold the token; the database holds only the hash.
+// stored. The client holds the token. The database holds only the hash.
 func NewToken() (token, hash string, err error) {
 	b := make([]byte, 32)
 	if _, err := rand.Read(b); err != nil {

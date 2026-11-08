@@ -9,9 +9,10 @@ interface SetupProps {
 }
 
 /**
- * The setup link's page (architecture.md, New-instance lifecycle): a fresh
- * instance has no owner until whoever holds the link makes their account
- * here. The address is taken as verified: holding the link is holding the box.
+ * The setup link's page (architecture.md, New-instance lifecycle). A fresh
+ * instance has no owner until the holder of the link creates their account
+ * here. The email address is treated as verified, because holding the link
+ * proves access to the mailbox.
  */
 export function Setup({ token, onSetUp }: SetupProps) {
   const [username, setUsername] = useState('')

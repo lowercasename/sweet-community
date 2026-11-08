@@ -1,7 +1,7 @@
 import { article, expect, member, open, owner, test, uniq, writePost } from './helpers'
 
 test.describe('mentions', () => {
-  test('@ offers the people here; a mention tells its person, wears their name, and leads to their page', async ({
+  test("typing @ suggests the group's users, and a mention notifies the user, shows their name, and links to their page", async ({
     browser,
   }, testInfo) => {
     const kit = await member(browser, testInfo, 'kit')
@@ -10,7 +10,7 @@ test.describe('mentions', () => {
     await open(mo.page)
     const text = uniq('a word for ')
     await kit.page.locator('.editor-post .ProseMirror').first().click()
-    // An @ counts after a space, not glued to a word.
+    // An @ starts a mention only after a space, not directly after a word.
     await kit.page.keyboard.type(`${text} @${mo.username.slice(0, -1)}`)
     const list = kit.page.getByRole('listbox', { name: 'People' })
     await expect(list.getByRole('option', { name: mo.username })).toBeVisible()
@@ -21,20 +21,20 @@ test.describe('mentions', () => {
     const post = article(kit.page, text)
     await expect(post.getByRole('link', { name: `@${mo.username}` })).toBeVisible()
 
-    // Mo is told, and the notification opens the post.
+    // Mo gets a notification, and the notification opens the post.
     const nav = mo.page.getByRole('navigation', { name: 'Main' })
     await nav.getByRole('button', { name: 'Notifications, unread' }).click()
     await mo.page.getByRole('button', { name: `${kit.username} mentioned you in a post, new` }).click()
     await expect(mo.page).toHaveURL(/\/p\/[0-9a-f-]+$/)
     await expect(mo.page.locator('article:visible').filter({ hasText: text })).toBeVisible()
-    // The name in the body leads to mo's page, in the app.
+    // The mention in the post body links to mo's page inside the app.
     await mo.page
       .locator('article:visible')
       .getByRole('link', { name: `@${mo.username}` })
       .click()
     await expect(mo.page).toHaveURL(new RegExp(`/u/${mo.username}$`))
 
-    // In chat: the same, worded by the room.
+    // The same flow in chat. The notification text says that the mention was in the chat.
     await open(kit.page)
     await kit.page.locator('.editor-line .ProseMirror').first().click()
     await kit.page.keyboard.type(`@${mo.username.slice(0, -1)}`)
@@ -52,7 +52,7 @@ test.describe('mentions', () => {
     await mo.context.close()
   })
 
-  test('in a room, @ offers the people in it and nobody else', async ({ browser }, testInfo) => {
+  test('in a room, typing @ suggests only the members of the room', async ({ browser }, testInfo) => {
     const kit = await member(browser, testInfo, 'kit')
     const mo = await member(browser, testInfo, 'mo')
     const boss = await owner(browser, testInfo)
@@ -73,7 +73,7 @@ test.describe('mentions', () => {
     await boss.context.close()
   })
 
-  test('in chat the list opens under the @, and Enter picks the person instead of sending', async ({
+  test('in chat the suggestion list opens at the @, and Enter selects the user instead of sending the message', async ({
     browser,
   }, testInfo) => {
     const kit = await member(browser, testInfo, 'kit')
@@ -92,7 +92,7 @@ test.describe('mentions', () => {
     const above = box.y + box.height <= where.y + 8
     const below = box.y >= where.y + 16
     expect(above || below).toBe(true)
-    // Enter with the list open picks, and sends nothing.
+    // Pressing Enter while the list is open selects a user and sends nothing.
     const before = await kit.page.getByRole('article').count()
     await kit.page.keyboard.press('Enter')
     await expect(list).toHaveCount(0)

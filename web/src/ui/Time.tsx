@@ -5,7 +5,10 @@ interface TimeProps {
   at: number
 }
 
-/** How long ago, or until, in a word. A server's clock and a browser's never agree exactly, so under a minute either way is just now. */
+/**
+ * A short relative time, past or future. The server's clock and the browser's clock never agree exactly,
+ * so a difference under a minute in either direction returns "just now".
+ */
 export function relative(at: number, now: number): string {
   const future = at > now
   const s = Math.round(Math.abs(now - at) / 1000)
@@ -20,7 +23,7 @@ export function relative(at: number, now: number): string {
   return new Date(at).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' })
 }
 
-/** Re-renders once a minute so "3m ago" keeps up. */
+/** Returns the current time and re-renders once a minute, so a relative time such as "3m ago" stays current. */
 function useNow(): number {
   const [now, setNow] = useState(() => Date.now())
   useEffect(() => {
@@ -30,7 +33,7 @@ function useNow(): number {
   return now
 }
 
-/** Relative time with the absolute UTC instant in dateTime and title. */
+/** A relative time. The absolute UTC instant is in the dateTime and title attributes. */
 export function Time({ at }: TimeProps) {
   const now = useNow()
   const iso = new Date(at).toISOString()

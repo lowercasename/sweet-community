@@ -4,7 +4,7 @@ export type StreamStatus = 'connecting' | 'live' | 'reconnecting' | 'offline'
 
 export type EventHandler = (kind: string, data: unknown, seq: number) => void
 
-// Two per resource (architecture.md, Realtime): the whole thing, or its deletion.
+// Two event kinds per resource (architecture.md, Realtime). The whole resource, or its deletion.
 const EVENT_KINDS = [
   'post',
   'post_delete',
@@ -30,8 +30,8 @@ const HEALTH_TIMEOUT_MS = 10_000
  * Subscribes to GET /api/events and resyncs from the last seen seq on every
  * reconnect. EventSource cannot see the server's `: hb` comment lines, so
  * liveness is checked by pinging /healthz every 30 s while the page is
- * visible; and because iOS kills background sockets while readyState stays
- * OPEN, the stream is force-reopened on visibilitychange, pageshow and online.
+ * visible. iOS kills background sockets while readyState stays OPEN, so the
+ * stream is force-reopened on visibilitychange, pageshow and online.
  */
 export function useEventStream(onEvent: EventHandler): { status: StreamStatus; lastSeq: number } {
   const [status, setStatus] = useState<StreamStatus>('connecting')
@@ -42,8 +42,8 @@ export function useEventStream(onEvent: EventHandler): { status: StreamStatus; l
   const lastSeqRef = useRef(0)
   const statusRef = useRef<StreamStatus>('connecting')
   const sourceRef = useRef<EventSource | null>(null)
-  // The server's version as this tab first heard it. The frontend is
-  // embedded in the binary, so another version later is another app.
+  // The server's version as this tab first received it. The frontend is
+  // embedded in the binary, so a different version later is a different app.
   const versionRef = useRef<string | null>(null)
 
   useEffect(() => {
@@ -75,8 +75,8 @@ export function useEventStream(onEvent: EventHandler): { status: StreamStatus; l
 
       es.onopen = () => update('live')
       es.onerror = () => {
-        // The browser retries on its own while readyState is CONNECTING;
-        // if it gave up (CLOSED) we reopen with ?since= ourselves.
+        // The browser retries on its own while readyState is CONNECTING.
+        // If it has given up (CLOSED), we reopen with ?since= ourselves.
         update(navigator.onLine ? 'reconnecting' : 'offline')
         if (es.readyState === EventSource.CLOSED) {
           window.setTimeout(() => {
@@ -121,7 +121,7 @@ export function useEventStream(onEvent: EventHandler): { status: StreamStatus; l
       try {
         const res = await fetch('/healthz', { cache: 'no-store', signal: ctrl.signal })
         if (!res.ok) throw new Error(String(res.status))
-        // Reachable again after an outage: the socket is almost certainly dead.
+        // The server is reachable again after an outage. The socket is almost certainly dead, so reopen it.
         if (statusRef.current === 'offline') open()
       } catch {
         if (!disposed) update('offline')

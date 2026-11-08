@@ -160,8 +160,8 @@ type ListCommentsRow struct {
 	AuthorPictureID sql.NullString
 }
 
-// Comments reach their group through their post. Membership is the
-// handler's check; who may edit or delete is perm's call after GetCommentOwners.
+// A comment belongs to a group through its post. The handler checks
+// membership. perm decides who can edit or delete, after GetCommentOwners.
 func (q *Queries) ListComments(ctx context.Context, postID string) ([]ListCommentsRow, error) {
 	rows, err := q.db.QueryContext(ctx, listComments, postID)
 	if err != nil {

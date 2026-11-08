@@ -6,9 +6,10 @@ import (
 	"strings"
 )
 
-// Hit is one search result (architecture.md, Search): what kind of thing,
-// where it is, who said it and when, and an excerpt of its text with the
-// matches marked. The excerpt is plain text; the client draws the marks.
+// Hit is one search result (architecture.md, Search). It holds the kind of
+// resource, its location, its author and time, and an excerpt of its text
+// with the matches marked. The excerpt is plain text and the client renders
+// the marks.
 type Hit struct {
 	Kind      string  `json:"kind"`
 	ID        string  `json:"id"`
@@ -16,21 +17,22 @@ type Hit struct {
 	PostID    *string `json:"post_id"`
 	Author    User    `json:"author"`
 	CreatedAt int64   `json:"created_at"`
-	// Excerpt is a window of the text; a match is wrapped in \x01 and \x02.
+	// Excerpt is a window of the text. Each match is wrapped in \x01 and \x02.
 	Excerpt string `json:"excerpt"`
 }
 
-// The marks around a match in an excerpt, for the client to find.
+// MarkStart and MarkEnd delimit a match in an excerpt, for the client to find.
 const (
 	MarkStart = "\x01"
 	MarkEnd   = "\x02"
 )
 
-// ftsQuery turns what was typed into an FTS5 query that cannot be a syntax
-// error: each word quoted (quotes inside doubled), all required. The index
-// is trigrams, so a word matches any part of a word ("armalade" finds
-// marmalade), and a word of fewer than three characters cannot match at
-// all: those are dropped, and with nothing left the query is empty.
+// ftsQuery converts the typed text to an FTS5 query that cannot be a syntax
+// error. Each word is quoted, with inner quotes doubled, and every word is
+// required. The index uses trigrams, so a word matches any part of a word
+// ("armalade" finds marmalade). A word of fewer than three characters cannot
+// match at all, so such words are dropped. When no words remain, the query
+// is empty.
 func ftsQuery(q string) string {
 	var terms []string
 	for _, w := range strings.Fields(q) {
@@ -42,10 +44,10 @@ func ftsQuery(q string) string {
 	return strings.Join(terms, " ")
 }
 
-// search is `GET /api/search?q=`: the posts, comments and messages whose
-// text matches, from the groups the searcher is present in, best match
-// first, up to fifty. The index is a virtual table sqlc does not read, so
-// this one query is written by hand.
+// search is `GET /api/search?q=`. It returns the posts, comments and messages
+// whose text matches, from the groups the searcher is an unhidden member of,
+// best match first, up to fifty. The index is a virtual table that sqlc does
+// not read, so this one query is written by hand.
 func (s *Server) search(w http.ResponseWriter, r *http.Request) {
 	q := ftsQuery(r.URL.Query().Get("q"))
 	if q == "" {

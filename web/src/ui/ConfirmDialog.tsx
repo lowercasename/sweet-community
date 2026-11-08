@@ -5,20 +5,20 @@ import { Heading } from './Heading'
 interface ConfirmDialogProps {
   open: boolean
   title: string
-  /** The action, in the same words as the menu item that led here: "Delete". */
+  /** The confirm button's text. Uses the same wording as the menu item that opened the dialog, for example "Delete". */
   confirmLabel: string
-  /** True while the action runs; the confirm button waits. */
+  /** True while the action runs. The confirm button is disabled meanwhile. */
   busy?: boolean
   onConfirm: () => void
-  /** Cancel, Escape, or a click on the backdrop. */
+  /** Called on Cancel, on Escape, or on a click on the backdrop. */
   onClose: () => void
   children?: ReactNode
 }
 
-/** A modal question with one real action and Cancel. The browser's own dialog element: focus and Escape come free. */
+/** A modal dialog with one action button and Cancel. It uses the native dialog element, which handles focus and Escape itself. */
 export function ConfirmDialog({ open, title, confirmLabel, busy, onConfirm, onClose, children }: ConfirmDialogProps) {
   const ref = useRef<HTMLDialogElement>(null)
-  // Mounted only while open: it opens modally on mount and leaves the DOM on close.
+  // The dialog is mounted only while open. It calls showModal on mount and is removed from the DOM on close.
   useEffect(() => {
     const d = ref.current
     if (d && !d.open) d.showModal()

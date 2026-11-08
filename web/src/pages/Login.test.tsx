@@ -2,7 +2,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 
-/** Signing in, and what an unverified address does to it (architecture.md, Accounts). */
+/** Signing in, and how an unverified email address affects it (architecture.md, Accounts). */
 vi.mock('../api', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../api')>()),
   login: vi.fn(),
@@ -20,7 +20,7 @@ const fill = () => {
 }
 
 describe('Login', () => {
-  it('a refused sign-in for an unverified address shows where the link went, with resend and a change of address', async () => {
+  it('a refused sign-in for an unverified address shows the address the link was sent to, with resend and change of address options', async () => {
     const { ApiError, login, resendVerification, changeUnverifiedEmail } = await import('../api')
     const { Login } = await import('./Login')
     vi.mocked(login).mockRejectedValue(new ApiError(403, 'unverified', { email: 'kit@example.test' }))
@@ -45,7 +45,7 @@ describe('Login', () => {
     expect(screen.getByLabelText('Username or email')).toBeTruthy()
   })
 
-  it('a community with no owner yet has no sign-in form, only a word about the setup link', async () => {
+  it('a community with no owner yet has no sign-in form, only a message about the setup link', async () => {
     const { Login } = await import('./Login')
     render(
       <Login
@@ -57,7 +57,7 @@ describe('Login', () => {
     expect(screen.queryByLabelText('Username or email')).toBeNull()
   })
 
-  it('any other refusal is shown as it came', async () => {
+  it('any other error is shown as the server sent it', async () => {
     const { ApiError, login } = await import('../api')
     const { Login } = await import('./Login')
     vi.mocked(login).mockRejectedValue(new ApiError(401, 'Wrong username or password'))

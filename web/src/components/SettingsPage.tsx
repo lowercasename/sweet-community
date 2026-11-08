@@ -22,9 +22,15 @@ import {
 
 interface SettingsPageProps {
   me: User
-  /** The instance as a group: its can flags say whether I edit the instance's settings. */
+  /**
+   * The root group, which represents the instance. Its can flags say whether
+   * the user can edit the instance's settings.
+   */
   root: Group
-  /** Sign out: this session via the app's sign-out, or every session after logoutEverywhere. */
+  /**
+   * Signs out of this session through the app's sign-out. Also called after
+   * logoutEverywhere signs out every session.
+   */
   onSignOut: () => void
 }
 
@@ -34,7 +40,8 @@ export function SettingsPage({ me, root, onSignOut }: SettingsPageProps) {
   const [removing, setRemoving] = useState(false)
   const [removeBusy, setRemoveBusy] = useState(false)
   const [removeError, setRemoveError] = useState<string | null>(null)
-  // Off this community for good (architecture.md, Admin tools); the instance owner hands over first.
+  // Permanently removes the user from this community (architecture.md, Admin tools). The instance owner must transfer
+  // ownership first.
   const removeMe = async () => {
     setRemoveBusy(true)
     try {
@@ -100,7 +107,7 @@ export function SettingsPage({ me, root, onSignOut }: SettingsPageProps) {
                   </FilePicker>
                   {live.picture && (
                     <Button variant="ghost" disabled={pictureBusy} onClick={() => void removePicture()}>
-                      Back to the donut
+                      Remove picture
                     </Button>
                   )}
                 </Row>
@@ -113,8 +120,8 @@ export function SettingsPage({ me, root, onSignOut }: SettingsPageProps) {
               <Stack gap={2}>
                 <Heading level={2}>Sign out</Heading>
                 <Text variant="secondary">
-                  If you have lost a device or think someone else has access to your account, sign out everywhere, which
-                  will end every logged in session including this one.
+                  If you have lost a device or think someone else has access to your account, use Sign out everywhere.
+                  It signs you out on every device, including this one.
                 </Text>
                 <Row>
                   <Button variant="secondary" disabled={busy} icon="logout" onClick={onSignOut}>

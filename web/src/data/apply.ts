@@ -20,10 +20,10 @@ import { ROOT_ID, keys } from './keys'
 
 /**
  * The cache's one write path. Every event from the stream, and every reply
- * to one of our own writes, goes through here: an upsert or a delete per
- * resource, idempotent, so a replay changes nothing. Caches that are not
- * loaded are left alone; they will fetch fresh when they are wanted.
- * The server has already decided what this viewer may see.
+ * to one of our own writes, goes through this function. Each resource has an
+ * upsert and a delete. Both are idempotent, so a replay changes nothing.
+ * Queries that are not loaded are left alone. They fetch fresh data when they
+ * are next used. The server has already decided what this viewer may see.
  */
 export function applyEvent(qc: QueryClient, kind: string, data: unknown): void {
   switch (kind) {
@@ -76,7 +76,7 @@ export function applyEvent(qc: QueryClient, kind: string, data: unknown): void {
     case 'settings':
       if (isSettings(data)) {
         qc.setQueryData<Settings>(keys.settings, data)
-        // The root group carries the setting as a flag, computed per viewer on the server.
+        // The root group carries the group_creation setting as a can flag, computed per viewer on the server.
         void qc.invalidateQueries({ queryKey: keys.groups })
       }
       break
@@ -92,9 +92,9 @@ export function applyEvent(qc: QueryClient, kind: string, data: unknown): void {
 type Topics = { topics: Topic[] }
 
 /**
- * A topic as the stream carries it says nothing about whether I follow it,
- * so what the cache already knows of that is kept. A reply to my own
- * follow or unfollow carries the truth and is applied with `setFollowing`.
+ * A topic event from the stream does not say whether the user follows the
+ * topic, so the cached `following` value is kept. The reply to the user's own
+ * follow or unfollow does carry it, and is applied through `applyFollowing`.
  */
 function upsertTopic(qc: QueryClient, t: Topic, following?: boolean) {
   qc.setQueryData<Topics>(keys.topics, (old) => {
@@ -105,12 +105,12 @@ function upsertTopic(qc: QueryClient, t: Topic, following?: boolean) {
   })
 }
 
-/** My own follow or unfollow, answered by the server with the topic as I now see it. */
+/** Applies the server's reply to the user's own follow or unfollow, which is the topic as the user now sees it. */
 export function applyFollowing(qc: QueryClient, t: Topic) {
   upsertTopic(qc, t, t.following)
 }
 
-/** A deleted topic goes from the list, and the posts that carried it carry none. */
+/** Removes a deleted topic from the list and clears topic_id on the posts that had it. */
 function deleteTopic(qc: QueryClient, id: string) {
   qc.setQueryData<Topics>(keys.topics, (old) => old && { topics: old.topics.filter((x) => x.id !== id) })
   const unfiled = (p: Post) => (p.topic_id === id ? { ...p, topic_id: null } : p)
@@ -139,7 +139,7 @@ type Users = { users: Member[] }
 type Groups = { groups: Group[] }
 type Members = { members: Membership[] }
 
-/** A post as a loaded feed holds it, for a post page to start from. */
+/** Finds a post in any loaded feed, as initial data for the post's page. */
 export function findPost(qc: QueryClient, id: string): Post | undefined {
   for (const [, data] of qc.getQueriesData<Posts>({ queryKey: ['posts'] })) {
     const found = data?.pages.flatMap((p) => p.posts).find((p) => p.id === id)
@@ -148,7 +148,7 @@ export function findPost(qc: QueryClient, id: string): Post | undefined {
   return undefined
 }
 
-/** A post on its author's page, if that page is loaded. */
+/** Upserts a post into its author's posts list, if that list is loaded. */
 function upsertUserPost(qc: QueryClient, post: Post) {
   qc.setQueryData<Posts>(keys.userPosts(post.author.username), (old) => {
     if (!old) return old
@@ -162,14 +162,15 @@ function upsertUserPost(qc: QueryClient, post: Post) {
 
 function upsertPost(qc: QueryClient, post: Post) {
   upsertUserPost(qc, post)
-  // Someone else's new post I have not read counts on the room's feed; an edit is not new.
+  // A new post by another user that the viewer has not read counts as unread on the group's feed. An edit is not new.
   const me = qc.getQueryData<User | null>(keys.me)
   if (post.edited_at == null && (!me || me.id !== post.author.id))
     bumpMarker(qc, `feed:${post.group_id}`, post.created_at)
-  // Its page, if open, shows the same post.
+  // The post's page query, if loaded, gets the same post.
   qc.setQueryData<Post>(keys.post(post.id), (old) => (old ? post : old))
-  // The group's feed, and each topic view of it that is loaded: in the one
-  // it is filed under, out of the others (architecture.md, Topics).
+  // Update the group's feed and each loaded topic view of it. The post goes
+  // into the view of the topic it is filed under and out of every other view
+  // (architecture.md, Topics).
   for (const [key] of qc.getQueriesData<Posts>({ queryKey: keys.posts(post.group_id) })) {
     const topicId = key[2]
     const belongs = topicId === undefined || topicId === post.topic_id
@@ -235,7 +236,7 @@ function upsertComment(qc: QueryClient, c: Comment) {
         : [...thread.comments, c].sort((a, b) => a.created_at - b.created_at),
     })
   }
-  // A brand-new comment counts on its post; an edit, or a replay, does not.
+  // A new comment increments its post's comment count. An edit or a replay does not.
   if (!known && c.edited_at == null) countComments(qc, c.post_id, c.group_id, 1)
 }
 
@@ -247,10 +248,10 @@ function deleteComment(qc: QueryClient, id: string, postId: string, groupId: str
 }
 
 function upsertMessage(qc: QueryClient, m: Message) {
-  // Someone else's word I have not read counts on the room (architecture.md, Notifications).
+  // A message by another user that the viewer has not read counts as unread on the group (architecture.md, Notifications).
   const me = qc.getQueryData<User | null>(keys.me)
   if (!me || me.id !== m.author.id) bumpMarker(qc, `chat:${m.group_id}`, m.created_at)
-  // The newest word in a group is what orders the Messages page; a replay never moves it back.
+  // The group's newest message time orders the Messages page. A replay never moves it backwards.
   qc.setQueryData<Groups>(keys.groups, (old) =>
     old
       ? {
@@ -278,16 +279,16 @@ function deleteMessage(qc: QueryClient, id: string, groupId: string) {
   )
 }
 
-/** A person changed (their picture, their name): the same person everywhere. */
+/** A user changed, for example their picture or their name. Updates every copy of the user in the cache. */
 function upsertUser(qc: QueryClient, u: User) {
   qc.setQueryData<Users>(keys.users, (old) =>
     old ? { users: old.users.map((x) => (x.id === u.id ? { ...x, ...u } : x)) } : old,
   )
   const me = qc.getQueryData<User | null>(keys.me)
   if (me && me.id === u.id) qc.setQueryData<User>(keys.me, { ...me, ...u })
-  // Their content everywhere: the author snapshots in loaded feeds, threads and
-  // rooms follow too, so a renamed (or removed) person reads right at once,
-  // whether or not they are still on the people list.
+  // Update the author snapshots in every loaded feed, thread and chat too, so
+  // a renamed or removed user is shown correctly at once, whether or not they
+  // are still in the users list.
   const as = (a: User) => (a.id === u.id ? { ...a, ...u } : a)
   qc.setQueriesData<Posts>(
     { queryKey: ['posts'] },
@@ -306,7 +307,7 @@ function upsertUser(qc: QueryClient, u: User) {
         pages: old.pages.map((p) => ({ ...p, posts: p.posts.map((x) => ({ ...x, author: as(x.author) })) })),
       },
   )
-  // Their page says who they are now; a renamed person's page is at a new address, so fetch afresh.
+  // Profile pages are refetched. A renamed user's profile is at a new path.
   void qc.invalidateQueries({ queryKey: ['profile'] })
   qc.setQueriesData<Thread>(
     { queryKey: ['comments'] },
@@ -322,7 +323,7 @@ function upsertUser(qc: QueryClient, u: User) {
   )
 }
 
-/** The notifications stream's unread moves by how many were opened or arrived. */
+/** Adjusts a stream's unread count by the number of notifications opened or received. */
 function countUnread(qc: QueryClient, stream: string, by: number) {
   qc.setQueryData<Markers>(keys.markers, (old) =>
     old
@@ -331,7 +332,10 @@ function countUnread(qc: QueryClient, stream: string, by: number) {
   )
 }
 
-/** One more thing on a stream, newer than where I have read to: it counts. A replay after a reconnect refetches the markers anyway. */
+/**
+ * Increments a stream's unread count for a new item newer than the read marker. A replay after a reconnect refetches
+ * the markers anyway.
+ */
 function bumpMarker(qc: QueryClient, stream: string, at: number) {
   qc.setQueryData<Markers>(keys.markers, (old) => {
     if (!old) return old
@@ -344,10 +348,12 @@ function bumpMarker(qc: QueryClient, stream: string, at: number) {
 }
 
 /**
- * Something done to me: at the top of my list, once, and one more unread on
- * the notifications stream while it is unopened. Opened (the same event,
- * with read_at), it is one fewer. The count follows what the list knows;
- * for a list not loaded, a new unopened one counts and a reconnect refetches.
+ * Upserts a notification. A new one goes to the top of the list once, and
+ * increments the notifications stream's unread count while it is unopened.
+ * When it is opened (the same event with read_at set), the count is
+ * decremented. The count is computed from the loaded list. When the list is
+ * not loaded, a new unopened notification increments the count, and a
+ * reconnect refetches it.
  */
 function upsertNotification(qc: QueryClient, n: Notification) {
   const list = qc.getQueryData<Notifications>(keys.notifications)
@@ -365,7 +371,7 @@ function upsertNotification(qc: QueryClient, n: Notification) {
   })
 }
 
-/** The opened ones up to a time are gone, for good; an unopened one stays. */
+/** Removes the opened notifications created before a time. Unopened notifications stay. */
 function clearNotifications(qc: QueryClient, before: number) {
   qc.setQueryData<Notifications>(keys.notifications, (old) =>
     old
@@ -380,7 +386,10 @@ function clearNotifications(qc: QueryClient, before: number) {
   )
 }
 
-/** Where I have read a stream to, and what is still unread past it: forward only, as on the server, so a stale tab's word changes nothing. */
+/**
+ * Upserts a read marker, which is the time the user has read a stream up to and the unread count past it. The
+ * marker only moves forward, as on the server, so a stale tab's marker changes nothing.
+ */
 function upsertMarker(qc: QueryClient, m: Marker) {
   qc.setQueryData<Markers>(keys.markers, (old) => {
     const markers = old?.markers ?? []
@@ -391,7 +400,7 @@ function upsertMarker(qc: QueryClient, m: Marker) {
   })
 }
 
-/** A stream I no longer have: its marker goes. */
+/** Removes the marker of a stream the user no longer has. */
 function dropMarker(qc: QueryClient, stream: string) {
   qc.setQueryData<Markers>(keys.markers, (old) =>
     old ? { markers: old.markers.filter((x) => x.stream !== stream) } : old,
@@ -404,11 +413,11 @@ function upsertGroup(qc: QueryClient, g: Group) {
     if (!old) return old
     return { groups: known ? old.groups.map((x) => (x.id === g.id ? g : x)) : [...old.groups, g] }
   })
-  // A new place of mine has a chat marker.
+  // A new group of the user's has a chat marker, so refetch the markers.
   if (!known) void qc.invalidateQueries({ queryKey: keys.markers })
 }
 
-/** A group gone, or me gone from it: nothing of it stays in the cache. */
+/** Removes everything about a group from the cache, when the group is deleted or the user leaves it. */
 function dropGroup(qc: QueryClient, id: string) {
   qc.setQueryData<Groups>(keys.groups, (old) => (old ? { groups: old.groups.filter((x) => x.id !== id) } : old))
   qc.removeQueries({ queryKey: keys.posts(id) })
@@ -424,8 +433,9 @@ function dropGroup(qc: QueryClient, id: string) {
 const ROOT_KIND = 'root'
 
 function upsertMembership(qc: QueryClient, m: Membership) {
-  // My hiding a conversation (architecture.md, Groups): it stays in my list,
-  // marked hidden, and nothing else of it stays. Its people do not change.
+  // The user hid a conversation (architecture.md, Groups). The conversation
+  // stays in the groups list marked hidden, and everything else about it is
+  // removed. Its members do not change.
   const viewer = qc.getQueryData<User | null>(keys.me)
   if (viewer && viewer.id === m.user.id && m.hidden_at != null) {
     qc.setQueryData<Groups>(keys.groups, (old) =>
@@ -443,7 +453,7 @@ function upsertMembership(qc: QueryClient, m: Membership) {
     const known = old.members.some((x) => x.user.id === m.user.id)
     return { members: known ? old.members.map((x) => (x.user.id === m.user.id ? m : x)) : [...old.members, m] }
   })
-  // The root group's membership is the instance's people list.
+  // The root group's members are the instance's users list.
   const groups = qc.getQueryData<Groups>(keys.groups)
   const isRoot = groups?.groups.some((g) => g.id === m.group_id && g.kind === ROOT_KIND) ?? isRootID(m.group_id)
   if (isRoot) {
@@ -457,13 +467,13 @@ function upsertMembership(qc: QueryClient, m: Membership) {
           : [...old.users, asMember],
       }
     })
-    // Who may remove whom is the server's call per viewer, and a role change moves it: refetch.
+    // The server computes who may remove whom per viewer, and a role change affects it, so refetch.
     void qc.invalidateQueries({ queryKey: keys.users })
   }
-  // My own role in a group moved every can flag in it; the server recomputes them on refetch.
+  // A change to the user's own role in a group changes every can flag in it. The server recomputes them on refetch.
   const me = qc.getQueryData<User | null>(keys.me)
   if (me && me.id === m.user.id) {
-    // A place of mine, new or back: it has a chat marker now.
+    // The user joined or rejoined a group, which now has a chat marker.
     void qc.invalidateQueries({ queryKey: keys.markers })
     void qc.invalidateQueries({ queryKey: keys.groups })
     void qc.invalidateQueries({ queryKey: keys.posts(m.group_id) })
@@ -480,7 +490,7 @@ function deleteMembership(qc: QueryClient, groupId: string, userId: string) {
   const root = isRootID(groupId)
   if (me && me.id === userId) {
     if (root) {
-      // Off the instance, removed by staff or by me: signed out, nothing of mine kept here.
+      // The user was removed from the instance, by staff or by themselves. Sign out and clear the cache.
       qc.setQueryData<User | null>(keys.me, null)
       qc.removeQueries({ predicate: (q) => q.queryKey[0] !== 'me' })
       return
@@ -491,18 +501,18 @@ function deleteMembership(qc: QueryClient, groupId: string, userId: string) {
   qc.setQueryData<Members>(keys.members(groupId), (old) =>
     old ? { members: old.members.filter((x) => x.user.id !== userId) } : old,
   )
-  // The root group's membership is the instance's people list.
+  // The root group's members are the instance's users list.
   if (root)
     qc.setQueryData<Users>(keys.users, (old) => (old ? { users: old.users.filter((x) => x.id !== userId) } : old))
 }
 
-/** Does this thread's post live in this group, as far as the cache knows? */
+/** Whether the post with this id is in this group's loaded feed. */
 function inGroup(qc: QueryClient, postId: unknown, groupId: string): boolean {
   const posts = qc.getQueryData<Posts>(keys.posts(groupId))
   return posts?.pages.some((p) => p.posts.some((x) => x.id === postId)) ?? false
 }
 
-/** The root group's fixed id, for when the groups list is not loaded yet. */
+/** Whether the id is the root group's fixed id. Used when the groups list is not loaded yet. */
 function isRootID(id: string): boolean {
   return id === ROOT_ID
 }

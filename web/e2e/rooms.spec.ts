@@ -1,10 +1,10 @@
 import { article, expect, member, open, png, test, uniq } from './helpers'
 
 test.describe('room pictures', () => {
-  test("the owner gives a room a picture; it marks the room in the nav and heads the room's posts elsewhere", async ({
+  test("the owner sets a room picture, which is shown on the room's nav item and in the header of the room's posts outside the room", async ({
     browser,
   }, testInfo) => {
-    test.slow() // many page loads; the dev server's are the slow ones
+    test.slow() // Many page loads. The dev server's page loads are the slow ones.
     const kit = await member(browser, testInfo, 'kit')
     const mo = await member(browser, testInfo, 'mo')
     const name = uniq('Wool')
@@ -18,7 +18,8 @@ test.describe('room pictures', () => {
 
     await open(kit.page, `/r/${gid}/members`)
     await open(mo.page)
-    // The room's item may carry ", unread" in its name (kit's post is new to mo), so the name is matched at its start.
+    // The room's nav item may have ", unread" in its accessible name (kit's post is new to mo), so the name is
+    // matched at its start.
     const nav = (p: typeof kit) => p.page.getByRole('navigation', { name: 'Main' })
     const item = (p: typeof kit) => nav(p).getByRole('button', { name: new RegExp(`^${name}`) })
     await expect(item(kit).locator('img')).toHaveCount(0)
@@ -28,15 +29,15 @@ test.describe('room pictures', () => {
       .locator('input[type=file]')
       .setInputFiles({ name: 'wool.png', mimeType: 'image/png', buffer: png(64, 64) })
     await expect(item(kit).locator('img')).toHaveAttribute('src', /\/img\//)
-    // Mo's nav learns it live.
+    // Mo's nav updates live.
     await expect(item(mo).locator('img')).toHaveAttribute('src', /\/img\//)
 
-    // On the post's page and on kit's profile the post is headed by the room, with its picture.
+    // On the post's page and on kit's profile, the post has a header with the room's name and picture.
     await open(mo.page, `/p/${pid}`)
     const headed = mo.page.locator('article:visible').filter({ hasText: text })
     await expect(headed).toContainText(`Posted in ${name}`)
     await expect(headed.locator('img').first()).toHaveAttribute('src', /\/img\//)
-    // The header's line runs edge to edge of the card.
+    // The header's bottom border spans the full width of the card.
     const strip = (await headed
       .getByText('Posted in')
       .locator('xpath=ancestor::div[contains(@class,"border-b")][1]')
@@ -45,7 +46,8 @@ test.describe('room pictures', () => {
     expect(Math.abs(strip.width - card.width)).toBeLessThan(3)
     await open(mo.page, `/u/${kit.username}`)
     await expect(article(mo.page, text)).toContainText(`Posted in ${name}`)
-    // The header's name leads to the room, where there is no header: the room is the page.
+    // The room name in the header links to the room. Inside the room the post has no header, because the page
+    // is the room.
     await article(mo.page, text).getByRole('link', { name }).click()
     await expect(mo.page).toHaveURL(new RegExp(`/r/${gid}$`))
     await expect(article(mo.page, text)).not.toContainText('Posted in')

@@ -17,13 +17,13 @@ import {
 } from '@floating-ui/react'
 
 interface HoverCardProps {
-  /** Whose card: the control's name, and the dialog is named "About <name>". */
+  /** The user's name. It is the trigger's accessible name, and the dialog is named "About <name>". */
   name: string
-  /** What the card holds. */
+  /** The card's content. */
   card: ReactNode
-  /** The trigger's content: the name as written, with their picture before it where one is shown. */
+  /** The trigger's content. The name as displayed, with the user's avatar before it where one is shown. */
   children?: ReactNode
-  /** A size under the running text: a comment's author. */
+  /** A smaller font size than the running text. Used for a comment's author. */
   small?: boolean
 }
 
@@ -33,13 +33,14 @@ const TRIGGER =
   'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-pink'
 
 /**
- * A name that opens a card about its person: on hover after a beat, on
- * keyboard focus, or on a tap or click, since phones have no hover. The
- * pointer may travel from the name into the card (safePolygon), because
- * the card holds a button. Floating UI positions it; it is portalled to
- * the body so no pane clips it and no heading holds it, and autoUpdate
- * keeps it on its name while the pane scrolls. Escape, an outside press,
- * or leaving both closes it.
+ * A user's name that opens a card about the user. The card opens on hover
+ * after a short delay, on keyboard focus, or on a tap or click, since phones
+ * have no hover. The pointer may move from the name into the card
+ * (safePolygon), because the card contains a button. Floating UI positions
+ * the card. It is portalled to the body so that no pane clips it and no
+ * heading contains it, and autoUpdate keeps it next to the name while the
+ * pane scrolls. Escape, a press outside, or leaving both the name and the
+ * card closes it.
  */
 export function HoverCard({ name, card, children, small = false }: HoverCardProps) {
   const [open, setOpen] = useState(false)
@@ -48,8 +49,8 @@ export function HoverCard({ name, card, children, small = false }: HoverCardProp
     open,
     onOpenChange: setOpen,
     placement: 'bottom-start',
-    // The card flips above its name when the name's own scroll pane has no room below: the card is portalled to
-    // the body, so the pane is not among its clipping ancestors and must be named.
+    // The card flips above the name when the name's scroll pane has no room below it. The card is portalled to
+    // the body, so the pane is not one of its clipping ancestors and must be passed as the boundary.
     middleware: [offset(6), flip({ boundary: scrollPane ?? undefined, padding: 8 }), shift({ padding: 8 })],
     whileElementsMounted: autoUpdate,
   })

@@ -1,5 +1,5 @@
-// Package web embeds the built frontend (web/ → internal/web/dist) and serves
-// it as a single-page app: unknown paths fall back to index.html.
+// Package web embeds the built frontend (web/ is built into internal/web/dist)
+// and serves it as a single-page app. Unknown paths are served index.html.
 package web
 
 import (
@@ -22,7 +22,8 @@ func Handler() http.Handler {
 		panic(err)
 	}
 	if _, err := fs.Stat(sub, "index.html"); err != nil {
-		// Built without a frontend (dev-backend). Serve a hint instead of 404s.
+		// The binary was built without a frontend (dev-backend). Serve an
+		// explanatory page instead of 404 responses.
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			w.Header().Set("Content-Type", "text/html; charset=utf-8")
 			w.Write([]byte(placeholder))
@@ -39,7 +40,7 @@ func Handler() http.Handler {
 				return
 			}
 		}
-		// SPA fallback.
+		// Serve index.html for any path that is not a file.
 		r.URL.Path = "/"
 		fileServer.ServeHTTP(w, r)
 	})

@@ -6,17 +6,18 @@ import { Body } from './Body'
 import { PersonName } from './PersonName'
 
 interface MessageGroupProps {
-  /** Consecutive messages from one person within a few minutes; at least one. */
+  /** Consecutive messages from one user within a few minutes. Contains at least one message. */
   messages: Message[]
-  /** Resolves when the server has deleted the message; the cache drops it. */
+  /** Resolves when the server has deleted the message. The message is then removed from the query cache. */
   onDelete: (id: string) => Promise<void>
 }
 
 /**
- * One person's run of messages: avatar, name and time once, then the bodies
- * close together, each its own block. A message's menu floats at the top
- * right of its own block, the first one's too, never on the author's line;
- * the block takes a blush while hovered (Raphael, 2026-11-06).
+ * A run of messages by one user. The avatar, name and time are shown once,
+ * followed by the message bodies close together, each in its own block. A
+ * message's menu is positioned at the top right of its own block. This
+ * includes the first message, whose menu is never on the author's line. The
+ * block gets the blush background while hovered (Raphael, 2026-11-06).
  */
 export function MessageGroup({ messages, onDelete }: MessageGroupProps) {
   const first = messages[0]

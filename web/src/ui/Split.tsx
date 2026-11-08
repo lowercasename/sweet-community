@@ -12,34 +12,35 @@ interface SplitProps {
   /** Width of the left pane as a fraction of the whole. */
   ratio: number
   onRatio: (ratio: number) => void
-  /** Called when the handle is dragged (or keyed) past a pane's edge. */
+  /** Called when the handle is dragged, or moved with the keyboard, past a pane's edge. */
   onCollapse: (side: 'left' | 'right') => void
-  /** Which panes are open. A closed pane stays mounted, hidden, so its editor keeps its draft. */
+  /** Which panes are open. A closed pane stays mounted but hidden, so its editor keeps its draft. */
   show: SplitShow
-  /** Stands in for a closed pane: a Rail. Omit on narrow screens, where the tab bar does that job. */
+  /** Rendered in place of a closed pane. A Rail. Omit on narrow screens, where the tab bar reopens panes instead. */
   leftRail?: ReactNode
   rightRail?: ReactNode
-  /** The whole split hidden, with everything in it still mounted (another page is showing). */
+  /** Hide the whole split while keeping everything in it mounted. Used while another page is showing. */
   hidden?: boolean
   left: ReactNode
   right: ReactNode
 }
 
 /**
- * Two panes with a draggable divider. Drag to resize; drag far enough and
- * the pane on that side collapses (the page swaps in a Rail). Keyboard:
- * arrows resize, Home/End collapse, double-click resets.
+ * Two panes with a draggable divider. Dragging resizes the panes. Dragging far
+ * enough collapses the pane on that side, and the page renders a Rail in its
+ * place. With the keyboard, the arrow keys resize, Home and End collapse, and
+ * double-click resets the ratio.
  *
- * Both panes are always in the tree, whatever is shown, so closing and
- * reopening one, or visiting another page, never loses what was being
- * typed in it. The children keep their positions too: a conditional
- * child renders as a hole, not a shift.
+ * Both panes are always in the React tree, whichever is shown, so closing and
+ * reopening a pane, or visiting another page, never loses the text being typed
+ * in it. The children also keep their positions in the tree. A conditional
+ * child renders as an empty slot, not a shift of the other children.
  */
 export function Split({ ratio, onRatio, onCollapse, show, leftRail, rightRail, hidden, left, right }: SplitProps) {
   const ref = useRef<HTMLDivElement>(null)
   const dragging = useRef(false)
-  // The ratio before a drag began: a drag that ends in a collapse must not
-  // leave the pane pinned at its minimum when it is reopened.
+  // The ratio before the current drag began. A drag that ends in a collapse
+  // must not leave the pane at its minimum width when it is reopened.
   const startRatio = useRef(ratio)
 
   const collapse = (side: 'left' | 'right') => {
@@ -83,8 +84,8 @@ export function Split({ ratio, onRatio, onCollapse, show, leftRail, rightRail, h
     e.preventDefault()
   }
 
-  // A hidden pane takes no column, and neither does an absent rail (phones),
-  // so the columns are exactly what is on screen.
+  // A hidden pane has no grid column, and neither does an absent rail (on
+  // phones), so the grid columns match exactly what is on screen.
   const columns =
     show === 'both'
       ? `minmax(0, ${ratio}fr) 16px minmax(0, ${1 - ratio}fr)`

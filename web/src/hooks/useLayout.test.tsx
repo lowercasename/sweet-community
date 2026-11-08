@@ -4,10 +4,11 @@ import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { useLayout } from './useLayout'
 
 /**
- * The layout (which panes are open, the divider, the nav) is one piece of
- * state for the whole page: the tab bar in one component changes it, the
- * panes in another must follow. Two hook calls that each kept their own
- * state once left the Posts tab lit with the chat pane still showing.
+ * The layout (which panes are open, the divider position, the nav state) is
+ * one piece of state for the whole page. The tab bar in one component changes
+ * it, and the panes in another component must follow. Two hook calls that
+ * each kept their own state once left the Posts tab highlighted while the
+ * chat pane was still showing.
  */
 afterEach(cleanup)
 
@@ -21,7 +22,7 @@ function Panes() {
 }
 
 describe('useLayout', () => {
-  it('is shared: a change made in one component shows in another', () => {
+  it('is shared, so a change made in one component shows in another', () => {
     localStorage.setItem('sweet.layout', 'chat')
     render(
       <>

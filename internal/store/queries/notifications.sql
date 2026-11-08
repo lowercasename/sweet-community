@@ -1,5 +1,5 @@
--- Notifications are per person; the handler lists the signed-in person's
--- own and nobody else's. Markers likewise.
+-- Notifications are per user. The handler lists only the logged-in user's
+-- own notifications. The same applies to markers.
 
 -- name: CreateNotification :exec
 INSERT INTO notifications (id, user_id, kind, actor_id, group_id, post_id, topic_id, created_at)
@@ -12,7 +12,7 @@ FROM notifications n JOIN users u ON u.id = n.actor_id
 WHERE n.id = sqlc.arg(id);
 
 -- name: ReadNotification :exec
--- Opening it reads it, once; a second opening keeps the first time.
+-- Opening a notification marks it read once. A second opening keeps the first read_at.
 UPDATE notifications SET read_at = sqlc.arg(read_at) WHERE id = sqlc.arg(id) AND user_id = sqlc.arg(user_id) AND read_at IS NULL;
 
 -- name: ListNotifications :many
@@ -24,32 +24,34 @@ ORDER BY n.created_at DESC, n.id DESC
 LIMIT sqlc.arg(page_size);
 
 -- name: CountUnreadNotificationsInGroup :one
--- Whether one of a kind about a group is still unopened: a conversation's
--- message notification is written once until it is read.
+-- Counts the unread notifications of one kind for one group. A conversation's
+-- message notification is written once and not again until it is read.
 SELECT COUNT(*) FROM notifications
 WHERE user_id = sqlc.arg(user_id) AND kind = sqlc.arg(kind) AND group_id = sqlc.arg(group_id) AND read_at IS NULL;
 
 -- name: ListUnreadNotificationsInGroupUpTo :many
--- The unopened ones of a kind about a group up to a time: what reading the
--- group's chat to that time reads.
+-- The unread notifications of one kind for one group, up to a time. Reading
+-- the group's chat up to that time marks these notifications read.
 SELECT id FROM notifications
 WHERE user_id = sqlc.arg(user_id) AND kind = sqlc.arg(kind) AND group_id = sqlc.arg(group_id) AND read_at IS NULL AND created_at <= sqlc.arg(before)
 ORDER BY created_at;
 
 -- name: DeleteReadNotifications :exec
--- The ones I have opened, up to a time; an unread one is never cleared.
+-- Deletes the user's read notifications up to a time. An unread notification is never cleared.
 DELETE FROM notifications WHERE user_id = sqlc.arg(user_id) AND read_at IS NOT NULL AND created_at <= sqlc.arg(before);
 
 -- name: SetMarker :exec
--- Forward only: a stale tab cannot unread what another has read.
+-- A marker only moves forward, so an outdated tab cannot mark unread what another tab has marked read.
 INSERT INTO read_markers (user_id, stream, read_at) VALUES (sqlc.arg(user_id), sqlc.arg(stream), sqlc.arg(read_at))
 ON CONFLICT (user_id, stream) DO UPDATE SET read_at = MAX(read_at, excluded.read_at);
 
--- A marker row exists for every stream of mine whether or not I have read
--- anything: the notifications stream (unread only: a notification is read by
--- opening it), and the chat and the feed of every group I am present in. Unread is what is newer than where I
--- have read to: others' live messages or posts since my marker, or since I
--- joined if I never read.
+-- A marker row exists for each of the user's streams, whether or not they
+-- have read anything. The streams are the notifications stream and the chat
+-- and feed of every group the user is in and has not hidden. The
+-- notifications row has only an unread count, because a notification is
+-- read by opening it. Unread counts the items newer than the user's read
+-- position. These are other users' live messages or posts since the user's
+-- marker, or since they joined if they have never read.
 
 -- name: GetChatMarker :one
 SELECT m.user_id, CAST('chat:' || m.group_id AS TEXT) AS stream, CAST(COALESCE(r.read_at, m.joined_at) AS INTEGER) AS read_at,
@@ -66,14 +68,16 @@ FROM memberships m LEFT JOIN read_markers r ON r.user_id = m.user_id AND r.strea
 WHERE m.user_id = sqlc.arg(user_id) AND m.group_id = sqlc.arg(group_id) AND m.hidden_at IS NULL;
 
 -- name: GetNotificationsMarker :one
--- The notifications row alone, as ListMarkers lists it: for when a write elsewhere has read some.
+-- Returns only the notifications row, as ListMarkers lists it. It is used
+-- when a write elsewhere has marked some notifications read.
 SELECT u.id AS user_id, CAST('notifications' AS TEXT) AS stream, CAST(0 AS INTEGER) AS read_at,
        (SELECT COUNT(*) FROM notifications n WHERE n.user_id = u.id AND n.read_at IS NULL) AS unread
 FROM users u
 WHERE u.id = sqlc.arg(user_id);
 
 -- name: ListMarkers :many
--- The notifications row has no marker time: its unread is the rows not yet opened.
+-- The notifications row has no marker time. Its unread count is the number
+-- of notifications not yet opened.
 SELECT u.id AS user_id, CAST('notifications' AS TEXT) AS stream, CAST(0 AS INTEGER) AS read_at,
        (SELECT COUNT(*) FROM notifications n WHERE n.user_id = u.id AND n.read_at IS NULL) AS unread
 FROM users u

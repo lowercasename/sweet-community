@@ -21,8 +21,8 @@ type CountUnreadNotificationsInGroupParams struct {
 	GroupID string
 }
 
-// Whether one of a kind about a group is still unopened: a conversation's
-// message notification is written once until it is read.
+// Counts the unread notifications of one kind for one group. A conversation's
+// message notification is written once and not again until it is read.
 func (q *Queries) CountUnreadNotificationsInGroup(ctx context.Context, arg CountUnreadNotificationsInGroupParams) (int64, error) {
 	row := q.db.QueryRowContext(ctx, countUnreadNotificationsInGroup, arg.UserID, arg.Kind, arg.GroupID)
 	var count int64
@@ -47,8 +47,8 @@ type CreateNotificationParams struct {
 	CreatedAt int64
 }
 
-// Notifications are per person; the handler lists the signed-in person's
-// own and nobody else's. Markers likewise.
+// Notifications are per user. The handler lists only the logged-in user's
+// own notifications. The same applies to markers.
 func (q *Queries) CreateNotification(ctx context.Context, arg CreateNotificationParams) error {
 	_, err := q.db.ExecContext(ctx, createNotification,
 		arg.ID,
@@ -72,7 +72,7 @@ type DeleteReadNotificationsParams struct {
 	Before int64
 }
 
-// The ones I have opened, up to a time; an unread one is never cleared.
+// Deletes the user's read notifications up to a time. An unread notification is never cleared.
 func (q *Queries) DeleteReadNotifications(ctx context.Context, arg DeleteReadNotificationsParams) error {
 	_, err := q.db.ExecContext(ctx, deleteReadNotifications, arg.UserID, arg.Before)
 	return err
@@ -99,11 +99,13 @@ type GetChatMarkerRow struct {
 	Unread int64
 }
 
-// A marker row exists for every stream of mine whether or not I have read
-// anything: the notifications stream (unread only: a notification is read by
-// opening it), and the chat and the feed of every group I am present in. Unread is what is newer than where I
-// have read to: others' live messages or posts since my marker, or since I
-// joined if I never read.
+// A marker row exists for each of the user's streams, whether or not they
+// have read anything. The streams are the notifications stream and the chat
+// and feed of every group the user is in and has not hidden. The
+// notifications row has only an unread count, because a notification is
+// read by opening it. Unread counts the items newer than the user's read
+// position. These are other users' live messages or posts since the user's
+// marker, or since they joined if they have never read.
 func (q *Queries) GetChatMarker(ctx context.Context, arg GetChatMarkerParams) (GetChatMarkerRow, error) {
 	row := q.db.QueryRowContext(ctx, getChatMarker, arg.UserID, arg.GroupID)
 	var i GetChatMarkerRow
@@ -202,7 +204,8 @@ type GetNotificationsMarkerRow struct {
 	Unread int64
 }
 
-// The notifications row alone, as ListMarkers lists it: for when a write elsewhere has read some.
+// Returns only the notifications row, as ListMarkers lists it. It is used
+// when a write elsewhere has marked some notifications read.
 func (q *Queries) GetNotificationsMarker(ctx context.Context, userID string) (GetNotificationsMarkerRow, error) {
 	row := q.db.QueryRowContext(ctx, getNotificationsMarker, userID)
 	var i GetNotificationsMarkerRow
@@ -243,7 +246,8 @@ type ListMarkersRow struct {
 	Unread int64
 }
 
-// The notifications row has no marker time: its unread is the rows not yet opened.
+// The notifications row has no marker time. Its unread count is the number
+// of notifications not yet opened.
 func (q *Queries) ListMarkers(ctx context.Context, userID string) ([]ListMarkersRow, error) {
 	rows, err := q.db.QueryContext(ctx, listMarkers, userID)
 	if err != nil {
@@ -349,8 +353,8 @@ type ListUnreadNotificationsInGroupUpToParams struct {
 	Before  int64
 }
 
-// The unopened ones of a kind about a group up to a time: what reading the
-// group's chat to that time reads.
+// The unread notifications of one kind for one group, up to a time. Reading
+// the group's chat up to that time marks these notifications read.
 func (q *Queries) ListUnreadNotificationsInGroupUpTo(ctx context.Context, arg ListUnreadNotificationsInGroupUpToParams) ([]string, error) {
 	rows, err := q.db.QueryContext(ctx, listUnreadNotificationsInGroupUpTo,
 		arg.UserID,
@@ -389,7 +393,7 @@ type ReadNotificationParams struct {
 	UserID string
 }
 
-// Opening it reads it, once; a second opening keeps the first time.
+// Opening a notification marks it read once. A second opening keeps the first read_at.
 func (q *Queries) ReadNotification(ctx context.Context, arg ReadNotificationParams) error {
 	_, err := q.db.ExecContext(ctx, readNotification, arg.ReadAt, arg.ID, arg.UserID)
 	return err
@@ -406,7 +410,7 @@ type SetMarkerParams struct {
 	ReadAt int64
 }
 
-// Forward only: a stale tab cannot unread what another has read.
+// A marker only moves forward, so an outdated tab cannot mark unread what another tab has marked read.
 func (q *Queries) SetMarker(ctx context.Context, arg SetMarkerParams) error {
 	_, err := q.db.ExecContext(ctx, setMarker, arg.UserID, arg.Stream, arg.ReadAt)
 	return err

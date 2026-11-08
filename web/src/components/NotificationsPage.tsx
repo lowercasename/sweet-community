@@ -26,11 +26,11 @@ interface NotificationsPageProps {
 }
 
 /**
- * What was done to me (architecture.md, Notifications): newest first, each
- * a sentence that opens the thing, in two sections. New holds the ones I
- * have not opened; opening one reads it (looking at the page reads
- * nothing: Raphael, 2026-11-06) and it moves to Earlier, which Clear
- * deletes for good.
+ * The user's notifications (architecture.md, Notifications), newest first, in
+ * two sections. Each notification is a sentence that opens its target when
+ * clicked. New holds the unopened notifications. Opening one marks it read
+ * and moves it to Earlier. Viewing the page marks nothing as read (Raphael,
+ * 2026-11-06). Clear permanently deletes the notifications in Earlier.
  */
 export function NotificationsPage({ groups, onGo }: NotificationsPageProps) {
   const { notifications, loading, error, hasMore, loadMore } = useNotifications()
@@ -48,7 +48,7 @@ export function NotificationsPage({ groups, onGo }: NotificationsPageProps) {
     try {
       await clear()
     } catch (e) {
-      setProblem(e instanceof Error ? e.message : 'Could not clear them')
+      setProblem(e instanceof Error ? e.message : 'Could not clear the notifications')
     } finally {
       setClearing(false)
     }
@@ -75,7 +75,7 @@ export function NotificationsPage({ groups, onGo }: NotificationsPageProps) {
           <Card>
             <Stack gap={2}>
               {error && <Alert tone="error">{error.message}</Alert>}
-              {!loading && notifications.length === 0 && <Text variant="secondary">Nice and quiet in here.</Text>}
+              {!loading && notifications.length === 0 && <Text variant="secondary">No notifications yet.</Text>}
               {fresh.length > 0 && (
                 <Stack gap={1}>
                   <Heading level={3}>New</Heading>
@@ -115,7 +115,11 @@ interface NotificationRowProps {
   onOpen: () => void
 }
 
-/** One line: who, what, when. The row is the control, so the name is text, not a card. Unopened, it is marked new. */
+/**
+ * One notification row, showing the actor, the action and the time. The row
+ * is the button, so the actor's name is plain text and does not open a user
+ * card. An unopened notification is marked new.
+ */
 function NotificationRow({ notification: n, groups, onOpen }: NotificationRowProps) {
   const actor = useAuthor(n.actor)
   const { topics } = useTopics()

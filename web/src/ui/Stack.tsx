@@ -13,14 +13,14 @@ const GAPS: Record<Gap, string> = {
 interface StackProps {
   gap?: Gap
   as?: 'div' | 'section' | 'main' | 'ul'
-  /** Take the parent's remaining room: height in a column (a column of panes), width in a row (a message beside its menu). */
+  /** Take the parent's remaining space. Height when the parent is a column (a column of panes), width when it is a row (a message beside its menu). */
   fill?: boolean
-  /** Out of sight but still mounted. */
+  /** Hidden with display none but still mounted. */
   hidden?: boolean
   children?: ReactNode
 }
 
-/** Vertical flex column with a fixed gap scale: 0, 4, 8, 16, 32px. */
+/** A vertical flex column with a fixed gap scale of 0, 4, 8, 16 and 32px. */
 export function Stack({ gap = 2, as = 'div', fill = false, hidden = false, children }: StackProps) {
   const Tag = as
   const cls = hidden ? 'hidden' : `flex min-w-0 flex-col ${GAPS[gap]} ${fill ? 'min-h-0 flex-1' : ''}`

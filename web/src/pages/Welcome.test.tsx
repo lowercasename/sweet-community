@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, screen } from '@testing-library/react'
 import { renderWithQuery } from '../test-utils'
 
-/** Onboarding: name the community, then a link to invite the first people with. */
+/** Onboarding. The owner names the community, then gets an invite link for the first users. */
 vi.mock('../api', () => ({
   getSettings: vi.fn(() => Promise.resolve({ group_creation: 'anyone', name: '', description: '', owner_set: true })),
   setSettings: vi.fn((s: { name: string; description: string; group_creation: string }) =>
@@ -33,7 +33,7 @@ describe('Welcome', () => {
     const { Welcome } = await import('./Welcome')
     const onDone = vi.fn()
     const { qc } = renderWithQuery(<Welcome settings={unnamed} onDone={onDone} />)
-    // The page reads the live settings too; let that first read land before saving over it.
+    // The page also reads the live settings query. Wait for that first read to complete before saving over it.
     await vi.waitFor(() => expect(qc.getQueryData(['settings'])).toBeTruthy())
     expect((screen.getByRole('button', { name: 'Next' }) as HTMLButtonElement).disabled).toBe(true)
     fireEvent.change(screen.getByLabelText('Community name'), { target: { value: 'Knitting Circle' } })
@@ -44,7 +44,7 @@ describe('Welcome', () => {
       description: 'Wool.',
       group_creation: 'anyone',
     })
-    await screen.findByText('Invite your first people')
+    await screen.findByText('Invite people')
     fireEvent.click(screen.getByRole('button', { name: 'Create invite link' }))
     expect(createInvite).toHaveBeenCalled()
     const field = (await screen.findByLabelText('Invite link')) as HTMLInputElement

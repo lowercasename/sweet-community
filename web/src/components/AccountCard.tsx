@@ -4,9 +4,10 @@ import { useAccount, useChangeEmail } from '../data/hooks'
 import { Alert, Button, Card, Field, Form, Heading, Input, Row, Stack, Text } from '../ui'
 
 /**
- * My address and password (architecture.md, Accounts). A new address waits,
- * pending, until the link sent to it is opened; a new password wants the old
- * one and ends every other session.
+ * The user's email address and password (architecture.md, Accounts). A new
+ * address stays pending until the user opens the link sent to it. Changing
+ * the password requires the current password and signs out every other
+ * session.
  */
 export function AccountCard() {
   const { data: account, error } = useAccount()
@@ -68,7 +69,7 @@ export function AccountCard() {
               <Text variant="secondary">No email address yet.</Text>
             ))}
           {account?.pending_email && (
-            <Alert>A link is on its way to {account.pending_email}. Open it to confirm the new address.</Alert>
+            <Alert>A link has been sent to {account.pending_email}. Open it to confirm the new address.</Alert>
           )}
           <Form onSubmit={() => void submitEmail()}>
             <Field label={account?.email ? 'New email address' : 'Email address'}>

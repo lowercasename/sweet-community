@@ -4,11 +4,11 @@ import { IMAGE_ACCEPT } from '../editor/images'
 
 interface EditorToolbarProps {
   editor: Editor | null
-  /** When set, an image button appears and hands the chosen files here. */
+  /** When set, an image button is shown and passes the chosen files to this callback. */
   onImage?: (files: File[]) => void
 }
 
-/** Mod+K or the Link button: prompt for a URL and set/unset the link mark on the selection. */
+/** Called by Mod+K or the Link button. Prompts for a URL and sets or unsets the link mark on the selection. */
 export function promptLink(editor: Editor) {
   const previous = (editor.getAttributes('link').href as string | undefined) ?? ''
   const href = window.prompt('Link URL', previous)
@@ -18,7 +18,7 @@ export function promptLink(editor: Editor) {
   else chain.setLink({ href: href.trim() }).run()
 }
 
-/** Bold, italic, link. Phones have no ⌘ key, so these are not optional. */
+/** The Bold, Italic and Link buttons. Phones have no ⌘ key, so these buttons are always shown. */
 export function EditorToolbar({ editor, onImage }: EditorToolbarProps) {
   const active = useEditorState({
     editor,

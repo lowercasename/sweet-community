@@ -2,12 +2,12 @@ import type { ReactNode } from 'react'
 
 interface HeadingProps {
   level: 1 | 2 | 3
-  /** One line, cut with an ellipsis: a bar's title beside its controls. */
+  /** Keep to one line and truncate with an ellipsis. Used for a bar's title beside its controls. */
   truncate?: boolean
   children?: ReactNode
 }
 
-/** Chrome headings. The h1 is the wordmark. Headings inside bodies are styled by .content. */
+/** Headings in the app chrome. The h1 is the wordmark. Headings inside post bodies are styled by .content. */
 export function Heading({ level, truncate = false, children }: HeadingProps) {
   const cut = truncate ? ' min-w-0 truncate' : ''
   if (level === 1) return <h1 className={`m-0 text-[20px] font-bold leading-tight text-sweet${cut}`}>{children}</h1>

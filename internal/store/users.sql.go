@@ -196,8 +196,9 @@ type GetProfileByUsernameRow struct {
 	JoinedAt  int64
 }
 
-// A person as their profile shows them: who they are, their standing in the
-// root group, and their bio. A removed account has no profile.
+// A user's profile. It has the user's id, username and picture, their role
+// and joined time in the root group, and their bio. A removed account has no
+// profile.
 func (q *Queries) GetProfileByUsername(ctx context.Context, username string) (GetProfileByUsernameRow, error) {
 	row := q.db.QueryRowContext(ctx, getProfileByUsername, username)
 	var i GetProfileByUsernameRow
@@ -320,8 +321,9 @@ type RemoveUserParams struct {
 	ID        string
 }
 
-// Anonymise (architecture.md, Admin tools): the name becomes removed-<id prefix>,
-// the password and picture go, the row and the id stay for their content.
+// Anonymises a user (architecture.md, Admin tools). The username becomes
+// removed-<id prefix>, and the password and picture are cleared. The row and
+// the id stay so that the user's content keeps its author.
 func (q *Queries) RemoveUser(ctx context.Context, arg RemoveUserParams) error {
 	_, err := q.db.ExecContext(ctx, removeUser, arg.Username, arg.RemovedAt, arg.ID)
 	return err

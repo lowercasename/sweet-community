@@ -9,8 +9,8 @@ import (
 	"sweet/internal/db"
 )
 
-// The instance's VAPID keys are made once and kept, so devices subscribed
-// against them keep working across restarts.
+// The instance's VAPID keys are generated once and stored, so devices
+// subscribed with them keep working across restarts.
 func TestLoadKeysMakesThemOnceAndKeepsThem(t *testing.T) {
 	d, err := db.Open(filepath.Join(t.TempDir(), "push.db"))
 	if err != nil {

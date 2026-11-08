@@ -2,20 +2,20 @@ import type { ReactNode } from 'react'
 import { Button, Heading, Row } from '../ui'
 
 interface PageBarProps {
-  /** The view's name: Home, a room, a page. */
+  /** The view's title, for example Home, a group's name or a page's name. */
   title: string
-  /** From a page under something (a room's members, a post): the way back to it. */
+  /** On a page nested under another view, such as a group's members or a post, the back button to that view. */
   back?: { label: string; onClick: () => void }
-  /** The bar's controls, on the right. */
+  /** The bar's controls, shown on the right. */
   children?: ReactNode
 }
 
 /**
- * The bar across the top of every view (architecture.md, Layout), on the
- * phone and the desktop alike: its name, a way back when it sits under
- * something, and its controls, which never wrap: the title gives way first,
- * cut to one line. On a phone the controls are icons. Pages keep no title of
- * their own.
+ * The bar across the top of every view (architecture.md, Layout), on both
+ * phone and desktop. It shows the view's title, a back button when the view
+ * is nested under another view, and the view's controls. The controls never
+ * wrap. The title shrinks first and is truncated to one line. On a phone the
+ * controls are icons. Pages do not render a title of their own.
  */
 export function PageBar({ title, back, children }: PageBarProps) {
   return (

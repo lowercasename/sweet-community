@@ -7,7 +7,7 @@ interface DottedProps {
   children?: ReactNode
 }
 
-/** An icon or mark with an unread dot on its corner when something behind it is unread. */
+/** Wraps an icon or mark and shows an unread dot on its corner when `shown` is true. */
 export function Dotted({ shown, children }: DottedProps) {
   if (!shown) return <>{children}</>
   return (

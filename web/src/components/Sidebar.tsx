@@ -9,26 +9,29 @@ import { ConversationsSection } from './ConversationsSection'
 interface SidebarProps {
   me: User
   groups: Group[]
-  /** The current path; the item it names is marked. */
+  /** The current path. The nav item for this path is marked as current. */
   location: string
   expanded: boolean
   onGo: (path: string) => void
   onToggle: () => void
 }
 
-/** Is this path the item, or a page under it? */
+/** Returns whether the location is the item's path or a page under it. */
 function at(location: string, path: string): boolean {
   return location === path || location.startsWith(path + '/')
 }
 
 /**
- * The left navigation, in three blocks (architecture.md, Layout): places
- * (Home, then the rooms I am in, with New room as that section's own
- * control, then my latest conversations with All messages at their foot),
- * the tools that reach across every place (Search, Notifications), and the house
- * (People; Community, for the owner, since a page about the community does
- * not belong behind my own: Raphael, 2026-11-06; and me: my own page, where
- * Settings is). The head wears the community's name.
+ * The left navigation, in three blocks (architecture.md, Layout). The first
+ * block lists the groups. It has Home, then the groups the user is in, with
+ * New room as that section's own control, then the user's latest
+ * conversations with All messages at the bottom. The second block has the
+ * tools that work across every group, which are Search and Notifications.
+ * The third block has the community items. These are People, then Community
+ * for the owner, then the user's own profile page, where Settings is reached.
+ * Community is in the nav because a page about the community does not belong
+ * under the owner's own page (Raphael, 2026-11-06). The top of the nav shows
+ * the community's name.
  */
 export function Sidebar({ me, groups, location, expanded, onGo, onToggle }: SidebarProps) {
   const live = useAuthor(me)

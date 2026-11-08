@@ -22,7 +22,7 @@ func TestBody(t *testing.T) {
 			name:    "drops javascript: hrefs; bare links get rel and, if external, target",
 			in:      `<a href="javascript:alert(1)" target="_blank">bad</a><a href="https://sweet.sh">ok</a><a href="mailto:a@b.c">m</a><a href="/p/x" target="_blank">rel</a>`,
 			want:    []string{`<a href="https://sweet.sh" rel="noreferrer noopener" target="_blank">ok</a>`, `<a href="mailto:a@b.c" rel="noreferrer">m</a>`, `<a href="/p/x" target="_blank" rel="noreferrer noopener">rel</a>`},
-			wantNot: []string{"javascript"}, // the bad anchor survives as an inert hrefless <a>
+			wantNot: []string{"javascript"}, // the rejected anchor remains as an <a> without href
 
 		},
 		{
@@ -67,9 +67,9 @@ func TestBody(t *testing.T) {
 	}
 }
 
-// TestFixedPoint: HTML as TipTap serialises it must come out of Body unchanged,
-// so an edit cycle (stored → editor → stored) is byte-stable. Fixtures mirror
-// web/src/editor/roundtrip.test.ts.
+// TestFixedPoint checks that HTML as TipTap serialises it passes through Body
+// unchanged, so that an edit cycle (stored, then editor, then stored) is
+// byte-stable. The fixtures mirror web/src/editor/roundtrip.test.ts.
 func TestFixedPoint(t *testing.T) {
 	fixtures := []string{
 		`<p>Hello, world.</p>`,
@@ -82,7 +82,7 @@ func TestFixedPoint(t *testing.T) {
 		`<blockquote><p>Quoted.</p></blockquote>`,
 		`<p>Line one<br>Line two</p>`,
 		`<p><strong><em>both</em></strong> and <strong><s>struck bold</s></strong></p>`,
-		// What TipTap emits after loading an API-authored link (see roundtrip.test.ts).
+		// The HTML TipTap emits after loading a link created via the API (see roundtrip.test.ts).
 		`<p><a target="_blank" rel="noreferrer noopener" href="https://sweet.sh">ok</a></p>`,
 		// An uploaded image as TipTap's Image node serialises it (see editor/extensions.ts).
 		`<p>look</p><img src="/img/019a4c5e-0000-7000-8000-000000000002" alt="a cat" width="800" height="600" data-image-id="019a4c5e-0000-7000-8000-000000000002">`,

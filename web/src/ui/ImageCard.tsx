@@ -2,7 +2,7 @@ import { Button } from './Button'
 import { Icon } from './Icon'
 import { Textarea } from './Textarea'
 
-/** Mastodon allows 1500, Bluesky 2000, X 1000. */
+/** Maximum alt text length. Mastodon allows 1500, Bluesky 2000, X 1000. */
 export const ALT_MAX = 1500
 
 const PLACEHOLDER = 'Describe this image for people using screen readers.'
@@ -18,20 +18,20 @@ interface ImageCardProps {
   src: string
   alt: string
   onAltChange: (alt: string) => void
-  /** Enter in the field. */
+  /** Called when Enter is pressed in the alt text field. */
   onAltEnter?: () => void
   onRemove?: () => void
-  /** Show a grip carrying TipTap's data-drag-handle, for cards that are editor nodes. */
+  /** Show a drag grip with TipTap's data-drag-handle attribute. For cards that are editor nodes. */
   grip?: boolean
-  /** Adjacent cards join into one block: only the outer corners are rounded. */
+  /** Which corners are rounded. Adjacent cards join into one block, so only the outer corners are rounded. */
   corners?: keyof typeof CORNERS
   selected?: boolean
 }
 
 /**
- * An image while it is being written about: the picture small on the left,
- * the alt text field taking the rest. Used for image nodes in the post
- * editor and for the images attached to a chat message.
+ * An image with its alt text being edited. The picture is small on the left
+ * and the alt text field takes the rest of the width. Used for image nodes in
+ * the post editor and for the images attached to a chat message.
  */
 export function ImageCard({
   src,

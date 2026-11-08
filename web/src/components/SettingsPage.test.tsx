@@ -3,7 +3,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, screen, within } from '@testing-library/react'
 import { ROOT, group, renderWithQuery, user } from '../test-utils'
 
-/** My own settings: picture, account, sign out, leaving. The community's are on the Community page. */
+/**
+ * The user's own settings: picture, account, sign out and account removal.
+ * Community settings are on the Community page.
+ */
 vi.mock('../api', () => ({
   listMembers: vi.fn(() => Promise.resolve({ members: [] })),
   listUsers: vi.fn(() => Promise.resolve({ users: [] })),
@@ -27,7 +30,7 @@ afterEach(cleanup)
 beforeEach(() => vi.clearAllMocks())
 
 describe('SettingsPage', () => {
-  it('lets anyone but the owner remove their account, after a confirm; the owner hands over first', async () => {
+  it('lets a non-owner remove their account after confirming, and asks the owner to transfer ownership', async () => {
     const { removeUser } = await import('../api')
     const { SettingsPage } = await import('./SettingsPage')
     const { qc } = renderWithQuery(
@@ -45,7 +48,7 @@ describe('SettingsPage', () => {
     expect(screen.queryByRole('button', { name: 'Remove my account' })).toBeNull()
   })
 
-  it('shows my address; a new one waits as pending once its link is sent; a new password wants the old', async () => {
+  it('shows the email, keeps a new one pending once its link is sent, and a new password needs the old', async () => {
     const { changeEmail, changePassword } = await import('../api')
     const { SettingsPage } = await import('./SettingsPage')
     renderWithQuery(<SettingsPage me={user('kit')} root={group(ROOT, 'member')} onSignOut={() => {}} />)
@@ -54,8 +57,8 @@ describe('SettingsPage', () => {
     fireEvent.change(screen.getByLabelText('Your password'), { target: { value: 'longenough' } })
     fireEvent.click(screen.getByRole('button', { name: 'Send a link there' }))
     expect(changeEmail).toHaveBeenCalledWith('new@example.test', 'longenough')
-    await screen.findByText(/A link is on its way to new@example.test/)
-    // The old address stands until then.
+    await screen.findByText(/A link has been sent to new@example.test/)
+    // The old address stays in use until the link is opened.
     expect(screen.getByText('kit@example.test')).toBeTruthy()
 
     fireEvent.change(screen.getByLabelText('Current password'), { target: { value: 'longenough' } })

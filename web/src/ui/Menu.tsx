@@ -22,43 +22,45 @@ import { useTooltip } from './Tooltip'
 export interface MenuItem {
   label: string
   icon?: IconName
-  /** A second, quieter line under the label: a topic's description. */
+  /** A second, muted line under the label. Used for a topic's description. */
   detail?: string
-  /** A choice among several: the chosen one is marked. */
+  /** For a choice among several items. The chosen item is marked with a check. */
   checked?: boolean
   onSelect: () => void
 }
 
 interface MenuProps {
-  /** Accessible name of the trigger, e.g. "Post options". */
+  /** Accessible name of the trigger, for example "Post options". */
   label: string
   icon?: IconName
   items: MenuItem[]
   /**
-   * What the trigger looks like. `icon` (the default) is a ghost icon
-   * button, the three dots. `pill` is a topic pill with a chevron, wherever
-   * a topic is chosen, showing `children` as its text.
+   * The trigger's appearance. `icon` (the default) is a ghost icon button
+   * showing three dots. `pill` is a topic pill with a chevron, used wherever
+   * a topic is chosen, with `children` as its text.
    */
   trigger?: 'icon' | 'pill'
-  /** A pill with nothing chosen is quiet. */
+  /** Use the quiet pill style, for a pill with nothing chosen. */
   quiet?: boolean
-  /** A pill trigger's size: a label among content, or a control among controls. */
+  /** A pill trigger's size. `sm` is a label among content. `md` is a control among controls. */
   size?: PillSize
   disabled?: boolean
   children?: ReactNode
   /**
-   * Out of sight until its own block is hovered or holds focus, where there
-   * is a pointer to hover with; always shown on a touch screen, and while
-   * open. The block is named by level, since a post holds its comments: a
-   * post's menu shows while its card is hovered and no comment in it is; a
-   * comment's while its own article is; a message's while its own row is.
+   * Hide the trigger until its block is hovered or contains focus, on devices
+   * with a pointer. On a touch screen it is always shown. It is also shown
+   * while the menu is open. The value names the level of block, because a post
+   * contains its comments. A post's menu shows while its card is hovered and no
+   * comment inside it is hovered. A comment's menu shows while its own article
+   * is hovered. A message's menu shows while its own row is hovered.
    */
   reveal?: 'post' | 'comment' | 'message'
 }
 
 /**
- * The classes that hide a revealed menu until its block is hovered or focused, on pointer screens only. The blocks
- * are marked `block-post` (Card as article), `block-comment` (Box as article) and `block-message` (MessageBlock).
+ * The classes that hide a revealed menu until its block is hovered or focused, on devices with a pointer only. The
+ * blocks have the classes `block-post` (Card as article), `block-comment` (Box as article) and `block-message`
+ * (MessageBlock).
  */
 const REVEAL: Record<NonNullable<MenuProps['reveal']>, string> = {
   post: 'pointer-fine:opacity-0 pointer-fine:[.block-post:hover:not(:has(.block-comment:hover))_&]:opacity-100 pointer-fine:[.block-post:focus-within:not(:has(.block-comment:focus-within))_&]:opacity-100',
@@ -69,13 +71,13 @@ const REVEAL: Record<NonNullable<MenuProps['reveal']>, string> = {
 }
 
 /**
- * A three-dot menu: a ghost icon button that opens a short list of actions.
- * Floating UI positions it, keeps it inside the pane it is in (flipping up
- * near the bottom), closes it on Escape or an outside click, and moves
- * through the items with the arrow keys. It is rendered where its button
- * is, not portalled to the body, so it scrolls with the button and is
- * clipped by the pane's edge; it never needs to close on scroll, which once
- * shut it one frame after it opened.
+ * A three-dot menu. A ghost icon button that opens a short list of actions.
+ * Floating UI positions the list, keeps it inside its pane (flipping upwards
+ * near the bottom), closes it on Escape or a click outside, and moves through
+ * the items with the arrow keys. The list is rendered next to its button, not
+ * portalled to the body, so it scrolls with the button and is clipped by the
+ * pane's edge. This means it never needs to close on scroll. Closing on scroll
+ * once closed the menu one frame after it opened.
  */
 export function Menu({
   label,

@@ -1,9 +1,10 @@
 -- 011: notifications and read markers (architecture.md, Notifications).
--- A notification is one row for one person about one thing done to them,
--- written in the same transaction as the thing: a comment on their post,
--- being added to a room. A marker is how far along a stream a person has
--- read: the newest time they have seen, one row per person per stream
--- ('notifications', or 'chat:<group id>'), never moved backwards.
+-- A notification is one row for one user about one action that affects them,
+-- such as a comment on their post or being added to a room. It is written in
+-- the same transaction as the action. A marker records how far a user has
+-- read a stream, as the newest time they have seen. There is one row per
+-- user per stream ('notifications', or 'chat:<group id>'), and it never
+-- moves backwards.
 CREATE TABLE notifications (
     id         TEXT PRIMARY KEY,
     user_id    TEXT NOT NULL REFERENCES users(id),

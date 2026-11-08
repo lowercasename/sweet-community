@@ -2,7 +2,7 @@ import { expect, member, open, sendMessage, test, uniq, type Person } from './he
 
 const nav = (p: Person) => p.page.getByRole('navigation', { name: 'Main' })
 
-/** Open a DM with someone from the People page, and land in it. */
+/** Opens a DM with a user from the People page and waits until the DM is shown. */
 async function messageFromPeople(p: Person, who: string) {
   await nav(p).getByRole('button', { name: 'People' }).click()
   await p.page.getByRole('listitem').filter({ hasText: who }).getByRole('button', { name: 'Message' }).click()
@@ -11,7 +11,7 @@ async function messageFromPeople(p: Person, who: string) {
 }
 
 test.describe('nav', () => {
-  test('rooms and conversations sit in their own sections; conversations by latest word; the page lists them all', async ({
+  test('rooms and conversations have separate nav sections, conversations are ordered by latest message, and the Messages page lists all', async ({
     browser,
   }, testInfo) => {
     const kit = await member(browser, testInfo, 'kit')
@@ -19,7 +19,7 @@ test.describe('nav', () => {
     const jo = await member(browser, testInfo, 'jo')
     await open(kit.page)
 
-    // A new group lands in the Rooms section, made from that section's own control.
+    // A group created with the Rooms section's New room button appears in the Rooms section.
     const groups = nav(kit).getByRole('group', { name: 'Rooms' })
     await groups.getByRole('button', { name: 'New room' }).click()
     const name = uniq('Knitting ')
@@ -28,18 +28,20 @@ test.describe('nav', () => {
     await expect(kit.page).toHaveURL(/\/r\/[^/]+$/)
     await expect(groups.getByRole('button', { name })).toBeVisible()
     await expect(groups.getByRole('button', { name })).toHaveAttribute('aria-current', 'page')
-    // A section's items are smaller than Home and sit touching, a stack under their title.
+    // A section's items are smaller than Home and have no gap between them, so they form a list under the
+    // section title.
     const home = await nav(kit).getByRole('button', { name: 'Home' }).boundingBox()
     const room = await groups.getByRole('button', { name }).boundingBox()
     expect(home && room && room.height < home.height).toBeTruthy()
 
-    // A conversation joins the Messages section at once, marked while I am in it, drawn by the other's face.
+    // A new conversation appears in the Messages section immediately. It is marked as current while it is open, and
+    // it is shown with the other user's profile picture.
     await messageFromPeople(kit, mo.username)
     const conversations = nav(kit).getByRole('group', { name: 'Messages' })
     await expect(conversations.getByRole('button', { name: mo.username })).toHaveAttribute('aria-current', 'page')
     await expect(conversations.getByRole('button', { name: mo.username }).locator('img')).toHaveCount(1)
     await sendMessage(kit.page, uniq('hi mo '))
-    // The section's own control starts one: pick a person, land in the conversation.
+    // The section's New message button starts a conversation. After a user is chosen, the conversation opens.
     await conversations.getByRole('button', { name: 'New message' }).click()
     await expect(kit.page).toHaveURL(/\/messages\/new$/)
     await kit.page.getByLabel('To').selectOption({ label: jo.username })
@@ -48,7 +50,8 @@ test.describe('nav', () => {
     await expect(kit.page.getByRole('heading', { name: jo.username })).toBeVisible()
     await sendMessage(kit.page, uniq('hi jo '))
 
-    // The section orders by latest word; with everything shown there is no All messages row. The page lists them the same way.
+    // The section is ordered by latest message. When every conversation is shown, there is no All messages row.
+    // The Messages page lists them in the same order.
     const items = conversations.getByRole('button')
     await expect(items).toHaveCount(3)
     await expect(items.nth(0)).toHaveAccessibleName('New message')
@@ -64,7 +67,8 @@ test.describe('nav', () => {
     await expect(rows.nth(0)).toContainText(jo.username)
     await expect(rows.nth(1)).toContainText(mo.username)
 
-    // Mo speaks: mo's conversation moves to the top of kit's section and list, from the stream.
+    // Mo sends a message. An event from the stream moves mo's conversation to the top of kit's nav section and of
+    // the Messages page list.
     await open(mo.page)
     await nav(mo).getByRole('button', { name: kit.username }).click()
     await expect(mo.page.getByRole('heading', { name: kit.username })).toBeVisible()
@@ -73,13 +77,14 @@ test.describe('nav', () => {
     await expect(rows.nth(0)).toContainText(mo.username)
     await expect(rows.nth(1)).toContainText(jo.username)
 
-    // Opening one from the list marks it in the section.
+    // Opening a conversation from the list marks it as current in the nav section.
     await rows.nth(0).getByRole('button').click()
     await expect(kit.page).toHaveURL(/\/r\/[^/]+$/)
     await expect(kit.page.getByRole('heading', { name: mo.username })).toBeVisible()
     await expect(conversations.getByRole('button', { name: mo.username })).toHaveAttribute('aria-current', 'page')
 
-    // Collapsed, a name hidden behind its mark is a tooltip, not the browser's title.
+    // When the nav is collapsed, an item's name is hidden and only its tile is shown. The name is shown in a
+    // tooltip, not in the browser's title attribute.
     await nav(kit).getByRole('button', { name: 'Collapse' }).click()
     const tile = nav(kit).getByRole('button', { name })
     await expect(tile).not.toHaveAttribute('title')
@@ -91,7 +96,9 @@ test.describe('nav', () => {
     await jo.context.close()
   })
 
-  test('@phone the menu holds the same blocks, conversations included', async ({ browser }, testInfo) => {
+  test('@phone the menu contains the same blocks as the nav, including conversations', async ({
+    browser,
+  }, testInfo) => {
     const kit = await member(browser, testInfo, 'kit')
     const mo = await member(browser, testInfo, 'mo')
     await open(kit.page)
@@ -103,7 +110,7 @@ test.describe('nav', () => {
       kit.page.getByRole('group', { name: 'Messages' }).getByRole('button', { name: 'New message' }),
     ).toBeVisible()
 
-    // People, Message mo, then back through the menu: mo is in the Messages section, and on the full list.
+    // Open People, message mo, then open the menu again. Mo is in the Messages section and in the full list.
     await kit.page.getByRole('button', { name: 'People' }).click()
     await kit.page
       .getByRole('listitem')
@@ -118,16 +125,16 @@ test.describe('nav', () => {
     await kit.page.goto('/messages')
     await expect(kit.page.getByRole('list').getByRole('button', { name: mo.username })).toBeVisible()
 
-    // Home from the menu.
+    // Open Home from the menu.
     await nav(kit).getByRole('button', { name: 'Menu' }).click()
-    // The menu's Home, not the tab bar's.
+    // Click the menu's Home button, not the tab bar's.
     await kit.page.getByRole('button', { name: 'Home' }).first().click()
     await expect(kit.page).toHaveURL(/\/$/)
     await kit.context.close()
     await mo.context.close()
   })
 
-  test('a rule in the nav has the same air above it as below it, after a section of small items', async ({
+  test('a rule in the nav has the same space above it as below it, after a section of small items', async ({
     browser,
   }, testInfo) => {
     const kit = await member(browser, testInfo, 'kit')

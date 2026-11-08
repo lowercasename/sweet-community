@@ -1,11 +1,11 @@
 import { article, confirm, expect, member, open, pick, sendMessage, test, uniq, view, writePost } from './helpers'
 
 test.describe('posts and comments', () => {
-  test('write, edit, comment, delete; another person sees each change live', async ({ browser }, testInfo) => {
+  test('write, edit, comment and delete, and another user sees each change live', async ({ browser }, testInfo) => {
     const kit = await member(browser, testInfo, 'kit')
     const mo = await member(browser, testInfo, 'mo')
-    // A deep feed, so the pane can scroll: a menu opened on a button that
-    // had to be scrolled into view once closed itself a frame later.
+    // Create enough posts for the pane to scroll. A menu opened from a button that
+    // had to be scrolled into view once closed itself one frame later.
     for (let i = 0; i < 14; i++) {
       await kit.context.request.post('/api/groups/00000000-0000-7000-8000-000000000000/posts', {
         data: { body_html: `<p>filler ${i}</p>` },
@@ -18,7 +18,7 @@ test.describe('posts and comments', () => {
     await writePost(kit.page, text)
     await expect(article(mo.page, text)).toBeVisible()
 
-    // Edit: the author has the menu, a bystander does not.
+    // Edit. The author has the post menu, and another user does not.
     await expect(article(mo.page, text).getByRole('button', { name: 'Post options' })).toHaveCount(0)
     await pick(kit.page, article(kit.page, text), 'Post options', 'Edit')
     await kit.page.locator('article .editor-post .ProseMirror').first().click()
@@ -29,7 +29,7 @@ test.describe('posts and comments', () => {
     await expect(article(kit.page, text)).toContainText('edited')
     await expect(article(mo.page, text)).toContainText('and boats')
 
-    // Comment: appears for both; the count on the post follows.
+    // Comment. The comment appears for both users, and the comment count on the post updates.
     await article(mo.page, text).getByRole('button', { name: 'Show comments' }).click()
     await article(mo.page, text).locator('.editor-line .ProseMirror').click()
     await mo.page.keyboard.type('Boats are fine too')
@@ -39,7 +39,7 @@ test.describe('posts and comments', () => {
     await article(kit.page, text).getByRole('button', { name: 'Show comments' }).click()
     await expect(article(kit.page, text)).toContainText('Boats are fine too')
 
-    // The post's author may delete a comment on their post; the comment's author may too.
+    // The post's author may delete a comment on their post. The comment's author may also delete it.
     const comment = article(kit.page, text).getByRole('article').filter({ hasText: 'Boats are fine too' })
     await pick(kit.page, comment, 'Comment options', 'Delete')
     await confirm(kit.page, 'Delete')
@@ -47,7 +47,7 @@ test.describe('posts and comments', () => {
     await expect(article(mo.page, text)).not.toContainText('Boats are fine too')
     await expect(article(kit.page, text).getByRole('button', { name: 'Hide comments' })).not.toContainText('1')
 
-    // Delete the post: asks first; gone for everyone.
+    // Delete the post. A confirmation is shown first, and then the post is removed for every user.
     await pick(kit.page, article(kit.page, text), 'Post options', 'Delete')
     await confirm(kit.page, 'Delete')
     await expect(article(kit.page, text)).toHaveCount(0)
@@ -56,7 +56,9 @@ test.describe('posts and comments', () => {
     await mo.context.close()
   })
 
-  test('Mod+Enter posts; the editor empties; the post is at the top', async ({ browser }, testInfo) => {
+  test('Mod+Enter submits the post, the editor is cleared, and the post is at the top of the feed', async ({
+    browser,
+  }, testInfo) => {
     const kit = await member(browser, testInfo)
     await open(kit.page)
     const text = uniq('Quick one ')
@@ -71,7 +73,7 @@ test.describe('posts and comments', () => {
 })
 
 test.describe('post page', () => {
-  test('a post has a page of its own: from its time, with the thread open; Back returns to its room', async ({
+  test('a post has its own page, opened from its timestamp with the thread open, and Back returns to its room', async ({
     browser,
   }, testInfo) => {
     const kit = await member(browser, testInfo, 'kit')
@@ -84,7 +86,7 @@ test.describe('post page', () => {
     const path = new URL(kit.page.url()).pathname
     await expect(kit.page.getByRole('heading', { name: `Post by ${kit.username}` })).toBeVisible()
 
-    // The thread is open: a reply from here counts on the feed behind.
+    // The thread is open. A reply sent from this page is counted on the feed behind it.
     const shown = kit.page.locator('article:visible').filter({ hasText: text })
     await expect(shown.locator('[data-placeholder]')).toHaveAttribute('data-placeholder', `Reply to ${kit.username}…`)
     await shown.locator('.editor-line .ProseMirror').click()
@@ -92,7 +94,7 @@ test.describe('post page', () => {
     await kit.page.getByRole('button', { name: 'Reply' }).click()
     await expect(shown).toContainText('From the page')
 
-    // The address holds: a reload, and another person.
+    // The URL still works after a reload and for another user.
     await kit.page.reload()
     await expect(kit.page.getByRole('heading', { name: `Post by ${kit.username}` })).toBeVisible()
     await open(mo.page, path)
@@ -103,7 +105,7 @@ test.describe('post page', () => {
     await expect(kit.page).toHaveURL(/\/$/)
     await expect(article(kit.page, text).getByRole('button', { name: 'Show comments' })).toContainText('1')
 
-    // A post in a room mo is not in has no page for mo.
+    // A post in a room that mo is not a member of has no page for mo.
     const room = await kit.context.request.post('/api/groups', {
       data: { kind: 'group', name: uniq('Wool'), mode: 'both' },
     })
@@ -111,7 +113,7 @@ test.describe('post page', () => {
     const secret = await kit.context.request.post(`/api/groups/${gid}/posts`, { data: { body_html: '<p>secret</p>' } })
     const pid = ((await secret.json()) as { id: string }).id
     await mo.page.goto(`/p/${pid}`)
-    await expect(mo.page.getByText(/This post is gone/)).toBeVisible()
+    await expect(mo.page.getByText(/This post has been deleted/)).toBeVisible()
     await expect(mo.page.getByText('secret')).toHaveCount(0)
     await kit.context.close()
     await mo.context.close()
@@ -136,7 +138,7 @@ test.describe('post page', () => {
 })
 
 test.describe('menus', () => {
-  test('a post, comment or message menu is out of sight until its block is hovered', async ({ browser }, testInfo) => {
+  test('a post, comment or message menu is hidden until its block is hovered', async ({ browser }, testInfo) => {
     const kit = await member(browser, testInfo)
     await open(kit.page)
     const text = uniq('Hover me ')
@@ -146,7 +148,7 @@ test.describe('menus', () => {
     await expect(menu).toHaveCSS('opacity', '0')
     await post.hover()
     await expect(menu).toHaveCSS('opacity', '1')
-    // A comment's menu, when hovered, shows instead of the post's.
+    // When a comment is hovered, the comment's menu is shown instead of the post's.
     await post.getByRole('button', { name: 'Show comments' }).click()
     await post.locator('.editor-line .ProseMirror').click()
     await kit.page.keyboard.type('A reply')
@@ -155,15 +157,17 @@ test.describe('menus', () => {
     await comment.hover()
     await expect(comment.getByRole('button', { name: 'Comment options' })).toHaveCSS('opacity', '1')
     await expect(menu).toHaveCSS('opacity', '0')
-    // On the card but off the comment, the comment's menu goes and the post's returns.
+    // When the pointer is on the card but not on the comment, the comment's menu is hidden and the post's menu is
+    // shown again.
     await post.getByRole('button', { name: 'Hide comments' }).hover()
     await expect(comment.getByRole('button', { name: 'Comment options' })).toHaveCSS('opacity', '0')
     await expect(menu).toHaveCSS('opacity', '1')
-    // The open menu stays while the pointer is on it.
+    // The open menu stays open while the pointer is on it.
     await menu.click({ force: true })
     await expect(kit.page.getByRole('menuitem', { name: 'Edit' })).toBeVisible()
     await kit.page.keyboard.press('Escape')
-    // Chat: the same. (The thread closes first, so its reply box is not the first line editor on the page.)
+    // Chat behaves the same way. The thread is closed first, so that its reply box is not the first line editor on
+    // the page.
     await post.getByRole('button', { name: 'Hide comments' }).click()
     const said = uniq('hover word ')
     await sendMessage(kit.page, said)
@@ -173,7 +177,9 @@ test.describe('menus', () => {
     await kit.context.close()
   })
 
-  test('@phone menus are always in sight, since there is nothing to hover with', async ({ browser }, testInfo) => {
+  test('@phone menus are always visible, because a touch screen has no pointer to hover with', async ({
+    browser,
+  }, testInfo) => {
     const kit = await member(browser, testInfo)
     await open(kit.page)
     await view(kit.page, 'Posts').click()

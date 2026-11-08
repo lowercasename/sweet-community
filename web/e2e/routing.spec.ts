@@ -1,7 +1,7 @@
 import { expect, member, open, test } from './helpers'
 
 test.describe('routing', () => {
-  test('every page is a URL: reload keeps the place, back returns, unknown paths go home', async ({
+  test('every page has a URL, a reload keeps the current page, Back returns to the previous page, and unknown paths go to Home', async ({
     browser,
   }, testInfo) => {
     const kit = await member(browser, testInfo)
@@ -23,7 +23,7 @@ test.describe('routing', () => {
     await kit.page.goto('/nowhere/at/all')
     await expect(kit.page).toHaveURL(/\/$/)
     await expect(kit.page.locator('.editor-post').first()).toBeVisible()
-    // The bar names every view, Home included.
+    // The bar shows the name of every view, including Home.
     await expect(kit.page.getByRole('heading', { name: 'Home' })).toBeVisible()
     for (const [path, title] of [
       ['/messages', 'Messages'],

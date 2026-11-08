@@ -7,21 +7,21 @@ interface VerifyProps {
   token: string
   /** The community's name, for the frame. */
   name?: string
-  /** The address is verified and the session issued: hand over who I am. */
+  /** Called when the address is verified and the session is issued, with the signed-in user. */
   onVerified: (me: User) => void
 }
 
 /**
  * The page a verification link opens (architecture.md, Accounts). The token
- * is spent on arrival, once: a used, expired or made-up link says so and
- * offers a new one.
+ * is used once, on arrival. A used, expired or invalid link shows an error
+ * and offers to send a new link.
  */
 export function Verify({ token, name, onVerified }: VerifyProps) {
   const [error, setError] = useState<string | null>(null)
   const [email, setEmail] = useState('')
   const [busy, setBusy] = useState(false)
   const [asked, setAsked] = useState(false)
-  // Once, whatever React does with effects in development.
+  // Run the effect once, even though React runs effects twice in development.
   const started = useRef(false)
   useEffect(() => {
     if (started.current) return
@@ -49,7 +49,7 @@ export function Verify({ token, name, onVerified }: VerifyProps) {
           <Heading level={2}>This link does not work</Heading>
           <Alert tone="error">{error}</Alert>
           {asked ? (
-            <Text>If that address has an account waiting to be verified, a new link is on its way.</Text>
+            <Text>If that address belongs to an account waiting to be verified, a new link has been sent.</Text>
           ) : (
             <Form onSubmit={() => void resend()}>
               <Field label="Send a new link to">

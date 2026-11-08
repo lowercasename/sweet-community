@@ -10,7 +10,7 @@ import { PersonName } from './PersonName'
 interface CommentThreadProps {
   postId: string
   groupId: string
-  /** The post's author, whom a reply answers. */
+  /** The post's author, shown as the user a reply is addressed to. */
   replyTo: string
   disabled: boolean
 }
@@ -101,9 +101,10 @@ function CommentItem({ comment, groupId, disabled, onEdit, onDelete }: CommentIt
 }
 
 /**
- * The thread under a post, on its own ground (architecture.md, Posts): a
- * grey panel holding the comments, oldest first, a hairline between each,
- * and the reply editor at its foot, the one white thing in it.
+ * The comment thread under a post (architecture.md, Posts). It is a grey
+ * panel with its own background. The panel contains the comments, oldest
+ * first, with a hairline between each, and the reply editor at the bottom.
+ * The reply editor is the only white element in the panel.
  */
 export function CommentThread({ postId, groupId, replyTo, disabled }: CommentThreadProps) {
   const { comments, loading, error } = useComments(postId)

@@ -2,7 +2,7 @@ import type { ReactNode } from 'react'
 
 interface FieldProps {
   label: string
-  /** A line under the control, for a term the person may not know yet. */
+  /** A line of text under the control, for explaining a term the user may not know yet. */
   hint?: string
   children?: ReactNode
 }

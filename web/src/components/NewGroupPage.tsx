@@ -13,7 +13,7 @@ const MODES: { value: GroupMode; label: string }[] = [
   { value: 'chat', label: 'Chat only' },
 ]
 
-/** A room needs a name and a mode; everything else is a membership. */
+/** The page for creating a group. A group needs a name and a mode. Everything else is set through memberships. */
 export function NewGroupPage({ onCreated }: NewGroupPageProps) {
   const { create } = useGroupActions()
   const [name, setName] = useState('')

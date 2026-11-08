@@ -128,7 +128,7 @@ type ListMessagesRow struct {
 	AuthorPictureID sql.NullString
 }
 
-// Chat messages live in a group's room. Membership is the handler's check.
+// Chat messages belong to a group's chat. The handler checks membership.
 func (q *Queries) ListMessages(ctx context.Context, arg ListMessagesParams) ([]ListMessagesRow, error) {
 	rows, err := q.db.QueryContext(ctx, listMessages, arg.GroupID, arg.Before, arg.PageSize)
 	if err != nil {

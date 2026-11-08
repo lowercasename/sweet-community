@@ -22,9 +22,9 @@ Four variants. Each variant answers one question: what does pressing this button
 | **primary** | The main action of the surface. At most one visible at a time. | Pink fill, white text, medium weight | Red (sweet) fill | Not used as a toggle | Pink fill at 45% opacity, white text. Still recognisable as the main action. Never grey. |
 | **secondary** | An action that changes something or starts a flow, but is not the surface's main action. | 1px border in the line colour, ink text, card background | Pink border, red text | Not used as a toggle | Grey (mute) text, border unchanged |
 | **ghost** | A quiet action next to content, a toggle, a menu trigger, or Cancel. | No border, grey text | Field background, ink text | Blush background, red text. A text toggle shows its state at rest (Subscribed) and its action on hover (Unsubscribe). | Line-coloured text |
-| **danger** | An action that removes something and cannot simply be undone: a post, a room, a member, an account, all sessions. Always has an icon. Always confirmed when the loss is real. | Ghost shape, red text and icon | Blush background | Not used as a toggle | Line-coloured text |
+| **danger** | An action that removes something and cannot simply be undone: a post, a room, a member, an account, all sessions. Always has an icon. Always confirmed when the loss is real. | Ghost shape, red text and icon | Blush background and a blush-line border. Blush alone is almost white, so the border makes the hover visible. | Not used as a toggle | Line-coloured text |
 
-One height, 32px, as now. Pills change from 34px to 32px so a pill and a button on one row align. Icon sizes: 18px in a button, 20px in the nav, 22px in the tab bar. These three are documented so no fourth size is added.
+One height, 34px. Text buttons and medium pills are already 34px: a 24px line, 4px padding above and below, and a 1px border. Icon-only buttons are 32px today, because they use 6px padding around an 18px icon. They change to 7px padding, so every button and pill on a row is 34px. Icon sizes: 18px in a button, 20px in the nav, 22px in the tab bar. These three are documented so no fourth size is added.
 
 Busy state is a `busy` prop, not a label change. `busy` disables the button and shows a small spinner in place of the icon, or before the text if there is no icon. The label does not change: "Save" stays "Save" while saving. This removes nineteen hand-written "…" labels and fixes the three dialogs without one.
 
@@ -124,15 +124,20 @@ Numbers refer to the inventory.
 - 6 to 8, destructive actions: the danger variant, the filled confirm button, the verb repeated in the dialog, `busy` on every dialog.
 - 9, grey primaries: a disabled primary stays pink.
 - 10 to 12, toggles: pressed is a ghost-only state by design. Pressed and current share one look, because both mean "this is selected". The three text toggles use one wording pattern.
-- 13 and 14, pills next to buttons: pills change to 32px. Hover rules are written down for each primitive.
+- 13 and 14, pills next to buttons: medium pills and text buttons are both 34px already. Icon-only buttons change from 32px to 34px. Hover rules are written down for each primitive.
 - 15 to 19, labels: the verb table and the `busy` prop.
 - 20 to 22, icons: the icon table, `user` added, `people` narrowed to People and members.
 - 23 to 26, placement: the row rule, the gap rule, menus always visible on rows and shown on hover on content.
 - 27 to 30, duplicate implementations: NavItem, TabBar, Rail, ListRow, SuggestionList and Menu items use `buttonClass('ghost')` for hover and current states. FilePicker takes its variant from its caller, as now. HoverCard's trigger (a person's name, red, underlined on hover) is documented as the one text control that is not a Link.
 
+## Open points
+
+- White text on pink `#ed5e5e` has a contrast ratio of 3.3:1, and ghost text `#7a7a7a` on white has 4.3:1. Both are below the 4.5:1 guideline for 16px text. White on Sweet red `#ce1717` is 5.6:1. Changing either is a change to Sweet's colours, so it is listed here for a decision, not proposed.
+- A pressed ghost button uses a blush background, which is almost white. The pressed state is visible through the red text and the changed icon or label, not through the background.
+
 ## Order of work
 
 1. `Button`: add `danger`, add `busy`, restyle the disabled primary, export the tokens the nav primitives need. Vitest for `busy` and `danger`. A Playwright page that renders every variant in every state at both widths and saves screenshots to `test-results`, reviewed before anything else changes.
-2. Pill to 32px. Nav primitives onto the ghost tokens. Screenshots of the sidebar, tab bar, rail and feed header.
+2. Icon-only buttons to 34px. Nav primitives onto the ghost tokens. Screenshots of the sidebar, tab bar, rail and feed header.
 3. One commit per surface in the order above, each checked at both widths.
 4. Record the rules in `architecture.md` under a Buttons heading, and delete this file.

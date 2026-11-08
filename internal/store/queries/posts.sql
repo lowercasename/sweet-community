@@ -1,6 +1,6 @@
--- Posts live in a group. The handler has already checked the viewer's
--- membership of the group it lists; who may edit or delete is perm's call,
--- made after GetPostOwners. The queries themselves do not check.
+-- Posts belong to a group. The handler has already checked the viewer's
+-- membership of the group it lists. perm decides who can edit or delete,
+-- after GetPostOwners. The queries do not check permissions.
 
 -- name: ListPosts :many
 SELECT p.id, p.group_id, p.topic_id, p.body_html, p.body_text, p.created_at, p.edited_at,
@@ -35,7 +35,8 @@ WHERE id = sqlc.arg(id) AND deleted_at IS NULL;
 UPDATE posts SET deleted_at = sqlc.arg(deleted_at) WHERE id = sqlc.arg(id) AND deleted_at IS NULL;
 
 -- name: ListPostsByAuthor :many
--- One person's posts, as a viewer may see them: only from groups the viewer is present in.
+-- One user's posts that a viewer can see. Only posts in groups that the
+-- viewer is in, and has not hidden, are returned.
 SELECT p.id, p.group_id, p.topic_id, p.body_html, p.body_text, p.created_at, p.edited_at,
        u.id AS author_id, u.username AS author_username, u.picture_id AS author_picture_id,
        (SELECT COUNT(*) FROM comments c WHERE c.post_id = p.id AND c.deleted_at IS NULL) AS comment_count

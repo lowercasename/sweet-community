@@ -12,10 +12,11 @@ import (
 	"sweet/internal/store"
 )
 
-// Profile is a person as their page shows them (architecture.md, Accounts):
-// who they are, their standing here, when they joined, and their bio, which
-// is a body like any other, sanitised by the same policy. Everyone on the
-// instance may see every profile; only its person edits the bio.
+// Profile is a user as their profile page shows them (architecture.md,
+// Accounts). It holds the user, their role on the instance, when they
+// joined, and their bio. The bio is a body like any other and is sanitised by
+// the same policy. Every user on the instance may see every profile. Only
+// the profile's user may edit the bio.
 type Profile struct {
 	User
 	Role     string `json:"role"`
@@ -26,13 +27,13 @@ type Profile struct {
 	} `json:"can"`
 }
 
-// profileFor fills in what the viewer may do.
+// profileFor fills in the viewer's can flags.
 func profileFor(viewer User, p Profile) Profile {
 	p.Can.Edit = viewer.ID == p.ID
 	return p
 }
 
-// getProfile is a person by name; a removed account, or no account, is 404.
+// getProfile returns a user by username. A removed account or an unknown username returns 404.
 func (s *Server) getProfile(w http.ResponseWriter, r *http.Request) {
 	me, _ := userFrom(r.Context())
 	row, err := s.q().GetProfileByUsername(r.Context(), r.PathValue("name"))
@@ -47,7 +48,7 @@ func (s *Server) getProfile(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, profileFor(me, wireProfile(row)))
 }
 
-// setBio sets the signed-in person's bio: sanitised like a body, and it may
+// setBio sets the signed-in user's bio. It is sanitised like a body and may
 // be empty. The event carries the whole profile, so every open page redraws it.
 func (s *Server) setBio(w http.ResponseWriter, r *http.Request) {
 	var in struct {
@@ -76,8 +77,8 @@ func (s *Server) setBio(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// listUserPosts is one person's posts, newest first, only from the groups
-// the viewer is in, each with the viewer's own flags for its group.
+// listUserPosts returns one user's posts, newest first, from the groups the
+// viewer is in only. Each post carries the viewer's can flags for its group.
 func (s *Server) listUserPosts(w http.ResponseWriter, r *http.Request) {
 	me, _ := userFrom(r.Context())
 	who, err := s.q().GetProfileByUsername(r.Context(), r.PathValue("name"))

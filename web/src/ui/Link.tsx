@@ -13,9 +13,9 @@ function isExternal(href: string): boolean {
 const CLASS = 'text-sky underline-offset-2 hover:text-sweet hover:underline'
 
 /**
- * Sky-blue anchor that turns Sweet red on hover. External links open in a
- * new tab; a path in the app is a real anchor (copy it, open it in a new
- * tab) that wouter routes without a page load.
+ * A sky-blue anchor that turns Sweet red on hover. An external link opens in
+ * a new tab. A path in the app is a real anchor, so it can be copied or opened
+ * in a new tab, and wouter routes it without a page load.
  */
 export function Link({ href, children }: LinkProps) {
   if (isExternal(href)) {

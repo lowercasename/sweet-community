@@ -12,8 +12,8 @@ import (
 	"sweet/internal/push"
 )
 
-// pushKey is `GET /api/push/key`: the instance's public VAPID key, which the
-// browser needs to subscribe. 404 while push is not set up.
+// pushKey is `GET /api/push/key`. It returns the instance's public VAPID key,
+// which the browser needs to subscribe. It returns 404 while push is not set up.
 func (s *Server) pushKey(w http.ResponseWriter, r *http.Request) {
 	if s.PushKey == "" {
 		writeErr(w, http.StatusNotFound, "Push is not set up on this server")
@@ -22,8 +22,9 @@ func (s *Server) pushKey(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]string{"key": s.PushKey})
 }
 
-// subscribePush is `POST /api/push/subscriptions {endpoint, keys: {p256dh, auth}}`,
-// the subscription as the browser gives it: this device of mine.
+// subscribePush is `POST /api/push/subscriptions {endpoint, keys: {p256dh, auth}}`.
+// The body is the subscription for the user's current device, as the browser
+// provides it.
 func (s *Server) subscribePush(w http.ResponseWriter, r *http.Request) {
 	var in struct {
 		Endpoint string `json:"endpoint"`
@@ -34,7 +35,7 @@ func (s *Server) subscribePush(w http.ResponseWriter, r *http.Request) {
 	}
 	r.Body = http.MaxBytesReader(w, r.Body, 8192)
 	if err := json.NewDecoder(r.Body).Decode(&in); err != nil || !strings.HasPrefix(in.Endpoint, "https://") || in.Keys.P256dh == "" || in.Keys.Auth == "" {
-		writeErr(w, http.StatusBadRequest, "A subscription has an https endpoint and two keys")
+		writeErr(w, http.StatusBadRequest, "A push subscription needs an https endpoint and two keys")
 		return
 	}
 	me, _ := userFrom(r.Context())
@@ -64,9 +65,10 @@ func (s *Server) unsubscribePush(w http.ResponseWriter, r *http.Request) {
 }
 
 // pushWords returns the text, path and tag for a push notification, or ok
-// false for kinds that do not push. Kinds that push: mention, comment on your
-// post, and message in a conversation (tagged by conversation so a device
-// shows one notification per conversation).
+// false for kinds that are not pushed. The kinds that are pushed are a
+// mention, a comment on the user's post, and a message in a conversation.
+// A message is tagged by conversation so that a device shows one
+// notification per conversation.
 func pushWords(n Notification) (body, path, tag string, ok bool) {
 	switch n.Kind {
 	case NotifyComment:
@@ -88,7 +90,7 @@ func pushWords(n Notification) (body, path, tag string, ok bool) {
 }
 
 // pushAfterCommit sends a push for each notification among the events just
-// committed, to its person's devices, off the request's path.
+// committed, to the recipient's devices, in goroutines outside the request.
 func (s *Server) pushAfterCommit(payloads []json.RawMessage, community string) {
 	if s.Push == nil {
 		return

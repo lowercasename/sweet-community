@@ -6,7 +6,7 @@ import { Wordmark } from './Wordmark'
 afterEach(cleanup)
 
 describe('Wordmark', () => {
-  it('defaults to Sweet, and when collapsed the mark alone has the label as its name', () => {
+  it('defaults the label to Sweet, and when collapsed only the mark is shown, with the label as its accessible name', () => {
     render(<Wordmark expanded={false} />)
     expect(screen.getByRole('img', { name: 'Sweet' })).toBeTruthy()
     expect(screen.queryByText('Sweet')).toBeNull()

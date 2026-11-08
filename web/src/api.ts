@@ -1,23 +1,27 @@
-// API contract. Same origin, JSON, timestamps in Unix ms UTC, ids are UUIDs.
+// API contract. Requests go to the same origin and use JSON. Timestamps are Unix ms UTC. IDs are UUIDs.
 
 export interface User {
   id: string
   username: string
-  /** Avatar url, or null for the donut. */
+  /** Avatar URL, or null to show the default donut image. */
   picture: string | null
 }
 
-/** What the signed-in person may do to one resource. The server's call (internal/perm); the client shows it. */
+/** What the signed-in user may do to one resource. The server decides this (internal/perm) and the client shows it. */
 export interface Can {
   edit: boolean
   delete: boolean
-  /** A post's alone (architecture.md, Topics): I may file it under a topic, as its author or the community's staff. */
+  /**
+   * Posts only (architecture.md, Topics). Whether I may file the post under a topic. This is true for the post's
+   * author and for the community's staff.
+   */
   set_topic?: boolean
 }
 
 /**
- * A topic (architecture.md, Topics): a label a post on the community's feed
- * can carry, at most one. The staff keep the list. `following` is mine.
+ * A topic (architecture.md, Topics). A topic is a label on a post in the
+ * community's feed. A post has at most one topic. The staff manage the list of
+ * topics. `following` is the current user's follow state.
  */
 export interface Topic {
   id: string
@@ -31,15 +35,15 @@ export interface Topic {
 
 export type Role = 'owner' | 'moderator' | 'member'
 
-/** Someone on the instance: a person with their role in the root group. */
+/** A user on the instance, with their role in the root group. */
 export interface Member extends User {
   role: Role
   joined_at: number
-  /** Whether I may remove them from the instance: the server's call, per viewer. */
+  /** Whether I may remove this user from the instance. The server computes this for each viewer. */
   can: { remove: boolean }
 }
 
-/** What the signed-in person may do to a group. */
+/** What the signed-in user may do to a group. */
 export interface GroupCan {
   add_members: boolean
   remove_members: boolean
@@ -49,9 +53,9 @@ export interface GroupCan {
   set_mode: boolean
   delete: boolean
   leave: boolean
-  /** Root group only: the instance's group_creation setting, applied to me. */
+  /** Root group only. The result of the instance's group_creation setting for the current user. */
   create_groups?: boolean
-  /** Root group only: I edit the instance's settings. */
+  /** Root group only. Whether the current user may edit the instance's settings. */
   manage_instance?: boolean
 }
 
@@ -59,11 +63,11 @@ export type GroupMode = 'posts' | 'chat' | 'both'
 
 /** The instance's settings (architecture.md, Feature flags). */
 /**
- * The instance's settings (architecture.md, Admin tools): what the owner
- * sets about the community, readable by anyone, signed in or not, since the
- * sign-in and join pages wear its name. `owner_set` is state: false until
- * the setup link has been used. The name is empty until the owner names
- * the community, which is onboarding.
+ * The instance's settings (architecture.md, Admin tools). The owner sets these
+ * for the community. Anyone can read them, signed in or not, because the
+ * sign-in and join pages show the community's name. `owner_set` is state, not
+ * a setting. It is false until the setup link has been used. The name is
+ * empty until the owner names the community during onboarding.
  */
 export interface Settings {
   group_creation: 'anyone' | 'staff'
@@ -72,28 +76,31 @@ export interface Settings {
   owner_set: boolean
 }
 
-/** A group as its viewer sees it (architecture.md, Groups). The instance is the one of kind root. */
+/** A group as its viewer sees it (architecture.md, Groups). The group of kind root represents the instance. */
 export interface Group {
   id: string
   kind: 'root' | 'group' | 'dm'
   name: string
-  /** The group's one setting: posts, chat or both. A DM is chat. */
+  /** The group's only setting: posts, chat or both. A DM is always chat. */
   mode: GroupMode
   created_at: number
-  /** A room's picture, or null for the tile with its initial. */
+  /** A room's picture, or null to show the tile with the room's initial. */
   picture: string | null
-  /** When its newest live message was sent, or null. Server-computed; orders the Messages page. */
+  /** When the group's newest live message was sent, or null. Computed by the server. Orders the Messages page. */
   last_message_at: number | null
-  /** The viewer's own role in it. */
+  /** The viewer's own role in the group. */
   role: Role
   can: GroupCan
-  /** DMs only: a DM is named by its people, present or away. */
+  /** DMs only. A DM is named after its members, including members who have hidden it. */
   members?: User[]
-  /** DMs only: set while I have hidden it. It is listed for me under Hidden on All messages, and nothing else of it is. */
+  /**
+   * DMs only. Set while I have hidden the DM. While it is set, the DM is listed for me under Hidden on All messages,
+   * and nothing else of the DM is shown.
+   */
   hidden_at?: number | null
 }
 
-/** A person as their page shows them (architecture.md, Accounts): standing, joined, a bio they alone edit. */
+/** A user as their page shows them (architecture.md, Accounts): role, join time, and a bio that only they can edit. */
 export interface Profile extends User {
   role: Role
   joined_at: number
@@ -106,7 +113,7 @@ export interface Membership {
   user: User
   role: Role
   joined_at: number
-  /** Set while I have hidden a conversation; never carried for anyone else. */
+  /** Set while I have hidden a conversation. It is never included for any other user's membership. */
   hidden_at?: number | null
 }
 
@@ -124,7 +131,7 @@ export interface Invite {
   created_by: User
   created_at: number
   expires_at: number
-  /** How many people have joined through it: a link is good for anyone who has it, for its week. */
+  /** How many users have joined through the invite. A link works for anyone who has it, for one week. */
   uses: number
 }
 
@@ -137,7 +144,10 @@ export interface Session {
 export interface Post {
   id: string
   group_id: string
-  /** The topic it is filed under, or null (architecture.md, Topics). Named from the topics cache at render time. */
+  /**
+   * The topic the post is filed under, or null (architecture.md, Topics). The client looks up the topic's name in the
+   * topics cache at render time.
+   */
   topic_id: string | null
   author: User
   body_html: string
@@ -153,7 +163,7 @@ export interface Comment {
   id: string
   post_id: string
   group_id: string
-  /** The post's author may delete any comment on it; the server already folded that into `can`. */
+  /** The post's author may delete any comment on the post. The server has already included that in `can`. */
   post_author_id: string
   author: User
   body_html: string
@@ -173,7 +183,10 @@ export interface Message {
   can: Can
 }
 
-/** One thing done to me (architecture.md, Notifications): who, what kind, where; a comment's post. Read by opening it. */
+/**
+ * A notification for the current user (architecture.md, Notifications). It has the actor, the kind and the group, and
+ * for a comment, the post. Opening it marks it read.
+ */
 export interface Notification {
   id: string
   user_id: string
@@ -181,10 +194,10 @@ export interface Notification {
   actor: User
   group_id: string
   post_id: string | null
-  /** The topic, for a post in one I follow. */
+  /** The topic, for a post in a topic I follow. */
   topic_id?: string | null
   created_at: number
-  /** When I opened it; null until I do. */
+  /** When I opened the notification, or null if I have not opened it. */
   read_at: number | null
 }
 
@@ -193,16 +206,25 @@ export interface NotificationPage {
   next_before: number | null
 }
 
-/** How far along a stream I have read: `notifications`, or `chat:<group id>`. One row per stream of mine, read or not. Forward only. */
+/**
+ * How far I have read in a stream. The stream is `notifications` or `chat:<group id>`. There is one row per stream of
+ * mine, whether or not I have read it. The marker only moves forward.
+ */
 export interface Marker {
   user_id: string
   stream: string
   read_at: number
-  /** How much of the stream is newer than read_at: others' messages in a chat, notifications on that stream. The server's count. */
+  /**
+   * How many items in the stream are newer than read_at. For a chat, this counts other users' messages. For
+   * notifications, it counts notifications. The server computes the count.
+   */
   unread: number
 }
 
-/** One search result (architecture.md, Search): what kind of thing, where, who said it, and an excerpt with its matches marked. */
+/**
+ * One search result (architecture.md, Search). It has the kind of item, the group, the author, and an excerpt with
+ * its matches marked.
+ */
 export interface Hit {
   kind: 'post' | 'comment' | 'message'
   id: string
@@ -210,7 +232,7 @@ export interface Hit {
   post_id: string | null
   author: User
   created_at: number
-  /** Plain text; a match is wrapped in \x01 and \x02. */
+  /** Plain text. Each match is wrapped in \x01 and \x02. */
   excerpt: string
 }
 
@@ -226,7 +248,7 @@ export interface PostPage {
 
 export class ApiError extends Error {
   status: number
-  /** What else the server said, beyond `error`: a refused sign-in names the unverified address. */
+  /** Fields of the error response other than `error`. For example, a refused sign-in names the unverified address. */
   body: Record<string, unknown>
   constructor(status: number, message: string, body: Record<string, unknown> = {}) {
     super(message)
@@ -250,16 +272,16 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
         body = (await res.json()) as Record<string, unknown>
         if (typeof body.error === 'string') message = body.error
       } catch {
-        // keep the status text
+        // Keep the status text as the message.
       }
     }
     throw new ApiError(res.status, message, body)
   }
   const text = await res.text()
-  // An accepted request with nothing to say (a link is on its way) has no body.
+  // An accepted request with nothing to return (for example, when a link has been emailed) has no body.
   if (text === '') return undefined as T
   if (!isJson) {
-    // Usually a stale backend answering with the app page. Say so.
+    // This is usually an outdated backend responding with the app's HTML page. Report that in the error.
     throw new ApiError(res.status, `The server sent a page instead of data for ${path}. Is the backend up to date?`)
   }
   return JSON.parse(text) as T
@@ -273,7 +295,10 @@ const json = (method: string, body: unknown): RequestInit => ({
 
 const g = (groupId: string) => `/api/groups/${encodeURIComponent(groupId)}`
 
-/** Takes someone off the instance (architecture.md, Admin tools): their posts, comments and messages stay under a removed name. */
+/**
+ * Removes a user from the instance (architecture.md, Admin tools). Their posts, comments and messages stay, under a
+ * removed name.
+ */
 export async function removeUser(userId: string): Promise<void> {
   await request(`/api/users/${encodeURIComponent(userId)}`, { method: 'DELETE' })
 }
@@ -294,7 +319,7 @@ export function updateGroup(groupId: string, patch: { name?: string; mode?: Grou
   return request<Group>(g(groupId), json('PUT', patch))
 }
 
-/** A room's picture: an uploaded image's id, or null for the tile. The owner's call. */
+/** Sets a room's picture to an uploaded image's ID, or to null to show the tile. Only the owner can do this. */
 export function setGroupPicture(groupId: string, imageId: string | null): Promise<Group> {
   return request<Group>(`${g(groupId)}/picture`, json('PUT', { image_id: imageId }))
 }
@@ -307,12 +332,15 @@ export function setSettings(s: Pick<Settings, 'group_creation' | 'name' | 'descr
   return request<Settings>('/api/settings', json('PUT', s))
 }
 
-/** The setup link's page: the owner's account, from a fresh instance's one-time token; signed in. */
+/**
+ * Used by the setup link's page. Creates the owner's account with a fresh instance's one-time token and returns a
+ * signed-in session.
+ */
 export function setup(token: string, username: string, email: string, password: string): Promise<Session> {
   return request<Session>('/api/setup', json('POST', { token, username, email, password }))
 }
 
-/** The conversation with one person: the existing one if there is one, else a new one. */
+/** Opens the conversation with one user. Returns the existing conversation if there is one, or creates a new one. */
 export function openDM(userId: string): Promise<Group> {
   return request<Group>('/api/groups', json('POST', { kind: 'dm', members: [userId] }))
 }
@@ -329,13 +357,16 @@ export function addMember(groupId: string, userId: string): Promise<Membership> 
   return request<Membership>(`${g(groupId)}/members`, json('POST', { user_id: userId }))
 }
 
-/** The owner sets member or moderator; role owner hands the group over. */
+/** The owner sets a member's role to member or moderator. Setting the role to owner transfers the group. */
 export function setMemberRole(groupId: string, userId: string, role: Role): Promise<Membership> {
   return request<Membership>(`${g(groupId)}/members/${encodeURIComponent(userId)}`, json('PUT', { role }))
 }
 
-/** Remove someone, or leave when it is yourself. */
-/** Removes from a room (nothing comes back); steps out of a conversation (the membership, stepped out, comes back). */
+/** Removes a user from a group, or leaves the group when the user is yourself. */
+/**
+ * For a room, removes the membership and returns nothing. For a conversation, hides it for that user and returns the
+ * membership with `hidden_at` set.
+ */
 export function removeMember(groupId: string, userId: string): Promise<Membership | undefined> {
   return request<Membership | undefined>(`${g(groupId)}/members/${encodeURIComponent(userId)}`, { method: 'DELETE' })
 }
@@ -352,7 +383,10 @@ export function getPosts(
   return request<PostPage>(`${g(groupId)}/posts?${params}`)
 }
 
-/** One post by its address: for its page, when the feed it is in is not loaded. 404 when gone or not mine to see. */
+/**
+ * Fetches one post by its ID, for the post's page when its feed is not loaded. Returns 404 when the post is deleted
+ * or I may not see it.
+ */
 export function getPost(id: string): Promise<Post> {
   return request<Post>(`/api/posts/${encodeURIComponent(id)}`)
 }
@@ -361,7 +395,10 @@ export function createPost(groupId: string, bodyHtml: string, topicId: string | 
   return request<Post>(`${g(groupId)}/posts`, json('POST', { body_html: bodyHtml, topic_id: topicId }))
 }
 
-/** Files a post under a topic, or under none (architecture.md, Topics): its author's or the community staff's call. */
+/**
+ * Files a post under a topic, or under no topic (architecture.md, Topics). Only the post's author or the community's
+ * staff can do this.
+ */
 export function setPostTopic(id: string, topicId: string | null): Promise<Post> {
   return request<Post>(`/api/posts/${encodeURIComponent(id)}/topic`, json('PUT', { topic_id: topicId }))
 }
@@ -382,7 +419,10 @@ export async function deleteTopic(id: string): Promise<void> {
   await request(`/api/topics/${encodeURIComponent(id)}`, { method: 'DELETE' })
 }
 
-/** Follow a topic to be told of posts in it, or stop. The reply is the topic as I now see it. */
+/**
+ * Follows a topic, so that I get notifications for posts in it, or unfollows it. The response is the topic as I now
+ * see it.
+ */
 export function followTopic(id: string, on: boolean): Promise<Topic> {
   return request<Topic>(`/api/topics/${encodeURIComponent(id)}/follow`, { method: on ? 'PUT' : 'DELETE' })
 }
@@ -415,23 +455,23 @@ export function listNotifications(before?: number | null, limit = 30): Promise<N
   return request<NotificationPage>(`/api/notifications?${params}`)
 }
 
-/** What clearing removed: every opened notification of mine up to a time. */
+/** The result of clearing notifications. Clearing removed every opened notification of mine up to the time `before`. */
 export interface Cleared {
   user_id: string
   before: number
 }
 
-/** Opening a notification reads it; the reply is the row, read. */
+/** Marks a notification read when it is opened. The response is the notification, now read. */
 export function readNotification(id: string): Promise<Notification> {
   return request<Notification>(`/api/notifications/${encodeURIComponent(id)}/read`, { method: 'PUT' })
 }
 
-/** Clears the notifications I have opened, for good. */
+/** Permanently deletes the notifications I have opened. */
 export function clearNotifications(): Promise<Cleared> {
   return request<Cleared>('/api/notifications', { method: 'DELETE' })
 }
 
-/** What matches, from the rooms I am in, best first, up to fifty. */
+/** Returns the matches from the groups I am a member of, best match first, up to fifty. */
 export function search(q: string): Promise<{ hits: Hit[] }> {
   return request(`/api/search?q=${encodeURIComponent(q)}`)
 }
@@ -440,7 +480,10 @@ export function listMarkers(): Promise<{ markers: Marker[] }> {
   return request('/api/markers')
 }
 
-/** I have read this stream up to this time. The server holds it to now and never moves it back. */
+/**
+ * Records that I have read this stream up to this time. The server caps the time at the current time and never moves
+ * a marker back.
+ */
 export function setMarker(stream: string, readAt: number): Promise<Marker> {
   return request<Marker>(`/api/markers/${encodeURIComponent(stream)}`, json('PUT', { read_at: readAt }))
 }
@@ -465,14 +508,17 @@ export function login(username: string, password: string): Promise<Session> {
   return request<Session>('/api/login', json('POST', { username, password }))
 }
 
-/** My own account (architecture.md, Accounts): the address, whether it is verified, and one waiting to be. */
+/**
+ * My own account (architecture.md, Accounts): the email address, whether it is verified, and a new address that is
+ * waiting to be verified.
+ */
 export interface Account {
   email: string | null
   email_verified: boolean
   pending_email: string | null
 }
 
-/** Joining makes the account and sends a link to the address; the link signs in (verifyEmail). */
+/** Creates the account and sends a link to the email address. Opening the link signs the user in (verifyEmail). */
 export function register(code: string, username: string, password: string, email: string): Promise<{ email: string }> {
   return request('/api/register', json('POST', { code, username, password, email }))
 }
@@ -481,12 +527,18 @@ export function verifyEmail(token: string): Promise<Session> {
   return request<Session>('/api/verify', json('POST', { token }))
 }
 
-/** A new link to an unverified address; the server answers the same whether or not it knows the address. */
+/**
+ * Sends a new link to an unverified address. The server gives the same response whether or not it knows the
+ * address.
+ */
 export async function resendVerification(email: string): Promise<void> {
   await request('/api/verify/resend', json('POST', { email }))
 }
 
-/** The mistyped address of a never-verified account, replaced; the password stands in for a session. */
+/**
+ * Replaces the mistyped address of an account that has never been verified. The password is used instead of a
+ * session.
+ */
 export async function changeUnverifiedEmail(username: string, password: string, email: string): Promise<void> {
   await request('/api/verify/change', json('POST', { username, password, email }))
 }
@@ -499,7 +551,7 @@ export function resetPassword(token: string, password: string): Promise<Session>
   return request<Session>(`/api/reset/${encodeURIComponent(token)}`, json('POST', { password }))
 }
 
-/** What I set for myself (architecture.md, Notifications): the weekly digest, on or off. */
+/** My own settings (architecture.md, Notifications): whether the weekly digest is on or off. */
 export interface MySettings {
   digest: 'weekly' | 'off'
 }
@@ -512,12 +564,15 @@ export function setMySettings(s: MySettings): Promise<MySettings> {
   return request<MySettings>('/api/me/settings', json('PUT', s))
 }
 
-/** The server's public key for web push, or a 404 when push is not set up. */
+/** Returns the server's public key for web push, or a 404 when push is not set up. */
 export function getPushKey(): Promise<{ key: string }> {
   return request('/api/push/key')
 }
 
-/** This device, as the browser describes it, kept by the server so it can be told of mentions and replies. */
+/**
+ * Registers this device's push subscription, as the browser describes it. The server stores it so that it can send
+ * this device push notifications for mentions and replies.
+ */
 export function subscribePush(sub: PushSubscriptionJSON): Promise<void> {
   return request('/api/push/subscriptions', json('POST', sub))
 }
@@ -562,22 +617,22 @@ export async function revokeInvite(code: string): Promise<void> {
   await fetch(`/api/invites/${encodeURIComponent(code)}`, { method: 'DELETE' })
 }
 
-/** Everyone on the instance: the root group's members with their roles. */
+/** Lists every user on the instance: the root group's members with their roles. */
 export function listUsers(): Promise<{ users: Member[] }> {
   return request('/api/users')
 }
 
-/** One person by name; 404 when there is nobody of that name, or they have been removed. */
+/** Fetches one user by username. Returns 404 when no user has that name, or when the user has been removed. */
 export function getProfile(name: string): Promise<Profile> {
   return request<Profile>(`/api/users/${encodeURIComponent(name)}`)
 }
 
-/** My bio, a body like any other; empty clears it. The reply is my profile. */
+/** Sets my bio, which is a body like any other. An empty body clears it. The response is my profile. */
 export function setBio(bodyHtml: string): Promise<Profile> {
   return request<Profile>('/api/me/bio', json('PUT', { body_html: bodyHtml }))
 }
 
-/** One person's posts, newest first, from the rooms I am in. */
+/** Returns one user's posts, newest first, from the groups I am a member of. */
 export function getUserPosts(name: string, before?: number | null, limit = 20): Promise<PostPage> {
   const params = new URLSearchParams({ limit: String(limit) })
   if (before != null) params.set('before', String(before))

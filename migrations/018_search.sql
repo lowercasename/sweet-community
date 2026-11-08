@@ -1,9 +1,10 @@
--- 018: search (architecture.md, Search). One FTS5 table over the plain text
--- of posts, comments and messages, kept in step by triggers on each: a live
--- row's text is in it, a deleted row's is not, an edit replaces. It carries
--- its own copy of the text rather than reading the source tables as external
--- content, because the source rows are keyed by UUID and have no stable
--- rowid for FTS to point at. Backfilled here; triggers do not backfill.
+-- 018: search (architecture.md, Search). One FTS5 table indexes the plain
+-- text of posts, comments and messages. Triggers on each table keep it in
+-- sync. A live row's text is in the index, a deleted row's text is not, and
+-- an edit replaces the text. The table stores its own copy of the text
+-- instead of reading the source tables as external content, because the
+-- source rows are keyed by UUID and have no stable rowid for FTS to
+-- reference. This migration backfills the index, because triggers do not.
 CREATE VIRTUAL TABLE search USING fts5(
     text,
     kind UNINDEXED,

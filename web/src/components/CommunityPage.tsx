@@ -3,7 +3,10 @@ import { Alert, Card, Heading, Measure, Pane, ScrollArea, Stack } from '../ui'
 import { CommunityForm } from './CommunityForm'
 import { TopicsCard } from './TopicsCard'
 
-/** The owner's page for the community itself: in the nav, not behind the owner's own page (Raphael, 2026-11-06). */
+/**
+ * The owner's page for the community settings. It is linked from the nav, not
+ * from the owner's profile page (Raphael, 2026-11-06).
+ */
 export function CommunityPage() {
   const { settings, error } = useSettings()
   return (

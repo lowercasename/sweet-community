@@ -1,7 +1,7 @@
--- 022: topics (architecture.md, Topics). A label a post can carry, at most
--- one, kept by the community's staff. People follow a topic to be told of
--- new posts in it. A fifth kind of notification, topic_post, carries the
--- topic so the words can name it.
+-- 022: topics (architecture.md, Topics). A topic is a label on a post, and a
+-- post has at most one. The community's staff manage topics. Users follow a
+-- topic to be notified of new posts in it. A fifth kind of notification,
+-- topic_post, stores the topic so the notification text can name it.
 CREATE TABLE topics (
     id          TEXT PRIMARY KEY,
     name        TEXT NOT NULL,

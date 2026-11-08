@@ -29,10 +29,11 @@ interface MessagesPageProps {
 }
 
 /**
- * All my conversations, latest word first (architecture.md, Layout): the
- * nav shows the latest five, this page every one, each named by its other
- * person and opening at its own URL under its bar like any room. Below them, the ones I have hidden;
- * opening one shows it again.
+ * Lists all the user's conversations, most recent message first
+ * (architecture.md, Layout). The nav shows the latest five and this page
+ * shows all of them. Each is labelled with the other user's name and opens at
+ * its own URL, under its bar, like any group. Hidden conversations are listed
+ * below the others. Opening one unhides it.
  */
 export function MessagesPage({ me, onGo }: MessagesPageProps) {
   const { groups, loading } = useGroups()
@@ -89,7 +90,7 @@ export function MessagesPage({ me, onGo }: MessagesPageProps) {
               {out.length > 0 && (
                 <Stack gap={1}>
                   <Heading level={3}>Hidden</Heading>
-                  <Text variant="small">Opening a hidden conversation brings it back.</Text>
+                  <Text variant="small">Opening a hidden conversation moves it back to your list.</Text>
                   {problem && <Alert tone="error">{problem}</Alert>}
                   <List gap={1}>{out.map((g) => row(g, () => void show(g)))}</List>
                 </Stack>

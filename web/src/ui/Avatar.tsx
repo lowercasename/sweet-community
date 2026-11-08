@@ -1,12 +1,12 @@
 import donut from '../assets/donut.svg'
 
 interface AvatarProps {
-  /** The person's name, for assistive tech; the control around the picture names it to the eye. */
+  /** The user's name, as the alt text. The control around the picture shows the name visually. */
   name: string
-  /** URL of their picture. Without one, they are a donut, as on old Sweet. */
+  /** URL of the user's picture. Without one, the donut is shown, as on old Sweet. */
   picture?: string | null
   size?: 'xs' | 'sm' | 'md' | 'lg'
-  /** Hidden from assistive tech: the control it sits in says the name (a nav item's mark). */
+  /** Hide from assistive tech. For when the control around it already has the name, such as a nav item's mark. */
   decorative?: boolean
 }
 
@@ -17,7 +17,7 @@ const SIZES: Record<NonNullable<AvatarProps['size']>, string> = {
   lg: 'h-14 w-14',
 }
 
-/** A round profile picture. The default is Sweet's donut, which matters. */
+/** A round profile picture. The default is Sweet's donut, which is part of Sweet's identity. */
 export function Avatar({ name, picture, size = 'md', decorative = false }: AvatarProps) {
   return (
     <img

@@ -1,16 +1,17 @@
 interface TileProps {
-  /** The place's name; its first letter is shown when it has no picture. */
+  /** The group's name. Its first letter is shown when the group has no picture. */
   name: string
-  /** The place's picture, when it has one. */
+  /** The group's picture, if it has one. */
   picture?: string | null
-  /** `md` matches a person's picture, on the room's own settings beside the control that sets it. */
+  /** `md` matches the size of a user's avatar. Used on the room's settings page beside the control that sets the picture. */
   size?: 'sm' | 'md'
 }
 
 /**
- * A place's mark: a small square carrying its picture, or its initial. Line
- * icons mean features, tiles and faces mean places and people, so a group in
- * the nav never looks like a page. Decorative; the label beside it names the place.
+ * A group's mark. A small square showing its picture, or its initial when it
+ * has none. Line icons mean features, and tiles and avatars mean groups and
+ * people, so a group in the nav never looks like a page. Decorative. The label
+ * beside it names the group.
  */
 export function Tile({ name, picture, size = 'sm' }: TileProps) {
   const initial = [...name.trim()][0]?.toLocaleUpperCase() ?? '?'

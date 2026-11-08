@@ -7,7 +7,7 @@ interface SelectProps<T extends string> {
   disabled?: boolean
 }
 
-/** The browser's own select, in the editor's style. */
+/** The browser's native select element, styled like the editor. */
 export function Select<T extends string>({ value, options, onChange, label, disabled }: SelectProps<T>) {
   return (
     <select

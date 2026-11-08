@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, screen } from '@testing-library/react'
 import { renderWithQuery } from '../test-utils'
 
-/** The owner's page for the community: name, what it is for, who may make rooms. */
+/** The owner's page for the community settings: the name, the description and who may create groups. */
 vi.mock('../api', () => ({
   listTopics: vi.fn(() => Promise.resolve({ topics: [] })),
   getSettings: vi.fn(() =>
@@ -18,7 +18,7 @@ afterEach(cleanup)
 beforeEach(() => vi.clearAllMocks())
 
 describe('CommunityPage', () => {
-  it('shows the settings as they are and saves them together', async () => {
+  it('shows the current settings and saves them in one request', async () => {
     const { setSettings } = await import('../api')
     const { CommunityPage } = await import('./CommunityPage')
     renderWithQuery(<CommunityPage />)
@@ -32,7 +32,7 @@ describe('CommunityPage', () => {
     await screen.findByText('Saved.')
   })
 
-  it('will not save without a name', async () => {
+  it('does not save without a name', async () => {
     const { setSettings } = await import('../api')
     const { CommunityPage } = await import('./CommunityPage')
     renderWithQuery(<CommunityPage />)

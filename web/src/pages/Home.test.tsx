@@ -5,13 +5,18 @@ import { FakeEventSource, ROOT, dm, group, member, notification, post, renderWit
 import { ApiError } from '../api'
 
 /**
- * Guards on the signed-in page. The draft bug: closing and reopening a
- * pane, or visiting Settings and coming back, must not remount posts or
- * chat; a remount would fetch their first page again, so one fetch each is
- * the assertion. The avatar bug: a person's picture is shown from the users
- * cache, so a change arriving on the stream redraws it everywhere. And
- * groups: the nav lists mine, a group opens with the panes its mode says,
- * a DM is named by its people, and New room follows the root's flag.
+ * Regression tests for the signed-in page.
+ *
+ * The draft bug. Closing and reopening a pane, or visiting Settings and
+ * coming back, must not remount posts or chat. A remount would fetch their
+ * first page again, so the tests assert one fetch each.
+ *
+ * The avatar bug. A user's picture is read from the users cache, so a change
+ * that arrives on the stream updates it everywhere.
+ *
+ * Groups. The nav lists my groups, a group opens with the panes its mode
+ * sets, a DM is named after its members, and New room follows the root
+ * group's flag.
  */
 vi.mock('../api', async (importOriginal) => ({
   ApiError: (await importOriginal<typeof import('../api')>()).ApiError,
@@ -90,7 +95,8 @@ beforeEach(async () => {
 async function home(path = '/') {
   window.history.replaceState(null, '', path)
   const { Home } = await import('./Home')
-  // The app sets me in the cache before Home mounts; the stream's events about me depend on it.
+  // The app puts the current user in the cache before Home mounts. The stream's events about the current user
+  // depend on it.
   const result = renderWithQuery(<Home me={raphael} onSignOut={() => {}} />, (qc) => qc.setQueryData(['me'], raphael))
   if (path === '/') {
     await screen.findByText('p1')
@@ -102,7 +108,7 @@ async function home(path = '/') {
 const nav = () => within(screen.getByRole('navigation'))
 
 describe('Home', () => {
-  it('shows the root group and fetches its feed and room once each', async () => {
+  it('shows the root group and fetches its posts and its messages once each', async () => {
     const { getPosts, getMessages } = await import('../api')
     await home()
     expect(getPosts).toHaveBeenCalledWith(ROOT, null, 20, null)
@@ -129,7 +135,7 @@ describe('Home', () => {
     await screen.findByText('Profile picture')
     expect(window.location.pathname).toBe('/settings')
     expect(editors()).toBe(2)
-    // Mounted, but out of sight: another page is showing.
+    // The editors are still mounted but hidden, because another page is showing.
     expect(container.querySelector('.ProseMirror')!.closest('.hidden')).not.toBeNull()
     fireEvent.click(nav().getByRole('button', { name: 'Home' }))
     expect(window.location.pathname).toBe('/')
@@ -140,11 +146,11 @@ describe('Home', () => {
     expect(getMessages).toHaveBeenCalledTimes(1)
   })
 
-  it('shows a changed picture on posts and in the nav as soon as the stream says so', async () => {
+  it('shows a changed picture on posts and in the nav as soon as the stream sends the change', async () => {
     await home()
     const article = screen.getByText('p1').closest('article')!
     const postAvatar = () => within(article).getByRole('img', { name: 'raphael' }).getAttribute('src')
-    // The nav's face is decorative (the row's name says who); its picture is the thing to check.
+    // The profile picture in the nav is decorative (the row's name identifies the user). Its src is what to check.
     const navAvatar = () => nav().getByRole('button', { name: 'raphael' }).querySelector('img')!.getAttribute('src')
     expect(postAvatar()).not.toContain('/img/')
     expect(navAvatar()).not.toContain('/img/')
@@ -160,7 +166,7 @@ describe('Home', () => {
     const { container } = await home()
     expect(nav().getByRole('button', { name: 'Knitting' })).toBeTruthy()
     expect(nav().getByRole('button', { name: 'kit' })).toBeTruthy()
-    // One conversation: no All messages, since the section shows it all.
+    // There is one conversation, so there is no All messages button. The section already shows every conversation.
     expect(nav().queryByRole('button', { name: 'All messages' })).toBeNull()
     expect(nav().getByRole('button', { name: 'New room' })).toBeTruthy()
 
@@ -168,17 +174,18 @@ describe('Home', () => {
     await vi.waitFor(() => expect(getMessages).toHaveBeenCalledWith('knit', null))
     expect(window.location.pathname).toBe('/r/knit')
     expect(container.querySelector('.ProseMirror')!.closest('.hidden')).toBeNull()
-    // Chat only: no divider, no posts editor; the group's name and its Members control are shown.
+    // The group is chat only. There is no divider and no post editor. The group's name and its Members button are
+    // shown.
     expect(screen.queryByRole('separator')).toBeNull()
     expect(screen.getByRole('heading', { name: 'Knitting' })).toBeTruthy()
     expect(screen.getByRole('button', { name: 'Members and settings' })).toBeTruthy()
     expect(container.querySelectorAll('.ProseMirror').length).toBe(1)
-    // Members shows alone: the group's view is still mounted but out of sight.
+    // The members page is shown by itself. The group's view is still mounted but hidden.
     fireEvent.click(screen.getByRole('button', { name: 'Members and settings' }))
     await screen.findByRole('heading', { name: 'Members' })
     expect(window.location.pathname).toBe('/r/knit/members')
     expect(container.querySelector('.ProseMirror')!.closest('.hidden')).not.toBeNull()
-    // The group's bar stays, with its name and a way back; Members is no longer offered there.
+    // The group's bar is still shown, with its name and a back button. The Members button is no longer in the bar.
     expect(screen.getByRole('heading', { name: 'Knitting' }).closest('.hidden')).toBeNull()
     expect(screen.queryByRole('button', { name: 'Members and settings' })).toBeNull()
     fireEvent.click(screen.getByRole('button', { name: 'Back to Knitting' }))
@@ -186,24 +193,24 @@ describe('Home', () => {
     expect(container.querySelector('.ProseMirror')!.closest('.hidden')).toBeNull()
   })
 
-  it('the Messages page lists my conversations; one opens like a room and is marked in the nav', async () => {
+  it('the Messages page lists my conversations, and a conversation opens like a room and is marked as current in the nav', async () => {
     const { getMessages } = await import('../api')
     const { container } = await home('/messages')
     expect(window.location.pathname).toBe('/messages')
     await screen.findByRole('heading', { name: 'Messages' })
-    // The feed and room stay mounted behind the page.
+    // The posts and chat panes stay mounted behind the page.
     expect(container.querySelector('.ProseMirror')!.closest('.hidden')).not.toBeNull()
 
     fireEvent.click(within(screen.getByRole('list')).getByRole('button', { name: 'kit' }))
     expect(window.location.pathname).toBe('/r/d1')
     await vi.waitFor(() => expect(getMessages).toHaveBeenCalledWith('d1', null))
-    // The bar is a title: its names are text, not cards.
+    // The bar is a title. The names in it are text, not buttons that open profile cards.
     expect(within(screen.getByRole('heading', { name: 'kit' })).queryByRole('button')).toBeNull()
     expect(nav().getByRole('button', { name: 'kit' }).getAttribute('aria-current')).toBe('page')
     expect(nav().getByRole('button', { name: 'Home' }).getAttribute('aria-current')).toBeNull()
   })
 
-  it("a conversation's bar has no people button, only a menu with Hide; its members page does not exist", async () => {
+  it("a conversation's bar has no people button, only a menu with Hide, and the conversation has no members page", async () => {
     const { removeMember } = await import('../api')
     vi.mocked(removeMember).mockResolvedValue({
       group_id: 'd1',
@@ -226,12 +233,12 @@ describe('Home', () => {
     expect(nav().queryByRole('button', { name: 'kit' })).toBeNull()
   })
 
-  it('opens whatever page the URL names, and the back button returns', async () => {
+  it('opens the page that the URL names, and the back button returns to the previous page', async () => {
     const { getMessages } = await import('../api')
     await home('/r/knit/members')
     await screen.findByRole('heading', { name: 'Members' })
     expect(screen.getByRole('heading', { name: 'Knitting' }).closest('.hidden')).toBeNull()
-    // The group named by the URL is the one mounted behind the page.
+    // The group in the URL is the group mounted behind the page.
     await vi.waitFor(() => expect(getMessages).toHaveBeenCalledWith('knit', null))
     expect(getMessages).not.toHaveBeenCalledWith(ROOT, null)
 
@@ -249,14 +256,14 @@ describe('Home', () => {
     expect(window.location.pathname).toBe('/')
   })
 
-  it('a post has a page of its own: its time links there, the thread is open, Back returns to its room', async () => {
+  it('a post has its own page, its timestamp links to it, the thread is open, and Back returns to its room', async () => {
     const { getPost } = await import('../api')
     vi.mocked(getPost).mockResolvedValue(post('p1', raphael))
     await home()
     fireEvent.click(within(screen.getByText('p1').closest('article')!).getByRole('link'))
     expect(window.location.pathname).toBe('/p/p1')
     await screen.findByRole('heading', { name: 'Post by raphael' })
-    // The feed stays mounted behind; the page's own copy of the post shows, with its reply editor.
+    // The feed stays mounted behind the page. The page shows its own copy of the post, with its reply editor.
     const shown = screen.getAllByRole('article').filter((a) => !a.closest('.hidden'))
     expect(shown).toHaveLength(1)
     expect(shown[0].querySelector('.editor-line')).not.toBeNull()
@@ -266,7 +273,7 @@ describe('Home', () => {
     expect(screen.getByRole('separator')).toBeTruthy()
   })
 
-  it('opens a post by its address, with its room behind it', async () => {
+  it('opens a post by its URL, with its room mounted behind it', async () => {
     const { getPost, getMessages } = await import('../api')
     vi.mocked(getPost).mockResolvedValue(post('g1', kit, { group_id: 'knit' }))
     await home('/p/g1')
@@ -277,20 +284,21 @@ describe('Home', () => {
     expect(window.location.pathname).toBe('/r/knit')
   })
 
-  it('says so when a post is gone or not mine to see', async () => {
+  it('shows a message when a post is deleted or I may not see it', async () => {
     const { getPost } = await import('../api')
     vi.mocked(getPost).mockRejectedValue(new ApiError(404, 'no such post'))
     await home('/p/nothing')
-    await screen.findByText(/This post is gone/)
+    await screen.findByText(/This post has been deleted/)
     fireEvent.click(screen.getAllByRole('button', { name: 'Home' }).find((b) => !b.closest('nav'))!)
     expect(window.location.pathname).toBe('/')
   })
 
-  it('a notification on the stream lights the bell; the page leaves it lit; opening the notification puts it out', async () => {
+  it('a notification from the stream puts a dot on the notifications button, the notifications page keeps it, and opening the notification removes it', async () => {
     const { readNotification, listNotifications } = await import('../api')
     await home()
     expect(nav().getByRole('button', { name: 'Notifications' })).toBeTruthy()
-    // The list is not loaded until the page asks for it; the stream counts it on my marker meanwhile.
+    // The list is not loaded until the page requests it. Until then, the stream event increments the unread count on
+    // my marker.
     const fresh = notification('n5', 'comment', kit, { post_id: 'p1' })
     vi.mocked(listNotifications).mockResolvedValue({ notifications: [fresh], next_before: null })
     vi.mocked(readNotification).mockResolvedValue({ ...fresh, read_at: 9 })
@@ -307,7 +315,7 @@ describe('Home', () => {
     await nav().findByRole('button', { name: 'Notifications' })
   })
 
-  it("a folded pane's rail carries its own stream's dot; opening the pane reads it at once", async () => {
+  it("a collapsed pane's rail shows the dot for that pane's stream, and opening the pane marks it read immediately", async () => {
     await home()
     fireEvent.keyDown(screen.getByRole('separator'), { key: 'Home' })
     expect(screen.getByRole('button', { name: 'Show posts' })).toBeTruthy()
@@ -320,7 +328,7 @@ describe('Home', () => {
     expect(screen.queryByRole('button', { name: 'Show posts, unread' })).toBeNull()
   })
 
-  it('hides New room when the root group says I may not', async () => {
+  it('hides New room when the root group does not allow me to create rooms', async () => {
     const { listGroups } = await import('../api')
     vi.mocked(listGroups).mockResolvedValue({
       groups: [group(ROOT, 'member', { can: { ...group(ROOT, 'member').can, create_groups: false } })],

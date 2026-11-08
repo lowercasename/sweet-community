@@ -14,7 +14,7 @@ const clearPostsTopic = `-- name: ClearPostsTopic :exec
 UPDATE posts SET topic_id = NULL WHERE topic_id = ?1
 `
 
-// A deleted topic's posts stay, without one.
+// A deleted topic's posts are kept, with no topic.
 func (q *Queries) ClearPostsTopic(ctx context.Context, topicID sql.NullString) error {
 	_, err := q.db.ExecContext(ctx, clearPostsTopic, topicID)
 	return err
@@ -179,9 +179,9 @@ type ListTopicsRow struct {
 	FollowerCount int64
 }
 
-// Topics (architecture.md, Topics): the community's labels for posts. Who
-// may make or change them is perm's call (root staff); who follows one is
-// that person's own business.
+// Topics (architecture.md, Topics) are the community's labels for posts.
+// perm decides who can create or change them (root staff). Following a topic
+// is each user's own choice.
 func (q *Queries) ListTopics(ctx context.Context) ([]ListTopicsRow, error) {
 	rows, err := q.db.QueryContext(ctx, listTopics)
 	if err != nil {

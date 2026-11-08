@@ -1,11 +1,11 @@
-// Package perm answers "may this person do that to this thing". Every
-// handler asks here and nowhere else, so the rules live in one table-tested
-// place. The frontend mirrors nothing: the server's answer travels as `can`
-// flags on each resource.
+// Package perm decides whether a user may perform an action on a resource.
+// Every handler calls this package and nothing else for that decision, so the
+// rules are in one table-tested place. The frontend does not duplicate the
+// rules. The server sends its decisions as `can` flags on each resource.
 //
-// Roles belong to memberships, not people (architecture.md, Groups). An
-// Actor is therefore a person together with their role in the one group at
-// hand; the same functions serve the root group and every other group.
+// Roles belong to memberships, not to users (architecture.md, Groups). An
+// Actor is therefore a user together with their role in the group in question.
+// The same functions serve the root group and every other group.
 package perm
 
 const (
@@ -21,12 +21,13 @@ const (
 	KindDM    = "dm"
 )
 
-// Root is the instance's own group, which everyone belongs to. The one id
-// that is not a UUIDv7, fixed by the migration that created it.
+// Root is the id of the instance's own group, which every user belongs to. It
+// is the only id that is not a UUIDv7. The migration that created the group
+// fixed it.
 const Root = "00000000-0000-7000-8000-000000000000"
 
-// Actor is whoever is asking, with their role in the group the thing is
-// in. An empty Role means they are not a member of that group.
+// Actor is the user performing the action, with their role in the group the
+// resource is in. An empty Role means the user is not a member of that group.
 type Actor struct {
 	ID   string
 	Role string
@@ -35,40 +36,41 @@ type Actor struct {
 func (a Actor) member() bool { return a.Role != "" }
 func (a Actor) staff() bool  { return a.Role == Owner || a.Role == Moderator }
 
-// CanSee is the visibility rule (architecture.md, Visibility rules):
-// membership of the thing's group, nothing else. Staff have no extra sight.
+// CanSee is the visibility rule (architecture.md, Visibility rules). A user
+// can see a resource only when they are a member of its group. Staff have no
+// extra visibility.
 func CanSee(a Actor) bool { return a.member() }
 
-// Post is what the rules need to know about a post.
+// Post holds the fields of a post that the rules use.
 type Post struct{ AuthorID string }
 
-// Comment is what the rules need to know about a comment: whose it is, and whose post it is on.
+// Comment holds the fields of a comment that the rules use. They are the comment's author and the author of the post it is on.
 type Comment struct{ AuthorID, PostAuthorID string }
 
-// Message is what the rules need to know about a chat message.
+// Message holds the fields of a chat message that the rules use.
 type Message struct{ AuthorID string }
 
-// Group is what the rules need to know about a group.
+// Group holds the fields of a group that the rules use.
 type Group struct{ Kind string }
 
-// EditPost: the author, nobody else. Staff delete rather than rewrite.
+// EditPost allows only the author. Staff can delete a post but not edit it.
 func EditPost(a Actor, p Post) bool { return a.member() && a.ID == p.AuthorID }
 
-// DeletePost: the author, or the group's staff.
+// DeletePost allows the author and the group's staff.
 func DeletePost(a Actor, p Post) bool { return a.member() && (a.ID == p.AuthorID || a.staff()) }
 
-// EditComment: the author, nobody else.
+// EditComment allows only the author.
 func EditComment(a Actor, c Comment) bool { return a.member() && a.ID == c.AuthorID }
 
-// DeleteComment: the author; the post's author, for anything on their post; or the group's staff.
+// DeleteComment allows the comment's author, the author of the post it is on, and the group's staff.
 func DeleteComment(a Actor, c Comment) bool {
 	return a.member() && (a.ID == c.AuthorID || a.ID == c.PostAuthorID || a.staff())
 }
 
-// DeleteMessage: the author, or the group's staff. Nobody edits a sent message.
+// DeleteMessage allows the author and the group's staff. A sent message cannot be edited.
 func DeleteMessage(a Actor, m Message) bool { return a.member() && (a.ID == m.AuthorID || a.staff()) }
 
-// Post and Send: any member writes in a group they are in.
+// Write allows any member of the group to post and to send messages in it.
 func Write(a Actor) bool { return a.member() }
 
 // Group modes.
@@ -78,14 +80,14 @@ const (
 	ModeBoth  = "both"
 )
 
-// Instance setting group_creation: who may create groups.
+// Values of the instance setting group_creation, which says who may create groups.
 const (
 	CreationAnyone = "anyone"
 	CreationStaff  = "staff"
 )
 
-// CreateGroup: a member of the root group, or only its staff, as the
-// instance's group_creation setting says.
+// CreateGroup allows a member of the root group, or only the root group's
+// staff, depending on the instance's group_creation setting.
 func CreateGroup(root Actor, policy string) bool {
 	if policy == CreationStaff {
 		return root.staff()
@@ -93,34 +95,38 @@ func CreateGroup(root Actor, policy string) bool {
 	return root.member()
 }
 
-// ManageInstance: the root group's owner edits instance settings.
+// ManageInstance allows the root group's owner to edit instance settings.
 func ManageInstance(root Actor) bool { return root.Role == Owner }
 
-// ManageTopics (architecture.md, Topics): the root group's staff keep the
-// community's list of topics.
+// ManageTopics allows the root group's staff to manage the community's list
+// of topics (architecture.md, Topics).
 func ManageTopics(root Actor) bool { return root.staff() }
 
-// SetTopic: the author files their own post, and the root staff may file
-// anyone's, the one change staff make to another's post (Raphael,
-// 2026-11-07: filing is moderation, not rewriting). The actor is as they
-// stand in the root group, since only the community's feed has topics.
+// SetTopic allows the author to set the topic of their own post, and the root
+// group's staff to set the topic of any post. It is the only change staff may
+// make to another user's post (Raphael, 2026-11-07: setting a topic is
+// moderation, not rewriting). The actor's role is their role in the root
+// group, because only the community's feed has topics.
 func SetTopic(root Actor, p Post) bool {
 	return root.member() && (root.ID == p.AuthorID || root.staff())
 }
 
-// Transfer: the owner hands ownership to another member of the group.
+// Transfer allows the owner to transfer ownership to another member of the group.
 func Transfer(a, target Actor) bool { return a.Role == Owner && target.member() && target.ID != a.ID }
 
-// AddMembers: the group's staff. Nobody is added to a conversation: its
-// people are its identity, and a conversation with someone else is another
-// conversation. In the root group, adding is an invite link.
-// RemoveMembers: the group's staff; in a conversation nobody, people step out.
+// AddMembers allows the group's staff. Nobody can be added to a conversation,
+// because a conversation is identified by its participants, and a conversation
+// with a different set of participants is a different conversation. In the
+// root group, members are added by invite link.
+// RemoveMembers allows the group's staff. Nobody can be removed from a
+// conversation. A participant leaves it instead.
 func AddMembers(a Actor, g Group) bool { return g.Kind != KindDM && a.staff() }
 func RemoveMembers(a Actor) bool       { return a.staff() }
 
-// RemoveFromInstance (architecture.md, Admin tools): root staff remove those
-// below them, a moderator the members and the owner the moderators too;
-// anyone removes themselves; never the owner, who hands over first.
+// RemoveFromInstance (architecture.md, Admin tools) allows root staff to
+// remove users with a lower role. A moderator can remove members. The owner
+// can remove members and moderators. Any user can remove themselves. The owner
+// cannot be removed and must transfer ownership first.
 func RemoveFromInstance(a, target Actor) bool {
 	if !target.member() || target.Role == Owner {
 		return false
@@ -131,11 +137,12 @@ func RemoveFromInstance(a, target Actor) bool {
 	return a.Role == Owner || (a.Role == Moderator && target.Role == Member)
 }
 
-// Invite: adding to the root group, which is an invite link.
+// Invite allows creating an invite link, which is how members are added to the root group.
 func Invite(root Actor) bool { return AddMembers(root, Group{Kind: KindRoot}) }
 
-// SetRole: the group's owner makes anyone else a member or a moderator. The
-// owner's own role never changes this way (transfer is a separate action, later).
+// SetRole allows the group's owner to set any other member's role to member
+// or moderator. The owner's own role cannot be changed this way. Transfer is
+// a separate action, to be added later.
 func SetRole(a, target Actor, role string) bool {
 	if a.Role != Owner || target.Role == Owner || target.ID == a.ID {
 		return false
@@ -143,13 +150,14 @@ func SetRole(a, target Actor, role string) bool {
 	return role == Member || role == Moderator
 }
 
-// Rename and SetMode: the owner; the root group is not renamed, a DM is neither
-// renamed nor changed from chat. DeleteGroup: the owner; never the root.
+// Rename and SetMode allow the owner. The root group cannot be renamed. A DM
+// cannot be renamed or changed from chat mode. DeleteGroup allows the owner,
+// and the root group cannot be deleted.
 func Rename(a Actor, g Group) bool      { return a.Role == Owner && g.Kind == KindGroup }
 func SetMode(a Actor, g Group) bool     { return a.Role == Owner && g.Kind != KindDM }
 func DeleteGroup(a Actor, g Group) bool { return a.Role == Owner && g.Kind != KindRoot }
 
-// Leave: any member but the owner, of any group but the root. Leaving a
-// room removes you; leaving a conversation is stepping out, and opening it
-// again is stepping back in.
+// Leave allows any member except the owner to leave any group except the
+// root. Leaving a room removes the membership. Leaving a conversation hides
+// it, and opening the conversation again restores it.
 func Leave(a Actor, g Group) bool { return a.member() && a.Role != Owner && g.Kind != KindRoot }

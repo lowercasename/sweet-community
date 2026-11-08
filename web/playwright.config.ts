@@ -1,12 +1,11 @@
 import { defineConfig, devices } from '@playwright/test'
 
 /**
- * Flows through the real browser (architecture.md, Testing). Two servers:
- * the built binary on a fresh database, and the Vite dev server in front
- * of it, because dev mode (React StrictMode, hot reload) is where Raphael
- * looks. A third server is an instance as it first starts, with no owner, for
- * the setup flow alone. Four projects: built desktop, built phone, dev
- * desktop, and fresh for the one test tagged so.
+ * Playwright tests in a real browser (architecture.md, Testing). Three servers:
+ * the built binary on a fresh database, the Vite dev server in front of it
+ * (because Raphael uses dev mode, with React StrictMode and hot reload), and
+ * a new instance with no owner, used only by the setup test. Four projects:
+ * built desktop, built phone, dev desktop, and fresh for the test tagged @fresh.
  */
 const BUILT = 'http://127.0.0.1:8098'
 const DEV = 'http://127.0.0.1:5199'

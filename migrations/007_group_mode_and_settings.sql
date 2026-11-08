@@ -1,5 +1,5 @@
--- 007: a group's one setting, its mode (posts, chat, both); a DM is chat
--- only. And the instance's first setting, who may create groups.
+-- 007: a group's only setting, its mode (posts, chat, both). A DM is chat
+-- only. Also the instance's first setting, which controls who can create groups.
 ALTER TABLE groups ADD COLUMN mode TEXT NOT NULL DEFAULT 'both' CHECK (mode IN ('posts', 'chat', 'both'));
 UPDATE groups SET mode = 'chat' WHERE kind = 'dm';
 

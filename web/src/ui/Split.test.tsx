@@ -4,10 +4,10 @@ import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { Split, type SplitShow } from './Split'
 
 /**
- * The panes hold editors with half-written drafts. Closing a pane, reopening
+ * The panes contain editors with unfinished drafts. Closing a pane, reopening
  * it, or hiding the whole split behind another page must never unmount them.
- * An uncontrolled input is the simplest stateful child: its value survives
- * only if the very same DOM node does.
+ * An uncontrolled input is the simplest stateful child. Its value survives
+ * only if the same DOM node survives.
  */
 function split(show: SplitShow, hidden = false, rails = true) {
   return (
@@ -70,7 +70,7 @@ describe('Split', () => {
     expect(screen.queryByText('Show chat')).toBeNull()
   })
 
-  it('gives the open pane the whole width when there are no rails (phones)', () => {
+  it('gives the open pane the whole width when there are no rails, as on phones', () => {
     const { container, rerender } = render(split('right', false, false))
     const grid = () => (container.firstElementChild as HTMLElement).style.gridTemplateColumns
     expect(grid()).toBe('minmax(0, 1fr)')

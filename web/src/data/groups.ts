@@ -1,22 +1,22 @@
 import type { Group } from '../api'
 
 /*
- * Views of my groups for the nav and the Messages page (architecture.md,
- * Layout): pure functions over what the cache holds.
+ * Views of the user's groups for the nav and the Messages page (architecture.md,
+ * Layout). Pure functions over the groups in the cache.
  */
 
-/** When a conversation last had a word in it, or when it was opened. */
+/** When a conversation's last message was sent, or when the conversation was created if it has no messages. */
 export const activity = (g: Group) => g.last_message_at ?? g.created_at
 
-/** The conversations I am in, latest word first. */
+/** The conversations the user is in, most recent message first. */
 export const conversationsOf = (groups: Group[]) =>
   groups.filter((g) => g.kind === 'dm' && g.hidden_at == null).sort((a, b) => activity(b) - activity(a))
 
-/** The conversations I have hidden, latest word first; opening one shows it again. */
+/** The conversations the user has hidden, most recent message first. Opening one unhides it. */
 export const hiddenOf = (groups: Group[]) =>
   groups.filter((g) => g.kind === 'dm' && g.hidden_at != null).sort((a, b) => activity(b) - activity(a))
 
-/** My rooms, alphabetically with case aside: places keep a stable order. */
+/** The user's rooms, sorted alphabetically ignoring case, so the order is stable. */
 export const roomsOf = (groups: Group[]) =>
   groups
     .filter((g) => g.kind === 'group')

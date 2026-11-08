@@ -16,10 +16,11 @@ import (
 	"sweet/internal/store"
 )
 
-// Topic (architecture.md, Topics): a label a post on the community's feed
-// can carry, at most one. The root group's staff keep the list; anyone may
-// follow one to be told of posts in it. The counts are for the owner's
-// list; Following is the viewer's own, filled in on the way out.
+// Topic is a label a post on the community's feed can carry, at most one per
+// post (architecture.md, Topics). The root group's staff manage the list. Any
+// user may follow a topic to be notified of posts in it. The counts are for
+// the owner's list. Following is the viewer's own state and is filled in
+// when the response is built.
 type Topic struct {
 	ID            string `json:"id"`
 	Name          string `json:"name"`
@@ -39,7 +40,7 @@ func wireTopic(row store.GetTopicRow) Topic {
 	return Topic{ID: row.ID, Name: row.Name, Description: row.Description, CreatedAt: row.CreatedAt, PostCount: row.PostCount, FollowerCount: row.FollowerCount}
 }
 
-// topicInput trims and bounds a topic's name and description.
+// topicInput reads a topic's name and description, trims them, and checks their lengths.
 func topicInput(w http.ResponseWriter, r *http.Request) (name, description string, ok bool) {
 	var in struct {
 		Name        string `json:"name"`
@@ -65,7 +66,7 @@ func topicInput(w http.ResponseWriter, r *http.Request) (name, description strin
 	return "", "", false
 }
 
-// listTopics is the community's topics, alphabetical, with whether I follow each.
+// listTopics returns the community's topics in alphabetical order, each with whether the user follows it.
 func (s *Server) listTopics(w http.ResponseWriter, r *http.Request) {
 	me, _ := userFrom(r.Context())
 	rows, err := s.q().ListTopics(r.Context())
@@ -145,7 +146,8 @@ func (s *Server) updateTopic(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// deleteTopic: the topic's posts stay, without one, and its follows go.
+// deleteTopic deletes a topic. Its posts remain without a topic, and its
+// follows are deleted.
 func (s *Server) deleteTopic(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
 	s.logged(w, r, "topic_delete", db.Now(), func(qtx *store.Queries) (any, int, error) {
@@ -167,8 +169,8 @@ func (s *Server) deleteTopic(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// followTopic and unfollowTopic are mine alone: no event, the reply is the
-// topic as I now see it.
+// followTopic and unfollowTopic change the user's own follow state, so no
+// event is logged. The response is the topic as the user now sees it.
 func (s *Server) followTopic(w http.ResponseWriter, r *http.Request) { s.setFollow(w, r, true) }
 
 func (s *Server) unfollowTopic(w http.ResponseWriter, r *http.Request) { s.setFollow(w, r, false) }
@@ -204,7 +206,7 @@ func (s *Server) setFollow(w http.ResponseWriter, r *http.Request, on bool) {
 	writeJSON(w, http.StatusOK, t)
 }
 
-// topicExists answers 400 for a topic id that names nothing; nil for none.
+// topicExists returns 400 for a topic id that does not exist. It returns nil for a nil topicID.
 func topicExists(r *http.Request, q *store.Queries, topicID *string) (int, error) {
 	if topicID == nil {
 		return 0, nil
@@ -218,7 +220,7 @@ func topicExists(r *http.Request, q *store.Queries, topicID *string) (int, error
 }
 
 // tellFollowers writes a topic_post notification to each follower of the
-// topic but the author, inside the caller's transaction.
+// topic except the author, inside the caller's transaction.
 func tellFollowers(r *http.Request, qtx *store.Queries, topicID, postID, actor string, now int64) ([]events.Entry, error) {
 	followers, err := qtx.ListTopicFollowers(r.Context(), topicID)
 	if err != nil {
@@ -237,10 +239,11 @@ func tellFollowers(r *http.Request, qtx *store.Queries, topicID, postID, actor s
 	return out, nil
 }
 
-// setPostTopic is `PUT /api/posts/{id}/topic {topic_id}`: the author files
-// their post, or the root staff file anyone's (perm.SetTopic). Only a post
-// on the community's feed has a topic. Moving a post into a topic tells
-// that topic's followers; filing it where it already is tells nobody.
+// setPostTopic is `PUT /api/posts/{id}/topic {topic_id}`. The author may set
+// their own post's topic, and the root group's staff may set any post's
+// (perm.SetTopic). Only a post on the community's feed has a topic. Moving a
+// post into a topic notifies that topic's followers. Setting the topic it
+// already has notifies nobody.
 func (s *Server) setPostTopic(w http.ResponseWriter, r *http.Request) {
 	var in struct {
 		TopicID *string `json:"topic_id"`

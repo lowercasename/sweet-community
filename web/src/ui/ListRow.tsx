@@ -1,13 +1,13 @@
 import type { ReactNode } from 'react'
 
 interface ListRowProps {
-  /** The row's accessible name: what it opens. */
+  /** The row's accessible name. Names what the row opens. */
   label: string
   onClick?: () => void
   children?: ReactNode
 }
 
-/** A whole list row that opens something, as a conversation on the Messages page does. */
+/** A list row that is one button, for a row that opens something. Used for a conversation on the Messages page. */
 export function ListRow({ label, onClick, children }: ListRowProps) {
   return (
     <button

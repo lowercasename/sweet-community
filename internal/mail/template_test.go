@@ -8,9 +8,9 @@ import (
 	"testing"
 )
 
-// One template for every email (Raphael, 2026-11-07: pared down, quick to
-// read, consistent): the text names the community, says the thing, gives
-// the link, and the HTML is the same message in one column.
+// Every email uses one template (Raphael, 2026-11-07: pared down, quick to
+// read, consistent). The text names the community, states the message and
+// gives the link. The HTML is the same message in one column.
 func TestContentRendersTextAndHTMLAlike(t *testing.T) {
 	c := Content{
 		Community: "Thursday Group",
@@ -47,7 +47,7 @@ func TestContentRendersTextAndHTMLAlike(t *testing.T) {
 	if strings.Contains(h, "<img") || strings.Contains(h, "<style") {
 		t.Error("the template carries no images and no stylesheet")
 	}
-	// Anything written into the message is escaped in the HTML.
+	// Every field of the content is HTML-escaped in the HTML body.
 	bad := Content{Community: "<b>x</b>", Heading: "<script>", Lines: []string{"a & b"}}.HTML()
 	if strings.Contains(bad, "<b>x</b>") || strings.Contains(bad, "<script>") || !strings.Contains(bad, "a &amp; b") {
 		t.Errorf("unescaped content: %s", bad)
@@ -59,7 +59,8 @@ func TestMessageCarriesBothBodies(t *testing.T) {
 	if m.To != "kit@example.test" || m.Subject != "Hi there" || !strings.HasPrefix(m.Text, "Hi\n\nA line.") || !strings.Contains(m.HTML, "<h1") {
 		t.Fatalf("message: %+v", m)
 	}
-	// The development directory keeps the text, which is what links are read from, and the HTML beside it.
+	// The development directory holds the text file, which links are read
+	// from, and the HTML file next to it.
 	d := Dir{Path: filepath.Join(t.TempDir(), "mail")}
 	if err := d.Send(context.Background(), m); err != nil {
 		t.Fatal(err)
@@ -79,7 +80,7 @@ func TestMessageCarriesBothBodies(t *testing.T) {
 	}
 }
 
-// The SMTP body of a message with HTML is multipart/alternative: text first, then HTML.
+// The SMTP body of a message with HTML is multipart/alternative, with the text part before the HTML part.
 func TestSMTPBodyIsMultipartWhenHTMLIsThere(t *testing.T) {
 	m := Message{To: "kit@example.test", Subject: "Hi", Text: "plain", HTML: "<p>rich</p>"}
 	body := string(smtpBody("sweet@example.org", m))

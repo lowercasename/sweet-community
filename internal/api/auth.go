@@ -24,8 +24,8 @@ const (
 	cookieName = "sweet_session"
 	// SessionTTL is the rolling lifetime of a session.
 	SessionTTL = 180 * 24 * time.Hour
-	// touchAfter is how stale last_seen_at may be before a request refreshes
-	// it and the expiry, so most requests do not write.
+	// touchAfter is the age last_seen_at must reach before a request updates
+	// it and the expiry. Most requests therefore do not write.
 	touchAfter = 24 * time.Hour
 )
 
@@ -37,7 +37,7 @@ const (
 	groupKey
 )
 
-// userFrom returns the authenticated user, if the handler is behind requireAuth.
+// userFrom returns the authenticated user when the handler is wrapped by requireAuth.
 func userFrom(ctx context.Context) (User, bool) {
 	u, ok := ctx.Value(userKey).(User)
 	return u, ok
@@ -57,14 +57,14 @@ func withGroup(ctx context.Context, g Group, a perm.Actor) context.Context {
 	return context.WithValue(ctx, groupKey, groupCtx{g, a})
 }
 
-// groupFrom is the group named in the path and the user as perm sees them in it (set by requireGroup).
+// groupFrom returns the group in the request path and the user's Actor in it. Both are set by requireGroup.
 func groupFrom(ctx context.Context) (Group, perm.Actor) {
 	g, _ := ctx.Value(groupKey).(groupCtx)
 	return g.group, g.actor
 }
 
 // tokenFrom reads the session token from the cookie or, for the app shell,
-// an Authorization: Bearer header.
+// from an Authorization: Bearer header.
 func tokenFrom(r *http.Request) string {
 	if h := r.Header.Get("Authorization"); strings.HasPrefix(h, "Bearer ") {
 		return strings.TrimPrefix(h, "Bearer ")
@@ -75,7 +75,7 @@ func tokenFrom(r *http.Request) string {
 	return ""
 }
 
-// authenticate resolves the request's session to a user, refreshing the
+// authenticate resolves the request's session to a user. It refreshes the
 // session's expiry at most once a day.
 func (s *Server) authenticate(r *http.Request) (User, string, bool) {
 	token := tokenFrom(r)
@@ -108,8 +108,8 @@ func (s *Server) requireAuth(next http.HandlerFunc) http.HandlerFunc {
 	}
 }
 
-// requireRoot is requireAuth plus a rule about the user's role in the root
-// group: the instance's staff are the root group's staff.
+// requireRoot is requireAuth plus a check of the user's role in the root
+// group. The instance's staff are the root group's staff.
 func (s *Server) requireRoot(ok func(perm.Actor) bool, next http.HandlerFunc) http.HandlerFunc {
 	return s.requireAuth(func(w http.ResponseWriter, r *http.Request) {
 		u, _ := userFrom(r.Context())
@@ -126,9 +126,9 @@ func (s *Server) requireRoot(ok func(perm.Actor) bool, next http.HandlerFunc) ht
 	})
 }
 
-// Protect is the CSRF guard for the whole server: a state-changing request
+// Protect is the CSRF guard for the whole server. A state-changing request
 // must come from this origin. SameSite=Lax on the cookie covers most
-// browsers; this covers the rest and is cheap.
+// browsers. This check covers the rest and is cheap.
 func Protect(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.Method {
@@ -152,7 +152,7 @@ func Protect(next http.Handler) http.Handler {
 }
 
 // issueSession creates a session for the user and sets the cookie. The token
-// is also returned for clients that hold it as a bearer token.
+// is also returned for clients that send it as a bearer token.
 func (s *Server) issueSession(w http.ResponseWriter, r *http.Request, userID string) (string, error) {
 	token, hash, err := auth.NewToken()
 	if err != nil {
@@ -187,8 +187,9 @@ func isHTTPS(r *http.Request) bool {
 	return r.TLS != nil || strings.EqualFold(r.Header.Get("X-Forwarded-Proto"), "https")
 }
 
-// loginLimiter slows password guessing: per address, 5 quick attempts then
-// one every 12 seconds. Entries are never evicted; fine for one instance.
+// loginLimiter slows password guessing. Per address, it allows 5 attempts at
+// once and then one every 12 seconds. Entries are never evicted, which is
+// acceptable for one instance.
 type loginLimiter struct {
 	mu sync.Mutex
 	m  map[string]*rate.Limiter
@@ -212,18 +213,20 @@ func (l *loginLimiter) get(addr string) *rate.Limiter {
 	return lim
 }
 
-// allow spends one attempt: five at once, then one every twelve seconds.
+// allow consumes one attempt. Five are allowed at once, then one every twelve seconds.
 func (l *loginLimiter) allow(addr string) bool { return l.get(addr).Allow() }
 
-// open says whether an attempt would be allowed, without spending one; spend
-// takes one. Sign-in pays only for failures: a wrong password is what the
-// limit is for, and a right one, or an unverified address, is no guess.
+// open reports whether an attempt would be allowed, without consuming one.
+// spend consumes one. Sign-in consumes an attempt only on failure, because
+// the limit exists for wrong passwords. A correct password or an unverified
+// address is not a guess.
 func (l *loginLimiter) open(addr string) bool { return l.get(addr).Tokens() >= 1 }
 func (l *loginLimiter) spend(addr string)     { l.get(addr).Allow() }
 
-// clientAddr is who is asking, for the limiters: the socket's address, or,
-// behind a trusted proxy, the first address in X-Forwarded-For. Without
-// TrustProxy the header is ignored, since anyone can send one.
+// clientAddr returns the client's address for the limiters. It is the
+// socket's remote address or, behind a trusted proxy, the first address in
+// X-Forwarded-For. Without TrustProxy the header is ignored, because any
+// client can send one.
 func (s *Server) clientAddr(r *http.Request) string {
 	if s.TrustProxy {
 		if first, _, _ := strings.Cut(r.Header.Get("X-Forwarded-For"), ","); strings.TrimSpace(first) != "" {
@@ -249,7 +252,7 @@ func (s *Server) login(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusBadRequest, "Bad request")
 		return
 	}
-	// The name field takes a username or an email address.
+	// The username field accepts a username or an email address.
 	var row store.GetUserByUsernameRow
 	var err error
 	if strings.Contains(in.Username, "@") {
@@ -261,8 +264,8 @@ func (s *Server) login(w http.ResponseWriter, r *http.Request) {
 	}
 	u := wireUser(row.ID, row.Username, row.PictureID)
 	hash := row.PasswordHash
-	// Same answer for unknown user and wrong password; the hash runs either
-	// way so timing does not reveal which.
+	// An unknown user and a wrong password get the same response. The hash
+	// is computed in both cases so that timing does not reveal which.
 	if errors.Is(err, sql.ErrNoRows) || !hash.Valid {
 		auth.CheckPassword(auth.DummyHash, in.Password)
 		s.limiter.spend(s.clientAddr(r))
@@ -278,8 +281,9 @@ func (s *Server) login(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusUnauthorized, "Wrong username or password")
 		return
 	}
-	// An account with an address uses it only once the address is verified.
-	// (The owner made at the command line has none, and is let in.)
+	// An account with an email address can sign in only once the address is
+	// verified. The owner created at the command line has no address and is
+	// allowed in.
 	if row.Email.Valid && !row.EmailVerifiedAt.Valid {
 		writeJSON(w, http.StatusForbidden, map[string]any{"error": "unverified", "email": row.Email.String})
 		return
@@ -298,7 +302,7 @@ func (s *Server) logout(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
-// logoutAll ends every session of the user, this one included.
+// logoutAll deletes every session of the user, including the current one.
 func (s *Server) logoutAll(w http.ResponseWriter, r *http.Request) {
 	u, _ := userFrom(r.Context())
 	s.q().DeleteUserSessions(r.Context(), u.ID)

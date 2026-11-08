@@ -4,11 +4,12 @@ import { Editor } from '@tiptap/core'
 import { chatExtensions, commentExtensions, postExtensions } from './extensions'
 
 /**
- * Round-trip guard: setContent(html) then getHTML() must return the same
- * string. The fixtures are written exactly as TipTap serialises them today,
- * so a TipTap upgrade that changes serialisation fails this test.
- * One fixture per node and mark in the schema. Note TipTap serialises marks in
- * schema order (strong, em, s) regardless of input nesting.
+ * Round-trip guard. setContent(html) followed by getHTML() must return the
+ * same string. The fixtures are written exactly as TipTap serialises them
+ * today, so a TipTap upgrade that changes serialisation fails this test.
+ * There is one fixture per node and mark in the schema. Note that TipTap
+ * serialises marks in schema order (strong, em, s) regardless of the input
+ * nesting.
  */
 const fixtures: Record<string, string> = {
   paragraph: '<p>Hello, world.</p>',
@@ -63,7 +64,7 @@ describe('editor HTML round-trip', () => {
   }
 })
 
-/** The chat schema is a subset: these must round-trip, and blocks outside it must not survive. */
+/** The chat schema is a subset of the post schema. These fixtures must round-trip, and blocks outside the schema must be removed. */
 const chatFixtures: Record<string, string> = {
   paragraph: '<p>hello</p>',
   marks: '<p>a <strong>b</strong> <em>c</em> <s>d</s></p>',
@@ -82,7 +83,7 @@ describe('chat HTML round-trip', () => {
       '<p>T</p><p>a</p><p>q</p>',
     )
   })
-  it('has no inline images (chat attaches them above the text instead)', () => {
+  it('has no inline images, because chat attaches them above the text instead', () => {
     expect(roundTrip('<img src="/img/1" alt="" width="1" height="1" data-image-id="1"><p>hi</p>', chatExtensions)).toBe(
       '<p>hi</p>',
     )

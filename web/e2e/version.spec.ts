@@ -1,13 +1,16 @@
 import { expect, open, owner, test } from './helpers'
 
 /**
- * An upgrade swaps the binary, frontend and all. The stream's first event
- * names the version; a tab that heard another one reloads (architecture.md,
- * Updates: Clients). A second binary cannot be started mid-test, so the
- * first connection is answered by a stand-in stream naming an older
- * version, and the real server's answer on reconnection is the upgrade.
+ * An upgrade replaces the binary, including the frontend. The first event on
+ * the stream carries the server's version, and a tab that received a different
+ * version reloads (architecture.md, Updates: Clients). A second binary cannot
+ * be started during the test, so the first connection is answered by a fake
+ * stream that sends an older version. The real server's response on
+ * reconnection then acts as the upgrade.
  */
-test('a tab that loaded another version reloads when the stream says so', async ({ browser }, info) => {
+test('a tab that loaded a different version reloads when the stream reports a different version', async ({
+  browser,
+}, info) => {
   const o = await owner(browser, info)
   const page = o.page
   const stream = '**/api/events*'

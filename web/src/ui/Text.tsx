@@ -2,7 +2,7 @@ import type { ReactNode } from 'react'
 
 interface TextProps {
   as?: 'p' | 'span'
-  /** `name` is an author name: Sweet red, medium weight. */
+  /** `name` is for an author name. Sweet red, medium weight. */
   variant?: 'body' | 'secondary' | 'small' | 'name'
   weight?: 'normal' | 'bold'
   children?: ReactNode

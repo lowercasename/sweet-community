@@ -1,13 +1,13 @@
-/** Adjacent images render as a gallery of up to this many; longer runs split. */
+/** Adjacent images render as a gallery of up to this many images. Longer runs are split. */
 export const GALLERY_MAX = 8
 
 /**
- * Wrap each run of adjacent top-level <img> elements in
+ * Wraps each run of adjacent top-level <img> elements in
  * <div class="gallery" data-count="N">, for the .gallery rules in global.css.
- * Stored HTML never carries gallery markup (architecture.md): this is a
- * render-time view of plain images, so the editor and the sanitiser only
- * ever see <img>. A run of 2 or more becomes galleries of at most
- * GALLERY_MAX; a leftover single image stays a plain image.
+ * Stored HTML never contains gallery markup (architecture.md). The gallery is
+ * a render-time view of plain images, so the editor and the sanitiser only
+ * ever see <img>. A run of 2 or more images becomes galleries of at most
+ * GALLERY_MAX images each. A single leftover image stays a plain image.
  */
 export function wrapGalleries(html: string): string {
   if (!html.includes('<img')) return html

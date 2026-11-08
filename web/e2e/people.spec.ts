@@ -1,7 +1,7 @@
 import { anyView, article, expect, member, open, sendMessage, test, uniq, writePost } from './helpers'
 
 test.describe('people', () => {
-  test('a name opens a card about the person, which the pointer may enter, with a way to message them', async ({
+  test('a username opens a card about the user, the pointer can move into the card, and the card has a button to message the user', async ({
     browser,
   }, testInfo) => {
     const kit = await member(browser, testInfo, 'kit')
@@ -13,7 +13,7 @@ test.describe('people', () => {
 
     const name = article(mo.page, text).getByRole('button', { name: kit.username })
     const card = mo.page.getByRole('dialog', { name: `About ${kit.username}` })
-    // The picture beside the name is the same control.
+    // The profile picture beside the name is the same control.
     await article(mo.page, text).getByRole('img', { name: kit.username }).hover()
     await expect(card).toBeVisible()
     await mo.page.mouse.move(8, 8)
@@ -21,23 +21,23 @@ test.describe('people', () => {
     await name.hover()
     await expect(card).toBeVisible()
     await expect(card).toContainText(/joined (just now|\d+m ago)/)
-    // Into the card: it stays. Away from both: it goes.
+    // The card stays open while the pointer is in it. It closes when the pointer leaves both the name and the card.
     await card.getByRole('button', { name: 'Message' }).hover()
     await expect(card).toBeVisible()
     await mo.page.mouse.move(8, 8)
     await expect(card).toBeHidden()
-    // A click opens it too, and Escape closes it.
+    // A click also opens the card, and Escape closes it.
     await name.click()
     await expect(card).toBeVisible()
     await mo.page.keyboard.press('Escape')
     await expect(card).toBeHidden()
 
-    // Message from the card lands in the conversation with kit.
+    // The card's Message button opens the conversation with kit.
     await name.click()
     await card.getByRole('button', { name: 'Message' }).click()
     await expect(mo.page).toHaveURL(/\/r\/[^/]+$/)
     await expect(mo.page.getByRole('heading', { name: kit.username })).toBeVisible()
-    // In the chat, my own name opens a card with nobody to message.
+    // In the chat, my own name opens a card that has no Message button.
     const hi = uniq('hi kit ')
     await sendMessage(mo.page, hi)
     await article(mo.page, hi).getByRole('button', { name: mo.username }).click()
@@ -48,10 +48,12 @@ test.describe('people', () => {
     await mo.context.close()
   })
 
-  test("a card near the pane's foot opens above its name, not over the editor", async ({ browser }, testInfo) => {
+  test('a card for a name near the bottom of the pane opens above the name, not over the editor', async ({
+    browser,
+  }, testInfo) => {
     const kit = await member(browser, testInfo, 'kit')
     const mo = await member(browser, testInfo, 'mo')
-    // Turns alternate, so each message is its own run with its own name, the last one at the foot.
+    // The authors alternate, so each message is its own run with its own name. The last message is at the bottom.
     for (let i = 0; i < 30; i++) {
       await (i % 2 ? kit : mo).context.request.post('/api/groups/00000000-0000-7000-8000-000000000000/messages', {
         data: { body_html: `<p>filler ${i}</p>` },
@@ -67,7 +69,7 @@ test.describe('people', () => {
     await name.hover()
     const card = kit.page.getByRole('dialog', { name: `About ${mo.username}` })
     await expect(card).toBeVisible()
-    // The card never covers the editor under the pane: it flips above its name when it must.
+    // The card never covers the editor below the pane. It moves above its name when there is not enough space below.
     const editor = (await kit.page.locator('form', { has: kit.page.locator('.editor-line') }).boundingBox())!
     const c = (await card.boundingBox())!
     expect(c.y + c.height).toBeLessThanOrEqual(editor.y + 1)
@@ -75,7 +77,7 @@ test.describe('people', () => {
     await mo.context.close()
   })
 
-  test('@phone a tap on a name opens the card, and Message goes to the conversation', async ({ browser }, testInfo) => {
+  test('@phone tapping a name opens the card, and Message opens the conversation', async ({ browser }, testInfo) => {
     const kit = await member(browser, testInfo, 'kit')
     const mo = await member(browser, testInfo, 'mo')
     const text = uniq('tap me ')

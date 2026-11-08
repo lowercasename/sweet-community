@@ -6,14 +6,15 @@ import { Alert, Button, Field, Form, Input, Row, Text } from '../ui'
 
 interface JoinProps {
   code: string
-  /** The community, as anyone may read it; undefined while it loads. */
+  /** The community's public settings. Undefined while they load. */
   community?: Settings
 }
 
 /**
- * The page an invite link opens: who invited you, to what; pick a name, a
- * password and an address, and a link goes to the address; opening it is
- * what signs you in (architecture.md, Accounts).
+ * The page an invite link opens (architecture.md, Accounts). It shows who
+ * invited the visitor and to which community. The visitor picks a username,
+ * a password and an email address, and a verification link is sent to the
+ * address. Opening the link signs them in.
  */
 export function Join({ code, community }: JoinProps) {
   const [invitedBy, setInvitedBy] = useState<string | null>(null)

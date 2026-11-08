@@ -6,10 +6,10 @@ import { useEventStream, type StreamStatus } from './useEventStream'
 const StreamContext = createContext<StreamStatus>('connecting')
 
 /**
- * One SSE connection per page, writing straight into the query cache
+ * One SSE connection per page, writing directly into the query cache
  * (architecture.md, Client data). Nothing else listens to the stream. A
- * reconnect after a gap invalidates everything: the stream replays what was
- * missed, and this is the belt to its braces.
+ * reconnect after a disconnection invalidates every query. The stream replays
+ * the missed events, and the invalidation is a second safeguard.
  */
 export function StreamProvider({ children }: { children?: ReactNode }) {
   const qc = useQueryClient()

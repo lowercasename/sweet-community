@@ -15,12 +15,13 @@ import {
 } from '@floating-ui/react'
 
 /**
- * A control whose name is hidden (a collapsed nav item, an icon button, a
- * menu's trigger) says it in a tooltip on hover or keyboard focus, drawn by
- * Floating UI and portalled to the body, never the browser's title, which
- * is slow and unstyled. The control takes `ref` and spreads `props` onto
- * itself, merging its own handlers through it, and renders `tooltip` beside
- * itself. Nothing happens while `enabled` is false.
+ * A tooltip for a control whose name is not visible, such as a collapsed nav
+ * item, an icon button or a menu trigger. The tooltip shows the name on hover
+ * or keyboard focus. It is positioned by Floating UI and portalled to the body.
+ * The browser's title attribute is not used because it is slow and unstyled.
+ * The control passes `ref` to its element, spreads `props` onto it (passing its
+ * own handlers through `props` so they are merged), and renders `tooltip` next
+ * to itself. Nothing happens while `enabled` is false.
  */
 export function useTooltip(label: string, enabled: boolean, placement: Placement = 'bottom') {
   const [open, setOpen] = useState(false)

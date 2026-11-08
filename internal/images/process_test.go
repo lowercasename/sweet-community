@@ -38,7 +38,7 @@ func pngOf(w, h int, c color.Color) []byte {
 }
 
 func TestProcess(t *testing.T) {
-	// Opaque becomes JPEG; transparent stays PNG.
+	// An opaque image becomes a JPEG. A transparent image stays a PNG.
 	p, err := Process(bytes.NewReader(pngOf(10, 10, color.NRGBA{200, 30, 30, 255})))
 	if err != nil || p.ContentType != "image/jpeg" || p.Width != 10 {
 		t.Fatalf("opaque: %+v %v", p, err)
@@ -47,12 +47,12 @@ func TestProcess(t *testing.T) {
 	if err != nil || p.ContentType != "image/png" {
 		t.Fatalf("transparent: %+v %v", p, err)
 	}
-	// Longest side capped, aspect kept.
+	// The longer side is capped at MaxSide and the aspect ratio is kept.
 	p, err = Process(bytes.NewReader(pngOf(3000, 150, color.NRGBA{0, 0, 0, 255})))
 	if err != nil || p.Width != MaxSide || p.Height != 100 {
 		t.Fatalf("resize: %+v %v", p, err)
 	}
-	// Animated GIFs pass through untouched; static ones are re-encoded.
+	// An animated GIF is stored unchanged. A static GIF is re-encoded.
 	anim := gifOf(3)
 	p, err = Process(bytes.NewReader(anim))
 	if err != nil || p.ContentType != "image/gif" || !bytes.Equal(p.Data, anim) || p.Width != 8 {
@@ -62,7 +62,7 @@ func TestProcess(t *testing.T) {
 	if err != nil || p.ContentType == "image/gif" {
 		t.Fatalf("static gif should be re-encoded: %+v %v", p.ContentType, err)
 	}
-	// Not an image, whatever it claims to be.
+	// Input that is not an image is rejected regardless of what it claims to be.
 	if _, err := Process(strings.NewReader("<svg xmlns='http://www.w3.org/2000/svg'></svg>")); err != ErrNotImage {
 		t.Fatalf("svg: %v", err)
 	}

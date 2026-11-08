@@ -9,9 +9,8 @@ import (
 	"sweet/internal/store"
 )
 
-// MySettings is what a person sets for themselves (architecture.md,
-// Notifications: per-person, with off one click away). Digest is "weekly"
-// or "off".
+// MySettings holds a user's own settings (architecture.md, Notifications:
+// per-person, with off one click away). Digest is "weekly" or "off".
 type MySettings struct {
 	Digest string `json:"digest"`
 }
@@ -45,7 +44,8 @@ func (s *Server) getMySettings(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, st)
 }
 
-// setMySettings is `PUT /api/me/settings {digest}`. Mine alone: no event.
+// setMySettings is `PUT /api/me/settings {digest}`. The settings are the
+// user's own, so no event is logged.
 func (s *Server) setMySettings(w http.ResponseWriter, r *http.Request) {
 	var in MySettings
 	r.Body = http.MaxBytesReader(w, r.Body, 4096)
@@ -54,7 +54,7 @@ func (s *Server) setMySettings(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if in.Digest != DigestWeekly && in.Digest != DigestOff {
-		writeErr(w, http.StatusBadRequest, "The digest is weekly or off")
+		writeErr(w, http.StatusBadRequest, "Digest must be weekly or off")
 		return
 	}
 	me, _ := userFrom(r.Context())

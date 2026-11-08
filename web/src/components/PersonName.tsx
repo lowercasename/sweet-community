@@ -6,11 +6,11 @@ import { groupPath, profilePath } from '../routes'
 import { Alert, Avatar, Button, HoverCard, Row, Stack, Text, Time } from '../ui'
 
 interface PersonNameProps {
-  /** The person as the content carried them; the card shows them as they are now. */
+  /** The user snapshot included in the content. The card shows the user's current data. */
   user: User
-  /** Their picture before the name, inside the same control, so hovering it opens the card too. */
+  /** The size of the avatar shown before the name, inside the same control, so hovering it also opens the card. */
   avatar?: 'xs' | 'sm' | 'md'
-  /** A comment's author: a 20px face and a 15px name, a size under the post's. */
+  /** For a comment's author. Shows a 20px avatar and a 15px name, one size smaller than a post's author. */
   small?: boolean
 }
 
@@ -20,7 +20,11 @@ const ROLE_WORD: Record<Member['role'], string> = {
   member: '',
 }
 
-/** The card: who they are now, their standing here, and a way to message them (not myself, nor someone no longer here). */
+/**
+ * The user card. It shows the user's current data, their role and join date,
+ * and a Message button. The button is not shown on the viewer's own card or
+ * for a user who is no longer on the instance.
+ */
 function PersonCard({ person, me }: { person: Member | User; me: User | null | undefined }) {
   const { openDM } = useGroupActions()
   const [, navigate] = useLocation()
@@ -66,10 +70,10 @@ function PersonCard({ person, me }: { person: Member | User; me: User | null | u
 }
 
 /**
- * A person's name wherever it is written (architecture.md, Layout): a
- * control that opens a card about them. The name and the card come from
- * the users cache, so a new picture or name shows here at once; the
- * snapshot the content carried is the fallback.
+ * A user's name, wherever it is shown (architecture.md, Layout). It is a
+ * control that opens a card about the user. The name and the card use the
+ * users cache, so a new picture or name is shown at once. The snapshot
+ * included in the content is the fallback.
  */
 export function PersonName({ user, avatar, small = false }: PersonNameProps) {
   const { data: users } = useUsers()

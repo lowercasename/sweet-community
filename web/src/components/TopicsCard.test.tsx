@@ -3,7 +3,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, screen, within } from '@testing-library/react'
 import { renderWithQuery } from '../test-utils'
 
-/** The owner's list of topics (architecture.md, Topics): add, rename, delete, and what delete does, said with the numbers. */
+/**
+ * The owner's list of topics (architecture.md, Topics). The owner can add,
+ * rename and delete topics. The delete confirmation states its effect with
+ * the post and subscriber counts.
+ */
 vi.mock('../api', () => ({
   listTopics: vi.fn(),
   createTopic: vi.fn(),
@@ -41,7 +45,7 @@ async function draw() {
 }
 
 describe('TopicsCard', () => {
-  it('lists the topics with their counts and adds one, trimmed', async () => {
+  it('lists the topics with their counts, and adds a topic with trimmed input', async () => {
     const { createTopic } = await import('../api')
     await draw()
     const rows = screen.getAllByRole('listitem')
@@ -57,7 +61,7 @@ describe('TopicsCard', () => {
     expect((screen.getByLabelText('Topic name') as HTMLInputElement).value).toBe('')
   })
 
-  it('renames in place', async () => {
+  it('renames a topic inline', async () => {
     const { updateTopic } = await import('../api')
     await draw()
     fireEvent.click(screen.getByRole('button', { name: 'Options for Practice' }))
@@ -69,7 +73,7 @@ describe('TopicsCard', () => {
     await screen.findByText('Practice notes')
   })
 
-  it('deletes after saying what happens to the posts and the people', async () => {
+  it('deletes after stating what happens to the posts and the subscribers', async () => {
     const { deleteTopic } = await import('../api')
     await draw()
     fireEvent.click(screen.getByRole('button', { name: 'Options for Practice' }))
@@ -82,7 +86,7 @@ describe('TopicsCard', () => {
     await vi.waitFor(() => expect(screen.queryByText('Practice')).toBeNull())
   })
 
-  it('explains what a topic is before any exist', async () => {
+  it('explains what a topic is when none exist', async () => {
     const { listTopics } = await import('../api')
     vi.mocked(listTopics).mockResolvedValue({ topics: [] })
     const { TopicsCard } = await import('./TopicsCard')

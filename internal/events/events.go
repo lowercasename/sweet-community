@@ -1,6 +1,6 @@
-// Package events is the instance's event log and in-process pub/sub, and the
-// SSE handler that serves it. One process per instance, so a map of channels
-// is the whole broker.
+// Package events holds the instance's event log, the in-process pub/sub, and
+// the SSE handler that serves them. There is one process per instance, so a
+// map of channels is sufficient as the broker.
 package events
 
 import (
@@ -26,7 +26,7 @@ type Event struct {
 // Hub fans events out to connected SSE clients.
 type Hub struct {
 	db *sql.DB
-	// Version names the running binary; the stream announces it first, so
+	// Version identifies the running binary. The stream sends it first, so
 	// a tab that loaded another version can reload (architecture.md, Updates).
 	Version string
 	mu      sync.Mutex
@@ -37,9 +37,9 @@ func NewHub(db *sql.DB) *Hub {
 	return &Hub{db: db, subs: map[chan Event]struct{}{}}
 }
 
-// Log appends an event inside the caller's write transaction. The seq it
-// returns is commit-ordered because it is assigned while the write lock is
-// held. Callers broadcast after Commit, not before.
+// Log appends an event inside the caller's write transaction. The returned
+// seq is in commit order because it is assigned while the write lock is
+// held. Callers must broadcast after Commit, not before.
 func Log(ctx context.Context, tx *sql.Tx, kind string, payload any, now int64) (Event, error) {
 	raw, err := json.Marshal(payload)
 	if err != nil {
@@ -52,9 +52,9 @@ func Log(ctx context.Context, tx *sql.Tx, kind string, payload any, now int64) (
 	return Event{Seq: seq, Kind: kind, Payload: raw}, nil
 }
 
-// Broadcast delivers a committed event to every live subscriber. Slow
-// subscribers are skipped rather than blocking the writer; they catch up
-// from the log on their next reconnect.
+// Broadcast delivers a committed event to every connected subscriber. A
+// subscriber whose channel is full is skipped rather than blocking the
+// writer. It catches up from the log on its next reconnect.
 func (h *Hub) Broadcast(e Event) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
@@ -93,31 +93,32 @@ func (h *Hub) Since(ctx context.Context, after int64, limit int) ([]Event, error
 	return out, nil
 }
 
-// Heartbeat is how often the server writes a comment line to keep the
-// connection observably alive (proxies, Cloudflare's 125 s read timeout,
-// and dead-client detection on our side).
+// Heartbeat is the interval at which the server writes a comment line. The
+// line keeps the connection alive through proxies and Cloudflare's 125 s read
+// timeout, and lets the server detect a disconnected client.
 const Heartbeat = 15 * time.Second
 
-// Entry is an event to log: a kind and its payload.
+// Entry is an event to log. It holds a kind and its payload.
 type Entry struct {
 	Kind    string
 	Payload any
 }
 
-// Serve is the SSE endpoint. It replays from Last-Event-ID or ?since=, then
-// goes live. Every event carries id: <seq>. filter runs on each event before
-// it is written: the log holds every event once, as it is; each connection
-// decides whether its viewer may have it and adds their own view (can
-// flags). A dropped event still advances the viewer's sequence.
+// Serve is the SSE endpoint. It replays events after Last-Event-ID or
+// ?since=, then streams live events. Every event carries id: <seq>. filter
+// runs on each event before it is written. The log holds every event once,
+// unfiltered. Each connection decides whether its viewer may receive the
+// event and adds the viewer's own view, such as can flags. A filtered-out
+// event still advances the viewer's sequence.
 func (h *Hub) Serve(w http.ResponseWriter, r *http.Request, filter func(Event) (Event, bool)) {
 	flusher, ok := w.(http.Flusher)
 	if !ok {
 		http.Error(w, "streaming unsupported", http.StatusInternalServerError)
 		return
 	}
-	// A client that names a sequence, even 0, wants everything after it; one
-	// that names none has just loaded the page from the API and wants only
-	// what happens next.
+	// A client that sends a sequence, including 0, wants every event after
+	// it. A client that sends none has just loaded the page from the API and
+	// wants only events from now on.
 	after, replay := int64(0), false
 	if v := r.Header.Get("Last-Event-ID"); v != "" {
 		after, _ = strconv.ParseInt(v, 10, 64)
@@ -127,8 +128,8 @@ func (h *Hub) Serve(w http.ResponseWriter, r *http.Request, filter func(Event) (
 		replay = true
 	}
 
-	// Subscribe before replaying so nothing committed during the replay is
-	// missed; duplicates are filtered by seq below.
+	// Subscribe before replaying so that no event committed during the replay
+	// is missed. Duplicates are filtered by seq below.
 	ch := h.subscribe()
 	defer h.unsubscribe(ch)
 
@@ -138,7 +139,8 @@ func (h *Hub) Serve(w http.ResponseWriter, r *http.Request, filter func(Event) (
 	w.WriteHeader(http.StatusOK)
 	fmt.Fprint(w, ": connected\n\n")
 	if h.Version != "" {
-		// No id: it is not part of the log, and must not move Last-Event-ID.
+		// The version event has no id. It is not part of the log and must not
+		// change Last-Event-ID.
 		v, _ := json.Marshal(h.Version)
 		fmt.Fprintf(w, "event: version\ndata: %s\n\n", v)
 	}
@@ -148,7 +150,7 @@ func (h *Hub) Serve(w http.ResponseWriter, r *http.Request, filter func(Event) (
 	write := func(e Event) {
 		e, ok := filter(e)
 		if !ok {
-			// A comment line carrying the id keeps Last-Event-ID moving.
+			// A comment line with the id advances Last-Event-ID.
 			fmt.Fprintf(w, "id: %d\n: skipped\n\n", e.Seq)
 			return
 		}
@@ -163,8 +165,8 @@ func (h *Hub) Serve(w http.ResponseWriter, r *http.Request, filter func(Event) (
 				write(e)
 				last = e.Seq
 			}
-			// A comment marks the end of the replay, so a reader that wants
-			// only the backlog knows when it has it.
+			// A comment line marks the end of the replay, so a reader that
+			// wants only the backlog knows when it has received all of it.
 			fmt.Fprint(w, ": caught up\n\n")
 			flusher.Flush()
 		}

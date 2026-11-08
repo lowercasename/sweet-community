@@ -3,7 +3,7 @@ import { ImageCard } from './ImageCard'
 import { GALLERY_MAX } from '../content/galleries'
 
 interface Run {
-  /** Images in this gallery, counting this one. 1 means a lone image. */
+  /** The number of images in this gallery, including this one. 1 means a single image. */
   count: number
   first: boolean
   last: boolean
@@ -12,8 +12,8 @@ interface Run {
 const ALONE: Run = { count: 1, first: true, last: true }
 
 /**
- * Where this image sits in its run of adjacent images, as the post will
- * render them: runs longer than GALLERY_MAX split into several galleries.
+ * Returns where this image sits in its run of adjacent images, as the post
+ * will render them. A run longer than GALLERY_MAX is split into several galleries.
  */
 function runAt(doc: Editor['state']['doc'], pos: number | undefined): Run {
   if (pos === undefined) return ALONE
@@ -31,15 +31,15 @@ function runAt(doc: Editor['state']['doc'], pos: number | undefined): Run {
 }
 
 /**
- * An image node in the editor, drawn as an ImageCard. Adjacent cards join
+ * An image node in the editor, rendered as an ImageCard. Adjacent cards join
  * into one block because the post will render them as a gallery. The grip
- * drags the card anywhere between blocks, in or out of a gallery.
+ * drags the card to any position between blocks, into or out of a gallery.
  */
 export function EditorImage({ editor, node, getPos, selected, updateAttributes, deleteNode }: NodeViewProps) {
   const run = useEditorState({ editor, selector: ({ editor }) => runAt(editor.state.doc, getPos()) }) ?? ALONE
   const corners = run.first && run.last ? 'all' : run.first ? 'top' : run.last ? 'bottom' : 'none'
 
-  // Enter in the field returns to writing, just after this image.
+  // Enter in the alt text field moves the cursor back into the document, just after this image.
   const leave = () => {
     const pos = getPos()
     if (pos !== undefined)

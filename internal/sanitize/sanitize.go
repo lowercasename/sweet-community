@@ -1,6 +1,6 @@
 // Package sanitize holds the one bluemonday policy that every body (post,
-// comment, chat message) passes through before storage. The policy is the
-// schema: what it allows is exactly what a body may contain.
+// comment, chat message) passes through before storage. The policy defines
+// the schema of a body. A body may contain exactly what the policy allows.
 package sanitize
 
 import (
@@ -16,8 +16,9 @@ var (
 	mentionRe = regexp.MustCompile(`^mention$`)
 	imgSrcRe  = regexp.MustCompile(`^/img/[0-9a-fA-F-]{36}$`)
 	targetRe  = regexp.MustCompile(`^_blank$`)
-	// TipTap's default rel, and the rel this policy itself adds to a bare link
-	// (so a post made via the API is stable once it has been edited in TipTap).
+	// relRe accepts TipTap's default rel value and the rel value this policy
+	// adds to a link that has none. The second keeps a post created via the
+	// API stable once it has been edited in TipTap.
 	relRe = regexp.MustCompile(`^(noopener noreferrer nofollow|noreferrer noopener)$`)
 
 	body  = newBodyPolicy()
@@ -27,45 +28,47 @@ var (
 func newBodyPolicy() *bluemonday.Policy {
 	p := bluemonday.NewPolicy()
 
-	// Block structure TipTap's StarterKit produces.
+	// Block elements that TipTap's StarterKit produces.
 	p.AllowElements("p", "br", "h2", "h3", "blockquote", "ul", "ol", "li", "pre", "code", "hr")
 	// Inline marks.
 	p.AllowElements("strong", "em", "s", "u")
 
-	// Links: http(s) and mailto only. TipTap emits exactly
+	// Links allow the http, https and mailto schemes only. TipTap emits exactly
 	//   <a target="_blank" rel="noopener noreferrer nofollow" href="...">
 	// and those two attribute values are accepted verbatim, so stored HTML is
-	// byte-identical to editor output (the round-trip test depends on this).
-	// A link that arrives without them (API-authored) gets rel="noreferrer"
-	// and, if external, target="_blank" rel="... noopener" added.
+	// byte-identical to editor output. The round-trip test depends on this.
+	// A link without those attributes, such as one created via the API, gets
+	// rel="noreferrer" added. If it is external, it also gets target="_blank"
+	// and noopener in rel.
 	p.AllowAttrs("href").OnElements("a")
 	p.AllowAttrs("target").Matching(targetRe).OnElements("a")
 	p.AllowAttrs("rel").Matching(relRe).OnElements("a")
 	p.AllowURLSchemes("http", "https", "mailto")
 	p.RequireParseableURLs(true)
-	p.AllowRelativeURLs(true) // needed for our own /img/<id> paths; href is still scheme-checked
+	p.AllowRelativeURLs(true) // required for the /img/<id> paths. href is still scheme-checked.
 	p.RequireNoFollowOnLinks(false)
 	p.RequireNoReferrerOnLinks(true)
 	p.AddTargetBlankToFullyQualifiedLinks(true)
 
-	// Mentions: <span data-type="mention" data-mention-id="<uuid>">@name</span>
+	// A mention is <span data-type="mention" data-mention-id="<uuid>">@name</span>.
 	p.AllowAttrs("data-type").Matching(mentionRe).OnElements("span")
 	p.AllowAttrs("data-mention-id").Matching(uuidRe).OnElements("span")
 
-	// Images: our own /img/<id> path only, with alt and bounded dimensions.
+	// Images allow the /img/<id> path only, with alt and integer dimensions.
 	p.AllowAttrs("src").Matching(imgSrcRe).OnElements("img")
 	p.AllowAttrs("data-image-id").Matching(uuidRe).OnElements("img")
 	p.AllowAttrs("alt").OnElements("img")
 	p.AllowAttrs("width", "height").Matching(bluemonday.Integer).OnElements("img")
 
-	// Nothing else: no class, style, id, event handlers, iframes, scripts.
+	// Nothing else is allowed. There are no class, style or id attributes, no
+	// event handlers, no iframes and no scripts.
 	return p
 }
 
-// MaxBodyBytes is the hard cap on an incoming body before sanitisation.
+// MaxBodyBytes is the maximum size of an incoming body before sanitisation.
 const MaxBodyBytes = 200 * 1024
 
-// Body sanitises TipTap HTML for storage. The result is trusted everywhere
+// Body sanitises TipTap HTML for storage. The result is trusted by all code
 // after this point.
 func Body(in string) string {
 	return strings.TrimSpace(body.Sanitize(in))
@@ -73,7 +76,7 @@ func Body(in string) string {
 
 // Text returns the plain text of a sanitised body, for search and excerpts.
 func Text(sanitised string) string {
-	// Give block boundaries a space so words don't run together.
+	// Replace block boundaries with a space so that adjacent words stay separate.
 	s := strings.NewReplacer("</p>", " ", "<br>", " ", "<br/>", " ", "</li>", " ", "</h2>", " ", "</h3>", " ", "</blockquote>", " ").Replace(sanitised)
 	s = strip.Sanitize(s)
 	s = html.UnescapeString(s)

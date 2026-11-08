@@ -29,16 +29,16 @@ import (
 	"sweet/internal/store"
 )
 
-// newTestServer boots a real server on a temp-file database with the owner
-// signed in. Each client has its own cookie jar, so tests can act as
-// several people at once.
+// newTestServer starts a real server on a temp-file database and logs the
+// owner in. Each client has its own cookie jar, so a test can act as
+// several users at once.
 func newTestServer(t *testing.T) (*httptest.Server, *client) {
 	t.Helper()
 	ts, owner, _ := newTestServerWith(t)
 	return ts, owner
 }
 
-// newTestServerWith also hands back the Server, for tests that reach past HTTP.
+// newTestServerWith also returns the Server, for tests that use it directly instead of through HTTP.
 func newTestServerWith(t *testing.T) (*httptest.Server, *client, *Server) {
 	t.Helper()
 	d, err := db.Open(filepath.Join(t.TempDir(), "test.db"))
@@ -156,7 +156,7 @@ func TestInviteRegisterAndSessions(t *testing.T) {
 		t.Fatalf("open invites: want 1, got %d", n)
 	}
 
-	// Anyone can check a link before signing up.
+	// An unauthenticated client can look up an invite code before registering.
 	anon := newClient(t, ts)
 	check := anon.mustStatus(200, "GET", "/api/invites/"+code, nil)
 	if check["invited_by"] != "raphael" {
@@ -164,7 +164,7 @@ func TestInviteRegisterAndSessions(t *testing.T) {
 	}
 	anon.mustStatus(404, "GET", "/api/invites/nope", nil)
 
-	// Rules before the invite is spent.
+	// Validation rules are checked before the invite is used.
 	anon.mustStatus(400, "POST", "/api/register", map[string]string{"code": code, "username": "a", "password": "longenough", "email": "a@example.test"})
 	anon.mustStatus(400, "POST", "/api/register", map[string]string{"code": code, "username": "admin", "password": "longenough", "email": "admin@example.test"})
 	anon.mustStatus(400, "POST", "/api/register", map[string]string{"code": code, "username": "kit", "password": "short", "email": "kit@example.test"})
@@ -173,7 +173,7 @@ func TestInviteRegisterAndSessions(t *testing.T) {
 		t.Fatalf("failed registrations must not spend the invite; open invites = %d", n)
 	}
 
-	// A good registration signs the new member in.
+	// A valid registration logs the new member in.
 	kit := newClient(t, ts)
 	kit.mustStatus(202, "POST", "/api/register", map[string]string{"code": code, "username": "kit", "password": "longenough", "email": "kit@example.test"})
 	reg := kit.mustStatus(200, "POST", "/api/verify", map[string]string{"token": linkToken(mailed(t, ts, "kit@example.test", "verify")[0])})
@@ -185,17 +185,17 @@ func TestInviteRegisterAndSessions(t *testing.T) {
 		t.Fatalf("me: %v", me)
 	}
 
-	// The link is good for the next person too (a group moves together), and counts them.
+	// The invite stays valid for the next user, so a group of people can join together. It counts its uses.
 	newClient(t, ts).mustStatus(202, "POST", "/api/register", map[string]string{"code": code, "username": "kit2", "password": "longenough", "email": "kit2@example.test"})
 	anon.mustStatus(200, "GET", "/api/invites/"+code, nil)
 	if invs := owner.mustStatus(200, "GET", "/api/invites", nil)["invites"].([]any); len(invs) != 1 || invs[0].(map[string]any)["uses"] != 2.0 {
 		t.Fatalf("open invites after two joins: %v", invs)
 	}
-	// Revoked, it is good for nobody.
+	// A revoked invite works for nobody.
 	owner.mustStatus(204, "DELETE", "/api/invites/"+code, nil)
 	newClient(t, ts).mustStatus(404, "POST", "/api/register", map[string]string{"code": code, "username": "kit3", "password": "longenough", "email": "kit3@example.test"})
 
-	// Usernames are unique, case-insensitively.
+	// Usernames are unique, compared case-insensitively.
 	inv2 := owner.mustStatus(201, "POST", "/api/invites", nil)
 	newClient(t, ts).mustStatus(409, "POST", "/api/register", map[string]string{"code": inv2["code"].(string), "username": "KIT", "password": "longenough", "email": "kit-again@example.test"})
 	// Registering with an address that already has an account returns 202 like any other registration.
@@ -207,18 +207,18 @@ func TestInviteRegisterAndSessions(t *testing.T) {
 		t.Fatalf("taken address on register: %v, mail to owner %d (had %d)", again, mailCount(ts, "kit@example.test"), had)
 	}
 	newClient(t, ts).mustStatus(403, "POST", "/api/login", map[string]string{"username": "kit2", "password": "longenough"})
-	// Without a valid invite, a taken username or address gets the same 404 as a free one.
+	// Without a valid invite, a taken username or address gets the same 404 as an unused one.
 	newClient(t, ts).mustStatus(404, "POST", "/api/register", map[string]string{"code": "not-a-code", "username": "kit", "password": "longenough", "email": "kit@example.test"})
 	newClient(t, ts).mustStatus(404, "POST", "/api/register", map[string]string{"code": "not-a-code", "username": "nobody", "password": "longenough", "email": "nobody@example.test"})
 
-	// The bearer form of the token works without the cookie.
+	// The token works as a bearer token without the cookie.
 	bare := newClient(t, ts)
 	status, body := bare.do("GET", "/api/me", nil, "Authorization", "Bearer "+reg["token"].(string))
 	if status != 200 || body["username"] != "kit" {
 		t.Fatalf("bearer: %d %v", status, body)
 	}
 
-	// Log out ends this session only; log out everywhere ends the bearer one too.
+	// Logout ends only the current session. Logout-all also ends the bearer session.
 	kit2 := newClient(t, ts)
 	kit2.login("kit", "longenough")
 	kit.mustStatus(204, "POST", "/api/logout", nil)
@@ -230,7 +230,7 @@ func TestInviteRegisterAndSessions(t *testing.T) {
 		t.Fatalf("bearer session should be gone after logout-all, got %d", status)
 	}
 
-	// Members may list people and may not mint invites.
+	// Members can list users but cannot create invites.
 	kit3 := newClient(t, ts)
 	kit3.login("kit", "longenough")
 	users := kit3.mustStatus(200, "GET", "/api/users", nil)
@@ -275,13 +275,13 @@ func TestCrossSiteWritesAreRefused(t *testing.T) {
 	if status != 403 {
 		t.Fatalf("Sec-Fetch-Site cross-site: want 403, got %d", status)
 	}
-	// Same-origin and no-Origin (curl, the app shell) are fine.
+	// Same-origin requests and requests without an Origin header (curl, the app shell) are allowed.
 	status, _ = owner.do("POST", rootPath+"/posts", map[string]string{"body_html": "<p>x</p>"}, "Origin", owner.base)
 	if status != 201 {
 		t.Fatalf("same Origin: want 201, got %d", status)
 	}
 	owner.mustStatus(201, "POST", rootPath+"/posts", map[string]string{"body_html": "<p>x</p>"})
-	// Reads are never blocked.
+	// Read requests are never blocked.
 	status, _ = owner.do("GET", rootPath+"/posts", nil, "Origin", "https://evil.example")
 	if status != 200 {
 		t.Fatalf("cross-origin GET: want 200, got %d", status)
@@ -336,7 +336,7 @@ func TestComments(t *testing.T) {
 		t.Fatalf("new post comment_count: %v", post["comment_count"])
 	}
 
-	// Nothing yet; unknown post is a 404 either way.
+	// A new post has no comments. An unknown post returns 404 for both GET and POST.
 	if n := len(owner.mustStatus(200, "GET", "/api/posts/"+id+"/comments", nil)["comments"].([]any)); n != 0 {
 		t.Fatalf("comments on a new post: %d", n)
 	}
@@ -344,7 +344,7 @@ func TestComments(t *testing.T) {
 	owner.mustStatus(404, "POST", "/api/posts/nope/comments", map[string]string{"body_html": "<p>x</p>"})
 	owner.mustStatus(400, "POST", "/api/posts/"+id+"/comments", map[string]string{"body_html": "<p> </p>"})
 
-	// Kit answers; the quote is just a blockquote in the body.
+	// Kit comments. The quote is a plain blockquote in the body.
 	c := kit.mustStatus(201, "POST", "/api/posts/"+id+"/comments", map[string]string{"body_html": "<blockquote><p>a question</p></blockquote><p>an answer</p>"})
 	if c["post_id"] != id || c["author"].(map[string]any)["username"] != "kit" || c["edited_at"] != nil {
 		t.Fatalf("comment: %v", c)
@@ -352,7 +352,7 @@ func TestComments(t *testing.T) {
 	cid := c["id"].(string)
 	owner.mustStatus(201, "POST", "/api/posts/"+id+"/comments", map[string]string{"body_html": "<p>thanks</p>"})
 
-	// Listed oldest first; the post now counts them.
+	// Comments are listed oldest first. The post's comment_count now includes them.
 	list := owner.mustStatus(200, "GET", "/api/posts/"+id+"/comments", nil)["comments"].([]any)
 	if len(list) != 2 || list[0].(map[string]any)["id"] != cid {
 		t.Fatalf("comment list: %v", list)
@@ -362,7 +362,7 @@ func TestComments(t *testing.T) {
 		t.Fatalf("comment_count after two comments: %v", posts[0])
 	}
 
-	// Author-only edit: 403 for someone else's, even the post's author.
+	// Only the comment's author can edit it. Anyone else gets 403, including the post's author.
 	owner.mustStatus(403, "PUT", "/api/comments/"+cid, map[string]string{"body_html": "<p>not yours</p>"})
 	edited := kit.mustStatus(200, "PUT", "/api/comments/"+cid, map[string]string{"body_html": "<p>an answer, edited</p>"})
 	if edited["post_id"] != id || edited["edited_at"] == nil || edited["body_html"] != "<p>an answer, edited</p>" {
@@ -370,14 +370,15 @@ func TestComments(t *testing.T) {
 	}
 	kit.mustStatus(404, "PUT", "/api/comments/nope", map[string]string{"body_html": "<p>x</p>"})
 
-	// Editing the post keeps its count.
+	// Editing the post keeps its comment_count.
 	p2 := owner.mustStatus(200, "PUT", "/api/posts/"+id, map[string]string{"body_html": "<p>a question, clarified</p>"})
 	if p2["comment_count"].(float64) != 2 {
 		t.Fatalf("comment_count after post edit: %v", p2)
 	}
 }
 
-// upload posts bytes as multipart field "file" and returns status and body.
+// upload sends bytes to POST /api/images as the multipart field "file" and
+// returns the status and body.
 func (c *client) upload(data []byte) (int, map[string]any) {
 	c.t.Helper()
 	var buf bytes.Buffer
@@ -413,7 +414,7 @@ func testPNG(w, h int) []byte {
 func TestImagesUploadServeAndPicture(t *testing.T) {
 	ts, owner := newTestServer(t)
 
-	// Not an image: refused by content, whatever the name.
+	// A file that is not an image is rejected based on its content, whatever its file name.
 	if status, body := owner.upload([]byte("<script>alert(1)</script>")); status != 422 {
 		t.Fatalf("non-image upload: %d %v", status, body)
 	}
@@ -424,7 +425,7 @@ func TestImagesUploadServeAndPicture(t *testing.T) {
 	}
 	url := img["url"].(string)
 
-	// Served to members with a long private cache life; not to strangers.
+	// The image is served to members with a long private cache lifetime. It is not served to unauthenticated clients.
 	res, err := owner.http.Get(owner.base + url)
 	if err != nil {
 		t.Fatal(err)
@@ -441,7 +442,7 @@ func TestImagesUploadServeAndPicture(t *testing.T) {
 	}
 	owner.mustStatus(404, "GET", "/img/nope", nil)
 
-	// A body may reference it; the sanitiser keeps our own path.
+	// A post body can reference the image. The sanitiser keeps image paths on this server.
 	post := owner.mustStatus(201, "POST", rootPath+"/posts", map[string]string{
 		"body_html": `<p>look</p><img src="` + url + `" data-image-id="` + img["id"].(string) + `" alt="a test" width="2000" height="500">`,
 	})
@@ -449,7 +450,7 @@ func TestImagesUploadServeAndPicture(t *testing.T) {
 		t.Fatalf("image stripped from body: %v", post["body_html"])
 	}
 
-	// Profile picture on, then off.
+	// Set the profile picture, then clear it.
 	me := owner.mustStatus(200, "PUT", "/api/me/picture", map[string]any{"image_id": img["id"]})
 	if me["picture"] != url {
 		t.Fatalf("picture set: %v", me)
@@ -476,7 +477,7 @@ func TestDeletePost(t *testing.T) {
 	id := post["id"].(string)
 	kit.mustStatus(201, "POST", "/api/posts/"+id+"/comments", map[string]string{"body_html": "<p>a comment</p>"})
 
-	// A member cannot delete someone else's post; the author can, once.
+	// A member cannot delete another user's post. The author can delete it once.
 	kit.mustStatus(403, "DELETE", "/api/posts/"+id, nil)
 	gone := owner.mustStatus(200, "DELETE", "/api/posts/"+id, nil)
 	if gone["id"] != id {
@@ -487,7 +488,7 @@ func TestDeletePost(t *testing.T) {
 	if posts := owner.mustStatus(200, "GET", rootPath+"/posts", nil); len(posts["posts"].([]any)) != 0 {
 		t.Fatalf("deleted post still listed: %v", posts)
 	}
-	// Its comments go with it.
+	// Deleting the post also deletes its comments.
 	kit.mustStatus(404, "GET", "/api/posts/"+id+"/comments", nil)
 	kit.mustStatus(404, "POST", "/api/posts/"+id+"/comments", map[string]string{"body_html": "<p>late</p>"})
 
@@ -525,7 +526,7 @@ func TestImageSweep(t *testing.T) {
 		return `<img src="` + url + `" alt="" width="40" height="40" data-image-id="` + id + `">`
 	}
 	_, draftURL := upload()           // never used
-	postID, postURL := upload()       // in a live post
+	postID, postURL := upload()       // in a post that is kept
 	deletedID, deletedURL := upload() // in a post that gets deleted
 	commentID, commentURL := upload() // in a comment
 	messageID, messageURL := upload() // in a chat message
@@ -538,7 +539,7 @@ func TestImageSweep(t *testing.T) {
 	owner.mustStatus(201, "POST", rootPath+"/messages", map[string]string{"body_html": imgTag(messageID, messageURL)})
 	owner.mustStatus(200, "PUT", "/api/me/picture", map[string]string{"image_id": pictureID})
 
-	// Nothing younger than the grace period goes, however unreferenced.
+	// The sweep removes no image younger than the grace period, even if nothing references it.
 	n, err := images.Sweep(context.Background(), srv.q(), srv.Images, db.Now()-3_600_000)
 	if err != nil || n != 0 {
 		t.Fatalf("sweep inside grace: %d %v", n, err)
@@ -550,7 +551,7 @@ func TestImageSweep(t *testing.T) {
 	for url, want := range map[string]int{draftURL: 404, deletedURL: 404, postURL: 200, commentURL: 200, messageURL: 200, pictureURL: 200} {
 		owner.mustStatus(want, "GET", url, nil)
 	}
-	// Idempotent.
+	// The sweep is idempotent.
 	if n, err = images.Sweep(context.Background(), srv.q(), srv.Images, db.Now()+1); err != nil || n != 0 {
 		t.Fatalf("second sweep: %d %v", n, err)
 	}
@@ -570,7 +571,7 @@ func TestDeleteComment(t *testing.T) {
 		return c.mustStatus(201, "POST", "/api/posts/"+pid+"/comments", map[string]string{"body_html": "<p>a comment</p>"})["id"].(string)
 	}
 
-	// Mo's comment: a bystander cannot delete it; Mo can, once.
+	// Another member cannot delete Mo's comment. Mo can delete it once.
 	byMo := comment(mo)
 	register("jo").mustStatus(403, "DELETE", "/api/comments/"+byMo, nil)
 	gone := mo.mustStatus(200, "DELETE", "/api/comments/"+byMo, nil)
@@ -580,11 +581,11 @@ func TestDeleteComment(t *testing.T) {
 	mo.mustStatus(404, "DELETE", "/api/comments/"+byMo, nil)
 	mo.mustStatus(404, "PUT", "/api/comments/"+byMo, map[string]string{"body_html": "<p>too late</p>"})
 
-	// The post's author may delete any comment on their post; the owner any comment at all.
+	// The post's author can delete any comment on their post. The owner can delete any comment.
 	kit.mustStatus(200, "DELETE", "/api/comments/"+comment(mo), nil)
 	owner.mustStatus(200, "DELETE", "/api/comments/"+comment(mo), nil)
 
-	// What is left is listed and counted.
+	// The remaining comment is listed and counted in comment_count.
 	keep := comment(mo)
 	list := kit.mustStatus(200, "GET", "/api/posts/"+pid+"/comments", nil)["comments"].([]any)
 	if len(list) != 1 || list[0].(map[string]any)["id"] != keep {
@@ -594,7 +595,7 @@ func TestDeleteComment(t *testing.T) {
 	if posts[0].(map[string]any)["comment_count"].(float64) != 1 {
 		t.Fatalf("comment_count: %v", posts[0])
 	}
-	// A comment on a deleted post is already gone.
+	// Deleting a post deletes its comments, so deleting one of them afterwards returns 404.
 	kit.mustStatus(200, "DELETE", "/api/posts/"+pid, nil)
 	mo.mustStatus(404, "DELETE", "/api/comments/"+keep, nil)
 }
@@ -629,11 +630,11 @@ func TestPictureChangeIsAnEvent(t *testing.T) {
 	}
 }
 
-// mailDirs is where each test server's mail lands, by server URL, so helpers
-// that only hold the server can read what it sent.
+// mailDirs maps each test server's URL to the directory its mail is written
+// to, so helpers that only have the server can read the mail it sent.
 var mailDirs sync.Map
 
-// mailed returns the links of a kind in the newest message sent to an address.
+// mailed returns the links of one kind in the newest email sent to an address.
 func mailed(t *testing.T, ts *httptest.Server, to, kind string) []string {
 	t.Helper()
 	dir, _ := mailDirs.Load(ts.URL)
@@ -655,18 +656,18 @@ func mailed(t *testing.T, ts *httptest.Server, to, kind string) []string {
 	return links
 }
 
-// mailCount is how many messages an address has had.
+// mailCount returns the number of emails sent to an address.
 func mailCount(ts *httptest.Server, to string) int {
 	dir, _ := mailDirs.Load(ts.URL)
 	files, _ := filepath.Glob(filepath.Join(dir.(string), "*-"+strings.ReplaceAll(to, "@", "_at_")+".txt"))
 	return len(files)
 }
 
-// linkToken is the token at the end of a link.
+// linkToken returns the token at the end of a link.
 func linkToken(link string) string { return link[strings.LastIndex(link, "/")+1:] }
 
-// registerMember makes a member, verified through the link they were sent,
-// and returns their client (signed in) and id.
+// registerMember registers a member, verifies them through the link in the
+// email they were sent, and returns their logged-in client and their id.
 func registerMember(t *testing.T, ts *httptest.Server, owner *client, name string) (*client, string) {
 	t.Helper()
 	inv := owner.mustStatus(201, "POST", "/api/invites", nil)
@@ -693,9 +694,9 @@ func TestCanFlags(t *testing.T) {
 	kit, _ := registerMember(t, ts, owner, "kit")
 	mo, _ := registerMember(t, ts, owner, "mo")
 
-	// Instance-level abilities are the root group's can flags (TestRootGroupAndRoles).
+	// Instance-level permissions are the root group's can flags (see TestRootGroupAndRoles).
 
-	// A post: its author edits and deletes; the owner deletes only; another member neither.
+	// A post. Its author can edit and delete it. The owner can only delete it. Another member can do neither.
 	post := kit.mustStatus(201, "POST", rootPath+"/posts", map[string]string{"body_html": "<p>kit's</p>"})
 	if e, d := can(post); !e || !d {
 		t.Fatalf("author's own post on create: edit %v delete %v", e, d)
@@ -711,7 +712,7 @@ func TestCanFlags(t *testing.T) {
 	}
 	pid := post["id"].(string)
 
-	// A comment by mo on kit's post: mo edits and deletes, kit deletes, the owner deletes.
+	// A comment by mo on kit's post. Mo can edit and delete it. Kit and the owner can delete it.
 	c := mo.mustStatus(201, "POST", "/api/posts/"+pid+"/comments", map[string]string{"body_html": "<p>mo</p>"})
 	if e, d := can(c); !e || !d {
 		t.Fatalf("mo's own comment: edit %v delete %v", e, d)
@@ -726,7 +727,7 @@ func TestCanFlags(t *testing.T) {
 		t.Fatalf("owner on mo's comment: edit %v delete %v", e, d)
 	}
 
-	// A message: its author deletes, the owner deletes, nobody edits.
+	// A message. Its author and the owner can delete it. Nobody can edit it.
 	m := mo.mustStatus(201, "POST", rootPath+"/messages", map[string]string{"body_html": "<p>hi</p>"})
 	if e, d := can(m); e || !d {
 		t.Fatalf("own message: edit %v delete %v", e, d)
@@ -757,7 +758,7 @@ func (c *client) readEvents(n int) []map[string]any {
 		line := sc.Text()
 		switch {
 		case line == ": caught up":
-			// The replay is complete; nothing more is coming without another write.
+			// The replay is complete. No more events arrive until another write.
 			return out
 		case strings.HasPrefix(line, "event: "):
 			kind = strings.TrimPrefix(line, "event: ")
@@ -779,7 +780,7 @@ func TestEventsAreUniformAndPersonalised(t *testing.T) {
 	c := kit.mustStatus(201, "POST", "/api/posts/"+pid+"/comments", map[string]string{"body_html": "<p>c1</p>"})
 	kit.mustStatus(200, "PUT", "/api/comments/"+c["id"].(string), map[string]string{"body_html": "<p>c2</p>"})
 
-	// Two kinds per resource: an edit is another "post" / "comment", not a kind of its own.
+	// Each resource has two event kinds, the whole resource or its deletion. An edit is another "post" or "comment" event, not a separate kind.
 	kinds := []string{}
 	for _, e := range kit.readEvents(6) {
 		if k := e["kind"].(string); k == "post" || k == "comment" {
@@ -790,7 +791,7 @@ func TestEventsAreUniformAndPersonalised(t *testing.T) {
 		t.Fatalf("event kinds: %v", kinds)
 	}
 
-	// The same event carries each viewer's own can flags.
+	// Each viewer receives the same event with their own can flags.
 	firstPost := func(c *client) map[string]any {
 		for _, e := range c.readEvents(6) {
 			if e["kind"] == "post" {
@@ -836,17 +837,17 @@ func TestDeleteMessage(t *testing.T) {
 	}
 }
 
-// Every reply to a write, and every event it logs, is the resource exactly
-// as a fetch would return it to that viewer. This is the property behind
-// "the stream carries the whole thing": a handler must not assemble a
-// payload by hand (three bugs came from that: a group without its flags,
-// a DM without its people, a membership without its joined time).
+// The response to every write, and every event the write logs, equals the
+// resource as a GET returns it to that viewer. The rule "the stream carries
+// the whole thing" depends on this property. A handler must not build a
+// payload by hand. Doing that caused three bugs. A group was sent without its
+// flags, a DM without its members, and a membership without its joined time.
 func TestRepliesAndEventsMatchTheRow(t *testing.T) {
 	ts, owner := newTestServer(t)
 	kit, kitID := registerMember(t, ts, owner, "kit")
 	mo, moID := registerMember(t, ts, owner, "mo")
 
-	// byID finds one item in a listed collection.
+	// byID returns the item with the given id from a list response.
 	byID := func(list map[string]any, key, id string) map[string]any {
 		t.Helper()
 		for _, x := range list[key].([]any) {
@@ -867,7 +868,7 @@ func TestRepliesAndEventsMatchTheRow(t *testing.T) {
 		t.Fatalf("member %s not listed", uid)
 		return nil
 	}
-	// lastEvent is the viewer's newest event of a kind about one thing.
+	// lastEvent returns the viewer's newest event of a kind that matches one resource.
 	lastEvent := func(c *client, kind string, match func(map[string]any) bool) map[string]any {
 		t.Helper()
 		var found map[string]any
@@ -895,7 +896,7 @@ func TestRepliesAndEventsMatchTheRow(t *testing.T) {
 		return func(m map[string]any) bool { return m["group_id"] == gid && m["user"].(map[string]any)["id"] == uid }
 	}
 
-	// Posts: created, commented on, edited (the edit carries the live comment count).
+	// A post is created, commented on and edited. The edit includes the current comment count.
 	post := kit.mustStatus(201, "POST", rootPath+"/posts", map[string]string{"body_html": "<p>v1</p>"})
 	pid := post["id"].(string)
 	same("created post", post, byID(kit.mustStatus(200, "GET", rootPath+"/posts", nil), "posts", pid), lastEvent(kit, "post", isID(pid)))
@@ -906,7 +907,7 @@ func TestRepliesAndEventsMatchTheRow(t *testing.T) {
 	same("edited post", edited, byID(kit.mustStatus(200, "GET", rootPath+"/posts", nil), "posts", pid), lastEvent(kit, "post", isID(pid)))
 	editedC := kit.mustStatus(200, "PUT", "/api/comments/"+cid, map[string]string{"body_html": "<p>c2</p>"})
 	same("edited comment", editedC, byID(kit.mustStatus(200, "GET", "/api/posts/"+pid+"/comments", nil), "comments", cid), lastEvent(kit, "comment", isID(cid)))
-	// The owner's view of the same post differs from kit's only by its can flags, and the stream agrees with the fetch for them too.
+	// The owner's view of the same post differs from kit's only in its can flags. The owner's stream event also matches the GET.
 	same("post as the owner", byID(owner.mustStatus(200, "GET", rootPath+"/posts", nil), "posts", pid), byID(owner.mustStatus(200, "GET", rootPath+"/posts", nil), "posts", pid), lastEvent(owner, "post", isID(pid)))
 
 	// Messages.
@@ -914,7 +915,7 @@ func TestRepliesAndEventsMatchTheRow(t *testing.T) {
 	mid := msg["id"].(string)
 	same("message", msg, byID(kit.mustStatus(200, "GET", rootPath+"/messages", nil), "messages", mid), lastEvent(kit, "message", isID(mid)))
 
-	// Groups: created, renamed, a member added, promoted, handed to; and a DM, created then found.
+	// A group is created and renamed. A member is added, promoted and made owner. A DM is created, then found by a second create.
 	group := kit.mustStatus(201, "POST", "/api/groups", map[string]any{"kind": "group", "name": "Knitting", "mode": "both"})
 	gid := group["id"].(string)
 	gp := "/api/groups/" + gid
@@ -929,7 +930,7 @@ func TestRepliesAndEventsMatchTheRow(t *testing.T) {
 	handed := kit.mustStatus(200, "PUT", gp+"/members/"+moID, map[string]string{"role": "owner"})
 	same("new owner", handed, byUser(kit.mustStatus(200, "GET", gp+"/members", nil), moID), lastEvent(kit, "membership", isMember(gid, moID)))
 	same("former owner", byUser(kit.mustStatus(200, "GET", gp+"/members", nil), kitID), byUser(kit.mustStatus(200, "GET", gp+"/members", nil), kitID), lastEvent(kit, "membership", isMember(gid, kitID)))
-	// Mo, now owner, sees the group with owner's flags on the stream and on a fetch alike.
+	// Mo is now the owner and gets the group with the owner's flags, both in the stream and from a GET.
 	same("group as its new owner", mo.mustStatus(200, "GET", gp, nil), mo.mustStatus(200, "GET", gp, nil), lastEvent(mo, "group", isID(gid)))
 
 	dm := kit.mustStatus(201, "POST", "/api/groups", map[string]any{"kind": "dm", "members": []string{moID}})
@@ -940,9 +941,9 @@ func TestRepliesAndEventsMatchTheRow(t *testing.T) {
 	same("dm as mo", mo.mustStatus(200, "GET", "/api/groups/"+did, nil), byID(mo.mustStatus(200, "GET", "/api/groups", nil), "groups", did), lastEvent(mo, "group", isID(did)))
 }
 
-// A post has an address of its own (architecture.md, Posts): GET
-// /api/posts/{id} is the same post the feed lists, with the viewer's flags;
-// a post in a group the viewer is not in, or a deleted one, does not exist to them.
+// A post has its own URL (architecture.md, Posts). GET /api/posts/{id}
+// returns the same post the feed lists, with the viewer's flags. A post in a
+// group the viewer is not in, or a deleted post, returns 404 to that viewer.
 func TestGetPost(t *testing.T) {
 	ts, owner := newTestServer(t)
 	kit, _ := registerMember(t, ts, owner, "kit")
@@ -965,7 +966,7 @@ func TestGetPost(t *testing.T) {
 		t.Fatalf("comment_count: %v", got["comment_count"])
 	}
 
-	// In a room mo is not in, the post does not exist to mo.
+	// A post in a room that mo is not in returns 404 to mo.
 	room := kit.mustStatus(201, "POST", "/api/groups", map[string]any{"kind": "group", "name": "Knitting", "mode": "both"})
 	private := kit.mustStatus(201, "POST", "/api/groups/"+room["id"].(string)+"/posts", map[string]string{"body_html": "<p>wool</p>"})
 	mo.mustStatus(404, "GET", "/api/posts/"+private["id"].(string), nil)

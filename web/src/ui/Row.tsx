@@ -11,29 +11,30 @@ const GAPS: Record<Gap, string> = {
 
 interface RowProps {
   gap?: Gap
-  /** `end`: a submit button alone at the foot of a form. */
+  /** `end` is used for a submit button alone at the bottom of a form. */
   justify?: 'start' | 'between' | 'end'
-  /** `end` lines a control up with the foot of a labelled field beside it. */
+  /** `end` aligns a control with the bottom of a labelled field beside it. */
   align?: 'baseline' | 'center' | 'start' | 'end'
-  /** A bar across the top of a pane: padded, with a hairline under it. */
+  /** Style as a bar across the top of a pane. Padded, with a hairline under it. */
   pad?: boolean
   /**
-   * `always`: wrap whenever the children's natural widths overflow (flex
-   * wraps before it shrinks). `narrow`: stay on one line and let the
-   * children shrink while the nearest container (a ListItem) is at least
-   * 36rem wide; wrap below that. For a list row with actions on the right.
-   * `never`: one line always; a child that may shrink (HtmlContent fill)
-   * takes what is left. For a message body with its menu beside it.
+   * `always` wraps whenever the children's natural widths overflow, because
+   * flex wraps before it shrinks. `narrow` stays on one line and lets the
+   * children shrink while the nearest CSS container (a ListItem) is at least
+   * 36rem wide, and wraps below that width. Used for a list row with actions
+   * on the right. `never` always stays on one line, and a child that may
+   * shrink (HtmlContent fill) takes the remaining width. Used for a message
+   * body with its menu beside it.
    */
   wrap?: 'always' | 'narrow' | 'never'
-  /** Never shrink: an actions cluster keeps its buttons whole. */
+  /** When false, the row never shrinks, so a group of action buttons keeps its buttons intact. */
   shrink?: boolean
-  /** Pushed to the end of its line, so an actions cluster that wraps onto its own line stays right-aligned. */
+  /** Push the row to the end of its line, so a group of action buttons that wraps onto its own line stays right-aligned. */
   push?: 'end'
   children?: ReactNode
 }
 
-/** Horizontal flex row. Wraps at narrow widths. */
+/** A horizontal flex row. Wraps at narrow widths. */
 export function Row({
   gap = 2,
   justify = 'start',

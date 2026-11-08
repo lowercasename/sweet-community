@@ -15,10 +15,11 @@ import (
 	"sweet/internal/push"
 )
 
-// Notifications (architecture.md, Notifications): one row per person per
-// thing done to them, written in the same transaction as the thing, told to
-// that person alone over the stream. Two kinds for now: a comment on your
-// post, and being added to a room. Reading is a marker on the stream.
+// Notifications (architecture.md, Notifications). There is one row per user
+// per action that affects them. The row is written in the same transaction
+// as the action and sent over the stream to that user only. This test covers
+// two kinds, a comment on the user's post and being added to a room. A
+// notification is marked read when the user opens it.
 func TestNotifications(t *testing.T) {
 	ts, owner := newTestServer(t)
 	kit, kitID := registerMember(t, ts, owner, "kit")
@@ -39,7 +40,7 @@ func TestNotifications(t *testing.T) {
 		return out
 	}
 
-	// A comment on my post is mine to hear about; my own comment is not; the commenter hears nothing.
+	// A comment on a user's post notifies that user. Their own comment does not. The commenter is not notified.
 	post := kit.mustStatus(201, "POST", rootPath+"/posts", map[string]string{"body_html": "<p>hello</p>"})
 	pid := post["id"].(string)
 	kit.mustStatus(201, "POST", "/api/posts/"+pid+"/comments", map[string]string{"body_html": "<p>me too</p>"})
@@ -52,12 +53,12 @@ func TestNotifications(t *testing.T) {
 	if n["kind"] != "comment" || n["post_id"] != pid || n["group_id"] != perm.Root || n["user_id"] != kitID || n["actor"].(map[string]any)["id"] != moID {
 		t.Fatalf("comment notification: %v", n)
 	}
-	// The owner's two are the arrivals of kit and mo (TestOwnerHearsOfEachArrival), nothing of the comment.
+	// The owner's two notifications are for kit and mo joining (TestOwnerHearsOfEachArrival). None is for the comment.
 	if len(list(mo)) != 0 || len(list(owner)) != 2 || list(owner)[0].(map[string]any)["kind"] != NotifyJoined {
 		t.Fatalf("others notified: mo %v owner %v", list(mo), list(owner))
 	}
 
-	// Being added to a room: the added person hears, the adder does not.
+	// When a user is added to a room, the added user is notified and the user who added them is not.
 	room := owner.mustStatus(201, "POST", "/api/groups", map[string]any{"kind": "group", "name": "Knitting", "mode": "both"})
 	gid := room["id"].(string)
 	owner.mustStatus(201, "POST", "/api/groups/"+gid+"/members", map[string]string{"user_id": kitID})
@@ -73,7 +74,7 @@ func TestNotifications(t *testing.T) {
 		t.Fatalf("the adder was notified of adding (beyond the two arrivals): %v", l)
 	}
 
-	// The stream carries each to its person only, and what it carries is the row.
+	// The stream sends each notification to its user only, and the event payload equals the row.
 	if evs := events(kit, "notification"); len(evs) != 2 || !reflect.DeepEqual(evs[1], added) || !reflect.DeepEqual(evs[0], n) {
 		t.Fatalf("kit's notification events: %v", evs)
 	}
@@ -81,13 +82,13 @@ func TestNotifications(t *testing.T) {
 		t.Fatalf("mo's notification events: %v", evs)
 	}
 
-	// Pages: newest first, by created_at.
+	// Pages are ordered newest first by created_at.
 	page := kit.mustStatus(200, "GET", "/api/notifications?limit=1", nil)
 	if len(page["notifications"].([]any)) != 1 || page["next_before"] == nil {
 		t.Fatalf("first page: %v", page)
 	}
 
-	// Reading is by opening, one at a time: the row gets read_at, the event is the row, mo cannot read kit's.
+	// A notification is read by opening it, one at a time. The row gets read_at, and the event payload equals the row. Mo cannot mark kit's notification read.
 	if n["read_at"] != nil || added["read_at"] != nil {
 		t.Fatalf("new notifications are unread: %v %v", n, added)
 	}
@@ -114,10 +115,10 @@ func TestNotifications(t *testing.T) {
 	if u := markers(kit)["notifications"]["unread"]; u != float64(1) {
 		t.Fatalf("unread after opening one of two: %v", u)
 	}
-	// The notifications stream takes no marker; the page alone reads nothing.
+	// A marker cannot be set on the notifications stream. Opening the notifications page does not mark anything read.
 	kit.mustStatus(400, "PUT", "/api/markers/notifications", map[string]any{"read_at": int64(n["created_at"].(float64))})
 
-	// Clearing: the opened ones go for good, told to me alone; the unread one stays.
+	// Clearing permanently deletes the read notifications, and the event is sent to this user only. The unread one stays.
 	cleared := kit.mustStatus(200, "DELETE", "/api/notifications", nil)
 	if cleared["user_id"] != kitID || cleared["before"] == nil {
 		t.Fatalf("cleared: %v", cleared)
@@ -132,8 +133,9 @@ func TestNotifications(t *testing.T) {
 		t.Fatalf("mo hears kit's clearing: %v", evs)
 	}
 
-	// Read markers: a row per stream of mine from the start (notifications with its unread, the root's chat and
-	// feed, Knitting's chat and feed); a chat marker moves forward, never backwards; told to me alone.
+	// Read markers. Each of the user's streams has a row from the start. These are notifications (with its unread
+	// count), the root group's chat and feed, and Knitting's chat and feed. A chat marker only moves forward. Marker
+	// events are sent to this user only.
 	if m := kit.mustStatus(200, "GET", "/api/markers", nil)["markers"].([]any); len(m) != 5 {
 		t.Fatalf("markers: %v", m)
 	}
@@ -156,23 +158,24 @@ func TestNotifications(t *testing.T) {
 		t.Fatalf("mo hears kit's markers: %v", evs)
 	}
 
-	// A chat stream is a group I am in; one I am not in does not exist to me; anything else is nonsense.
+	// A chat stream must be a group the user is in. A group the user is not in returns 404. Any other stream name returns 400.
 	kit.mustStatus(200, "PUT", "/api/markers/chat:"+gid, map[string]any{"read_at": readAt})
 	mo.mustStatus(404, "PUT", "/api/markers/chat:"+gid, map[string]any{"read_at": readAt})
 	kit.mustStatus(400, "PUT", "/api/markers/nonsense", map[string]any{"read_at": readAt})
 	kit.mustStatus(400, "PUT", "/api/markers/chat:"+gid, map[string]any{"read_at": 0})
 
-	// The future is not read: a marker ahead of now is held to now.
+	// A marker cannot be set in the future. A read_at after the current time is capped at the current time.
 	ahead := kit.mustStatus(200, "PUT", "/api/markers/chat:"+gid, map[string]any{"read_at": readAt + 1e12})
 	if ahead["read_at"].(float64) >= float64(readAt)+1e12 {
 		t.Fatalf("marker in the future: %v", ahead)
 	}
 }
 
-// Chat unread (architecture.md, Notifications): a marker row for every room
-// I am in, whether or not I have read anything, carrying how many messages
-// by others are newer than where I have read to. Joining counts from the
-// join: history is not unread. My own words are not unread either.
+// Chat unread counts (architecture.md, Notifications). There is a marker row
+// for every room the user is in, whether or not they have read anything. It
+// includes the number of other users' messages newer than the user's read
+// position. After a join, the count starts from the join time, so earlier
+// history is not unread. The user's own messages are not unread either.
 func TestChatUnread(t *testing.T) {
 	ts, owner := newTestServer(t)
 	kit, kitID := registerMember(t, ts, owner, "kit")
@@ -197,13 +200,13 @@ func TestChatUnread(t *testing.T) {
 	}
 	rootChat := "chat:" + perm.Root
 
-	// Every stream of mine has a row, read or not: notifications, the root's chat and its feed, unread 0.
+	// Each of the user's streams has a row, read or not. These are notifications and the root group's chat and feed, each with unread 0.
 	ms := markers(kit)
 	if len(ms) != 3 || ms["notifications"]["unread"] != float64(0) || ms[rootChat]["unread"] != float64(0) || ms[rootChat]["user_id"] != kitID || ms["feed:"+perm.Root]["unread"] != float64(0) {
 		t.Fatalf("kit's markers to begin with: %v", ms)
 	}
 
-	// Others' messages count; mine do not.
+	// Other users' messages are counted. The user's own messages are not.
 	mo.mustStatus(201, "POST", rootPath+"/messages", map[string]string{"body_html": "<p>one</p>"})
 	second := mo.mustStatus(201, "POST", rootPath+"/messages", map[string]string{"body_html": "<p>two</p>"})
 	kit.mustStatus(201, "POST", rootPath+"/messages", map[string]string{"body_html": "<p>mine</p>"})
@@ -214,7 +217,7 @@ func TestChatUnread(t *testing.T) {
 		t.Fatalf("mo's unread (kit's message): %v", n)
 	}
 
-	// Reading up to the second message leaves none; the reply is the row as GET lists it, and the event the same.
+	// Reading up to the second message leaves no unread messages. The response equals the row that GET lists, and so does the event.
 	readAt := int64(second["created_at"].(float64))
 	marker := kit.mustStatus(200, "PUT", "/api/markers/"+rootChat, map[string]any{"read_at": readAt})
 	if marker["unread"] != float64(0) || int64(marker["read_at"].(float64)) != readAt {
@@ -242,7 +245,7 @@ func TestChatUnread(t *testing.T) {
 		t.Fatalf("after deleting it: %v", n)
 	}
 
-	// A room with history: joining counts from the join.
+	// In a room with history, the unread count starts from the join.
 	room := owner.mustStatus(201, "POST", "/api/groups", map[string]any{"kind": "group", "name": "Knitting", "mode": "both"})
 	gid := room["id"].(string)
 	owner.mustStatus(201, "POST", "/api/groups/"+gid+"/messages", map[string]string{"body_html": "<p>old</p>"})
@@ -250,16 +253,16 @@ func TestChatUnread(t *testing.T) {
 	if n := unread(kit, "chat:"+gid); n != 0 {
 		t.Fatalf("history counted as unread: %v", n)
 	}
-	time.Sleep(2 * time.Millisecond) // times are milliseconds; a message in the join's own millisecond is not after it
+	time.Sleep(2 * time.Millisecond) // times are in milliseconds, and a message in the same millisecond as the join is not after it
 	owner.mustStatus(201, "POST", "/api/groups/"+gid+"/messages", map[string]string{"body_html": "<p>new</p>"})
 	if n := unread(kit, "chat:"+gid); n != 1 {
 		t.Fatalf("a new message in the room: %v", n)
 	}
-	// Notifications unread counts the same way: being added was one.
+	// The notifications unread count works the same way. Being added to the room is one unread notification.
 	if n := unread(kit, "notifications"); n != 1 {
 		t.Fatalf("notifications unread: %v", n)
 	}
-	// The feed has a marker of its own, counted the same way: others' live posts since my marker or my joining; an edit is not new.
+	// The feed has its own marker, counted the same way. It counts other users' posts that are not deleted, since the user's marker or join time. An edit is not a new post.
 	if n := unread(kit, "feed:"+gid); n != 0 {
 		t.Fatalf("history posts counted as unread: %v", n)
 	}
@@ -275,7 +278,7 @@ func TestChatUnread(t *testing.T) {
 	}
 	mo.mustStatus(404, "PUT", "/api/markers/feed:"+gid, map[string]any{"read_at": readAt})
 
-	// Leaving the room takes its markers with it.
+	// Leaving the room deletes its markers.
 	kit.mustStatus(204, "DELETE", "/api/groups/"+gid+"/members/"+kitID, nil)
 	if _, ok := markers(kit)["chat:"+gid]; ok {
 		t.Fatalf("a marker for a room I left: %v", markers(kit))
@@ -285,7 +288,7 @@ func TestChatUnread(t *testing.T) {
 	}
 }
 
-// A person's own settings (architecture.md, Notifications): the digest is weekly until they turn it off.
+// A user's own settings (architecture.md, Notifications). The digest is weekly until the user turns it off.
 func TestMySettings(t *testing.T) {
 	ts, owner := newTestServer(t)
 	kit, _ := registerMember(t, ts, owner, "kit")
@@ -299,13 +302,14 @@ func TestMySettings(t *testing.T) {
 	if got := kit.mustStatus(200, "GET", "/api/me/settings", nil); got["digest"] != "off" {
 		t.Fatalf("kept: %v", got)
 	}
-	// Mine alone.
+	// The setting applies to this user only.
 	if got := owner.mustStatus(200, "GET", "/api/me/settings", nil); got["digest"] != "weekly" {
 		t.Fatalf("someone else's: %v", got)
 	}
 }
 
-// A sender that remembers, and can be told a device is gone.
+// fakePush is a push sender that records what it sends. A test can mark a
+// device's endpoint as gone.
 type fakePush struct {
 	mu   sync.Mutex
 	sent []string // "endpoint title body url [tag]"
@@ -330,9 +334,9 @@ func (f *fakePush) all() []string {
 	return append([]string(nil), f.sent...)
 }
 
-// Web push (architecture.md, Notifications): a mention or a comment on your
-// post reaches each device you asked to be notified on, nothing else does,
-// and a device the push service has lost is dropped.
+// Web push (architecture.md, Notifications). A mention, or a comment on the
+// user's post, is pushed to each device the user subscribed. Nothing else is
+// pushed. A device that the push service reports as gone is removed.
 func TestPushForMentionsAndReplies(t *testing.T) {
 	ts, owner, srv := newTestServerWith(t)
 	fake := &fakePush{gone: map[string]bool{}}
@@ -351,7 +355,7 @@ func TestPushForMentionsAndReplies(t *testing.T) {
 	kit.mustStatus(400, "POST", "/api/push/subscriptions", sub("http://insecure.test/x"))
 	kit.mustStatus(201, "POST", "/api/push/subscriptions", sub("https://push.test/kit-phone"))
 	kit.mustStatus(201, "POST", "/api/push/subscriptions", sub("https://push.test/kit-laptop"))
-	kit.mustStatus(201, "POST", "/api/push/subscriptions", sub("https://push.test/kit-phone")) // again: the same device, once
+	kit.mustStatus(201, "POST", "/api/push/subscriptions", sub("https://push.test/kit-phone")) // the same device again is stored once
 
 	wait := func(n int) []string {
 		t.Helper()
@@ -366,7 +370,7 @@ func TestPushForMentionsAndReplies(t *testing.T) {
 		return nil
 	}
 
-	// A comment on kit's post: both of kit's devices, with the words and the post's address. Not mo, not the owner.
+	// A comment on kit's post is pushed to both of kit's devices, with the text and the post's URL. It is not pushed to mo or the owner.
 	post := kit.mustStatus(201, "POST", rootPath+"/posts", map[string]string{"body_html": "<p>hello</p>"})
 	pid := post["id"].(string)
 	mo.mustStatus(201, "POST", "/api/posts/"+pid+"/comments", map[string]string{"body_html": "<p>hi</p>"})
@@ -383,7 +387,7 @@ func TestPushForMentionsAndReplies(t *testing.T) {
 	if len(fake.all()) != 2 {
 		t.Fatalf("pushed for an add: %v", fake.all())
 	}
-	// A mention pushes. The phone is gone now: the push service says so, and it is dropped, so the laptop alone hears next time.
+	// A mention is pushed. The push service now reports the phone as gone, so it is removed. Only the laptop receives the next push.
 	fake.gone["https://push.test/kit-phone"] = true
 	mo.mustStatus(201, "POST", rootPath+"/posts", map[string]string{"body_html": "<p>" + mentionOf(kitID, "kit") + " look</p>"})
 	got = wait(3)
@@ -396,7 +400,7 @@ func TestPushForMentionsAndReplies(t *testing.T) {
 	if len(got) != 4 || !strings.HasPrefix(got[3], "https://push.test/kit-laptop") {
 		t.Fatalf("after the phone went: %v", got)
 	}
-	// Kit drops the laptop: silence.
+	// Kit removes the laptop subscription, so no more pushes are sent.
 	kit.mustStatus(200, "DELETE", "/api/push/subscriptions", map[string]string{"endpoint": "https://push.test/kit-laptop"})
 	mo.mustStatus(201, "POST", "/api/posts/"+pid+"/comments", map[string]string{"body_html": "<p>once more</p>"})
 	time.Sleep(150 * time.Millisecond)
@@ -405,12 +409,12 @@ func TestPushForMentionsAndReplies(t *testing.T) {
 	}
 }
 
-// mentionOf is a stored mention of a person, as the editor writes it.
+// mentionOf returns the stored HTML of a mention of a user, as the editor writes it.
 func mentionOf(id, name string) string {
 	return fmt.Sprintf(`<span data-type="mention" data-mention-id="%s">@%s</span>`, id, name)
 }
 
-// waitPushes is the fake's record once it holds n pushes, or a failure after a while.
+// waitPushes returns the fake's record once it has n pushes. It fails the test after a timeout.
 func waitPushes(t *testing.T, fake *fakePush, n int) []string {
 	t.Helper()
 	deadline := time.Now().Add(3 * time.Second)
@@ -425,9 +429,10 @@ func waitPushes(t *testing.T, fake *fakePush, n int) []string {
 }
 
 // A message in a conversation creates a notification (architecture.md,
-// Notifications, 2026-11-08): at most one unread row per conversation, marked
-// read either by opening it from the notifications page or by reading the
-// conversation. A message in a room's chat creates no notification.
+// Notifications, 2026-11-08). There is at most one unread row per
+// conversation. It is marked read either by opening it from the
+// notifications page or by reading the conversation. A message in a room's
+// chat creates no notification.
 func TestMessageNotifications(t *testing.T) {
 	ts, owner := newTestServer(t)
 	kit, kitID := registerMember(t, ts, owner, "kit")
@@ -453,7 +458,7 @@ func TestMessageNotifications(t *testing.T) {
 		return 0
 	}
 
-	// One message: one unread row for kit, from mo, with the conversation's group id and no post. Mo has none.
+	// One message creates one unread row for kit, from mo, with the conversation's group id and no post. Mo has no notifications.
 	mo.mustStatus(201, "POST", "/api/groups/"+gid+"/messages", map[string]string{"body_html": "<p>one</p>"})
 	ns := list(kit)
 	if len(ns) != 1 || ns[0]["kind"] != "message" || ns[0]["actor"].(map[string]any)["id"] != moID || ns[0]["group_id"] != gid || ns[0]["post_id"] != nil || ns[0]["read_at"] != nil {
@@ -467,7 +472,7 @@ func TestMessageNotifications(t *testing.T) {
 	if ns = list(kit); len(ns) != 1 || unreadBell(kit) != 1 {
 		t.Fatalf("a second row for the same conversation: %v (bell %v)", ns, unreadBell(kit))
 	}
-	// Moving the chat marker marks the row read. The PUT answers with the marker, and the updated
+	// Moving the chat marker marks the row read. The PUT returns the marker, and the updated
 	// row is sent as a notification event so every client updates.
 	readAt := int64(second["created_at"].(float64))
 	kit.mustStatus(200, "PUT", "/api/markers/chat:"+gid, map[string]any{"read_at": readAt})
@@ -491,7 +496,7 @@ func TestMessageNotifications(t *testing.T) {
 	if !told || !counted {
 		t.Fatalf("the read row and the bell's count did not both go out (row %v, count %v)", told, counted)
 	}
-	// The next message is a new row, and kit's reply is one for mo.
+	// The next message creates a new row, and kit's reply creates one for mo.
 	time.Sleep(2 * time.Millisecond)
 	mo.mustStatus(201, "POST", "/api/groups/"+gid+"/messages", map[string]string{"body_html": "<p>three</p>"})
 	if ns = list(kit); len(ns) != 2 || ns[0]["read_at"] != nil || ns[1]["read_at"] == nil {

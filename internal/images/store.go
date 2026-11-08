@@ -1,7 +1,8 @@
-// Package images stores uploaded pictures and turns whatever arrives into a
-// bounded JPEG or PNG. Storage is a tiny interface with two drivers: a local
-// directory (development, tests, self-hosters with disk) and any S3-compatible
-// bucket (R2 in production; images are large and R2 space is cheap).
+// Package images stores uploaded images and converts each upload into a
+// size-limited JPEG or PNG. Storage is a small interface with two drivers. The
+// local directory driver is for development, tests and self-hosters with disk.
+// The S3 driver works with any S3-compatible bucket, and production uses R2
+// because images are large and R2 storage is cheap.
 package images
 
 import (
@@ -19,15 +20,15 @@ import (
 
 var ErrNotFound = errors.New("Image not found")
 
-// Store is where image bytes live. Keys are "<id>.<ext>".
+// Store holds image bytes. Keys have the form "<id>.<ext>".
 type Store interface {
 	Put(ctx context.Context, key, contentType string, r io.Reader, size int64) error
 	Get(ctx context.Context, key string) (io.ReadCloser, error)
-	// Delete removes a stored file; a missing key is not an error.
+	// Delete removes a stored file. A missing key is not an error.
 	Delete(ctx context.Context, key string) error
 }
 
-// Local keeps files under one directory.
+// Local stores files in one directory.
 type Local struct{ dir string }
 
 func NewLocal(dir string) (*Local, error) {
@@ -89,11 +90,11 @@ func (l *Local) Delete(_ context.Context, key string) error {
 	return nil
 }
 
-// S3Config is read from the environment by main; Endpoint and Bucket set
-// means "use S3". Region "auto" suits R2.
+// S3Config is read from the environment by main. When Endpoint and Bucket are
+// both set, the S3 driver is used. Region "auto" is correct for R2.
 type S3Config struct {
 	Endpoint, Bucket, AccessKey, SecretKey, Region, Prefix string
-	Insecure                                               bool // plain http, for local S3 stand-ins
+	Insecure                                               bool // use plain HTTP, for local S3-compatible servers
 }
 
 // S3 is any S3-compatible bucket.
@@ -135,7 +136,8 @@ func (s *S3) Get(ctx context.Context, key string) (io.ReadCloser, error) {
 	if err != nil {
 		return nil, err
 	}
-	// GetObject is lazy; Stat makes a missing key an error now, not mid-stream.
+	// GetObject does not fetch until the object is read. Stat makes a missing
+	// key return an error here rather than during the read.
 	if _, err := obj.Stat(); err != nil {
 		obj.Close()
 		if minio.ToErrorResponse(err).Code == "NoSuchKey" {

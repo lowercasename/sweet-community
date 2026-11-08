@@ -6,28 +6,31 @@ import { useTooltip } from './Tooltip'
 interface NavItemProps {
   /** A feature's icon. */
   icon?: IconName
-  /** A place's or person's mark (a Tile, an Avatar), drawn where the icon would be. */
+  /** A group's or user's image (a Tile or an Avatar), drawn in place of the icon. */
   mark?: ReactNode
   label: string
-  /** Whether the bar is expanded; collapsed hides the label and says it in a tooltip. */
+  /** Whether the nav bar is expanded. When it is collapsed, the label is hidden and shown in a tooltip instead. */
   expanded: boolean
   /** The item for the page being viewed. */
   current?: boolean
-  /** `sm` inside a section: shorter and quieter, so the items read as a stack under their title. */
+  /** `sm` is used inside a section. It is shorter and has smaller text, so the items read as a list under the title. */
   size?: 'md' | 'sm'
-  /** Something unread behind it: a dot on the icon or mark, never a count, and "unread" in its name (the name is then the aria-label, in both states). */
+  /**
+   * Whether the item has unread content. It shows a dot on the icon or image, never a count, and adds "unread" to
+   * the item's name. The name is then set as the aria-label, both when expanded and when collapsed.
+   */
   dot?: boolean
   onClick?: () => void
 }
 
-/** The dot on an icon's corner; the icon's wrapper is relative. Shared with the phone's tab bar. */
+/** The dot on an icon's corner. The icon's wrapper must be position: relative. The phone's tab bar also uses it. */
 export function UnreadDot() {
   return (
     <span aria-hidden className="absolute -top-0.5 -right-0.5 h-2.5 w-2.5 rounded-full bg-sweet ring-2 ring-card" />
   )
 }
 
-/** One entry in the NavBar: an icon or a mark, plus its label when expanded. */
+/** One item in the NavBar: an icon or an image, plus its label when expanded. */
 export function NavItem({ icon, mark, label, expanded, current, size = 'md', dot = false, onClick }: NavItemProps) {
   const tip = useTooltip(label, !expanded, 'right')
   const name = dot ? `${label}, unread` : label

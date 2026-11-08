@@ -11,7 +11,7 @@ import (
 func file(s string) *fstest.MapFile { return &fstest.MapFile{Data: []byte(s)} }
 
 // A migration on a database that has been migrated before is an upgrade,
-// and an upgrade keeps a copy of what it found (architecture.md, Config:
+// and an upgrade copies the database first (architecture.md, Config:
 // "a VACUUM INTO copy is taken first so a bad migration is recoverable").
 func TestMigrateCopiesTheDatabaseBeforeAnUpgrade(t *testing.T) {
 	ctx := context.Background()
@@ -58,7 +58,7 @@ func TestMigrateCopiesTheDatabaseBeforeAnUpgrade(t *testing.T) {
 		t.Fatal("the copy has the table the upgrade added: it was taken after, not before")
 	}
 
-	// Nothing pending: the copy from the last upgrade stays as it was.
+	// When no migration is pending, the copy from the last upgrade is not replaced.
 	if _, err := d.ExecContext(ctx, `INSERT INTO a (id) VALUES (2)`); err != nil {
 		t.Fatal(err)
 	}
@@ -69,7 +69,7 @@ func TestMigrateCopiesTheDatabaseBeforeAnUpgrade(t *testing.T) {
 		t.Fatalf("a start with nothing to migrate replaced the copy (%d rows)", n)
 	}
 
-	// The next upgrade replaces it.
+	// The next upgrade replaces the copy.
 	third := fstest.MapFS{"001_a.sql": first["001_a.sql"], "002_b.sql": second["002_b.sql"], "003_c.sql": file(`CREATE TABLE c (id INTEGER PRIMARY KEY);`)}
 	if err := Migrate(ctx, d, third); err != nil {
 		t.Fatal(err)
@@ -79,7 +79,7 @@ func TestMigrateCopiesTheDatabaseBeforeAnUpgrade(t *testing.T) {
 	}
 }
 
-// With Litestream beside it, the binary leaves checkpointing to Litestream
+// When Litestream is running, the binary leaves checkpointing to Litestream
 // (architecture.md, Backups: wal_autocheckpoint=0 in the app).
 func TestLitestreamOwnsCheckpoints(t *testing.T) {
 	ctx := context.Background()

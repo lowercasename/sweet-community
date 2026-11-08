@@ -1,7 +1,9 @@
 import { article, expect, member, open, png, test, uniq } from './helpers'
 
 test.describe('images', () => {
-  test('images added to a post become cards with alt text, then a gallery', async ({ browser }, testInfo) => {
+  test('images added to a post are shown as cards with alt text in the editor, then as a gallery in the post', async ({
+    browser,
+  }, testInfo) => {
     const kit = await member(browser, testInfo)
     await open(kit.page)
     const text = uniq('Three from the walk ')
@@ -15,7 +17,7 @@ test.describe('images', () => {
         { name: 'b.png', mimeType: 'image/png', buffer: png(200, 320, [42, 143, 203]) },
         { name: 'c.png', mimeType: 'image/png', buffer: png(300, 300, [237, 94, 94]) },
       ])
-    // Three cards, labelled as one gallery; alt text goes on the second.
+    // There are three cards, labelled as one gallery. Alt text is added to the second image.
     await expect(kit.page.locator('.editor-post textarea')).toHaveCount(3)
     await expect(kit.page.getByText('Gallery of 3 images')).toBeVisible()
     await kit.page.locator('.editor-post textarea').nth(1).fill('A tall blue rectangle')
@@ -25,7 +27,7 @@ test.describe('images', () => {
     await expect(post.locator('.gallery img')).toHaveCount(3)
     await expect(post.locator('.gallery')).toHaveAttribute('data-count', '3')
     await expect(post.locator('.gallery img').nth(1)).toHaveAttribute('alt', 'A tall blue rectangle')
-    // The pictures really are served: natural size once decoded, not a broken image.
+    // The images are actually served. A decoded image has its natural size, which a broken image does not.
     await expect
       .poll(() =>
         post
@@ -37,7 +39,7 @@ test.describe('images', () => {
     await kit.context.close()
   })
 
-  test('a new profile picture shows on the feed and in the nav, for everyone, at once', async ({
+  test('a new profile picture is shown immediately in the feed and in the nav, for every user', async ({
     browser,
   }, testInfo) => {
     const kit = await member(browser, testInfo, 'kit')
@@ -58,10 +60,11 @@ test.describe('images', () => {
       .first()
       .setInputFiles({ name: 'me.png', mimeType: 'image/png', buffer: png(64, 64) })
     await expect(
-      // The nav's face is decorative: the account row's name says who; its picture is what changes.
+      // The profile picture in the nav is decorative. The account row's name identifies the user, and the
+      // picture's src is what changes.
       kit.page.getByRole('navigation', { name: 'Main' }).getByRole('button', { name: kit.username }).locator('img'),
     ).toHaveAttribute('src', /\/img\//)
-    // Mo's open feed follows without a reload.
+    // Mo's open feed updates without a reload.
     await expect(article(mo.page, text).getByRole('img', { name: kit.username })).toHaveAttribute('src', /\/img\//)
     await kit.context.close()
     await mo.context.close()

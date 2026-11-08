@@ -17,7 +17,7 @@ import (
 	"sweet/internal/store"
 )
 
-// InviteTTL is how long an invite link works.
+// InviteTTL is how long an invite link is valid.
 const InviteTTL = 7 * 24 * time.Hour
 
 type Invite struct {
@@ -26,11 +26,11 @@ type Invite struct {
 	CreatedBy User   `json:"created_by"`
 	CreatedAt int64  `json:"created_at"`
 	ExpiresAt int64  `json:"expires_at"`
-	// Uses is how many people have joined through it.
+	// Uses is the number of users who have joined through this link.
 	Uses int64 `json:"uses"`
 }
 
-// createInvite (owner) mints a link, good for anyone who has it for InviteTTL.
+// createInvite (owner) creates a link that anyone who has it can use for InviteTTL.
 func (s *Server) createInvite(w http.ResponseWriter, r *http.Request) {
 	u, _ := userFrom(r.Context())
 	code, err := auth.NewCode()
@@ -47,7 +47,7 @@ func (s *Server) createInvite(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusCreated, inv)
 }
 
-// listInvites (owner) returns the links that are still open.
+// listInvites (owner) returns the links that are still valid.
 func (s *Server) listInvites(w http.ResponseWriter, r *http.Request) {
 	rows, err := s.q().ListOpenInvites(r.Context(), db.Now())
 	if err != nil {
@@ -64,7 +64,7 @@ func (s *Server) listInvites(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{"invites": out})
 }
 
-// deleteInvite (owner) revokes an open link.
+// deleteInvite (owner) revokes a valid link.
 func (s *Server) deleteInvite(w http.ResponseWriter, r *http.Request) {
 	n, err := s.q().DeleteOpenInvite(r.Context(), r.PathValue("code"))
 	if err != nil {
@@ -78,7 +78,7 @@ func (s *Server) deleteInvite(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
-// getInvite (public) tells the join page whether a link is good and who sent it.
+// getInvite (public) returns whether a link is valid and who created it, for the join page.
 func (s *Server) getInvite(w http.ResponseWriter, r *http.Request) {
 	by, err := s.q().GetOpenInviteCreator(r.Context(), store.GetOpenInviteCreatorParams{Code: r.PathValue("code"), Now: db.Now()})
 	if errors.Is(err, sql.ErrNoRows) {
@@ -92,7 +92,7 @@ func (s *Server) getInvite(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{"invited_by": by})
 }
 
-// register (public) turns a valid invite into an account and signs it in.
+// register (public) creates an account from a valid invite and sends the verification email.
 func (s *Server) register(w http.ResponseWriter, r *http.Request) {
 	if !s.registerLimiter.open(s.clientAddr(r)) {
 		writeErr(w, http.StatusTooManyRequests, "Too many attempts. Wait a moment and try again.")
@@ -141,10 +141,10 @@ func (s *Server) register(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	defer tx.Rollback()
-	// User first (so the invite can reference it), then claim the invite. The
-	// UPDATE's WHERE makes a link single-use even under two simultaneous
-	// registrations: BEGIN IMMEDIATE serialises them and the second sees
-	// used_at set, rolls back, and the user it inserted goes with it.
+	// The UPDATE's WHERE clause makes a link single-use even under two
+	// simultaneous registrations. BEGIN IMMEDIATE serialises them, so the
+	// second sees used_at set and rolls back, which also discards the user it
+	// inserted.
 	qtx := store.New(tx)
 	// Check the invite before anything else. A bad code returns 404 before any username or email is
 	// looked up, so the endpoint reveals nothing about existing accounts. The transaction rolls back
@@ -181,8 +181,8 @@ func (s *Server) register(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusInternalServerError, err.Error())
 		return
 	}
-	// A new account is a membership of the root group, and that is an event:
-	// everyone's People page learns of them.
+	// A new account is a membership of the root group, which produces a
+	// membership event, so every user's People page receives the new user.
 	if err := qtx.CreateMembership(ctx, store.CreateMembershipParams{GroupID: perm.Root, UserID: u.ID, Role: perm.Member, JoinedAt: now}); err != nil {
 		writeErr(w, http.StatusInternalServerError, err.Error())
 		return
@@ -193,13 +193,13 @@ func (s *Server) register(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	m := wireMembership(perm.Root, joined)
-	u = m.User // what the row says, which is what everyone else receives
+	u = m.User // use the row's values, which are what the event carries
 	ev, err := events.Log(ctx, tx, "membership", m, now)
 	if err != nil {
 		writeErr(w, http.StatusInternalServerError, err.Error())
 		return
 	}
-	// The owner hears of each arrival (Raphael, 2026-11-06).
+	// The owner is notified of each new member (Raphael, 2026-11-06).
 	var told *events.Event
 	if ownerID, err := qtx.GetGroupOwnerID(ctx, perm.Root); err == nil {
 		entry, err := notify(r, qtx, NotifyJoined, ownerID, u.ID, perm.Root, nil, now)
@@ -224,8 +224,8 @@ func (s *Server) register(w http.ResponseWriter, r *http.Request) {
 	if told != nil {
 		s.Hub.Broadcast(*told)
 	}
-	// No session yet: the address is verified first, and the link that
-	// verifies it signs the person in.
+	// No session is issued yet. The address is verified first, and the link
+	// that verifies it signs the user in.
 	if err := s.sendToken(ctx, s.q(), u.ID, TokenVerify, in.Email); err != nil {
 		writeErr(w, http.StatusInternalServerError, err.Error())
 		return

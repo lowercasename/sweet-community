@@ -1,8 +1,9 @@
--- 006_groups: membership-scoped spaces (architecture.md, Groups). The
--- instance is the root group, which everyone belongs to. Roles move from
--- users to memberships: a person has a role in each group, not a role.
--- The migration runner has foreign keys off for the duration (SQLite's
--- documented procedure for rebuilding a table) and checks them after.
+-- 006_groups: groups scoped by membership (architecture.md, Groups). The
+-- instance is the root group, which every user belongs to. Roles move from
+-- users to memberships, so a user has a role in each group instead of one
+-- global role. The migration runner turns foreign keys off for the duration
+-- (SQLite's documented procedure for rebuilding a table) and checks them
+-- afterwards.
 
 CREATE TABLE groups (
     id         TEXT PRIMARY KEY,
@@ -21,18 +22,18 @@ CREATE TABLE memberships (
 );
 CREATE INDEX memberships_user_id ON memberships(user_id);
 
--- The root group has a fixed id (perm.Root), the one UUID that is not v7.
+-- The root group has a fixed id (perm.Root). It is the only UUID that is not v7.
 INSERT INTO groups (id, kind, name, created_at)
 VALUES ('00000000-0000-7000-8000-000000000000', 'root', '', CAST(strftime('%s', 'now') AS INTEGER) * 1000);
 
--- Everyone's instance role becomes their root membership.
+-- Each user's instance role becomes their root membership.
 INSERT INTO memberships (group_id, user_id, role, joined_at)
 SELECT '00000000-0000-7000-8000-000000000000', id, role, created_at FROM users;
 
 ALTER TABLE users DROP COLUMN role;
 
--- Posts and messages belong to a group. Rebuilt rather than altered so the
--- column can be NOT NULL REFERENCES groups(id).
+-- Posts and messages belong to a group. The tables are rebuilt rather than
+-- altered so the column can be NOT NULL REFERENCES groups(id).
 CREATE TABLE posts_new (
     id         TEXT PRIMARY KEY,
     group_id   TEXT NOT NULL REFERENCES groups(id),

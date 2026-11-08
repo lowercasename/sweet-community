@@ -1,13 +1,14 @@
 import { forwardRef, type ReactNode, type UIEvent } from 'react'
 
 interface ScrollAreaProps {
-  /** `cards` is a column of cards on the paper; `inner` is inside a Card. */
+  /** `cards` is for a column of cards on the page background. `inner` is for content inside a Card. */
   pad?: 'cards' | 'inner'
   onScroll?: (e: UIEvent<HTMLDivElement>) => void
   children?: ReactNode
 }
 
-// `cards` carries the pane's top and bottom margin, so it scrolls with the content and the pane runs edge to edge.
+// `cards` supplies the pane's top and bottom margin, so the margin scrolls with the content and the pane runs edge
+// to edge.
 const PADS: Record<NonNullable<ScrollAreaProps['pad']>, string> = {
   cards: 'px-1 py-4',
   inner: 'px-4 py-3',

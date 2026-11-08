@@ -2,10 +2,11 @@ package api
 
 import "testing"
 
-// Behind the compose stack's Caddy every request arrives from one address,
-// so the sign-in limiter must key on the address the proxy reports, or one
-// member's typos lock the whole community out. Only when told to trust it:
-// anyone can send the header.
+// Behind the compose stack's Caddy, every request arrives from one address.
+// The login limiter must therefore key on the address the proxy reports.
+// Otherwise one member's mistyped passwords block login for every user. The
+// server reads the header only when configured to trust it, because any
+// client can send the header.
 func TestTrustedProxyAddressKeysTheLimiter(t *testing.T) {
 	ts, _, srv := newTestServerWith(t)
 	srv.TrustProxy = true

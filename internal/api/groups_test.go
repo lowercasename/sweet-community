@@ -35,7 +35,7 @@ func TestRootGroupAndRoles(t *testing.T) {
 	mo, moID := registerMember(t, ts, owner, "mo")
 	ownerID := owner.mustStatus(200, "GET", "/api/me", nil)["id"].(string)
 
-	// Everyone is in the root group; the owner's root membership carries their abilities.
+	// Every user is in the root group. The owner's root membership includes their permissions.
 	root := myGroups(owner)[perm.Root]
 	if root["kind"] != "root" || root["role"] != "owner" || !groupCan(root, "add_members") || !groupCan(root, "set_roles") || !groupCan(root, "manage_instance") || groupCan(root, "leave") || groupCan(root, "delete") {
 		t.Fatalf("owner's root group: %v", root)
@@ -44,7 +44,7 @@ func TestRootGroupAndRoles(t *testing.T) {
 		t.Fatalf("member's root group: %v", r)
 	}
 
-	// Only the owner assigns roles, only member or moderator, never to the owner or to themselves.
+	// Only the owner can assign roles. The roles are member and moderator only, and cannot be assigned to the owner or to themselves.
 	kit.mustStatus(403, "PUT", rootPath+"/members/"+moID, map[string]string{"role": "moderator"})
 	owner.mustStatus(400, "PUT", rootPath+"/members/"+kitID, map[string]string{"role": "king"})
 	owner.mustStatus(403, "PUT", rootPath+"/members/"+ownerID, map[string]string{"role": "member"})
@@ -53,7 +53,7 @@ func TestRootGroupAndRoles(t *testing.T) {
 	if m["role"] != "moderator" || m["user"].(map[string]any)["username"] != "kit" || m["group_id"] != perm.Root {
 		t.Fatalf("promoted: %v", m)
 	}
-	// A role change is the same membership with a new role: it keeps its joined time (a zero once read "1 Jan 1970").
+	// A role change keeps the same membership with a new role, so it keeps its joined time. A zero joined time once displayed as "1 Jan 1970".
 	if joined := memberJoined(owner, rootPath, kitID); m["joined_at"] != joined || joined == float64(0) {
 		t.Fatalf("promoted: joined_at %v, listed %v", m["joined_at"], joined)
 	}
@@ -62,14 +62,14 @@ func TestRootGroupAndRoles(t *testing.T) {
 		t.Fatalf("last event after promotion: %v", e)
 	}
 
-	// A moderator invites and deletes anything, edits nothing of others', and does not assign roles.
+	// A moderator can create invites and delete anything. A moderator cannot edit other users' content or assign roles.
 	kit.mustStatus(201, "POST", "/api/invites", nil)
 	post := mo.mustStatus(201, "POST", rootPath+"/posts", map[string]string{"body_html": "<p>mo's</p>"})
 	kit.mustStatus(403, "PUT", "/api/posts/"+post["id"].(string), map[string]string{"body_html": "<p>no</p>"})
 	kit.mustStatus(200, "DELETE", "/api/posts/"+post["id"].(string), nil)
 	kit.mustStatus(403, "PUT", rootPath+"/members/"+moID, map[string]string{"role": "moderator"})
 
-	// Demotion; nobody leaves the root; nobody is removed from it either.
+	// Kit is demoted. Nobody can leave the root group, and nobody can be removed from it.
 	owner.mustStatus(200, "PUT", rootPath+"/members/"+kitID, map[string]string{"role": "member"})
 	kit.mustStatus(403, "POST", "/api/invites", nil)
 	kit.mustStatus(403, "DELETE", rootPath+"/members/"+kitID, nil)
@@ -94,7 +94,7 @@ func TestPrivateGroupIsInvisibleToNonMembers(t *testing.T) {
 	}
 	gp := "/api/groups/" + gid
 
-	// To anyone else, the instance owner included, the group does not exist.
+	// For any non-member, including the instance owner, every route on the group returns 404.
 	for _, c := range []*client{mo, owner} {
 		c.mustStatus(404, "GET", gp, nil)
 		c.mustStatus(404, "GET", gp+"/posts", nil)
@@ -109,7 +109,7 @@ func TestPrivateGroupIsInvisibleToNonMembers(t *testing.T) {
 		}
 	}
 
-	// Added by the owner, mo sees it, posts in it, and hears about it.
+	// After the owner adds mo, mo can see the group, post in it, and receive updates about it.
 	m := kit.mustStatus(201, "POST", gp+"/members", map[string]string{"user_id": moID})
 	if m["role"] != "member" || m["group_id"] != gid {
 		t.Fatalf("membership: %v", m)
@@ -131,15 +131,15 @@ func TestPrivateGroupIsInvisibleToNonMembers(t *testing.T) {
 	kit.mustStatus(200, "PUT", gp, map[string]string{"name": "Knitting circle"})
 	mo.mustStatus(403, "PUT", gp, map[string]string{"name": "Mine now"})
 
-	// The group's owner deletes a member's post; a member cannot delete the owner's.
+	// The group's owner can delete a member's post. A member cannot delete the owner's post.
 	kits := kit.mustStatus(201, "POST", gp+"/posts", map[string]string{"body_html": "<p>knit</p>"})
 	mo.mustStatus(403, "DELETE", "/api/posts/"+kits["id"].(string), nil)
 	kit.mustStatus(200, "DELETE", "/api/posts/"+post["id"].(string), nil)
 
-	// The instance owner, not a member, still cannot touch anything in it.
+	// The instance owner is not a member and cannot change anything in the group.
 	owner.mustStatus(404, "DELETE", "/api/posts/"+kits["id"].(string), nil)
 
-	// mo leaves; kit, the owner, cannot; then kit deletes the group and it is gone for good.
+	// Mo leaves. Kit is the owner and cannot leave. Kit then deletes the group, and the deletion is permanent.
 	mo.mustStatus(204, "DELETE", gp+"/members/"+moID, nil)
 	mo.mustStatus(404, "GET", gp+"/posts", nil)
 	kitID := kit.mustStatus(200, "GET", "/api/me", nil)["id"].(string)
@@ -171,17 +171,17 @@ func TestStreamIsFilteredPerViewer(t *testing.T) {
 		}
 		return strings.Join(ks, ",")
 	}
-	// jo is in the root only: no group, no membership, no secret post.
+	// Jo is only in the root group, so jo receives no group, no membership and no secret post.
 	if got := kinds(jo); strings.Contains(got, "group") || strings.Count(got, "post") != 1 {
 		t.Fatalf("jo's stream: %s", got)
 	}
-	// mo was added: their own membership (the group event predates it and is
-	// not replayed; the client fetches the group on the membership), the
-	// secret post, the public post.
+	// Mo was added, so mo receives their own membership, the secret post and
+	// the public post. The group event is older than the membership and is not
+	// replayed. The client fetches the group when it receives the membership.
 	if got := kinds(mo); !strings.Contains(got, "membership") || strings.Count(got, "post") != 2 {
 		t.Fatalf("mo's stream: %s", got)
 	}
-	// Nobody's stream carries a secret body they cannot see.
+	// No user's stream includes the body of a post that user cannot see.
 	for _, e := range jo.readEvents(50) {
 		if p, ok := e["payload"].(map[string]any); ok && p["body_html"] == "<p>secret</p>" {
 			t.Fatal("secret post reached a non-member")
@@ -203,8 +203,9 @@ func TestDMFindOrCreate(t *testing.T) {
 	if again["id"] != dm["id"] {
 		t.Fatalf("second dm with the same people is a new group: %v vs %v", again["id"], dm["id"])
 	}
-	// A DM is named by its people, so every reply that carries a DM carries them:
-	// the creation, the find, the fetch. (A reply without them once showed "Just you".)
+	// A DM's name comes from its members, so every response that includes a DM
+	// includes its members. This covers the create, the find and the GET. A
+	// response without them once displayed "Just you".
 	for what, g := range map[string]map[string]any{
 		"created": dm,
 		"found":   again,
@@ -222,11 +223,11 @@ func TestDMFindOrCreate(t *testing.T) {
 		t.Fatal("jo sees a dm they are not in")
 	}
 	jo.mustStatus(404, "GET", "/api/groups/"+dm["id"].(string)+"/messages", nil)
-	// In a DM both people are equals: nobody owns it, nobody renames it, anyone may leave.
+	// In a DM both users have the same role. Nobody owns it or can rename it, and either user can leave.
 	if dm["role"] != "member" || groupCan(dm, "rename") || groupCan(dm, "set_roles") || !groupCan(dm, "leave") {
 		t.Fatalf("dm abilities: %v", dm)
 	}
-	// Listed, the same; a named group does not carry people.
+	// The group list includes the same members. A named group does not include members.
 	if got := memberNames(myGroups(mo)[dm["id"].(string)]); got != "kit,mo" {
 		t.Fatalf("listed dm members: %q", got)
 	}
@@ -235,10 +236,11 @@ func TestDMFindOrCreate(t *testing.T) {
 	}
 }
 
-// A conversation is its people (architecture.md, Groups): one per set,
-// nobody added, a word with someone else is another conversation. Each
-// person's presence is their own: hiding it takes it off their list and
-// tells nobody else; opening it again shows it, history and all.
+// A conversation is identified by its members (architecture.md, Groups).
+// There is one conversation per set of users, and nobody can be added. A
+// message to someone else is a different conversation. Each member's hidden
+// state is their own. Hiding a conversation removes it from that user's list
+// and notifies nobody else. Opening it again shows it with its full history.
 func TestConversationIsItsPeople(t *testing.T) {
 	ts, owner := newTestServer(t)
 	kit, kitID := registerMember(t, ts, owner, "kit")
@@ -252,7 +254,7 @@ func TestConversationIsItsPeople(t *testing.T) {
 		t.Fatalf("conversation abilities: %v", pair)
 	}
 	kit.mustStatus(201, "POST", pp+"/messages", map[string]string{"body_html": "<p>between us</p>"})
-	// Nobody is added, staff included; and a conversation is two people, no more: that is a room.
+	// Nobody can add a member, staff included. A conversation has exactly two users. A group of more users is a room.
 	mo.mustStatus(403, "POST", pp+"/members", map[string]string{"user_id": joID})
 	owner.mustStatus(404, "POST", pp+"/members", map[string]string{"user_id": joID})
 	kit.mustStatus(400, "POST", "/api/groups", map[string]any{"kind": "dm", "members": []string{moID, joID}})
@@ -261,7 +263,7 @@ func TestConversationIsItsPeople(t *testing.T) {
 		t.Fatalf("the pair: %q", got)
 	}
 
-	// Mo hides it: gone from mo's sight, still the pair's to kit, who is not told.
+	// Mo hides the conversation. Mo can no longer read it. For kit it still has both users, and kit is not notified.
 	if out := mo.mustStatus(200, "DELETE", pp+"/members/"+moID, nil); out["hidden_at"] == nil || out["user"].(map[string]any)["id"] != moID {
 		t.Fatalf("hiding replies with the membership: %v", out)
 	}
@@ -283,11 +285,11 @@ func TestConversationIsItsPeople(t *testing.T) {
 		}
 	}
 	kit.mustStatus(201, "POST", pp+"/messages", map[string]string{"body_html": "<p>while mo is away</p>"})
-	// Even both hiding it deletes nothing.
+	// When both users hide it, nothing is deleted.
 	kit.mustStatus(200, "DELETE", pp+"/members/"+kitID, nil)
 	kit.mustStatus(404, "GET", pp, nil)
 
-	// Mo opens the conversation with kit again: the same one, shown again, with everything said in it.
+	// Mo opens the conversation with kit again. It is the same conversation, shown again, with all its messages.
 	back := mo.mustStatus(200, "POST", "/api/groups", map[string]any{"kind": "dm", "members": []string{kitID}})
 	if back["id"] != pid || back["hidden_at"] != nil {
 		t.Fatalf("mo showing it again: %v", back)
@@ -300,7 +302,7 @@ func TestConversationIsItsPeople(t *testing.T) {
 	}
 }
 
-// memberJoined is one member's joined time as the group's members list gives it.
+// memberJoined returns one member's joined time from the group's members list.
 func memberJoined(c *client, groupPath, userID string) any {
 	for _, m := range c.mustStatus(200, "GET", groupPath+"/members", nil)["members"].([]any) {
 		if mm := m.(map[string]any); mm["user"].(map[string]any)["id"] == userID {
@@ -310,7 +312,8 @@ func memberJoined(c *client, groupPath, userID string) any {
 	return nil
 }
 
-// memberNames is a DM's people as the wire names them, joined; "" when it carries none.
+// memberNames returns the usernames of a DM's members in the wire payload,
+// joined with commas. It returns "" when the payload has no members.
 func memberNames(g map[string]any) string {
 	members, _ := g["members"].([]any)
 	names := []string{}
@@ -331,7 +334,7 @@ func TestImagesFollowVisibility(t *testing.T) {
 		t.Fatalf("upload: %d %v", status, img)
 	}
 	url := img["url"].(string)
-	// Unreferenced: the uploader's own, nobody else's.
+	// An unreferenced image is visible to its uploader only.
 	kit.mustStatus(200, "GET", url, nil)
 	mo.mustStatus(404, "GET", url, nil)
 
@@ -353,7 +356,7 @@ func TestGroupModeAndInstanceSetting(t *testing.T) {
 	kit, _ := registerMember(t, ts, owner, "kit")
 	mo, moID := registerMember(t, ts, owner, "mo")
 
-	// A group's one setting is its mode; a chat-only group has no feed.
+	// A group's only setting is its mode. A chat-only group has no feed.
 	room := kit.mustStatus(201, "POST", "/api/groups", map[string]string{"name": "Room", "mode": "chat"})
 	rid := room["id"].(string)
 	if room["mode"] != "chat" {
@@ -365,8 +368,8 @@ func TestGroupModeAndInstanceSetting(t *testing.T) {
 	if both["mode"] != "both" || both["name"] != "Room" {
 		t.Fatalf("mode change: %v", both)
 	}
-	// The reply is the group as its owner sees it, flags and all: a bare group
-	// would strip the owner's controls the moment they saved.
+	// The response is the group as its owner sees it, including the flags. A
+	// group without flags would remove the owner's controls as soon as they saved.
 	if both["role"] != "owner" || !groupCan(both, "rename") || !groupCan(both, "set_mode") || !groupCan(both, "delete") {
 		t.Fatalf("reply to an update is not personalised: %v", both)
 	}
@@ -375,7 +378,7 @@ func TestGroupModeAndInstanceSetting(t *testing.T) {
 	if g := kit.mustStatus(201, "POST", "/api/groups", map[string]string{"name": "Default"}); g["mode"] != "both" {
 		t.Fatalf("default mode: %v", g)
 	}
-	// A DM is chat only, and stays so.
+	// A DM is chat only, and its mode cannot be changed.
 	dm := kit.mustStatus(201, "POST", "/api/groups", map[string]any{"kind": "dm", "members": []string{moID}})
 	if dm["mode"] != "chat" {
 		t.Fatalf("dm mode: %v", dm)
@@ -383,7 +386,7 @@ func TestGroupModeAndInstanceSetting(t *testing.T) {
 	kit.mustStatus(400, "PUT", "/api/groups/"+dm["id"].(string), map[string]string{"mode": "both"})
 	kit.mustStatus(403, "POST", "/api/groups/"+dm["id"].(string)+"/posts", map[string]string{"body_html": "<p>x</p>"})
 
-	// The instance's first setting: who may create groups. Anyone reads the settings (the sign-in page wears the name); the owner writes.
+	// The instance's first setting controls who can create groups. Anyone can read the settings, because the login page shows the name. Only the owner can change them.
 	kit.mustStatus(403, "PUT", "/api/settings", map[string]string{"group_creation": "staff", "name": "Knitting"})
 	if s := kit.mustStatus(200, "GET", "/api/settings", nil); s["group_creation"] != "anyone" || s["name"] != "" || s["owner_set"] != true {
 		t.Fatalf("default settings: %v", s)
@@ -423,7 +426,7 @@ func TestOwnershipNeverLapses(t *testing.T) {
 	kit.mustStatus(201, "POST", gp+"/members", map[string]string{"user_id": moID})
 	kit.mustStatus(201, "POST", gp+"/members", map[string]string{"user_id": joID})
 
-	// The owner cannot leave while owner, and only the owner hands ownership over.
+	// The owner cannot leave while they are the owner. Only the owner can transfer ownership.
 	kit.mustStatus(403, "DELETE", gp+"/members/"+kitID, nil)
 	mo.mustStatus(403, "PUT", gp+"/members/"+moID, map[string]string{"role": "owner"})
 	if !groupCan(myGroups(kit)[gid], "transfer") || groupCan(myGroups(mo)[gid], "transfer") {
@@ -443,29 +446,29 @@ func TestOwnershipNeverLapses(t *testing.T) {
 	if got := myGroups(mo)[gid]; got["role"] != "owner" || !groupCan(got, "rename") {
 		t.Fatalf("new owner: %v", got)
 	}
-	// Two owners never: the old one is a moderator now, and mo cannot make a second.
+	// A group never has two owners. The old owner is now a moderator, and mo cannot make a second owner.
 	mo.mustStatus(400, "PUT", gp+"/members/"+joID, map[string]string{"role": "king"})
 
-	// Now kit may leave; mods leaving changes nothing for the group.
+	// Kit can now leave. A moderator leaving does not change the group.
 	kit.mustStatus(204, "DELETE", gp+"/members/"+kitID, nil)
 	mo.mustStatus(200, "GET", gp, nil)
-	// The owner hands over to jo and leaves; jo, the last member, leaves and the group is gone.
+	// The owner transfers ownership to jo and leaves. Jo is the last member, and the group is then deleted.
 	mo.mustStatus(200, "PUT", gp+"/members/"+joID, map[string]string{"role": "owner"})
 	mo.mustStatus(204, "DELETE", gp+"/members/"+moID, nil)
-	jo.mustStatus(403, "DELETE", gp+"/members/"+joID, nil) // owner of a one-person group: hand over or delete
+	jo.mustStatus(403, "DELETE", gp+"/members/"+joID, nil) // the owner of a one-person group must transfer ownership or delete it
 	jo.mustStatus(200, "DELETE", gp, nil)
 	if _, ok := myGroups(jo)[gid]; ok {
 		t.Fatal("deleted group still listed")
 	}
 
-	// A conversation has no owner and is never deleted: everyone may hide it, and it waits.
+	// A conversation has no owner and is never deleted. Every member can hide it, and it is kept.
 	dm := kit.mustStatus(201, "POST", "/api/groups", map[string]any{"kind": "dm", "members": []string{moID}})
 	dp := "/api/groups/" + dm["id"].(string)
 	kit.mustStatus(200, "DELETE", dp+"/members/"+kitID, nil)
 	mo.mustStatus(200, "GET", dp, nil)
 	mo.mustStatus(200, "DELETE", dp+"/members/"+moID, nil)
 	mo.mustStatus(404, "GET", dp, nil)
-	// Nobody is left to receive it on the stream, so the log is the witness: a membership hidden, no deletion.
+	// No member is left to receive the event on the stream, so the test reads the event log. It has a hidden membership and no deletion.
 	rows, err := srv.q().ListEventsSince(context.Background(), store.ListEventsSinceParams{After: 0, PageSize: 500})
 	if err != nil {
 		t.Fatal(err)
@@ -478,7 +481,7 @@ func TestOwnershipNeverLapses(t *testing.T) {
 		t.Fatalf("the pair opened again is %v, want %v", back["id"], dm["id"])
 	}
 
-	// The root group: its owner can hand over, but never leave.
+	// The root group's owner can transfer ownership but can never leave.
 	owner.mustStatus(403, "DELETE", rootPath+"/members/"+owner.mustStatus(200, "GET", "/api/me", nil)["id"].(string), nil)
 	owner.mustStatus(200, "PUT", rootPath+"/members/"+kitID, map[string]string{"role": "owner"})
 	if got := myGroups(kit)[perm.Root]; got["role"] != "owner" || !groupCan(got, "set_roles") {
@@ -489,9 +492,9 @@ func TestOwnershipNeverLapses(t *testing.T) {
 	}
 }
 
-// A group carries the time of its newest live message, computed on the way
-// out, so the Messages page can order DMs by latest activity without the
-// client keeping a second copy of anything.
+// A group includes the time of its newest message that is not deleted. The
+// server computes it when it builds the response. The Messages page uses it
+// to order DMs by latest activity, so the client keeps no second copy of any data.
 func TestGroupsCarryLastActivity(t *testing.T) {
 	ts, owner := newTestServer(t)
 	kit, _ := registerMember(t, ts, owner, "kit")
@@ -513,20 +516,20 @@ func TestGroupsCarryLastActivity(t *testing.T) {
 	if got := kit.mustStatus(200, "GET", "/api/groups/"+id, nil)["last_message_at"]; got != msg["created_at"] {
 		t.Fatalf("fetched dm after a message: last_message_at %v, want %v", got, msg["created_at"])
 	}
-	// The root group carries it too: one shape for every group.
+	// The root group includes it too, because every group has the same shape.
 	if _, ok := myGroups(kit)[perm.Root]["last_message_at"]; !ok {
 		t.Fatal("root group lacks last_message_at")
 	}
-	// Deleting the only message is as if it were never said.
+	// After the only message is deleted, the group is as if the message was never sent.
 	kit.mustStatus(200, "DELETE", "/api/messages/"+msg["id"].(string), nil)
 	if v := myGroups(kit)[id]["last_message_at"]; v != nil {
 		t.Fatalf("dm after deleting its only message: last_message_at %v, want null", v)
 	}
 }
 
-// A room's picture (architecture.md, Groups): the owner sets it from an
-// uploaded image, the group event carries it, its members may see the image
-// and nobody else may, the sweep keeps it, and a conversation has none.
+// A room's picture (architecture.md, Groups). The owner sets it from an
+// uploaded image. The group event includes it. Only the room's members can
+// fetch the image. The sweep keeps it. A conversation has no picture.
 func TestGroupPicture(t *testing.T) {
 	ts, owner, srv := newTestServerWith(t)
 	kit, _ := registerMember(t, ts, owner, "kit")
@@ -561,7 +564,7 @@ func TestGroupPicture(t *testing.T) {
 	if ev["picture"] != "/img/"+iid {
 		t.Fatalf("the group event carries no picture: %v", ev)
 	}
-	// Mo, in the room, sees the image; the owner of the instance, not in it, does not.
+	// Mo is in the room and can fetch the image. The instance owner is not in the room and cannot.
 	if st, _ := mo.do("GET", "/img/"+iid, nil); st != 200 {
 		t.Fatalf("a member fetching the room's picture: %d", st)
 	}

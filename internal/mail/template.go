@@ -6,18 +6,20 @@ import (
 	"strings"
 )
 
-// Content is what every email Sweet sends is made of (architecture.md,
-// Email): who it is from, a heading, a few short lines, at most one link,
-// and a note. One renderer turns it into the plain text and the HTML of a
-// message, so every email reads the same and is quick to read on a phone.
+// Content is the structure of every email Sweet sends (architecture.md,
+// Email). It has the sender's community name, a heading, a few short lines,
+// at most one link, and a note. One renderer produces both the plain text and
+// the HTML of a message, so every email has the same layout and is quick to
+// read on a phone.
 type Content struct {
-	// Community is the community's name, or "Sweet" before it has one.
+	// Community is the community's name, or "Sweet" when no name is set.
 	Community string
 	Heading   string
 	Lines     []string
-	// Action is the one thing to do: a label and where it leads. Optional.
+	// Action is the one link in the message, with its label and URL. It is optional.
 	Action *Action
-	// Note is small print after the action: how long a link works, what to do if it was not you.
+	// Note is small print after the action. It says how long a link works and
+	// what to do if the recipient did not request the email.
 	Note string
 }
 
@@ -26,8 +28,8 @@ type Action struct {
 	URL   string
 }
 
-// Text is the plain-text body: readable in any client, and what the tests
-// and the development mail directory read links out of.
+// Text renders the plain-text body. It is readable in any mail client, and the
+// tests and the development mail directory read links from it.
 func (c Content) Text() string {
 	var b strings.Builder
 	b.WriteString(c.Heading)
@@ -48,9 +50,9 @@ func (c Content) Text() string {
 	return b.String()
 }
 
-// HTML is the same message as a single column that fits any screen: system
-// type, no images, one link in Sweet's red. Styles are inline, since mail
-// clients strip stylesheets.
+// HTML renders the same message as a single column that fits any screen. It
+// uses the system font, no images, and one link in Sweet's red. Styles are
+// inline, because mail clients strip stylesheets.
 func (c Content) HTML() string {
 	esc := html.EscapeString
 	var b strings.Builder

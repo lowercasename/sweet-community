@@ -23,10 +23,11 @@ const ROLE_WORD: Record<Profile['role'], string> = {
 }
 
 /**
- * A person's page at /u/<name> (architecture.md, Accounts): their picture,
- * name, standing and joining, a bio they alone edit, a way to message them,
- * and their posts from the rooms I share with them, newest first. No chat:
- * that is a conversation. My own page is where Settings is reached from.
+ * A user's profile page at /u/<name> (architecture.md, Accounts). It shows
+ * their picture, name, role and join date, a bio that only they can edit, a
+ * Message button, and their posts from the groups the viewer shares with
+ * them, newest first. It has no chat, because chat with a user is a
+ * conversation. Settings is reached from the viewer's own profile page.
  */
 export function ProfilePage({ name, me, onGo }: ProfilePageProps) {
   const { profile, loading, error } = useProfile(name)
@@ -40,7 +41,7 @@ export function ProfilePage({ name, me, onGo }: ProfilePageProps) {
               <Text variant="secondary">Loading…</Text>
             ) : (
               <Stack gap={2}>
-                <Text variant="secondary">There is nobody here by that name.</Text>
+                <Text variant="secondary">There is no user with that name.</Text>
                 <Row>
                   <Button variant="secondary" icon="people" onClick={() => onGo('/people')}>
                     People
@@ -158,7 +159,7 @@ function Loaded({ profile, me, onGo }: { profile: Profile; me: User; onGo: (path
   )
 }
 
-/** One of the person's posts, with the actions for its own room. */
+/** One of the user's posts, with the actions available in its own group. */
 function AuthorPost({
   post,
   place,

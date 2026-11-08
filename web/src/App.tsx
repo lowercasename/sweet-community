@@ -15,10 +15,11 @@ import { Welcome } from './pages/Welcome'
 import { RESET } from './routes'
 
 /**
- * Root: who is this, and are they here on a link from their mail, an
- * invite, or the setup link? Every page is a URL (architecture.md, Layout);
- * the join, verify, reset and setup pages are the ones a stranger may see.
- * The owner of a community with no name yet is kept on the welcome page.
+ * The root component. It checks who the user is, and whether they opened a
+ * link from an email, an invite link or the setup link. Every page has a URL
+ * (architecture.md, Layout). The join, verify, reset and setup pages are the
+ * pages a signed-out user can see. The owner of a community that has no name
+ * yet is kept on the welcome page.
  */
 export function App() {
   const { data: me, isPending } = useMe()
@@ -32,7 +33,7 @@ export function App() {
   const [resetting] = useRoute(RESET)
   const [resettingWith, resetParams] = useRoute(`${RESET}/:token`)
 
-  // The tab is named after the community.
+  // Set the browser tab's title to the community's name.
   useEffect(() => {
     document.title = settings?.name || 'Sweet'
   }, [settings?.name])
@@ -43,7 +44,7 @@ export function App() {
   }
 
   if (isPending) return null
-  // A verification link works signed in too: that is how a changed address takes effect.
+  // A verification link also works when the user is signed in. This is how a changed email address takes effect.
   if (verifying) {
     return (
       <Verify
@@ -78,12 +79,12 @@ export function App() {
   return <SignedIn me={me} onSignOut={() => void signOut()} />
 }
 
-/** Signed in: the owner of an unnamed community goes through onboarding first; everyone else, Home. */
+/** The signed-in app. The owner of an unnamed community goes through onboarding first. Every other user sees Home. */
 function SignedIn({ me, onSignOut }: { me: User; onSignOut: () => void }) {
   const { settings } = useSettings()
   const { groups } = useGroups()
   const owner = groups.find((g) => g.kind === 'root')?.can.manage_instance === true
-  // Onboarding runs to its own end (the invite step) once begun, whatever the name becomes meanwhile.
+  // Once onboarding has started, it runs until its last step (the invite step), even if the name changes meanwhile.
   const [welcoming, setWelcoming] = useState<boolean | null>(null)
   useEffect(() => {
     if (welcoming === null && settings && owner && settings.name === '') setWelcoming(true)

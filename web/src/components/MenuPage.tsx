@@ -14,10 +14,11 @@ interface MenuPageProps {
 }
 
 /**
- * The phone's menu: what the nav column holds, in the same blocks, with
- * the account first and Sign out last. Search and Notifications are tabs, so they
- * are not repeated here. It is the whole screen, flush, under no bar: a menu
- * is not a view to be named (Raphael, 2026-11-06).
+ * The phone menu. It contains the same items as the nav column, in the same
+ * sections, with the account first and Sign out last. Search and
+ * Notifications are tabs, so they are not repeated here. The menu fills the
+ * whole screen with no inset and no bar above it, because a menu is not a
+ * view that needs a title (Raphael, 2026-11-06).
  */
 export function MenuPage({ me, groups, onGo, onLogout }: MenuPageProps) {
   const live = useAuthor(me)

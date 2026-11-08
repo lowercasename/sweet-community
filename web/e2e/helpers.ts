@@ -3,20 +3,20 @@ import { join } from 'node:path'
 import { deflateSync } from 'node:zlib'
 import { expect, test as base, type Browser, type BrowserContext, type Page, type TestInfo } from '@playwright/test'
 
-/** A name nobody else in the run has. */
+/** Returns a name that no other call in the test run returns. */
 let counter = 0
 export const uniq = (prefix: string) => `${prefix}${Date.now().toString(36).slice(-5)}${(counter++).toString(36)}`
 
-/** Someone signed in: their context, page and name. */
+/** A signed-in user: their browser context, page and username. */
 export interface Person {
   context: BrowserContext
   page: Page
   username: string
 }
 
-/** Fix the layout so tests see the same thing every time: both panes, nav expanded. */
+/** Sets a fixed layout so that every test sees the same screen. Both panes are shown and the nav is expanded. */
 export async function prepare(page: Page) {
-  // A script error on the page is the first thing to know about when a flow fails.
+  // Log the page's script errors and console errors. A script error is the first thing to check when a flow fails.
   page.on('pageerror', (e) => console.log(`PAGEERROR ${page.url()}: ${e.message}`))
   page.on('console', (m) => {
     if (m.type() === 'error') console.log(`CONSOLE ${page.url()}: ${m.text()}`)
@@ -28,7 +28,7 @@ export async function prepare(page: Page) {
   })
 }
 
-/** A context made by hand needs the project's baseURL and viewport spelled out. */
+/** The project's baseURL and viewport settings. A browser context created by hand must be given them explicitly. */
 function options(info: TestInfo) {
   const use = info.project.use
   return {
@@ -39,7 +39,7 @@ function options(info: TestInfo) {
   }
 }
 
-/** The owner, signed in from the cookie the global setup saved. */
+/** The owner, signed in with the cookie that the global setup saved. */
 export async function owner(browser: Browser, info: TestInfo): Promise<Person> {
   const context = await browser.newContext({
     ...options(info),
@@ -50,18 +50,21 @@ export async function owner(browser: Browser, info: TestInfo): Promise<Person> {
   return { context, page, username: 'raphael' }
 }
 
-/** Where the test server puts the email it sends (serve.sh: one file per message). Playwright runs from `web/`. */
+/**
+ * The directory where the test server writes each email it sends, one file per message (serve.sh).
+ * Playwright runs from `web/`.
+ */
 const MAIL_DIR = join(process.cwd(), '..', 'data', 'e2e-mail')
-/** The fresh instance's (serve-fresh.sh). */
+/** The mail directory of the fresh instance (serve-fresh.sh). */
 export const FRESH_MAIL_DIR = join(process.cwd(), '..', 'data', 'e2e-fresh-mail')
 
-/** The email address a test person signs up with. */
+/** The email address a test user signs up with. */
 export const emailOf = (username: string) => `${username}@example.test`
 
 /**
- * The path (`/verify/<token>` or `/reset/<token>`) in the newest message
- * sent to an address. The server writes the file before it answers, so the
- * message is there by the time the request that caused it returns.
+ * Returns the path (`/verify/<token>` or `/reset/<token>`) in the newest message
+ * sent to an address. The server writes the file before it responds, so the
+ * file exists by the time the request that caused it returns.
  */
 export function mailLink(to: string, kind: 'verify' | 'reset', dir = MAIL_DIR): string {
   const suffix = `-${to.replace('@', '_at_')}.txt`
@@ -75,7 +78,10 @@ export function mailLink(to: string, kind: 'verify' | 'reset', dir = MAIL_DIR): 
   return m![1]
 }
 
-/** A new member: the owner mints an invite, they register through it, open the link they were sent, and their context is signed in. */
+/**
+ * Creates a new member. The owner creates an invite, the new user registers with it and opens the verification link
+ * they were sent, and their browser context is then signed in.
+ */
 export async function member(browser: Browser, info: TestInfo, prefix = 'kit'): Promise<Person> {
   const o = await owner(browser, info)
   const invite = await o.context.request.post('/api/invites')
@@ -97,25 +103,25 @@ export async function member(browser: Browser, info: TestInfo, prefix = 'kit'): 
   return { context, page, username }
 }
 
-/** Open the app at a path and wait for the signed-in frame. */
+/** Opens the app at a path and waits until the main navigation of the signed-in app is visible. */
 export async function open(page: Page, path = '/') {
   await page.goto(path)
   await expect(page.getByRole('navigation', { name: 'Main' })).toBeVisible()
 }
 
-/** On the phone, the choice between a place's views sits in the bar: Posts or Chat. */
+/** On the phone, the buttons that switch a group between its Posts view and its Chat view are in the bar. */
 export const view = (page: Page, name: 'Posts' | 'Chat' | 'Posts, unread' | 'Chat, unread', exact = true) =>
   page.getByRole('group', { name: 'View' }).getByRole('button', { name, exact })
 
-/** The same choice, whether or not it carries an unread dot: for going there, not for checking the dot. */
+/** The same view button, matched whether or not it shows an unread dot. Use it to switch views, not to check dots. */
 export const anyView = (page: Page, name: 'Posts' | 'Chat') =>
   page.getByRole('group', { name: 'View' }).getByRole('button', { name: new RegExp(`^${name}`) })
 
-/** The posts editor's surface and the chat editor's surface. */
+/** The editable area of the post editor and of the chat editor. */
 export const postEditor = (page: Page) => page.locator('.editor-post .ProseMirror').first()
 export const chatEditor = (page: Page) => page.locator('.editor-line .ProseMirror').first()
 
-/** Write a post in the visible feed and wait for it to appear. */
+/** Writes a post in the visible feed and waits for it to appear. */
 export async function writePost(page: Page, text: string) {
   await postEditor(page).click()
   await page.keyboard.type(text)
@@ -123,7 +129,7 @@ export async function writePost(page: Page, text: string) {
   await expect(page.getByRole('article').filter({ hasText: text }).first()).toBeVisible()
 }
 
-/** Send a chat message and wait for it to appear. */
+/** Sends a chat message and waits for it to appear. */
 export async function sendMessage(page: Page, text: string) {
   await chatEditor(page).click()
   await page.keyboard.type(text)
@@ -133,13 +139,13 @@ export async function sendMessage(page: Page, text: string) {
 
 export const article = (page: Page, text: string) => page.getByRole('article').filter({ hasText: text }).first()
 
-/** Open the three-dot menu on an article and pick an item. */
+/** Opens the three-dot menu on an article and selects an item. */
 export async function pick(page: Page, scope: ReturnType<Page['locator']>, menu: string, item: string) {
   await scope.getByRole('button', { name: menu }).click()
   await page.getByRole('menuitem', { name: item }).click()
 }
 
-/** Confirm the open dialog by its action word. */
+/** Confirms the open dialog by clicking the button whose label is `action`. */
 export async function confirm(page: Page, action: string) {
   const dialog = page.getByRole('dialog')
   await expect(dialog).toBeVisible()
@@ -147,7 +153,7 @@ export async function confirm(page: Page, action: string) {
   await expect(dialog).toBeHidden()
 }
 
-/** A small valid PNG: w×h, solid colour. */
+/** Returns a small valid PNG of w×h pixels in one solid colour. */
 export function png(w: number, h: number, rgb: [number, number, number] = [206, 23, 23]): Buffer {
   const crcTable = new Int32Array(256)
   for (let n = 0; n < 256; n++) {

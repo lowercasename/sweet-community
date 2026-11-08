@@ -4,9 +4,10 @@ import { cleanup, fireEvent, screen } from '@testing-library/react'
 import { renderWithQuery } from '../test-utils'
 
 /**
- * What reaches me when I am away (architecture.md, Notifications): the
- * weekly digest, on until I turn it off, and this device, when the browser
- * can do it.
+ * The settings for notifications sent while the user is away (architecture.md,
+ * Notifications). These are the weekly digest, which is on until the user
+ * turns it off, and push notifications to this device, when the browser
+ * supports them.
  */
 vi.mock('../api', () => ({
   getMySettings: vi.fn(() => Promise.resolve({ digest: 'weekly' })),
@@ -20,7 +21,7 @@ afterEach(cleanup)
 beforeEach(() => vi.clearAllMocks())
 
 describe('NotificationsCard', () => {
-  it('shows the digest on, turns it off and on, and says the action under the pointer', async () => {
+  it('shows the digest as on, turns it off and on, and shows the action on hover', async () => {
     const { setMySettings } = await import('../api')
     const { NotificationsCard } = await import('./NotificationsCard')
     renderWithQuery(<NotificationsCard />)
@@ -36,7 +37,7 @@ describe('NotificationsCard', () => {
     expect(setMySettings).toHaveBeenCalledWith({ digest: 'weekly' })
   })
 
-  it('says when this browser cannot show notifications, instead of offering a button that would fail', async () => {
+  it('shows a message when this browser cannot show notifications, instead of a button that would fail', async () => {
     const { NotificationsCard } = await import('./NotificationsCard')
     renderWithQuery(<NotificationsCard />)
     await screen.findByText('This browser cannot show notifications.')

@@ -6,21 +6,21 @@ interface Segment<K extends string> {
   key: K
   icon: IconName
   label: string
-  /** Something unread behind this view: a dot, and "unread" in its name. */
+  /** Whether this view has unread content. Shows a dot and adds "unread" to the accessible name. */
   dot?: boolean
 }
 
 interface SegmentedProps<K extends string> {
-  /** What the choice is, for assistive tech ("View"). */
+  /** The group's accessible name, for example "View". */
   label: string
   segments: Segment<K>[]
   value: K
-  /** Icons only (a phone's bar): the label is the name, not shown. */
+  /** Icons only, for the phone bar. The label becomes the accessible name and is not shown. */
   compact?: boolean
   onChange: (key: K) => void
 }
 
-/** A choice between views of one thing (Posts, Chat), drawn as pressed buttons in a row. */
+/** A choice between views of one thing, such as Posts and Chat, rendered as a row of toggle buttons. */
 export function Segmented<K extends string>({ label, segments, value, compact = false, onChange }: SegmentedProps<K>) {
   return (
     <div role="group" aria-label={label} className="flex flex-none gap-1">

@@ -84,10 +84,10 @@ type ImageVisibleToParams struct {
 	ViewerID string
 }
 
-// Can this viewer see this image (architecture.md, Images)? Yes if they
-// uploaded it, if it is anyone's profile picture, if it is the picture of a
-// group they belong to, or if it sits in a live post, comment or message of
-// a group they belong to. instr() on the id is
+// Reports whether a viewer can see an image (architecture.md, Images). The
+// viewer can see it if they uploaded it, if it is any user's profile picture,
+// if it is the picture of a group they are in, or if it appears in a live
+// post, comment or message in a group they are in. instr() on the id is
 // enough because bodies reference images as /img/<id> and data-image-id="<id>".
 func (q *Queries) ImageVisibleTo(ctx context.Context, arg ImageVisibleToParams) (sql.NullBool, error) {
 	row := q.db.QueryRowContext(ctx, imageVisibleTo, arg.ImageID, arg.ViewerID)
@@ -115,8 +115,9 @@ type ListUnreferencedImagesRow struct {
 	ContentType string
 }
 
-// Images nothing points at: not a profile picture, not a live group's
-// picture, not in a live post, comment (of a live post) or message of a live group.
+// Lists images that nothing references. Such an image is not a profile
+// picture or a live group's picture. It does not appear in a live post,
+// comment or message in a live group. A comment counts only if its post is live.
 func (q *Queries) ListUnreferencedImages(ctx context.Context, before int64) ([]ListUnreferencedImagesRow, error) {
 	rows, err := q.db.QueryContext(ctx, listUnreferencedImages, before)
 	if err != nil {
