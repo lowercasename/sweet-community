@@ -148,7 +148,9 @@ export function Home({ me, onSignOut }: HomeProps) {
           : atProfile
             ? { title: decodeURIComponent(profileParams.name) }
             : location === RULES
-              ? { title: 'Rules', back: { label: 'Back to Home', onClick: () => navigate('/') } }
+              ? narrow
+                ? { title: 'Rules', back: { label: 'Back to menu', onClick: () => navigate('/menu') } }
+                : { title: 'Rules', back: { label: 'Back to Home', onClick: () => navigate('/') } }
               : location === '/settings'
                 ? {
                     title: 'Settings',
@@ -203,10 +205,10 @@ export function Home({ me, onSignOut }: HomeProps) {
                 onChange={setLayout}
               />
             )}
-            {/* The community's rules, when it has some (architecture.md, Admin tools). */}
-            {atRoot && rules && (
+            {/* The community's rules, when it has some (architecture.md, Admin tools). On the phone they are in the menu. */}
+            {atRoot && rules && !narrow && (
               <Button variant="ghost" icon="rules" label="Rules" onClick={() => navigate(RULES)}>
-                {narrow ? undefined : 'Rules'}
+                Rules
               </Button>
             )}
             {viewing && current && current.kind === 'group' && (

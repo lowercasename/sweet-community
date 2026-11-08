@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, screen, within } from '@testing-library/react'
-import { ROOT, dm, group, nameOf, renderWithQuery, user } from '../test-utils'
+import { ROOT, dm, group, nameOf, paragraph, renderWithQuery, user } from '../test-utils'
 
 /**
  * The phone menu contains the same items as the nav column, in the same
@@ -17,14 +17,32 @@ vi.mock('../api', () => ({
   ),
   getSettings: vi.fn(() => Promise.resolve({ group_creation: 'anyone', name: '', description: '', owner_set: true })),
   getVersion: vi.fn(() => Promise.resolve({ release: 'v1.2.3', build: 'abcdef123456' })),
+  getRules: vi.fn(() => Promise.resolve({ body_html: '' })),
 }))
 
 const raphael = user('raphael')
 const kit = user('kit')
 
 afterEach(cleanup)
+beforeEach(async () => {
+  const { getRules } = await import('../api')
+  vi.mocked(getRules).mockResolvedValue({ body_html: '' })
+})
 
 describe('MenuPage', () => {
+  it('ends with Rules, before Sign out, when the community has rules (architecture.md, Admin tools)', async () => {
+    const { getRules } = await import('../api')
+    vi.mocked(getRules).mockResolvedValue({ body_html: paragraph('Be kind.') })
+    const { MenuPage } = await import('./MenuPage')
+    const onGo = vi.fn()
+    renderWithQuery(<MenuPage me={raphael} groups={[group(ROOT, 'member')]} onGo={onGo} onLogout={() => {}} />)
+    const rules = await screen.findByRole('button', { name: 'Rules' })
+    const names = screen.getAllByRole('button').map(nameOf)
+    expect(names.slice(-2)).toEqual(['Rules', 'Sign out'])
+    fireEvent.click(rules)
+    expect(onGo).toHaveBeenCalledWith('/rules')
+  })
+
   it('names the release at the bottom (architecture.md, Updates)', async () => {
     const { MenuPage } = await import('./MenuPage')
     renderWithQuery(<MenuPage me={raphael} groups={[group(ROOT, 'owner')]} onGo={() => {}} onLogout={() => {}} />)

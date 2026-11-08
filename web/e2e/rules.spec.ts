@@ -42,4 +42,24 @@ test.describe('rules', () => {
     await kit.context.close()
     await o.context.close()
   })
+
+  test('@phone the rules are at the end of the menu, not in the bar', async ({ browser }, testInfo) => {
+    const o = await owner(browser, testInfo)
+    const rule = uniq('Be patient ')
+    expect((await o.context.request.put('/api/rules', { data: { body_html: `<p>${rule}</p>` } })).ok()).toBeTruthy()
+    try {
+      const kit = await member(browser, testInfo, 'kit')
+      await open(kit.page)
+      await expect(kit.page.getByRole('button', { name: 'Rules' })).toHaveCount(0)
+      await open(kit.page, '/menu')
+      await kit.page.getByRole('button', { name: 'Rules' }).tap()
+      await expect(kit.page.getByText(rule)).toBeVisible()
+      await kit.page.getByRole('button', { name: 'Back to menu' }).tap()
+      await expect(kit.page).toHaveURL(/\/menu$/)
+      await kit.context.close()
+    } finally {
+      await o.context.request.put('/api/rules', { data: { body_html: '' } })
+      await o.context.close()
+    }
+  })
 })

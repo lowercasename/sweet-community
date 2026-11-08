@@ -1,8 +1,8 @@
 import type { Group, User } from '../api'
 import { roomsOf } from '../data/groups'
-import { useAuthor, useRelease, useUnreadPlaces } from '../data/hooks'
+import { useAuthor, useRelease, useRules, useUnreadPlaces } from '../data/hooks'
 import { anyUnread } from '../data/notifications'
-import { NEW_ROOM, groupPath, profilePath, COMMUNITY } from '../routes'
+import { NEW_ROOM, RULES, groupPath, profilePath, COMMUNITY } from '../routes'
 import { Avatar, Card, Hairline, NavItem, NavNote, NavSection, Pane, Stack, Tile } from '../ui'
 import { ConversationsSection } from './ConversationsSection'
 
@@ -22,6 +22,7 @@ interface MenuPageProps {
  */
 export function MenuPage({ me, groups, onGo, onLogout }: MenuPageProps) {
   const release = useRelease()
+  const rules = useRules()
   const live = useAuthor(me)
   const places = useUnreadPlaces()
   const root = groups.find((g) => g.kind === 'root')
@@ -70,6 +71,8 @@ export function MenuPage({ me, groups, onGo, onLogout }: MenuPageProps) {
           {(root?.can.manage_instance || root?.can.manage_topics) && (
             <NavItem icon="settings" label="Community" expanded onClick={() => onGo(COMMUNITY)} />
           )}
+          {/* On the phone the rules are here, at the end of the menu, not in Home's bar (Raphael, 2026-11-08). */}
+          {rules && <NavItem icon="rules" label="Rules" expanded onClick={() => onGo(RULES)} />}
           <Hairline />
           <NavItem icon="logout" label="Sign out" expanded onClick={onLogout} />
           {release && <NavNote>{`Sweet ${release}`}</NavNote>}
