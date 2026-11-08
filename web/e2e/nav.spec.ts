@@ -11,6 +11,24 @@ async function messageFromPeople(p: Person, who: string) {
 }
 
 test.describe('nav', () => {
+  test('nav labels are dark text at regular weight, and a section title is the lighter grey', async ({
+    browser,
+  }, testInfo) => {
+    const kit = await member(browser, testInfo, 'kit')
+    await open(kit.page)
+    const people = nav(kit).getByRole('button', { name: 'People' }).getByText('People')
+    await expect(people).toHaveCSS('color', 'rgb(26, 23, 23)')
+    await expect(people).toHaveCSS('font-weight', '400')
+    // The current item is red, on its label as well as its icon.
+    await expect(nav(kit).getByRole('button', { name: 'Home' }).getByText('Home')).toHaveCSS(
+      'color',
+      'rgb(206, 23, 23)',
+    )
+    const title = nav(kit).getByRole('group', { name: 'Rooms' }).getByText('Rooms', { exact: true })
+    await expect(title).toHaveCSS('color', 'rgb(105, 105, 105)')
+    await kit.context.close()
+  })
+
   test('rooms and conversations have separate nav sections, conversations are ordered by latest message, and the Messages page lists all', async ({
     browser,
   }, testInfo) => {
