@@ -37,6 +37,30 @@ async function draw(watching: boolean) {
   await screen.findByText('m2')
 }
 
+describe('ChatPane lines', () => {
+  it('shows joined and added lines on their own, between runs of messages (architecture.md, Chat)', async () => {
+    const { getMessages } = await import('../api')
+    const kit = user('kit')
+    vi.mocked(getMessages).mockResolvedValue({
+      messages: [
+        message('m4', mo, { created_at: 40 }),
+        message('a3', kit, { created_at: 30, kind: 'added', subject: mo, body_html: '', body_text: '' }),
+        message('j2', mo, { created_at: 20, kind: 'joined', body_html: '', body_text: '' }),
+        message('m1', mo, { created_at: 10 }),
+      ],
+      next_before: null,
+    })
+    const { ChatPane } = await import('./ChatPane')
+    renderWithQuery(<ChatPane groupId={ROOT} watching={false} />)
+    await screen.findByText('mo joined the community')
+    expect(screen.getByText('kit added mo to the room')).toBeTruthy()
+    // The line separates mo's two messages, so each starts its own run under mo's name.
+    expect(screen.getAllByRole('button', { name: 'mo' })).toHaveLength(2)
+    // Only the two messages can be replied to. The lines have no Reply.
+    expect(screen.getAllByRole('button', { name: 'Reply to this message' })).toHaveLength(2)
+  })
+})
+
 describe('ChatPane read marker', () => {
   it('moves the read marker to the newest message while watched', async () => {
     const { setMarker } = await import('../api')

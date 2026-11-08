@@ -10,6 +10,33 @@ import (
 	"database/sql"
 )
 
+const createChatLine = `-- name: CreateChatLine :exec
+INSERT INTO messages (id, group_id, author_id, body_html, body_text, created_at, kind, subject_id)
+VALUES (?1, ?2, ?3, '', '', ?4, ?5, ?6)
+`
+
+type CreateChatLineParams struct {
+	ID        string
+	GroupID   string
+	AuthorID  string
+	CreatedAt int64
+	Kind      string
+	SubjectID sql.NullString
+}
+
+// A joined or added line in a chat (architecture.md, Chat). It has no body.
+func (q *Queries) CreateChatLine(ctx context.Context, arg CreateChatLineParams) error {
+	_, err := q.db.ExecContext(ctx, createChatLine,
+		arg.ID,
+		arg.GroupID,
+		arg.AuthorID,
+		arg.CreatedAt,
+		arg.Kind,
+		arg.SubjectID,
+	)
+	return err
+}
+
 const createMessage = `-- name: CreateMessage :exec
 INSERT INTO messages (id, group_id, author_id, body_html, body_text, created_at, reply_to)
 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)
@@ -72,10 +99,12 @@ const getMessage = `-- name: GetMessage :one
 SELECT m.id, m.group_id, m.body_html, m.body_text, m.created_at,
        u.id AS author_id, u.username AS author_username, u.picture_id AS author_picture_id,
        m.reply_to, r.body_text AS reply_text, r.deleted_at AS reply_deleted_at,
-       ru.id AS reply_author_id, ru.username AS reply_author_username, ru.picture_id AS reply_author_picture_id
+       ru.id AS reply_author_id, ru.username AS reply_author_username, ru.picture_id AS reply_author_picture_id,
+       m.kind, su.id AS subject_id, su.username AS subject_username, su.picture_id AS subject_picture_id
 FROM messages m JOIN users u ON u.id = m.author_id
 LEFT JOIN messages r ON r.id = m.reply_to
 LEFT JOIN users ru ON ru.id = r.author_id
+LEFT JOIN users su ON su.id = m.subject_id
 WHERE m.id = ?1 AND m.deleted_at IS NULL
 `
 
@@ -94,6 +123,10 @@ type GetMessageRow struct {
 	ReplyAuthorID        sql.NullString
 	ReplyAuthorUsername  sql.NullString
 	ReplyAuthorPictureID sql.NullString
+	Kind                 string
+	SubjectID            sql.NullString
+	SubjectUsername      sql.NullString
+	SubjectPictureID     sql.NullString
 }
 
 func (q *Queries) GetMessage(ctx context.Context, id string) (GetMessageRow, error) {
@@ -114,24 +147,29 @@ func (q *Queries) GetMessage(ctx context.Context, id string) (GetMessageRow, err
 		&i.ReplyAuthorID,
 		&i.ReplyAuthorUsername,
 		&i.ReplyAuthorPictureID,
+		&i.Kind,
+		&i.SubjectID,
+		&i.SubjectUsername,
+		&i.SubjectPictureID,
 	)
 	return i, err
 }
 
 const getMessageOwners = `-- name: GetMessageOwners :one
-SELECT m.author_id, m.group_id FROM messages m JOIN groups g ON g.id = m.group_id
+SELECT m.author_id, m.group_id, m.kind FROM messages m JOIN groups g ON g.id = m.group_id
 WHERE m.id = ?1 AND m.deleted_at IS NULL AND g.deleted_at IS NULL
 `
 
 type GetMessageOwnersRow struct {
 	AuthorID string
 	GroupID  string
+	Kind     string
 }
 
 func (q *Queries) GetMessageOwners(ctx context.Context, id string) (GetMessageOwnersRow, error) {
 	row := q.db.QueryRowContext(ctx, getMessageOwners, id)
 	var i GetMessageOwnersRow
-	err := row.Scan(&i.AuthorID, &i.GroupID)
+	err := row.Scan(&i.AuthorID, &i.GroupID, &i.Kind)
 	return i, err
 }
 
@@ -173,10 +211,12 @@ const listMessages = `-- name: ListMessages :many
 SELECT m.id, m.group_id, m.body_html, m.body_text, m.created_at,
        u.id AS author_id, u.username AS author_username, u.picture_id AS author_picture_id,
        m.reply_to, r.body_text AS reply_text, r.deleted_at AS reply_deleted_at,
-       ru.id AS reply_author_id, ru.username AS reply_author_username, ru.picture_id AS reply_author_picture_id
+       ru.id AS reply_author_id, ru.username AS reply_author_username, ru.picture_id AS reply_author_picture_id,
+       m.kind, su.id AS subject_id, su.username AS subject_username, su.picture_id AS subject_picture_id
 FROM messages m JOIN users u ON u.id = m.author_id
 LEFT JOIN messages r ON r.id = m.reply_to
 LEFT JOIN users ru ON ru.id = r.author_id
+LEFT JOIN users su ON su.id = m.subject_id
 WHERE m.group_id = ?1 AND m.deleted_at IS NULL AND m.created_at < ?2
 ORDER BY m.created_at DESC, m.id DESC
 LIMIT ?3
@@ -203,6 +243,10 @@ type ListMessagesRow struct {
 	ReplyAuthorID        sql.NullString
 	ReplyAuthorUsername  sql.NullString
 	ReplyAuthorPictureID sql.NullString
+	Kind                 string
+	SubjectID            sql.NullString
+	SubjectUsername      sql.NullString
+	SubjectPictureID     sql.NullString
 }
 
 // Chat messages belong to a group's chat. The handler checks membership.
@@ -232,6 +276,10 @@ func (q *Queries) ListMessages(ctx context.Context, arg ListMessagesParams) ([]L
 			&i.ReplyAuthorID,
 			&i.ReplyAuthorUsername,
 			&i.ReplyAuthorPictureID,
+			&i.Kind,
+			&i.SubjectID,
+			&i.SubjectUsername,
+			&i.SubjectPictureID,
 		); err != nil {
 			return nil, err
 		}

@@ -78,7 +78,8 @@ test.describe('a fresh instance', () => {
       .getByRole('navigation', { name: 'Main' })
       .getByRole('button', { name: /^Notifications/ })
       .click()
-    for (const name of names) await expect(page.getByText(`${name} joined the community`)).toBeVisible()
+    for (const name of names)
+      await expect(page.getByRole('button', { name: new RegExp(`^${name} joined the community`) })).toBeVisible()
     await page.getByRole('navigation', { name: 'Main' }).getByRole('button', { name: 'People' }).click()
     await expect(page.getByText('2 joined with this link')).toBeVisible()
 

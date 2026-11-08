@@ -7,6 +7,7 @@ import { useStreamStatus } from '../hooks/StreamContext'
 import { Alert, Bar, Button, Card, Pane, ReplyStrip, Row, ScrollArea, Stack } from '../ui'
 import { chatExtensions } from '../editor/extensions'
 import { BodyEditor } from './BodyEditor'
+import { ChatLine } from './ChatLine'
 import { ConnectionStatus } from './ConnectionStatus'
 import { MessageGroup } from './MessageGroup'
 
@@ -32,7 +33,15 @@ function group(list: MessageData[]): MessageData[][] {
   for (const m of list) {
     const last = groups[groups.length - 1]
     const prev = last?.[last.length - 1]
-    if (prev && prev.author.id === m.author.id && m.created_at - prev.created_at < GROUP_WINDOW_MS) last.push(m)
+    // A joined or added line stands alone, so the messages on either side of it start separate runs.
+    if (
+      prev &&
+      m.kind === 'message' &&
+      prev.kind === 'message' &&
+      prev.author.id === m.author.id &&
+      m.created_at - prev.created_at < GROUP_WINDOW_MS
+    )
+      last.push(m)
     else groups.push([m])
   }
   return groups
@@ -160,16 +169,20 @@ export function ChatPane({ groupId, side = 'full', watching, focusMessage = null
             )}
             {error && <Alert tone="error">{error.message}</Alert>}
             {!loading && messages.length === 0 && <Alert>Nobody has said anything yet. Say hello.</Alert>}
-            {group(messages).map((run) => (
-              <MessageGroup
-                key={run[0].id}
-                messages={run}
-                onDelete={remove}
-                onReply={setReplying}
-                onJump={quoted}
-                highlight={highlight}
-              />
-            ))}
+            {group(messages).map((run) =>
+              run[0].kind === 'message' ? (
+                <MessageGroup
+                  key={run[0].id}
+                  messages={run}
+                  onDelete={remove}
+                  onReply={setReplying}
+                  onJump={quoted}
+                  highlight={highlight}
+                />
+              ) : (
+                <ChatLine key={run[0].id} line={run[0]} />
+              ),
+            )}
           </Stack>
         </ScrollArea>
         <Bar as="footer" edge="footer">

@@ -6,10 +6,12 @@
 SELECT m.id, m.group_id, m.body_html, m.body_text, m.created_at,
        u.id AS author_id, u.username AS author_username, u.picture_id AS author_picture_id,
        m.reply_to, r.body_text AS reply_text, r.deleted_at AS reply_deleted_at,
-       ru.id AS reply_author_id, ru.username AS reply_author_username, ru.picture_id AS reply_author_picture_id
+       ru.id AS reply_author_id, ru.username AS reply_author_username, ru.picture_id AS reply_author_picture_id,
+       m.kind, su.id AS subject_id, su.username AS subject_username, su.picture_id AS subject_picture_id
 FROM messages m JOIN users u ON u.id = m.author_id
 LEFT JOIN messages r ON r.id = m.reply_to
 LEFT JOIN users ru ON ru.id = r.author_id
+LEFT JOIN users su ON su.id = m.subject_id
 WHERE m.group_id = sqlc.arg(group_id) AND m.deleted_at IS NULL AND m.created_at < sqlc.arg(before)
 ORDER BY m.created_at DESC, m.id DESC
 LIMIT sqlc.arg(page_size);
@@ -18,10 +20,12 @@ LIMIT sqlc.arg(page_size);
 SELECT m.id, m.group_id, m.body_html, m.body_text, m.created_at,
        u.id AS author_id, u.username AS author_username, u.picture_id AS author_picture_id,
        m.reply_to, r.body_text AS reply_text, r.deleted_at AS reply_deleted_at,
-       ru.id AS reply_author_id, ru.username AS reply_author_username, ru.picture_id AS reply_author_picture_id
+       ru.id AS reply_author_id, ru.username AS reply_author_username, ru.picture_id AS reply_author_picture_id,
+       m.kind, su.id AS subject_id, su.username AS subject_username, su.picture_id AS subject_picture_id
 FROM messages m JOIN users u ON u.id = m.author_id
 LEFT JOIN messages r ON r.id = m.reply_to
 LEFT JOIN users ru ON ru.id = r.author_id
+LEFT JOIN users su ON su.id = m.subject_id
 WHERE m.id = sqlc.arg(id) AND m.deleted_at IS NULL;
 
 -- name: CreateMessage :exec
@@ -29,7 +33,7 @@ INSERT INTO messages (id, group_id, author_id, body_html, body_text, created_at,
 VALUES (sqlc.arg(id), sqlc.arg(group_id), sqlc.arg(author_id), sqlc.arg(body_html), sqlc.arg(body_text), sqlc.arg(created_at), sqlc.narg(reply_to));
 
 -- name: GetMessageOwners :one
-SELECT m.author_id, m.group_id FROM messages m JOIN groups g ON g.id = m.group_id
+SELECT m.author_id, m.group_id, m.kind FROM messages m JOIN groups g ON g.id = m.group_id
 WHERE m.id = sqlc.arg(id) AND m.deleted_at IS NULL AND g.deleted_at IS NULL;
 
 -- name: DeleteMessage :exec
@@ -48,3 +52,8 @@ SELECT id, group_id FROM messages WHERE author_id = sqlc.arg(author_id) AND dele
 -- Deletes every message of a removed user and clears its text.
 UPDATE messages SET deleted_at = COALESCE(deleted_at, sqlc.arg(deleted_at)), body_html = '', body_text = ''
 WHERE author_id = sqlc.arg(author_id);
+
+-- name: CreateChatLine :exec
+-- A joined or added line in a chat (architecture.md, Chat). It has no body.
+INSERT INTO messages (id, group_id, author_id, body_html, body_text, created_at, kind, subject_id)
+VALUES (sqlc.arg(id), sqlc.arg(group_id), sqlc.arg(author_id), '', '', sqlc.arg(created_at), sqlc.arg(kind), sqlc.narg(subject_id));

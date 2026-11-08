@@ -84,7 +84,10 @@ func forViewer(a perm.Actor, v any, st Settings) any {
 		return &c
 	case *Message:
 		m := *x
-		m.Can = Can{Delete: perm.DeleteMessage(a, perm.Message{AuthorID: m.Author.ID})}
+		// A joined or added line cannot be edited or deleted by anyone.
+		if m.Kind == MessageKind {
+			m.Can = Can{Delete: perm.DeleteMessage(a, perm.Message{AuthorID: m.Author.ID})}
+		}
 		return &m
 	}
 	return v

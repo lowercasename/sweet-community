@@ -25,7 +25,11 @@ type Message struct {
 	CreatedAt int64  `json:"created_at"`
 	// ReplyTo is the message this one replies to, or nil (architecture.md, Chat).
 	ReplyTo *ReplyTo `json:"reply_to"`
-	Can     Can      `json:"can"`
+	// Kind is "message", or "joined" or "added" for a line in the chat. A line has no body. Its author joined, or
+	// added Subject.
+	Kind    string `json:"kind"`
+	Subject *User  `json:"subject"`
+	Can     Can    `json:"can"`
 }
 
 // ReplyTo is a snippet of the message a reply answers, built from the
@@ -92,7 +96,7 @@ func (s *Server) createMessage(w http.ResponseWriter, r *http.Request) {
 		reply := sql.NullString{}
 		if replyTo != nil {
 			owners, err := qtx.GetMessageOwners(r.Context(), *replyTo)
-			if errors.Is(err, sql.ErrNoRows) || (err == nil && owners.GroupID != g.ID) {
+			if errors.Is(err, sql.ErrNoRows) || (err == nil && (owners.GroupID != g.ID || owners.Kind != MessageKind)) {
 				return nil, nil, http.StatusBadRequest, errors.New("You can only reply to a message in this chat")
 			}
 			if err != nil {
@@ -155,7 +159,7 @@ func (s *Server) deleteMessage(w http.ResponseWriter, r *http.Request) {
 		if !perm.CanSee(a) {
 			return nil, nil, http.StatusNotFound, errors.New("No such message")
 		}
-		if !perm.DeleteMessage(a, perm.Message{AuthorID: owners.AuthorID}) {
+		if owners.Kind != MessageKind || !perm.DeleteMessage(a, perm.Message{AuthorID: owners.AuthorID}) {
 			return nil, nil, http.StatusForbidden, errors.New("Not your message")
 		}
 		if err := qtx.DeleteMessage(r.Context(), store.DeleteMessageParams{DeletedAt: sql.NullInt64{Int64: now, Valid: true}, ID: id}); err != nil {
@@ -187,4 +191,33 @@ func replyEvents(ctx context.Context, qtx *store.Queries, messageID string) ([]e
 		out = append(out, events.Entry{Kind: "message", Payload: &m})
 	}
 	return out, nil
+}
+
+// The kinds of message (architecture.md, Chat). A joined or added line is a message with no body, so it is in
+// order with the messages around it.
+const (
+	MessageKind = "message"
+	JoinedKind  = "joined"
+	AddedKind   = "added"
+)
+
+// chatLine writes a joined or added line in a group's chat and returns its event. subject is the person added, or ""
+// for a joined line.
+func chatLine(ctx context.Context, qtx *store.Queries, groupID, kind, author, subject string, now int64) (events.Entry, error) {
+	id, err := uuid.NewV7()
+	if err != nil {
+		return events.Entry{}, err
+	}
+	if err := qtx.CreateChatLine(ctx, store.CreateChatLineParams{
+		ID: id.String(), GroupID: groupID, AuthorID: author, CreatedAt: now, Kind: kind,
+		SubjectID: sql.NullString{String: subject, Valid: subject != ""},
+	}); err != nil {
+		return events.Entry{}, err
+	}
+	row, err := qtx.GetMessage(ctx, id.String())
+	if err != nil {
+		return events.Entry{}, err
+	}
+	m := wireMessage(row)
+	return events.Entry{Kind: "message", Payload: &m}, nil
 }

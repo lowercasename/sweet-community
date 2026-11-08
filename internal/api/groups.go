@@ -584,6 +584,12 @@ func (s *Server) addMember(w http.ResponseWriter, r *http.Request) {
 		}
 		m := wireMembership(g.ID, row)
 		entries := []events.Entry{{Kind: "membership", Payload: m}}
+		// The room's chat says who added whom (architecture.md, Chat).
+		line, err := chatLine(r.Context(), qtx, g.ID, AddedKind, a.ID, in.UserID, now)
+		if err != nil {
+			return nil, nil, http.StatusInternalServerError, err
+		}
+		entries = append(entries, line)
 		// The added user is notified (architecture.md, Notifications). The membership event alone does not produce a notification.
 		if told, err := notify(r, qtx, NotifyAdded, in.UserID, a.ID, g.ID, nil, now); err != nil {
 			return nil, nil, http.StatusInternalServerError, err

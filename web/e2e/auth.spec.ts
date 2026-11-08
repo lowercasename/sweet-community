@@ -63,7 +63,7 @@ test.describe('signing in and joining', () => {
     await p2.goto(path)
     await expect(p2.getByText('raphael invited you to Sweet e2e.')).toBeVisible()
     await open(o.page, '/notifications')
-    await expect(o.page.getByText(`${name} joined the community`)).toBeVisible()
+    await expect(o.page.getByRole('button', { name: new RegExp(`^${name} joined the community`) })).toBeVisible()
     // Revoke the invite by its code, because the People page lists every open invite link, including the
     // ones the helpers created. A revoked invite link works for nobody.
     const revoked = await o.context.request.delete(`/api/invites/${path.split('/').pop()}`)

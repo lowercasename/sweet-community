@@ -839,8 +839,10 @@ func TestDeleteMessage(t *testing.T) {
 		t.Fatalf("delete reply: %v", gone)
 	}
 	mo.mustStatus(404, "DELETE", "/api/messages/"+id, nil)
-	if n := len(kit.mustStatus(200, "GET", rootPath+"/messages", nil)["messages"].([]any)); n != 0 {
-		t.Fatalf("deleted message still listed: %d", n)
+	for _, x := range kit.mustStatus(200, "GET", rootPath+"/messages", nil)["messages"].([]any) {
+		if x.(map[string]any)["id"] == id {
+			t.Fatal("deleted message still listed")
+		}
 	}
 	theirs := kit.mustStatus(201, "POST", rootPath+"/messages", map[string]string{"body_html": "<p>mine</p>"})
 	owner.mustStatus(200, "DELETE", "/api/messages/"+theirs["id"].(string), nil)

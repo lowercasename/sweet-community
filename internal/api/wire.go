@@ -68,6 +68,11 @@ func wireMessage(row store.GetMessageRow) Message {
 		BodyHTML:  row.BodyHtml,
 		BodyText:  row.BodyText,
 		CreatedAt: row.CreatedAt,
+		Kind:      row.Kind,
+	}
+	if row.SubjectID.Valid {
+		u := wireUser(row.SubjectID.String, row.SubjectUsername.String, row.SubjectPictureID)
+		m.Subject = &u
 	}
 	if row.ReplyTo.Valid {
 		rt := &ReplyTo{ID: row.ReplyTo.String}

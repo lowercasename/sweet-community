@@ -190,6 +190,17 @@ func (s *Server) register(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusInternalServerError, err.Error())
 		return
 	}
+	// The community's chat says that they joined (architecture.md, Chat).
+	line, err := chatLine(ctx, qtx, perm.Root, JoinedKind, u.ID, "", now)
+	if err != nil {
+		writeErr(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	lineEv, err := events.Log(ctx, tx, line.Kind, line.Payload, now)
+	if err != nil {
+		writeErr(w, http.StatusInternalServerError, err.Error())
+		return
+	}
 	// The owner and every moderator are notified of each new member (Raphael, 2026-11-06, moderators added
 	// 2026-11-08).
 	staff, err := qtx.ListMembers(ctx, perm.Root)
@@ -221,6 +232,7 @@ func (s *Server) register(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s.Hub.Broadcast(ev)
+	s.Hub.Broadcast(lineEv)
 	for _, t := range told {
 		s.Hub.Broadcast(t)
 	}

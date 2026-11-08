@@ -249,20 +249,22 @@ function deleteComment(qc: QueryClient, id: string, postId: string, groupId: str
 
 function upsertMessage(qc: QueryClient, m: Message) {
   // A message by another user that the viewer has not read counts as unread on the group (architecture.md, Notifications).
+  // A joined or added line does not, and it does not move the group's newest message time (architecture.md, Chat).
   const me = qc.getQueryData<User | null>(keys.me)
-  if (!me || me.id !== m.author.id) bumpMarker(qc, `chat:${m.group_id}`, m.created_at)
-  // The group's newest message time orders the Messages page. A replay never moves it backwards.
-  qc.setQueryData<Groups>(keys.groups, (old) =>
-    old
-      ? {
-          groups: old.groups.map((g) =>
-            g.id === m.group_id && (g.last_message_at ?? -Infinity) < m.created_at
-              ? { ...g, last_message_at: m.created_at }
-              : g,
-          ),
-        }
-      : old,
-  )
+  if (m.kind === 'message' && (!me || me.id !== m.author.id)) bumpMarker(qc, `chat:${m.group_id}`, m.created_at)
+  // The group's newest message time orders the Conversations page. A replay never moves it backwards.
+  if (m.kind === 'message')
+    qc.setQueryData<Groups>(keys.groups, (old) =>
+      old
+        ? {
+            groups: old.groups.map((g) =>
+              g.id === m.group_id && (g.last_message_at ?? -Infinity) < m.created_at
+                ? { ...g, last_message_at: m.created_at }
+                : g,
+            ),
+          }
+        : old,
+    )
   qc.setQueryData<Messages>(keys.messages(m.group_id), (old) => {
     if (!old) return old
     const known = old.pages.some((p) => p.messages.some((x) => x.id === m.id))

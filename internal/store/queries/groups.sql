@@ -4,7 +4,7 @@
 
 -- name: GetGroup :one
 SELECT g.id, g.kind, g.name, g.mode, g.created_at, g.picture_id,
-       (SELECT MAX(created_at) FROM messages WHERE group_id = g.id AND deleted_at IS NULL) AS last_message_at
+       (SELECT MAX(created_at) FROM messages WHERE group_id = g.id AND deleted_at IS NULL AND kind = 'message') AS last_message_at
 FROM groups g WHERE g.id = sqlc.arg(id) AND g.deleted_at IS NULL;
 
 -- name: GetMembership :one
@@ -16,7 +16,7 @@ SELECT role, joined_at FROM memberships WHERE group_id = sqlc.arg(group_id) AND 
 -- Every group the user has a row in, including conversations they have
 -- hidden. It returns hidden_at so the client can tell them apart.
 SELECT g.id, g.kind, g.name, g.mode, g.created_at, g.picture_id, m.role, m.hidden_at,
-       (SELECT MAX(created_at) FROM messages WHERE group_id = g.id AND deleted_at IS NULL) AS last_message_at
+       (SELECT MAX(created_at) FROM messages WHERE group_id = g.id AND deleted_at IS NULL AND kind = 'message') AS last_message_at
 FROM memberships m JOIN groups g ON g.id = m.group_id
 WHERE m.user_id = sqlc.arg(user_id) AND g.deleted_at IS NULL
 ORDER BY g.kind = 'root' DESC, g.created_at;
@@ -46,7 +46,7 @@ VALUES (sqlc.arg(id), sqlc.arg(kind), sqlc.arg(name), sqlc.arg(mode), sqlc.arg(c
 -- The conversation with exactly these users, found by its people_key. It
 -- returns the same columns as GetGroup.
 SELECT g.id, g.kind, g.name, g.mode, g.created_at, g.picture_id,
-       (SELECT MAX(created_at) FROM messages WHERE group_id = g.id AND deleted_at IS NULL) AS last_message_at
+       (SELECT MAX(created_at) FROM messages WHERE group_id = g.id AND deleted_at IS NULL AND kind = 'message') AS last_message_at
 FROM groups g WHERE g.kind = 'dm' AND g.people_key = sqlc.arg(people_key) AND g.deleted_at IS NULL;
 
 -- name: UpdateGroup :exec

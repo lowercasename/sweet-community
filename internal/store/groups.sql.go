@@ -101,7 +101,7 @@ func (q *Queries) DeleteMembership(ctx context.Context, arg DeleteMembershipPara
 
 const getDMByPeople = `-- name: GetDMByPeople :one
 SELECT g.id, g.kind, g.name, g.mode, g.created_at, g.picture_id,
-       (SELECT MAX(created_at) FROM messages WHERE group_id = g.id AND deleted_at IS NULL) AS last_message_at
+       (SELECT MAX(created_at) FROM messages WHERE group_id = g.id AND deleted_at IS NULL AND kind = 'message') AS last_message_at
 FROM groups g WHERE g.kind = 'dm' AND g.people_key = ?1 AND g.deleted_at IS NULL
 `
 
@@ -135,7 +135,7 @@ func (q *Queries) GetDMByPeople(ctx context.Context, peopleKey sql.NullString) (
 const getGroup = `-- name: GetGroup :one
 
 SELECT g.id, g.kind, g.name, g.mode, g.created_at, g.picture_id,
-       (SELECT MAX(created_at) FROM messages WHERE group_id = g.id AND deleted_at IS NULL) AS last_message_at
+       (SELECT MAX(created_at) FROM messages WHERE group_id = g.id AND deleted_at IS NULL AND kind = 'message') AS last_message_at
 FROM groups g WHERE g.id = ?1 AND g.deleted_at IS NULL
 `
 
@@ -329,7 +329,7 @@ func (q *Queries) ListMyGroupIDs(ctx context.Context, userID string) ([]string, 
 
 const listMyGroups = `-- name: ListMyGroups :many
 SELECT g.id, g.kind, g.name, g.mode, g.created_at, g.picture_id, m.role, m.hidden_at,
-       (SELECT MAX(created_at) FROM messages WHERE group_id = g.id AND deleted_at IS NULL) AS last_message_at
+       (SELECT MAX(created_at) FROM messages WHERE group_id = g.id AND deleted_at IS NULL AND kind = 'message') AS last_message_at
 FROM memberships m JOIN groups g ON g.id = m.group_id
 WHERE m.user_id = ?1 AND g.deleted_at IS NULL
 ORDER BY g.kind = 'root' DESC, g.created_at

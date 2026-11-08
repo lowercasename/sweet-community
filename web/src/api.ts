@@ -184,6 +184,9 @@ export interface Message {
   created_at: number
   /** The message this one replies to, or null (architecture.md, Chat). */
   reply_to: ReplyTo | null
+  /** A message, or a joined or added line in the chat. A line has no body. Its author joined, or added the subject. */
+  kind: 'message' | 'joined' | 'added'
+  subject: User | null
   can: Can
 }
 

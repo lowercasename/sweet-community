@@ -159,6 +159,8 @@ export const message = (id: string, author: User, extra: Partial<Message> = {}):
   created_at: Number.parseInt(id.replace(/\D/g, ''), 10) || 1,
   can: nobody,
   reply_to: null,
+  kind: 'message',
+  subject: null,
   ...extra,
 })
 

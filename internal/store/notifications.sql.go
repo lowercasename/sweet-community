@@ -83,7 +83,7 @@ func (q *Queries) DeleteReadNotifications(ctx context.Context, arg DeleteReadNot
 const getChatMarker = `-- name: GetChatMarker :one
 
 SELECT m.user_id, CAST('chat:' || m.group_id AS TEXT) AS stream, CAST(COALESCE(r.read_at, m.joined_at) AS INTEGER) AS read_at,
-       (SELECT COUNT(*) FROM messages x WHERE x.group_id = m.group_id AND x.deleted_at IS NULL AND x.author_id != m.user_id
+       (SELECT COUNT(*) FROM messages x WHERE x.group_id = m.group_id AND x.deleted_at IS NULL AND x.kind = 'message' AND x.author_id != m.user_id
           AND x.created_at > COALESCE(r.read_at, m.joined_at)) AS unread
 FROM memberships m LEFT JOIN read_markers r ON r.user_id = m.user_id AND r.stream = 'chat:' || m.group_id
 WHERE m.user_id = ?1 AND m.group_id = ?2 AND m.hidden_at IS NULL
@@ -229,7 +229,7 @@ FROM users u
 WHERE u.id = ?1
 UNION ALL
 SELECT m.user_id, CAST('chat:' || m.group_id AS TEXT) AS stream, CAST(COALESCE(r.read_at, m.joined_at) AS INTEGER) AS read_at,
-       (SELECT COUNT(*) FROM messages x WHERE x.group_id = m.group_id AND x.deleted_at IS NULL AND x.author_id != m.user_id
+       (SELECT COUNT(*) FROM messages x WHERE x.group_id = m.group_id AND x.deleted_at IS NULL AND x.kind = 'message' AND x.author_id != m.user_id
           AND x.created_at > COALESCE(r.read_at, m.joined_at)) AS unread
 FROM memberships m JOIN groups g ON g.id = m.group_id AND g.deleted_at IS NULL
 LEFT JOIN read_markers r ON r.user_id = m.user_id AND r.stream = 'chat:' || m.group_id
