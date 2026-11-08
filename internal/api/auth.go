@@ -151,6 +151,33 @@ func Protect(next http.Handler) http.Handler {
 	})
 }
 
+// contentSecurityPolicy allows scripts, images, fonts, connections, the
+// manifest and the service worker from the server's own origin only. Styles
+// may also be inline, because the editor (TipTap) adds its own style element.
+// No page may frame Sweet, and plugins and base URLs are refused.
+const contentSecurityPolicy = "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; " +
+	"img-src 'self' data:; font-src 'self' data:; connect-src 'self'; manifest-src 'self'; worker-src 'self'; " +
+	"object-src 'none'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'"
+
+// SecurityHeaders sets the security headers on every response (architecture.md, Accounts). HSTS is sent only over
+// HTTPS.
+func SecurityHeaders(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		h := w.Header()
+		h.Set("Content-Security-Policy", contentSecurityPolicy)
+		h.Set("X-Content-Type-Options", "nosniff")
+		h.Set("X-Frame-Options", "DENY")
+		// Links in posts lead to other sites. They are told nothing about the page the link was on.
+		h.Set("Referrer-Policy", "same-origin")
+		h.Set("Permissions-Policy", "camera=(), microphone=(), geolocation=(), payment=()")
+		h.Set("Cross-Origin-Opener-Policy", "same-origin")
+		if isHTTPS(r) {
+			h.Set("Strict-Transport-Security", "max-age=31536000")
+		}
+		next.ServeHTTP(w, r)
+	})
+}
+
 // issueSession creates a session for the user and sets the cookie. The token
 // is also returned for clients that send it as a bearer token.
 func (s *Server) issueSession(w http.ResponseWriter, r *http.Request, userID string) (string, error) {

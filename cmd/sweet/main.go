@@ -153,7 +153,7 @@ func main() {
 
 	httpSrv := &http.Server{
 		Addr:              *addr,
-		Handler:           api.Protect(mux),
+		Handler:           api.SecurityHeaders(api.Protect(mux)),
 		ReadHeaderTimeout: 10 * time.Second,
 		// There is no WriteTimeout, because SSE connections are long-lived by design.
 	}

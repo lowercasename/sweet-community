@@ -14,12 +14,17 @@ export interface Person {
   username: string
 }
 
+/** The content security policy violations that prepared pages reported during the current test. */
+const violations: string[] = []
+
 /** Sets a fixed layout so that every test sees the same screen. Both panes are shown and the nav is expanded. */
 export async function prepare(page: Page) {
   // Log the page's script errors and console errors. A script error is the first thing to check when a flow fails.
   page.on('pageerror', (e) => console.log(`PAGEERROR ${page.url()}: ${e.message}`))
   page.on('console', (m) => {
-    if (m.type() === 'error') console.log(`CONSOLE ${page.url()}: ${m.text()}`)
+    if (m.type() !== 'error') return
+    console.log(`CONSOLE ${page.url()}: ${m.text()}`)
+    if (m.text().includes('Content Security Policy')) violations.push(`${page.url()}: ${m.text()}`)
   })
   await page.addInitScript(() => {
     localStorage.setItem('sweet.layout', 'both')
@@ -202,5 +207,18 @@ export function png(w: number, h: number, rgb: [number, number, number] = [206, 
   ])
 }
 
-export const test = base
+/**
+ * The test function. After every test it checks that no prepared page reported a content security policy violation
+ * (architecture.md, Accounts), so a policy that blocks something a flow needs fails that flow.
+ */
+export const test = base.extend<{ policyGuard: void }>({
+  policyGuard: [
+    async ({}, use) => {
+      violations.length = 0
+      await use()
+      expect(violations, 'content security policy violations').toEqual([])
+    },
+    { auto: true },
+  ],
+})
 export { expect }

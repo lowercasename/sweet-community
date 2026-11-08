@@ -12,8 +12,12 @@ import '@fontsource/ubuntu/700-italic.css'
 import './global.css'
 import { App } from './App'
 import { makeQueryClient } from './data/client'
+import { listenForInstall } from './install'
 
 const queryClient = makeQueryClient()
+
+// The browser's offer to install Sweet arrives soon after load, so it is caught before anything renders.
+listenForInstall()
 
 // The service worker is only for web push (architecture.md, Notifications). It caches nothing.
 if ('serviceWorker' in navigator) {

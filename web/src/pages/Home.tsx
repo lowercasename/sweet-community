@@ -8,6 +8,7 @@ import {
   usePost,
   useTopics,
   useUnreadNotifications,
+  useSettings,
   useUnreadPlaces,
 } from '../data/hooks'
 import { anyUnread } from '../data/notifications'
@@ -26,6 +27,7 @@ import {
 } from '../routes'
 import { CommunityPage } from '../components/CommunityPage'
 import { GroupView, groupLabel } from '../components/GroupView'
+import { InstallPrompt } from '../components/InstallPrompt'
 import { MembersPage } from '../components/MembersPage'
 import { MenuPage } from '../components/MenuPage'
 import { MessagesPage } from '../components/MessagesPage'
@@ -86,6 +88,7 @@ export function Home({ me, onSignOut }: HomeProps) {
   // The chat message to scroll to, from a notification (architecture.md, Notifications).
   const focusMessage = search.get('message')
   const { topics, loading: topicsLoading } = useTopics()
+  const { settings } = useSettings()
   // A post's page sits over the room the post is in, once the post is known.
   const { post: openPost } = usePost(postParams?.id ?? '', atPost)
 
@@ -211,6 +214,8 @@ export function Home({ me, onSignOut }: HomeProps) {
             )}
           </PageBar>
         )}
+        {/* The offer to add the community to the home screen shows on Home only, so it never covers another page. */}
+        {atRoot && <InstallPrompt name={settings?.name || 'Sweet'} />}
         <Switch>
           <Route path="/people">
             {root && <PeoplePage me={me} root={root} onOpenGroup={(id) => navigate(groupPath(id, root.id))} />}

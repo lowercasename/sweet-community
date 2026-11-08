@@ -1,4 +1,5 @@
 import { getPushKey, subscribePush, unsubscribePush } from './api'
+import { isInstalled, isIOS } from './install'
 
 /**
  * Web push on this device (architecture.md, Notifications). The browser
@@ -16,9 +17,7 @@ export function pushSupported(): boolean {
 
 /** Safari on iOS allows push only for an app added to the home screen. */
 function needsInstall(): boolean {
-  const ios = /iPhone|iPad|iPod/.test(navigator.userAgent)
-  const standalone = window.matchMedia('(display-mode: standalone)').matches
-  return ios && !standalone
+  return isIOS() && !isInstalled()
 }
 
 async function registration(): Promise<ServiceWorkerRegistration> {
