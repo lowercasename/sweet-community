@@ -249,6 +249,7 @@ export function MembersPage({ group, me, onLeft }: MembersPageProps) {
                 <ActionRows>
                   {group.can.leave && (
                     <ActionRow
+                      title="Leave room"
                       action={
                         <Button
                           variant="danger"
@@ -265,6 +266,7 @@ export function MembersPage({ group, me, onLeft }: MembersPageProps) {
                   )}
                   {group.can.delete && (
                     <ActionRow
+                      title="Delete room"
                       action={
                         <Button
                           variant="danger"
