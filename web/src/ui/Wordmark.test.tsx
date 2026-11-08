@@ -6,19 +6,19 @@ import { Wordmark } from './Wordmark'
 afterEach(cleanup)
 
 describe('Wordmark', () => {
-  it('says Sweet until there is a name, and the mark alone carries the words when collapsed', () => {
+  it('defaults to Sweet, and when collapsed the mark alone has the label as its name', () => {
     render(<Wordmark expanded={false} />)
     expect(screen.getByRole('img', { name: 'Sweet' })).toBeTruthy()
     expect(screen.queryByText('Sweet')).toBeNull()
   })
 
-  it('shows the words beside the mark, and the mark says nothing twice', () => {
+  it('shows the label next to the mark, and the mark is hidden from assistive technology', () => {
     render(<Wordmark label="Knitting Circle" />)
     expect(screen.getByText('Knitting Circle')).toBeTruthy()
     expect(screen.queryByRole('img')).toBeNull()
   })
 
-  it('is one mark at two sizes: the letter two fifths of the circle in both', () => {
+  it('uses the same letter-to-circle ratio at both sizes', () => {
     const { container: md } = render(<Wordmark label="x" />)
     const { container: sm } = render(<Wordmark label="x" size="sm" />)
     const mark = (c: HTMLElement) => c.querySelector('span')!.className

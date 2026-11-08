@@ -1,17 +1,17 @@
 import type { ReactNode } from 'react'
 
 interface CenteredProps {
-  /** Above the column's card, on the card's own text line. */
+  /** Rendered above the children, inset by the card's padding so it aligns with the card's text. */
   head?: ReactNode
-  /** Below it, on the same line. */
+  /** Rendered below the children, with the same inset. */
   foot?: ReactNode
   children?: ReactNode
 }
 
 /**
- * A narrow column centred on the paper, for sign-in and join. The head and
- * the foot are inset by the card's padding, so the three left edges of text
- * are one edge.
+ * A narrow column centred on the page, for sign-in and join. The head and foot
+ * are inset by 16px, the card's padding, so the heading, the card's text and
+ * the foot share one left edge.
  */
 export function Centered({ head, foot, children }: CenteredProps) {
   return (

@@ -13,6 +13,7 @@ vi.mock('../api', () => ({
   createComment: vi.fn(),
   updateComment: vi.fn(),
   deleteComment: vi.fn(() => Promise.resolve()),
+  listMembers: vi.fn(() => Promise.resolve({ members: [] })),
   listUsers: vi.fn(() => Promise.resolve({ users: [] })),
   getMe: vi.fn(() => Promise.resolve({ id: 'kit', username: 'kit', picture: null })),
 }))

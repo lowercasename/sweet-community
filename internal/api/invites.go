@@ -94,6 +94,10 @@ func (s *Server) getInvite(w http.ResponseWriter, r *http.Request) {
 
 // register (public) turns a valid invite into an account and signs it in.
 func (s *Server) register(w http.ResponseWriter, r *http.Request) {
+	if !s.registerLimiter.open(s.clientAddr(r)) {
+		writeErr(w, http.StatusTooManyRequests, "Too many attempts. Wait a moment and try again.")
+		return
+	}
 	var in struct {
 		Code  string `json:"code"`
 		Email string `json:"email"`
@@ -142,8 +146,29 @@ func (s *Server) register(w http.ResponseWriter, r *http.Request) {
 	// registrations: BEGIN IMMEDIATE serialises them and the second sees
 	// used_at set, rolls back, and the user it inserted goes with it.
 	qtx := store.New(tx)
+	// Check the invite before anything else. A bad code returns 404 before any username or email is
+	// looked up, so the endpoint reveals nothing about existing accounts. The transaction rolls back
+	// on every error path below, which releases the invite again.
+	n, err := qtx.UseInvite(ctx, store.UseInviteParams{Code: in.Code, Now: now})
+	if err != nil {
+		writeErr(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	if n == 0 {
+		s.registerLimiter.spend(s.clientAddr(r))
+		writeErr(w, http.StatusNotFound, "This invite link has expired or been revoked")
+		return
+	}
 	if _, err := qtx.GetUserByEmail(ctx, in.Email); err == nil {
-		writeErr(w, http.StatusConflict, "That email address already has an account")
+		// The address already has an account. Respond exactly as for a new registration (202 with
+		// the address), so an invite holder cannot test whether an address is registered. Email the
+		// existing account about the attempt. The rollback leaves the invite unused.
+		tx.Rollback()
+		if err := s.tellAddressTaken(ctx, in.Email); err != nil {
+			writeErr(w, http.StatusInternalServerError, err.Error())
+			return
+		}
+		writeJSON(w, http.StatusAccepted, map[string]any{"email": in.Email})
 		return
 	}
 	if err := qtx.CreateUserWithEmail(ctx, store.CreateUserWithEmailParams{
@@ -154,15 +179,6 @@ func (s *Server) register(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		writeErr(w, http.StatusInternalServerError, err.Error())
-		return
-	}
-	n, err := qtx.UseInvite(ctx, store.UseInviteParams{Code: in.Code, Now: now})
-	if err != nil {
-		writeErr(w, http.StatusInternalServerError, err.Error())
-		return
-	}
-	if n == 0 {
-		writeErr(w, http.StatusNotFound, "This invite link has expired or been revoked")
 		return
 	}
 	// A new account is a membership of the root group, and that is an event:

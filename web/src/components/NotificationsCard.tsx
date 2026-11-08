@@ -53,9 +53,9 @@ export function NotificationsCard() {
         {error && <Alert tone="error">{error.message}</Alert>}
         {problem && <Alert tone="error">{problem}</Alert>}
         <Stack gap={1}>
-          <Text variant="secondary">
-            An email when you have been away for a week, with what you missed: new posts and their topics, who joined,
-            and replies to your posts.
+          <Heading level={3}>Weekly Digest</Heading>
+          <Text variant="small">
+            An email sent when you haven't visited for a week with a summary of what you missed.
           </Text>
           <Row>
             {settings && (
@@ -67,14 +67,15 @@ export function NotificationsCard() {
                 onClick={() => void toggleDigest()}
                 onHoverChange={setOverDigest}
               >
-                {digestOn ? (overDigest ? 'Turn off' : 'Weekly digest on') : 'Send me a weekly digest'}
+                {digestOn ? (overDigest ? 'Turn weekly digest off' : 'Weekly digest on') : 'Send me a weekly digest'}
               </Button>
             )}
           </Row>
         </Stack>
         <Stack gap={1}>
-          <Text variant="secondary">
-            A notification on this device when someone mentions you or replies to your post.
+          <Heading level={3}>Push notifications</Heading>
+          <Text variant="small">
+            Receive notifications on this device when someone mentions you or replies to your post.
           </Text>
           {device === 'unsupported' && <Text variant="small">This browser cannot show notifications.</Text>}
           {device === 'install-first' && (
@@ -95,7 +96,11 @@ export function NotificationsCard() {
                 onClick={() => void toggleDevice()}
                 onHoverChange={setOverDevice}
               >
-                {device === 'on' ? (overDevice ? 'Stop' : 'Notifying this device') : 'Notify this device'}
+                {device === 'on'
+                  ? overDevice
+                    ? 'Stop notifying this device'
+                    : 'Notifying this device'
+                  : 'Notify this device'}
               </Button>
             </Row>
           )}

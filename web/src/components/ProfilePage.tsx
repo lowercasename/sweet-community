@@ -3,6 +3,7 @@ import type { Post as PostData, Profile, User } from '../api'
 import { useGroupActions, useGroups, usePostActions, useProfile, useSetBio, useUserPosts } from '../data/hooks'
 import { useStreamStatus } from '../hooks/StreamContext'
 import { commentExtensions } from '../editor/extensions'
+import { ROOT_ID } from '../data/keys'
 import { groupPath } from '../routes'
 import { Alert, Avatar, Button, Card, Heading, Measure, Pane, Row, ScrollArea, Stack, Text, Time } from '../ui'
 import { Body } from './Body'
@@ -96,6 +97,7 @@ function Loaded({ profile, me, onGo }: { profile: Profile; me: User; onGo: (path
                 </Row>
                 {editing ? (
                   <BodyEditor
+                    groupId={ROOT_ID}
                     extensions={commentExtensions}
                     size="line"
                     placeholder="A few words about yourself…"

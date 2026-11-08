@@ -5,6 +5,7 @@ import { dm, member, renderWithQuery, user } from '../test-utils'
 
 /** New message takes one person and opens the conversation with them: the one that exists, or a new one. */
 vi.mock('../api', () => ({
+  listMembers: vi.fn(() => Promise.resolve({ members: [] })),
   listUsers: vi.fn(),
   openDM: vi.fn(),
 }))

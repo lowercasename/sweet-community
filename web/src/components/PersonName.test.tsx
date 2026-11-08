@@ -10,6 +10,7 @@ import { dm, member, renderWithQuery, user } from '../test-utils'
  * as the users cache has them now; my own card has no Message.
  */
 vi.mock('../api', () => ({
+  listMembers: vi.fn(() => Promise.resolve({ members: [] })),
   listUsers: vi.fn(),
   openDM: vi.fn(),
 }))

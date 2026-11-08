@@ -17,12 +17,13 @@ interface CommentThreadProps {
 
 interface CommentItemProps {
   comment: CommentData
+  groupId: string
   disabled: boolean
   onEdit: (bodyHtml: string) => Promise<void>
   onDelete: () => Promise<void>
 }
 
-function CommentItem({ comment, disabled, onEdit, onDelete }: CommentItemProps) {
+function CommentItem({ comment, groupId, disabled, onEdit, onDelete }: CommentItemProps) {
   const author = useAuthor(comment.author)
   const [editing, setEditing] = useState(false)
   const [confirming, setConfirming] = useState(false)
@@ -70,6 +71,7 @@ function CommentItem({ comment, disabled, onEdit, onDelete }: CommentItemProps) 
         </Row>
         {editing ? (
           <BodyEditor
+            groupId={groupId}
             extensions={commentExtensions}
             size="line"
             submitLabel="Save"
@@ -119,6 +121,7 @@ export function CommentThread({ postId, groupId, replyTo, disabled }: CommentThr
                 <Stack gap={2}>
                   {i > 0 && <Hairline />}
                   <CommentItem
+                    groupId={groupId}
                     comment={c}
                     disabled={disabled}
                     onEdit={(html) => edit(c.id, html)}
@@ -130,6 +133,7 @@ export function CommentThread({ postId, groupId, replyTo, disabled }: CommentThr
           </Stack>
         )}
         <BodyEditor
+          groupId={groupId}
           extensions={commentExtensions}
           size="line"
           placeholder={`Reply to ${replyTo}…`}

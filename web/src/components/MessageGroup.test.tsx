@@ -6,6 +6,7 @@ import { message, nobody, renderWithQuery, user } from '../test-utils'
 /** A chat message offers Delete exactly when its can flag says so, and asks first. */
 vi.mock('../api', () => ({
   getMe: vi.fn(() => Promise.resolve({ id: 'kit', username: 'kit', picture: null })),
+  listMembers: vi.fn(() => Promise.resolve({ members: [] })),
   listUsers: vi.fn(() => Promise.resolve({ users: [] })),
 }))
 

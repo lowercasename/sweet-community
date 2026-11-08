@@ -44,19 +44,21 @@ function InviteRow({ invite, onRevoke }: { invite: Invite; onRevoke: () => void 
   }
   return (
     <Stack gap={1}>
+      <Input value={url} readOnly selectOnFocus />
       <Row gap={2} align="center">
-        <Input value={url} readOnly selectOnFocus />
         <Button variant="secondary" onClick={() => void copy()}>
           {copied ? 'Copied' : 'Copy'}
         </Button>
         <Button variant="ghost" onClick={onRevoke}>
           Revoke
         </Button>
+        <Row push="end">
+          <Text variant="small">
+            Expires <Time at={invite.expires_at} />
+            {invite.uses > 0 && ` · ${invite.uses} joined through it`}
+          </Text>
+        </Row>
       </Row>
-      <Text variant="small">
-        Expires <Time at={invite.expires_at} />
-        {invite.uses > 0 && ` · ${invite.uses} joined through it`}
-      </Text>
     </Stack>
   )
 }
@@ -139,7 +141,8 @@ export function PeoplePage({ me, root, onOpenGroup }: PeoplePageProps) {
                 <Stack gap={2}>
                   <Heading level={2}>Invite someone</Heading>
                   <Text variant="secondary">
-                    Anyone with an invite link can join for seven days. Create a new one whenever you need to.
+                    Invite links are active for seven days and can be used multiple times. Create a new one whenever you
+                    need to.
                   </Text>
                   <Row>
                     <Button onClick={() => void invite()}>Create invite link</Button>
@@ -153,9 +156,6 @@ export function PeoplePage({ me, root, onOpenGroup }: PeoplePageProps) {
             )}
             <Card>
               <Stack gap={2}>
-                <Text variant="secondary">
-                  Moderators help run the community. They can delete anything posted, invite people and remove them.
-                </Text>
                 {error && <Alert tone="error">{error}</Alert>}
                 <List>
                   {[...(users?.values() ?? [])].map((u) => (

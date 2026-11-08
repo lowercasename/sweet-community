@@ -11,6 +11,7 @@ import { ROOT, dm, group, renderWithQuery, user } from '../test-utils'
 vi.mock('../api', () => ({
   listGroups: vi.fn(),
   openDM: vi.fn(),
+  listMembers: vi.fn(() => Promise.resolve({ members: [] })),
   listUsers: vi.fn(() => Promise.resolve({ users: [] })),
   listMarkers: vi.fn(() => Promise.resolve({ markers: [] })),
 }))

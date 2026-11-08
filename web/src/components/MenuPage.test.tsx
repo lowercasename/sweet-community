@@ -9,6 +9,7 @@ import { ROOT, dm, group, nameOf, renderWithQuery, user } from '../test-utils'
  * they are not here; DMs are behind Messages, as in the column.
  */
 vi.mock('../api', () => ({
+  listMembers: vi.fn(() => Promise.resolve({ members: [] })),
   listUsers: vi.fn(() => Promise.resolve({ users: [] })),
   listMarkers: vi.fn(() =>
     Promise.resolve({ markers: [{ user_id: 'raphael', stream: 'chat:knit', read_at: 0, unread: 2 }] }),

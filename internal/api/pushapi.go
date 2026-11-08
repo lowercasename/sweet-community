@@ -63,9 +63,10 @@ func (s *Server) unsubscribePush(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 }
 
-// pushWords is what a device shows for a notification, or ok false for the
-// kinds that do not push (architecture.md: mentions, replies to your posts,
-// and a message in a conversation, the last under the conversation's tag).
+// pushWords returns the text, path and tag for a push notification, or ok
+// false for kinds that do not push. Kinds that push: mention, comment on your
+// post, and message in a conversation (tagged by conversation so a device
+// shows one notification per conversation).
 func pushWords(n Notification) (body, path, tag string, ok bool) {
 	switch n.Kind {
 	case NotifyComment:
@@ -100,7 +101,7 @@ func (s *Server) pushAfterCommit(payloads []json.RawMessage, community string) {
 	for _, raw := range payloads {
 		var n Notification
 		if json.Unmarshal(raw, &n) != nil || n.ReadAt != nil {
-			// A row going out read (a conversation read to its marker) is not news.
+			// A notification that is already read (marked by a chat marker update) is not pushed.
 			continue
 		}
 		body, path, tag, ok := pushWords(n)

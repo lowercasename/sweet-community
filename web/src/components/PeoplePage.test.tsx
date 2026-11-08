@@ -10,6 +10,7 @@ import { ROOT, group, member, renderWithQuery, user } from '../test-utils'
  */
 vi.mock('../api', () => ({
   getMe: vi.fn(() => Promise.resolve({ id: 'raphael', username: 'raphael', picture: null })),
+  listMembers: vi.fn(() => Promise.resolve({ members: [] })),
   listUsers: vi.fn(),
   listInvites: vi.fn(() => Promise.resolve({ invites: [] })),
   createInvite: vi.fn(),

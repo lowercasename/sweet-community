@@ -120,7 +120,7 @@ func TestDigestGoesToTheAwayWithSomethingToTell(t *testing.T) {
 	}
 	f.person("sam", 2*day, 2*day, true)
 	_ = jo
-	// Two conversations with words kit has not read, and one kit has: two count. A room's chat does not.
+	// Two conversations have messages kit has not read, and one has messages kit has read. Two are counted. Room chat is not counted.
 	talk := f.conversation(mo, kit)
 	f.message(talk, mo, 4*day)
 	f.message(talk, mo, 3*day)

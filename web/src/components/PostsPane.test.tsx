@@ -8,6 +8,7 @@ vi.mock('../api', () => ({
   getPosts: vi.fn(),
   listMarkers: vi.fn(),
   setMarker: vi.fn(),
+  listMembers: vi.fn(() => Promise.resolve({ members: [] })),
   listUsers: vi.fn(() => Promise.resolve({ users: [] })),
   listTopics: vi.fn(() =>
     Promise.resolve({
@@ -98,6 +99,7 @@ describe('PostsPane showing a topic', () => {
     expect(getPosts).toHaveBeenCalledWith(ROOT, null, 20, null)
     expect((await screen.findByRole('button', { name: 'Showing' })).textContent).toContain('Everything')
     expect(screen.queryByRole('button', { name: 'Subscribe' })).toBeNull()
-    expect(screen.getByRole('button', { name: 'Topic' }).textContent).toContain('Set topic')
+    // The composer has no topic control. A post gets the topic the feed is filtered to (Raphael, 2026-11-08).
+    expect(screen.queryByRole('button', { name: 'Topic' })).toBeNull()
   })
 })

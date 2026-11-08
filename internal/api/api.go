@@ -121,6 +121,10 @@ type Server struct {
 	limiter loginLimiter
 	// mailLimiter paces the endpoints that send a link to any address asked for.
 	mailLimiter loginLimiter
+	// registerLimiter limits guessing at invite codes. Like the login limiter, it
+	// is charged only for a failed attempt (a bad code), never for a successful
+	// registration.
+	registerLimiter loginLimiter
 }
 
 func (s *Server) q() *store.Queries { return store.New(s.DB) }

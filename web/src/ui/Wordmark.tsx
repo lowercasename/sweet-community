@@ -1,22 +1,19 @@
 interface WordmarkProps {
-  /** Show the words beside the mark; the mark alone carries them as its name. */
+  /** Show the label text next to the mark. When false, the mark alone has the label as its accessible name. */
   expanded?: boolean
-  /** The words: the community's name, or what the mark is saying. Sweet until there is a name. */
+  /** The label: the community's name, or other text such as "Made with Sweet". Defaults to "Sweet". */
   label?: string
-  /**
-   * md is the community's own: the sidebar's head. sm is the product's
-   * credit under a stranger's page ("Made with Sweet").
-   */
+  /** md: 32px mark and 18px bold label, used in the sidebar head. sm: 20px mark and 14px label, used for the credit under auth pages. */
   size?: 'sm' | 'md'
 }
 
 /**
- * Sweet's S in a red circle with words beside it. The letter fills the
- * circle as it does on the icon (the cap two fifths of the diameter), so the
- * mark is one shape at every size, and the gap is the nav's, so in the
- * sidebar the name sits on the nav labels' line. The mark carries the red;
- * the credit's words are quiet, so a stranger's page has one loud thing,
- * the community's name.
+ * Sweet's S in a red circle, with a label next to it. At both sizes the
+ * letter's cap height is about two fifths of the circle's diameter, matching
+ * the app icon. The gap is 8px, the same as the nav's, so in the sidebar the
+ * label starts at the same x as the nav item labels. The label is red and
+ * bold at md and grey at sm, so the credit under an auth page does not
+ * compete with the page heading.
  */
 const SIZES = {
   md: { box: 'h-8', mark: 'h-8 w-8 text-[19px]', words: 'text-[18px] font-bold text-sweet' },

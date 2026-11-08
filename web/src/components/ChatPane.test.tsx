@@ -13,6 +13,7 @@ vi.mock('../api', () => ({
   getMessages: vi.fn(),
   listMarkers: vi.fn(),
   setMarker: vi.fn(),
+  listMembers: vi.fn(() => Promise.resolve({ members: [] })),
   listUsers: vi.fn(() => Promise.resolve({ users: [] })),
 }))
 

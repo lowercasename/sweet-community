@@ -5,6 +5,7 @@ import { ROOT, group, renderWithQuery, user } from '../test-utils'
 
 /** My own settings: picture, account, sign out, leaving. The community's are on the Community page. */
 vi.mock('../api', () => ({
+  listMembers: vi.fn(() => Promise.resolve({ members: [] })),
   listUsers: vi.fn(() => Promise.resolve({ users: [] })),
   logoutEverywhere: vi.fn(),
   uploadImage: vi.fn(),

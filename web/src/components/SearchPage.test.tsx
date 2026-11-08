@@ -7,6 +7,7 @@ import type { Hit } from '../api'
 /** Search (architecture.md, Search): the words in the URL, the hits drawn with what, where, who and the matches in bold. */
 vi.mock('../api', () => ({
   search: vi.fn(),
+  listMembers: vi.fn(() => Promise.resolve({ members: [] })),
   listUsers: vi.fn(() => Promise.resolve({ users: [] })),
 }))
 

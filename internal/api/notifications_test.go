@@ -424,10 +424,10 @@ func waitPushes(t *testing.T, fake *fakePush, n int) []string {
 	return nil
 }
 
-// A message in a conversation is a notification (architecture.md,
-// Notifications, 2026-11-08): one unopened row per conversation, read by
-// reading the conversation, through either door. A room's chat is unread,
-// never a notification.
+// A message in a conversation creates a notification (architecture.md,
+// Notifications, 2026-11-08): at most one unread row per conversation, marked
+// read either by opening it from the notifications page or by reading the
+// conversation. A message in a room's chat creates no notification.
 func TestMessageNotifications(t *testing.T) {
 	ts, owner := newTestServer(t)
 	kit, kitID := registerMember(t, ts, owner, "kit")
@@ -453,7 +453,7 @@ func TestMessageNotifications(t *testing.T) {
 		return 0
 	}
 
-	// One message: one row for kit, unopened, from mo, about the conversation and no post. Mo has none.
+	// One message: one unread row for kit, from mo, with the conversation's group id and no post. Mo has none.
 	mo.mustStatus(201, "POST", "/api/groups/"+gid+"/messages", map[string]string{"body_html": "<p>one</p>"})
 	ns := list(kit)
 	if len(ns) != 1 || ns[0]["kind"] != "message" || ns[0]["actor"].(map[string]any)["id"] != moID || ns[0]["group_id"] != gid || ns[0]["post_id"] != nil || ns[0]["read_at"] != nil {
@@ -462,19 +462,19 @@ func TestMessageNotifications(t *testing.T) {
 	if len(list(mo)) != 0 {
 		t.Fatalf("mo told of mo's own message: %v", list(mo))
 	}
-	// A second message while the first is unopened writes no second row: the bell says one thing per conversation.
+	// A second message while the first row is unread writes no second row.
 	second := mo.mustStatus(201, "POST", "/api/groups/"+gid+"/messages", map[string]string{"body_html": "<p>two</p>"})
 	if ns = list(kit); len(ns) != 1 || unreadBell(kit) != 1 {
 		t.Fatalf("a second row for the same conversation: %v (bell %v)", ns, unreadBell(kit))
 	}
-	// Reading the conversation reads the row: the marker's PUT answers with the marker, and the row,
-	// read, goes out as a notification event so every device's bell agrees.
+	// Moving the chat marker marks the row read. The PUT answers with the marker, and the updated
+	// row is sent as a notification event so every client updates.
 	readAt := int64(second["created_at"].(float64))
 	kit.mustStatus(200, "PUT", "/api/markers/chat:"+gid, map[string]any{"read_at": readAt})
 	if ns = list(kit); len(ns) != 1 || ns[0]["read_at"] == nil || unreadBell(kit) != 0 {
 		t.Fatalf("after reading the conversation: %v (bell %v)", ns, unreadBell(kit))
 	}
-	// The bell's own count goes with it, after the row, so a device that never loaded the list agrees too.
+	// The notifications stream's unread count is sent after the row, for clients that have not loaded the list.
 	var told, counted bool
 	for _, e := range kit.readEvents(80) {
 		p, _ := e["payload"].(map[string]any)
@@ -501,13 +501,13 @@ func TestMessageNotifications(t *testing.T) {
 	if ms := list(mo); len(ms) != 1 || ms[0]["kind"] != "message" || ms[0]["actor"].(map[string]any)["id"] != kitID {
 		t.Fatalf("mo's notifications after kit's reply: %v", ms)
 	}
-	// Opening the row from the bell reads it too, and the conversation's marker afterwards finds nothing left to read.
+	// Opening the row from the notifications page also marks it read. A later marker update finds nothing to mark.
 	mo.mustStatus(200, "PUT", "/api/notifications/"+list(mo)[0]["id"].(string)+"/read", nil)
 	mo.mustStatus(200, "PUT", "/api/markers/chat:"+gid, map[string]any{"read_at": db.Now()})
 	if ms := list(mo); len(ms) != 1 || ms[0]["read_at"] == nil || unreadBell(mo) != 0 {
 		t.Fatalf("after the bell door: %v", ms)
 	}
-	// A room's chat is unread, never a notification: kit hears of being added, and nothing of the message.
+	// A room's chat creates no notification. Kit is notified of being added to the room, not of the message.
 	room := owner.mustStatus(201, "POST", "/api/groups", map[string]any{"kind": "group", "name": "Knitting", "mode": "both"})
 	rid := room["id"].(string)
 	owner.mustStatus(201, "POST", "/api/groups/"+rid+"/members", map[string]string{"user_id": kitID})
@@ -522,8 +522,8 @@ func TestMessageNotifications(t *testing.T) {
 	}
 }
 
-// A message in a conversation pushes, once per unopened row, under the
-// conversation's own tag so a device shows one notification per person.
+// A message in a conversation sends a push, once per unread notification row,
+// tagged by conversation so a device shows one notification per conversation.
 func TestPushForMessages(t *testing.T) {
 	ts, owner, srv := newTestServerWith(t)
 	fake := &fakePush{gone: map[string]bool{}}
@@ -541,20 +541,20 @@ func TestPushForMessages(t *testing.T) {
 	if want := "https://push.test/kit-phone Thursday Group mo messaged you http://sweet.test/r/" + gid + " chat:" + gid; got[0] != want {
 		t.Fatalf("push:\n got %q\nwant %q", got[0], want)
 	}
-	// A second message while the first is unopened: no second push, since there is no second row.
+	// A second message while the first row is unread sends no second push, because no second row is written.
 	mo.mustStatus(201, "POST", "/api/groups/"+gid+"/messages", map[string]string{"body_html": "<p>still there?</p>"})
 	time.Sleep(150 * time.Millisecond)
 	if len(fake.all()) != 1 {
 		t.Fatalf("pushed again for an unopened conversation: %v", fake.all())
 	}
-	// Once kit has read the conversation, the next message pushes again.
+	// After kit reads the conversation, the next message creates a new row and a new push.
 	kit.mustStatus(200, "PUT", "/api/markers/chat:"+gid, map[string]any{"read_at": db.Now()})
 	time.Sleep(2 * time.Millisecond)
 	mo.mustStatus(201, "POST", "/api/groups/"+gid+"/messages", map[string]string{"body_html": "<p>yes</p>"})
 	if got = waitPushes(t, fake, 2); !strings.HasSuffix(got[1], " chat:"+gid) {
 		t.Fatalf("second push: %q", got[1])
 	}
-	// A room's chat never pushes.
+	// A message in a room's chat sends no push.
 	room := owner.mustStatus(201, "POST", "/api/groups", map[string]any{"kind": "group", "name": "Knitting", "mode": "both"})
 	owner.mustStatus(201, "POST", "/api/groups/"+room["id"].(string)+"/members", map[string]string{"user_id": kitID})
 	owner.mustStatus(201, "POST", "/api/groups/"+room["id"].(string)+"/messages", map[string]string{"body_html": "<p>wool</p>"})

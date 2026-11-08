@@ -148,6 +148,7 @@ export function Post({
           {editing ? (
             // The stored HTML is the editor's input: no separate document format.
             <BodyEditor
+              groupId={post.group_id}
               key={post.edited_at ?? 0}
               extensions={postExtensions}
               size="post"

@@ -87,10 +87,10 @@ test.describe('notifications', () => {
     const gid = ((await dm.json()) as { id: string }).id
     await mo.context.request.post(`/api/groups/${gid}/messages`, { data: { body_html: '<p>hello kit</p>' } })
 
-    // Live: the bell lights, and the conversation carries its own dot under Messages.
+    // Over the event stream: the bell gets its dot, and the conversation gets a dot under Messages.
     await expect(nav.getByRole('button', { name: 'Notifications, unread' })).toBeVisible()
     await expect(nav.getByRole('button', { name: `${mo.username}, unread` })).toBeVisible()
-    // Reading the conversation reads the notification: the dot goes, and the row sits under Earlier.
+    // Opening the conversation marks the notification read: the bell's dot goes, and the row moves to Earlier.
     await nav.getByRole('button', { name: `${mo.username}, unread` }).click()
     await expect(kit.page.getByText('hello kit')).toBeVisible()
     await expect(nav.getByRole('button', { name: 'Notifications', exact: true })).toBeVisible()
@@ -99,7 +99,7 @@ test.describe('notifications', () => {
     await expect(kit.page.getByRole('button', { name: `${mo.username} messaged you` })).toBeVisible()
     await expect(kit.page.getByRole('heading', { name: 'New' })).toHaveCount(0)
 
-    // The other door: a new message is a new row, and opening it from the bell opens the conversation and reads it.
+    // The other path: a new message creates a new row. Opening it from the notifications page opens the conversation and marks it read.
     await mo.context.request.post(`/api/groups/${gid}/messages`, { data: { body_html: '<p>still there?</p>' } })
     const row = kit.page.getByRole('button', { name: `${mo.username} messaged you, new` })
     await expect(row).toBeVisible()

@@ -67,8 +67,8 @@ func TestRegisterNeedsAVerifiedAddress(t *testing.T) {
 
 	// Sign in by address too, in any case.
 	newClient(t, ts).login("KIT@Example.test", "longenough")
-	// An address has one account.
-	newClient(t, ts).mustStatus(409, "POST", "/api/register", map[string]string{"code": invite(t, owner), "username": "mo", "password": "longenough", "email": "Kit@example.test"})
+	// An address belongs to one account. A second registration with it gets the same 202 as a first (see api_test).
+	newClient(t, ts).mustStatus(202, "POST", "/api/register", map[string]string{"code": invite(t, owner), "username": "mo", "password": "longenough", "email": "Kit@example.test"})
 	// The owner made at the command line has no address and is let in (newTestServer signed them in).
 }
 
@@ -113,11 +113,16 @@ func TestChangeUnverifiedEmail(t *testing.T) {
 	if acct := kit.mustStatus(200, "GET", "/api/me/account", nil); acct["email"] != "right@example.test" {
 		t.Fatalf("account: %v", acct)
 	}
-	// Another account's address cannot be claimed this way.
+	// Another account's address cannot be claimed this way. The response is 202, the same as for a free
+	// address. Jo's address is unchanged, and mo is emailed about the attempt.
 	registerMember(t, ts, owner, "mo")
 	jo := newClient(t, ts)
 	jo.mustStatus(202, "POST", "/api/register", map[string]string{"code": invite(t, owner), "username": "jo", "password": "longenough", "email": "jo@example.test"})
-	anon.mustStatus(409, "POST", "/api/verify/change", map[string]string{"username": "jo", "password": "longenough", "email": "MO@example.test"})
+	moHad := mailCount(ts, "mo@example.test")
+	anon.mustStatus(202, "POST", "/api/verify/change", map[string]string{"username": "jo", "password": "longenough", "email": "MO@example.test"})
+	if mailCount(ts, "mo@example.test") != moHad+1 || mailCount(ts, "MO@example.test") != 0 || len(mailed(t, ts, "jo@example.test", "verify")) == 0 {
+		t.Fatalf("taken address on change: mo got %d (had %d)", mailCount(ts, "mo@example.test"), moHad)
+	}
 }
 
 func TestPasswordReset(t *testing.T) {

@@ -5,6 +5,7 @@ import { member, mentionSpan, paragraph, renderWithQuery } from '../test-utils'
 
 /** A body's mentions wear their people's current names and lead to their pages, in the app. */
 vi.mock('../api', () => ({
+  listMembers: vi.fn(() => Promise.resolve({ members: [] })),
   listUsers: vi.fn(() => Promise.resolve({ users: [member('kit')] })),
 }))
 

@@ -11,6 +11,7 @@ import { ROOT, dm, group, marker, nameOf, notification, renderWithQuery, user } 
  * (Search, Notifications), the house (People, and me).
  */
 vi.mock('../api', () => ({
+  listMembers: vi.fn(() => Promise.resolve({ members: [] })),
   listUsers: vi.fn(() => Promise.resolve({ users: [] })),
   listNotifications: vi.fn(() => Promise.resolve({ notifications: [], next_before: null })),
   listMarkers: vi.fn(() => Promise.resolve({ markers: [] })),

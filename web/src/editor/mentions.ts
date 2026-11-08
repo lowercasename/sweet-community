@@ -51,26 +51,31 @@ export function withMentions(extensions: Extensions, people: () => User[]): Exte
           .slice(0, 6),
       render: () => {
         let list: ReactRenderer<SuggestionListHandle, SuggestionProps<User>> | null = null
-        const place = async (props: SuggestionProps<User>) => {
-          const el = list?.element as HTMLElement | undefined
-          const rect = props.clientRect?.()
-          if (!el || !rect) return
-          const { x, y } = await computePosition({ getBoundingClientRect: () => rect }, el, {
-            placement: 'bottom-start',
-            strategy: 'fixed',
-            middleware: [offset(4), flip(), shift({ padding: 8 })],
+        // The suggestion plugin marks the @ with a decoration that the browser lays out
+        // after this callback returns. Measure on the next animation frame. Measuring
+        // immediately gave an empty rect for a lone @ and placed the list at x=0.
+        const place = (props: SuggestionProps<User>) =>
+          requestAnimationFrame(() => {
+            const el = list?.element as HTMLElement | undefined
+            const rect = props.clientRect?.()
+            if (!el || !rect || (rect.width === 0 && rect.height === 0)) return
+            void computePosition({ getBoundingClientRect: () => rect }, el, {
+              placement: 'bottom-start',
+              strategy: 'fixed',
+              middleware: [offset(4), flip(), shift({ padding: 8 })],
+            }).then(({ x, y }) => Object.assign(el.style, { position: 'fixed', left: `${x}px`, top: `${y}px` }))
           })
-          Object.assign(el.style, { position: 'fixed', left: `${x}px`, top: `${y}px` })
-        }
         return {
           onStart: (props) => {
             list = new ReactRenderer(SuggestionList, { props, editor: props.editor })
+            // Keep the list off screen until it is positioned, so it does not flash at the bottom of the page.
+            Object.assign(list.element.style, { position: 'fixed', left: '-9999px', top: '0' })
             document.body.appendChild(list.element)
-            void place(props)
+            place(props)
           },
           onUpdate: (props) => {
             list?.updateProps(props)
-            void place(props)
+            place(props)
           },
           onKeyDown: (props: SuggestionKeyDownProps) => {
             if (props.event.key === 'Escape') {

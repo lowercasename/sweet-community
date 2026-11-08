@@ -1,6 +1,6 @@
--- A message in a conversation is a notification (architecture.md,
--- Notifications, 2026-11-08): a sixth kind, message. SQLite cannot widen a
--- CHECK in place, so the table is rebuilt with its rows and index.
+-- Adds the notification kind 'message' (architecture.md, Notifications,
+-- 2026-11-08). SQLite cannot change a CHECK constraint in place, so the table
+-- is rebuilt with its rows and index.
 CREATE TABLE notifications_new (
     id         TEXT PRIMARY KEY,
     user_id    TEXT NOT NULL REFERENCES users(id),

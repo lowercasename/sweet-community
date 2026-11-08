@@ -23,16 +23,18 @@ test.describe('topics', () => {
     await o.page.getByRole('button', { name: 'Add topic' }).click()
     await expect(o.page.getByRole('listitem').filter({ hasText: name })).toContainText('0 posts')
 
-    // Home: the feed's head reads Everything. The post is filed from the pill beside Post.
+    // Home shows Everything. The composer has no topic control. To post in a topic, select it in the
+    // feed header first, then post.
     await open(o.page)
     await expect(o.page.getByRole('button', { name: 'Showing' })).toContainText('Everything')
+    const composer = o.page.locator('form').filter({ has: postEditor(o.page) })
+    await expect(composer.getByRole('button', { name: 'Topic' })).toHaveCount(0)
+    await o.page.getByRole('button', { name: 'Showing' }).click()
+    await o.page.getByRole('menuitemradio', { name: new RegExp(`^${name}`) }).click()
+    await expect(o.page.getByRole('button', { name: 'Showing' })).toContainText(name)
     const text = uniq('A filed post ')
     await postEditor(o.page).click()
     await o.page.keyboard.type(text)
-    const composer = o.page.locator('form').filter({ has: postEditor(o.page) })
-    await composer.getByRole('button', { name: 'Topic' }).click()
-    await o.page.getByRole('menuitemradio', { name: new RegExp(`^${name}`) }).click()
-    await expect(composer.getByRole('button', { name: 'Topic' })).toContainText(name)
     await o.page.screenshot({ path: `test-results/topics-${testInfo.project.name}-composer.png` })
     await o.page.getByRole('button', { name: 'Post', exact: true }).click()
     const mine = article(o.page, text)

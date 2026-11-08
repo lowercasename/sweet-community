@@ -15,6 +15,7 @@ vi.mock('../api', () => ({
   readNotification: vi.fn(),
   clearNotifications: vi.fn(),
   listTopics: vi.fn(() => Promise.resolve({ topics: [] })),
+  listMembers: vi.fn(() => Promise.resolve({ members: [] })),
   listUsers: vi.fn(() => Promise.resolve({ users: [] })),
 }))
 
@@ -79,7 +80,7 @@ describe('NotificationsPage', () => {
     expect(readNotification).toHaveBeenCalledTimes(1)
   })
 
-  it('a message in a conversation reads "messaged you" and opens the conversation', async () => {
+  it('a message notification reads "messaged you" and opens the conversation', async () => {
     const { listNotifications, readNotification } = await import('../api')
     vi.mocked(listNotifications).mockResolvedValue({
       notifications: [notification('n30', 'message', mo, { group_id: 'talk' })],

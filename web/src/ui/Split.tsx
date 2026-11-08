@@ -109,7 +109,7 @@ export function Split({ ratio, onRatio, onCollapse, show, leftRail, rightRail, h
           aria-valuemax={Math.round(SPLIT_MAX * 100)}
           aria-valuenow={Math.round(ratio * 100)}
           tabIndex={0}
-          className="group flex cursor-col-resize touch-none items-center justify-center select-none focus-visible:outline-none"
+          className="group relative flex cursor-col-resize touch-none items-center justify-center select-none focus-visible:outline-none"
           onPointerDown={onPointerDown}
           onPointerMove={onPointerMove}
           onPointerUp={onPointerUp}
@@ -117,7 +117,11 @@ export function Split({ ratio, onRatio, onCollapse, show, leftRail, rightRail, h
           onDoubleClick={() => onRatio(SPLIT_DEFAULT)}
           onKeyDown={onKeyDown}
         >
-          <span className="h-10 w-1 rounded-full bg-line transition-colors group-hover:bg-pink group-focus-visible:bg-pink group-active:bg-sweet" />
+          <span
+            aria-hidden
+            className="absolute inset-y-2 w-0.5 rounded-full bg-pink opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100 group-active:bg-sweet group-active:opacity-100"
+          />
+          <span className="relative h-10 w-1 rounded-full bg-line transition-[background-color,height] group-hover:h-16 group-hover:bg-sweet group-focus-visible:bg-sweet group-active:bg-sweet" />
         </div>
       )}
       <div className={show === 'left' ? 'hidden' : 'contents'}>{right}</div>

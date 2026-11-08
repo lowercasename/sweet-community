@@ -14,7 +14,7 @@ self.addEventListener('push', (event) => {
   }
   event.waitUntil(
     self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((windows) => {
-      // Already looking at the thing, in a focused window: nothing to show.
+      // Do not show a notification for a page that is open in a focused window.
       const path = new URL(data.url, self.location.origin).pathname
       if (windows.some((w) => w.focused && new URL(w.url).pathname === path)) return
       return self.registration.showNotification(data.title, {

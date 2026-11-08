@@ -2,7 +2,7 @@ import { useRef, useState } from 'react'
 import { useEditor, useEditorState, type Extensions } from '@tiptap/react'
 import { withPlaceholder } from '../editor/extensions'
 import { mentionSuggestionKey, withMentions } from '../editor/mentions'
-import { useUsers } from '../data/hooks'
+import { useMembers } from '../data/hooks'
 import type { Topic } from '../api'
 import { Alert, Button, EditorSurface, Form, ImageCard, Row, Stack } from '../ui'
 import { imageFiles, imagesHtml, insertImages, uploadImages, type AttachedImage } from '../editor/images'
@@ -10,6 +10,8 @@ import { EditorToolbar, promptLink } from './EditorToolbar'
 import { TopicMenu } from './TopicMenu'
 
 interface BodyEditorProps {
+  /** The group this text is written in. The @ suggestion list offers this group's members only (architecture.md, Posts). */
+  groupId: string
   extensions: Extensions
   /** What the empty box says; the extension's default when unset. */
   placeholder?: string
@@ -48,6 +50,7 @@ interface BodyEditorProps {
 
 /** The one editor: posts, chat and comments differ only in schema, size, submit key and where images go. */
 export function BodyEditor({
+  groupId,
   extensions,
   placeholder,
   size,
@@ -72,14 +75,14 @@ export function BodyEditor({
   const cancelRef = useRef<(() => void) | undefined>(onCancel)
   cancelRef.current = onCancel
 
-  // The people an @ can name: the users cache as it is when the list opens.
-  const { data: users } = useUsers()
-  const usersRef = useRef(users)
-  usersRef.current = users
+  // The people the @ list can offer: the group's members, read from the cache when the list opens.
+  const { members } = useMembers(groupId)
+  const peopleRef = useRef(members)
+  peopleRef.current = members
   const editor = useEditor({
-    extensions: withMentions(placeholder ? withPlaceholder(extensions, placeholder) : extensions, () => [
-      ...(usersRef.current?.values() ?? []),
-    ]),
+    extensions: withMentions(placeholder ? withPlaceholder(extensions, placeholder) : extensions, () =>
+      peopleRef.current.map((m) => m.user),
+    ),
     content: initialHtml ?? '',
     autofocus: editing ? 'end' : false,
     editorProps: {

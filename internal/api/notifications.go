@@ -42,9 +42,9 @@ const (
 	NotifyJoined = "joined"
 	// NotifyTopicPost tells a topic's followers of a post in it (architecture.md, Topics).
 	NotifyTopicPost = "topic_post"
-	// NotifyMessage tells the other person of a message in a conversation: one
-	// unopened row per conversation, read by reading the conversation
-	// (architecture.md, Notifications, 2026-11-08). A room's chat is unread only.
+	// NotifyMessage: a message in a conversation (DM). At most one unread row per
+	// conversation. Marked read when the conversation's chat marker moves past it
+	// (architecture.md, Notifications, 2026-11-08). Room chat does not notify.
 	NotifyMessage = "message"
 )
 
@@ -73,9 +73,9 @@ func notify(r *http.Request, qtx *store.Queries, kind, to, actor, groupID string
 	return notifyIn(r, qtx, kind, to, actor, groupID, postID, nil, now)
 }
 
-// notifyMessage is the message notification for each other person in a
-// conversation who has none unopened for it yet. Nothing for a room, and
-// nothing for someone who has hidden the conversation.
+// notifyMessage writes a message notification for each other member of a
+// conversation who does not already have an unread one for it. It writes
+// nothing for a room, and nothing for a member who has hidden the conversation.
 func notifyMessage(r *http.Request, qtx *store.Queries, g Group, author string, now int64) ([]events.Entry, error) {
 	if g.Kind != perm.KindDM {
 		return nil, nil
@@ -105,8 +105,9 @@ func notifyMessage(r *http.Request, qtx *store.Queries, g Group, author string, 
 	return told, nil
 }
 
-// readMessageNotifications reads my message notifications for a conversation
-// up to where I have read its chat, and returns each, read, as an event.
+// readMessageNotifications marks the user's unread message notifications for a
+// conversation as read, up to the chat marker's time, and returns each updated
+// row as a notification event.
 func readMessageNotifications(r *http.Request, qtx *store.Queries, me, groupID string, upTo, now int64) ([]events.Entry, error) {
 	ids, err := qtx.ListUnreadNotificationsInGroupUpTo(r.Context(), store.ListUnreadNotificationsInGroupUpToParams{UserID: me, Kind: NotifyMessage, GroupID: groupID, Before: upTo})
 	if err != nil {
@@ -255,8 +256,8 @@ func (s *Server) setMarker(w http.ResponseWriter, r *http.Request) {
 	if in.ReadAt > now {
 		in.ReadAt = now
 	}
-	// The marker, and for a chat the message notifications it reads (architecture.md,
-	// Notifications: reading the conversation reads them), in one transaction.
+	// One transaction: the marker, and for a chat stream the message notifications
+	// that the new marker position marks as read (architecture.md, Notifications).
 	s.loggedMany(w, r, now, func(qtx *store.Queries) ([]events.Entry, any, int, error) {
 		// The row re-read after the write, as its stream's query lists it.
 		var reread func() (store.ListMarkersRow, error)
@@ -298,7 +299,8 @@ func (s *Server) setMarker(w http.ResponseWriter, r *http.Request) {
 		m := wireMarker(row)
 		entries := append([]events.Entry{{Kind: "marker", Payload: &m}}, read...)
 		if len(read) > 0 {
-			// The bell's count, after the rows it counts, so a device that never loaded the list agrees.
+			// Send the notifications stream's unread count after the updated rows. A client that has
+			// not loaded the notifications list cannot derive the count from the rows alone.
 			bell, err := qtx.GetNotificationsMarker(r.Context(), me.ID)
 			if err != nil {
 				return nil, nil, http.StatusInternalServerError, err

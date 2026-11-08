@@ -2,17 +2,18 @@ import type { ReactNode } from 'react'
 import { Card, Centered, Heading, Stack, Wordmark } from '../ui'
 
 interface AuthFrameProps {
-  /** The community's name, the page's title; Sweet until there is one. */
+  /** The community's name, used as the page heading. Defaults to "Sweet" before the community is named. */
   name?: string
   children?: ReactNode
 }
 
 /**
- * The frame of every page a stranger may see: sign in, join, verify, reset,
- * setup. The community's name over a narrow card (Raphael, 2026-11-06:
- * these pages are about the community), and the product's mark under it,
- * small, saying what the place is made with (Raphael, 2026-11-08: the name
- * out of the card, the mark down to the credit, so the S means Sweet).
+ * The layout of every page shown to someone who is not signed in: sign in,
+ * join, verify, reset, setup. The community's name is the heading above a
+ * narrow card (Raphael, 2026-11-06: these pages are about the community). A
+ * small "Made with Sweet" wordmark sits under the card (Raphael, 2026-11-08:
+ * the name moved out of the card and the mark moved down to the credit, so
+ * the page shows one S and it refers to Sweet).
  */
 export function AuthFrame({ name, children }: AuthFrameProps) {
   return (

@@ -38,8 +38,6 @@ export function PostsPane({ groupId, side = 'full', watching, topicId = null }: 
   const topic = topical ? topics.find((t) => t.id === topicId) : undefined
   const topicActions = useTopicActions()
   const [, navigate] = useLocation()
-  const [draftTopic, setDraftTopic] = useState<string | null>(topicId)
-  useEffect(() => setDraftTopic(topicId), [topicId])
   const [following, setFollowing] = useState(false)
   const [overBell, setOverBell] = useState(false)
   const follow = async () => {
@@ -52,8 +50,8 @@ export function PostsPane({ groupId, side = 'full', watching, topicId = null }: 
     }
   }
   const post = async (html: string) => {
-    await create(html, topical ? draftTopic : null)
-    setDraftTopic(topicId)
+    // The post gets the topic the feed is currently filtered to, or no topic (Raphael, 2026-11-08).
+    await create(html, topical ? (topic?.id ?? null) : null)
   }
 
   // Looking is reading (architecture.md, Notifications): while watched and
@@ -106,6 +104,7 @@ export function PostsPane({ groupId, side = 'full', watching, topicId = null }: 
               <Stack gap={1}>
                 <ConnectionStatus status={status} />
                 <BodyEditor
+                  groupId={groupId}
                   extensions={postExtensions}
                   size="post"
                   placeholder={topic ? `Say something in ${topic.name}…` : undefined}
@@ -113,7 +112,6 @@ export function PostsPane({ groupId, side = 'full', watching, topicId = null }: 
                   busyLabel="Posting…"
                   disabled={offline}
                   onSubmit={post}
-                  topic={topical && !topic ? { topics, value: draftTopic, onChange: setDraftTopic } : undefined}
                 />
               </Stack>
             </Card>

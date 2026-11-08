@@ -13,11 +13,11 @@ test.describe('notification settings', () => {
     await open(kit.page, '/settings')
     const on = kit.page.getByRole('button', { name: 'Weekly digest on' })
     await expect(on).toHaveAttribute('aria-pressed', 'true')
-    await kit.page.getByText(/A notification on this device/).scrollIntoViewIfNeeded()
+    await kit.page.getByText(/on this device when someone/).scrollIntoViewIfNeeded()
     await kit.page.screenshot({ path: `test-results/notify-${testInfo.project.name}-settings.png` })
     await on.hover()
-    await expect(kit.page.getByRole('button', { name: 'Turn off' })).toBeVisible()
-    await kit.page.getByRole('button', { name: 'Turn off' }).click()
+    await expect(kit.page.getByRole('button', { name: 'Turn weekly digest off' })).toBeVisible()
+    await kit.page.getByRole('button', { name: 'Turn weekly digest off' }).click()
     await expect(kit.page.getByRole('button', { name: 'Send me a weekly digest' })).toHaveAttribute(
       'aria-pressed',
       'false',
@@ -25,9 +25,12 @@ test.describe('notification settings', () => {
     await kit.page.reload()
     await expect(kit.page.getByRole('button', { name: 'Send me a weekly digest' })).toBeVisible()
     await kit.page.getByRole('button', { name: 'Send me a weekly digest' }).click()
+    // Move the pointer away so the button shows its state text instead of its hover text.
+    await kit.page.mouse.move(0, 0)
     await expect(kit.page.getByRole('button', { name: 'Weekly digest on' })).toBeVisible()
-    // The device section says one true thing about this browser. Headless Chromium reports notifications as blocked
-    // whatever the test grants, and subscribing would need a push service, so it stops at the words.
+    // The device section shows one of its states. Headless Chromium reports notifications as denied
+    // regardless of granted permissions, and subscribing would need a push service, so the test only
+    // checks that one of the three texts is shown.
     const device = kit.page.getByText(/Notify this device|blocking notifications from Sweet|cannot show notifications/)
     await expect(device.first()).toBeVisible()
     // The app is installable: a manifest and the worker that shows pushes.
@@ -45,7 +48,7 @@ test.describe('notification settings', () => {
     await kit.context.grantPermissions(['notifications'])
     await open(kit.page, '/settings')
     await expect(kit.page.getByRole('button', { name: 'Weekly digest on' })).toBeVisible()
-    await kit.page.getByText(/A notification on this device/).scrollIntoViewIfNeeded()
+    await kit.page.getByText(/on this device when someone/).scrollIntoViewIfNeeded()
     const overflow = await kit.page.evaluate(
       () =>
         [...document.querySelectorAll('main *')].filter((el) => {

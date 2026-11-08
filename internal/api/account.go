@@ -73,7 +73,7 @@ func (s *Server) sendToken(ctx context.Context, q *store.Queries, userID, kind, 
 			Heading:   "Verify your email address",
 			Lines:     []string{"Open the link to verify your address and sign in to " + community + "."},
 			Action:    &mail.Action{Label: "Verify and sign in", URL: s.BaseURL + "/verify/" + token},
-			Note:      "It works once, for a day. If you did not ask for it, ignore this.",
+			Note:      "The link expires in a day. If you did not ask for it, ignore this email.",
 		}.Message(email, "Verify your email for "+community)
 	case TokenReset:
 		m = mail.Content{
@@ -81,7 +81,7 @@ func (s *Server) sendToken(ctx context.Context, q *store.Queries, userID, kind, 
 			Heading:   "Choose a new password",
 			Lines:     []string{"Open the link to choose a new password for " + community + "."},
 			Action:    &mail.Action{Label: "Choose a new password", URL: s.BaseURL + "/reset/" + token},
-			Note:      "It works once, for an hour. If you did not ask for it, ignore this and your password stays as it is.",
+			Note:      "The link expires in an hour. If you did not ask for it, ignore this email and your password will not be changed.",
 		}.Message(email, "Reset your password for "+community)
 	}
 	if s.Mail == nil {
@@ -226,7 +226,13 @@ func (s *Server) changeUnverifiedEmail(w http.ResponseWriter, r *http.Request) {
 	}
 	n, err := s.q().SetUnverifiedEmail(r.Context(), store.SetUnverifiedEmailParams{Email: sql.NullString{String: email, Valid: true}, ID: row.ID})
 	if db.IsUniqueViolation(err) {
-		writeErr(w, http.StatusConflict, "That email address already has an account")
+		// The address already has an account. Respond 202 as if the link had been sent, so the
+		// response does not reveal which addresses are registered.
+		if err := s.tellAddressTaken(r.Context(), email); err != nil {
+			writeErr(w, http.StatusInternalServerError, err.Error())
+			return
+		}
+		w.WriteHeader(http.StatusAccepted)
 		return
 	}
 	if err != nil {
@@ -242,6 +248,40 @@ func (s *Server) changeUnverifiedEmail(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.WriteHeader(http.StatusAccepted)
+}
+
+// tellAddressTaken emails an address that someone tried to register or claim
+// while it already belongs to an account. The requester gets the same response
+// as for a free address, so the API never reveals whether an address is
+// registered. The account's owner is told about the attempt.
+func (s *Server) tellAddressTaken(ctx context.Context, email string) error {
+	if s.Mail == nil {
+		return nil
+	}
+	owner, err := s.q().GetUserByEmail(ctx, email)
+	if err != nil {
+		return err
+	}
+	email = owner.Email.String
+	st, err := s.settings(ctx)
+	if err != nil {
+		return err
+	}
+	community := st.Name
+	if community == "" {
+		community = "Sweet"
+	}
+	m := mail.Content{
+		Community: community,
+		Heading:   "This address already has an account",
+		Lines: []string{
+			"Someone tried to use this email address for an account on " + community + ". The address already belongs to your account, so nothing has changed.",
+			"If that was you, sign in with your existing account. If you have forgotten your password, you can reset it from the sign-in page.",
+		},
+		Action: &mail.Action{Label: "Sign in to " + community, URL: s.BaseURL + "/"},
+		Note:   "If this was not you, you can ignore this email.",
+	}.Message(email, "Someone tried to use your address on "+community)
+	return s.Mail.Send(ctx, m)
 }
 
 // requestReset is `POST /api/reset {email}`: a link to choose a new password,

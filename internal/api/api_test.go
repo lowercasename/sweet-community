@@ -198,6 +198,18 @@ func TestInviteRegisterAndSessions(t *testing.T) {
 	// Usernames are unique, case-insensitively.
 	inv2 := owner.mustStatus(201, "POST", "/api/invites", nil)
 	newClient(t, ts).mustStatus(409, "POST", "/api/register", map[string]string{"code": inv2["code"].(string), "username": "KIT", "password": "longenough", "email": "kit-again@example.test"})
+	// Registering with an address that already has an account returns 202 like any other registration.
+	// No account is created, and the existing account's owner is emailed about the attempt. This prevents
+	// email enumeration.
+	had := mailCount(ts, "kit@example.test")
+	again := newClient(t, ts).mustStatus(202, "POST", "/api/register", map[string]string{"code": inv2["code"].(string), "username": "kit2", "password": "longenough", "email": "KIT@example.test"})
+	if again["email"] != "KIT@example.test" || mailCount(ts, "kit@example.test") != had+1 || mailCount(ts, "KIT@example.test") != 0 {
+		t.Fatalf("taken address on register: %v, mail to owner %d (had %d)", again, mailCount(ts, "kit@example.test"), had)
+	}
+	newClient(t, ts).mustStatus(403, "POST", "/api/login", map[string]string{"username": "kit2", "password": "longenough"})
+	// Without a valid invite, a taken username or address gets the same 404 as a free one.
+	newClient(t, ts).mustStatus(404, "POST", "/api/register", map[string]string{"code": "not-a-code", "username": "kit", "password": "longenough", "email": "kit@example.test"})
+	newClient(t, ts).mustStatus(404, "POST", "/api/register", map[string]string{"code": "not-a-code", "username": "nobody", "password": "longenough", "email": "nobody@example.test"})
 
 	// The bearer form of the token works without the cookie.
 	bare := newClient(t, ts)

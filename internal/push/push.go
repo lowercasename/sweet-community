@@ -33,8 +33,8 @@ type Payload struct {
 	Title string `json:"title"`
 	Body  string `json:"body"`
 	URL   string `json:"url"`
-	// Tag groups pushes on a device: a new one under the same tag replaces
-	// the one showing, so a conversation is one notification, not a stack.
+	// Tag groups pushes on a device. A new push with the same tag replaces the
+	// one currently shown, so a conversation produces one notification, not several.
 	Tag string `json:"tag,omitempty"`
 }
 

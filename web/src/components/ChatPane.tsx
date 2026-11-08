@@ -128,6 +128,7 @@ export function ChatPane({ groupId, side = 'full', watching }: ChatPaneProps) {
           <Stack gap={1}>
             <ConnectionStatus status={status} />
             <BodyEditor
+              groupId={groupId}
               extensions={chatExtensions}
               size="line"
               enterSubmits
