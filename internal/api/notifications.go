@@ -41,7 +41,7 @@ type Notification struct {
 const (
 	NotifyComment = "comment"
 	NotifyAdded   = "added"
-	// NotifyJoined notifies the owner that a user joined through an invite link.
+	// NotifyJoined notifies the owner and the moderators that a user joined through an invite link.
 	NotifyJoined = "joined"
 	// NotifyTopicPost notifies a topic's followers of a post in it (architecture.md, Topics).
 	NotifyTopicPost = "topic_post"

@@ -190,10 +190,19 @@ func (s *Server) register(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusInternalServerError, err.Error())
 		return
 	}
-	// The owner is notified of each new member (Raphael, 2026-11-06).
-	var told *events.Event
-	if ownerID, err := qtx.GetGroupOwnerID(ctx, perm.Root); err == nil {
-		entry, err := notify(r, qtx, NotifyJoined, ownerID, u.ID, perm.Root, nil, now)
+	// The owner and every moderator are notified of each new member (Raphael, 2026-11-06, moderators added
+	// 2026-11-08).
+	staff, err := qtx.ListMembers(ctx, perm.Root)
+	if err != nil {
+		writeErr(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	var told []events.Event
+	for _, m := range staff {
+		if m.Role != perm.Owner && m.Role != perm.Moderator {
+			continue
+		}
+		entry, err := notify(r, qtx, NotifyJoined, m.ID, u.ID, perm.Root, nil, now)
 		if err != nil {
 			writeErr(w, http.StatusInternalServerError, err.Error())
 			return
@@ -204,7 +213,7 @@ func (s *Server) register(w http.ResponseWriter, r *http.Request) {
 				writeErr(w, http.StatusInternalServerError, err.Error())
 				return
 			}
-			told = &tev
+			told = append(told, tev)
 		}
 	}
 	if err := tx.Commit(); err != nil {
@@ -212,8 +221,8 @@ func (s *Server) register(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s.Hub.Broadcast(ev)
-	if told != nil {
-		s.Hub.Broadcast(*told)
+	for _, t := range told {
+		s.Hub.Broadcast(t)
 	}
 	// No session is issued yet. The first sign-in email finishes joining, and using it verifies the address. Its code
 	// works in this browser, which the sign-in cookie identifies.

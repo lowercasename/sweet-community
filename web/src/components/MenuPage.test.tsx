@@ -31,7 +31,7 @@ describe('MenuPage', () => {
     await screen.findByText('Sweet v1.2.3')
   })
 
-  it('lists the user, Home, the Rooms section, the Messages section, People and Sign out, in that order', async () => {
+  it('lists the user, Home, the Rooms section, the Conversations section, People and Sign out, in that order', async () => {
     const { MenuPage } = await import('./MenuPage')
     const onGo = vi.fn()
     const onLogout = vi.fn()
@@ -49,7 +49,7 @@ describe('MenuPage', () => {
       'Home',
       'New room',
       'Knitting, unread',
-      'New message',
+      'New conversation',
       'kit',
       'People',
       'Community',
@@ -58,7 +58,9 @@ describe('MenuPage', () => {
     expect(
       within(screen.getByRole('group', { name: 'Rooms' })).getByRole('button', { name: 'Knitting, unread' }),
     ).toBeTruthy()
-    expect(within(screen.getByRole('group', { name: 'Messages' })).getByRole('button', { name: 'kit' })).toBeTruthy()
+    expect(
+      within(screen.getByRole('group', { name: 'Conversations' })).getByRole('button', { name: 'kit' }),
+    ).toBeTruthy()
     fireEvent.click(screen.getByRole('button', { name: 'raphael' }))
     expect(onGo).toHaveBeenCalledWith('/u/raphael')
 

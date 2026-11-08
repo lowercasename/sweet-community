@@ -12,8 +12,8 @@ export function groupPath(id: string, rootId?: string): string {
 export const NEW_ROOM = '/rooms/new'
 
 /** The list of the user's conversations, and the page for starting a new one. */
-export const MESSAGES = '/messages'
-export const NEW_MESSAGE = '/messages/new'
+export const CONVERSATIONS = '/conversations'
+export const NEW_CONVERSATION = '/conversations/new'
 
 /** The search page (architecture.md, Search). The `?q=` parameter carries the query. */
 export const SEARCH = '/search'

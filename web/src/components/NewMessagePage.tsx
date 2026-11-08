@@ -10,7 +10,7 @@ interface NewMessagePageProps {
 }
 
 /**
- * The New message page, opened from the Messages section's own control
+ * The New conversation page, opened from the Conversations section's own control
  * (architecture.md, Layout). The user chooses one other user, and Start opens
  * the conversation with them, either the existing one or a new one. A
  * conversation has two users. For more users, the user creates a group.

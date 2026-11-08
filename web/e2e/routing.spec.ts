@@ -26,8 +26,8 @@ test.describe('routing', () => {
     // The bar shows the name of every view, including Home.
     await expect(kit.page.getByRole('heading', { name: 'Home' })).toBeVisible()
     for (const [path, title] of [
-      ['/messages', 'Messages'],
-      ['/messages/new', 'New message'],
+      ['/conversations', 'Conversations'],
+      ['/conversations/new', 'New conversation'],
       ['/notifications', 'Notifications'],
       ['/settings', 'Settings'],
     ]) {

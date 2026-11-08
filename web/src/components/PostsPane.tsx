@@ -86,7 +86,7 @@ export function PostsPane({ groupId, side = 'full', watching, topicId = null }: 
                       </Pill>
                     </Row>
                     <PillCaption>
-                      Topics sort posts by subject, like Events or Questions. Members see them once you add one.
+                      Topics sort posts by subject, like Introductions or Questions. Members see them once you add one.
                     </PillCaption>
                   </Stack>
                 ) : (

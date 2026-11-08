@@ -78,7 +78,7 @@ export function MessagesPage({ me, onGo }: MessagesPageProps) {
             <Stack gap={2}>
               {!loading && dms.length === 0 && out.length === 0 && (
                 <Stack gap={2}>
-                  <Text variant="secondary">No messages yet. Start one from the People page.</Text>
+                  <Text variant="secondary">No conversations yet. Start one from the People page.</Text>
                   <Row>
                     <Button variant="secondary" onClick={() => onGo('/people')}>
                       People

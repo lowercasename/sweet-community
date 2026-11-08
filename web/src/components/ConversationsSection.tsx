@@ -2,7 +2,7 @@ import type { Group, User } from '../api'
 import { conversationsOf, hiddenOf } from '../data/groups'
 import { anyUnread, type UnreadPlace } from '../data/notifications'
 import { useUsers } from '../data/hooks'
-import { MESSAGES, NEW_MESSAGE, groupPath } from '../routes'
+import { CONVERSATIONS, NEW_CONVERSATION, groupPath } from '../routes'
 import { Avatar, NavItem, NavSection } from '../ui'
 import { groupLabel } from './GroupView'
 
@@ -34,11 +34,11 @@ interface ConversationsSectionProps {
 }
 
 /**
- * The Messages section of the nav (architecture.md, Layout). It has a New
+ * The Conversations section of the nav (architecture.md, Layout). It has a New
  * message control of its own and the five conversations with the latest
  * messages. The open conversation is also listed if it is older. Each
  * conversation is labelled with the other user's name and shown with their
- * avatar. An All messages link is shown at the bottom when there are more
+ * avatar. An All conversations link is shown at the bottom when there are more
  * conversations than the section lists. With five or fewer, the link was a
  * row with no purpose (Raphael, 2026-11-06). A conversation is a group
  * without a name, so its rows are drawn the same way as room rows.
@@ -50,18 +50,18 @@ export function ConversationsSection({ groups, me, location, places, expanded, o
     : undefined
   const shown = all.slice(0, SHOWN)
   if (open && !shown.includes(open)) shown.push(open)
-  // Show All messages only when the section does not list every conversation. That is the case when there are more
+  // Show All conversations only when the section does not list every conversation. That is the case when there are more
   // than five, or when there are hidden conversations to restore. Never show it on the collapsed bar.
   const more = expanded && (all.length > SHOWN || hiddenOf(groups).length > 0)
   return (
     <NavSection
-      title="Messages"
+      title="Conversations"
       expanded={expanded}
       action={{
         icon: 'plus',
-        label: 'New message',
-        current: location === NEW_MESSAGE,
-        onClick: () => onGo(NEW_MESSAGE),
+        label: 'New conversation',
+        current: location === NEW_CONVERSATION,
+        onClick: () => onGo(NEW_CONVERSATION),
       }}
     >
       {shown.map((g) => (
@@ -79,11 +79,11 @@ export function ConversationsSection({ groups, me, location, places, expanded, o
       {more && (
         <NavItem
           icon="mail"
-          label="All messages"
+          label="All conversations"
           expanded={expanded}
           size="sm"
-          current={location === MESSAGES}
-          onClick={() => onGo(MESSAGES)}
+          current={location === CONVERSATIONS}
+          onClick={() => onGo(CONVERSATIONS)}
         />
       )}
     </NavSection>

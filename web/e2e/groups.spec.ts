@@ -195,7 +195,7 @@ test.describe('groups', () => {
     await expect(article(kit.page, text)).toBeVisible()
     await expect(kit.page.getByRole('heading', { name: mo.username })).toBeVisible()
     await expect(kit.page.getByRole('heading', { name: 'Just you' })).toHaveCount(0)
-    await open(kit.page, '/messages')
+    await open(kit.page, '/conversations')
     await expect(kit.page.getByRole('list').getByRole('button', { name: mo.username })).toBeVisible()
     await expect(kit.page.getByRole('list').getByRole('button', { name: 'Just you' })).toHaveCount(0)
     await expect(nav(kit.page).getByRole('button', { name: 'Just you' })).toHaveCount(0)
@@ -232,13 +232,13 @@ test.describe('groups', () => {
     await mo.page.getByRole('button', { name: 'Conversation options' }).click()
     await mo.page.getByRole('menuitem', { name: 'Hide conversation' }).click()
     await confirm(mo.page, 'Hide')
-    await expect(mo.page).toHaveURL(/\/messages$/)
+    await expect(mo.page).toHaveURL(/\/conversations$/)
     await expect(nav(mo.page).getByRole('button', { name: kit.username })).toHaveCount(0)
     await expect(kit.page.getByRole('heading', { name: mo.username })).toBeVisible()
     const meanwhile = uniq('while mo is out ')
     await sendMessage(kit.page, meanwhile)
 
-    // Mo opens it again from All messages. It is the same conversation and has every message sent in it.
+    // Mo opens it again from All conversations. It is the same conversation and has every message sent in it.
     await expect(mo.page.getByRole('heading', { name: 'Hidden' })).toBeVisible()
     await mo.page.getByRole('list').last().getByRole('button', { name: kit.username }).click()
     await expect(mo.page).toHaveURL(new RegExp(`${path}$`))

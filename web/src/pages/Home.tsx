@@ -16,8 +16,8 @@ import { StreamProvider } from '../hooks/StreamContext'
 import { useLayout } from '../hooks/useLayout'
 import {
   COMMUNITY,
-  MESSAGES,
-  NEW_MESSAGE,
+  CONVERSATIONS,
+  NEW_CONVERSATION,
   NEW_ROOM,
   NOTIFICATIONS,
   SEARCH,
@@ -45,8 +45,8 @@ import { Button, ConfirmDialog, Menu, Segmented, Shell, TabBar, Text } from '../
 
 /** What the bar calls each page that is not a place. */
 const PAGE_TITLES: Record<string, string> = {
-  [MESSAGES]: 'Messages',
-  [NEW_MESSAGE]: 'New message',
+  [CONVERSATIONS]: 'Conversations',
+  [NEW_CONVERSATION]: 'New conversation',
   [NEW_ROOM]: 'New room',
   [NOTIFICATIONS]: 'Notifications',
   [SEARCH]: 'Search',
@@ -120,7 +120,7 @@ export function Home({ me, onSignOut }: HomeProps) {
     try {
       await groupActions.leave(current.id, me.id)
       setHiding(false)
-      navigate(MESSAGES)
+      navigate(CONVERSATIONS)
     } finally {
       setBusy(false)
     }
@@ -235,10 +235,10 @@ export function Home({ me, onSignOut }: HomeProps) {
           <Route path={NOTIFICATIONS}>
             <NotificationsPage groups={groups} onGo={navigate} />
           </Route>
-          <Route path="/messages">
+          <Route path={CONVERSATIONS}>
             <MessagesPage me={me} onGo={navigate} />
           </Route>
-          <Route path={NEW_MESSAGE}>
+          <Route path={NEW_CONVERSATION}>
             <NewMessagePage me={me} onOpened={(g) => navigate(groupPath(g.id, root?.id))} />
           </Route>
           <Route path="/menu">
@@ -290,7 +290,7 @@ export function Home({ me, onSignOut }: HomeProps) {
           onClose={() => setHiding(false)}
         >
           <Text variant="secondary">
-            You can bring it back from All messages. The other person will not be notified.
+            You can bring it back from All conversations. The other person will not be notified.
           </Text>
         </ConfirmDialog>
         {narrow && (

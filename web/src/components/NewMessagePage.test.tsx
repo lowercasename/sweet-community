@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, screen, within } from '@testing-library/react'
 import { dm, member, renderWithQuery, user } from '../test-utils'
 
-/** New message takes one user and opens the conversation with them, either the existing one or a new one. */
+/** New conversation takes one user and opens the conversation with them, either the existing one or a new one. */
 vi.mock('../api', () => ({
   listMembers: vi.fn(() => Promise.resolve({ members: [] })),
   listUsers: vi.fn(),

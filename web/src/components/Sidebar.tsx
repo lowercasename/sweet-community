@@ -25,7 +25,7 @@ function at(location: string, path: string): boolean {
  * The left navigation, in three blocks (architecture.md, Layout). The first
  * block lists the groups. It has Home, then the groups the user is in, with
  * New room as that section's own control, then the user's latest
- * conversations with All messages at the bottom. The second block has the
+ * conversations with All conversations at the bottom. The second block has the
  * tools that work across every group, which are Search and Notifications.
  * The third block has the community items. These are People, then Community
  * for the owner, then the user's own profile page, where Settings is reached.

@@ -108,23 +108,23 @@ func TestScriptedOwnerNeedsNoSetup(t *testing.T) {
 	}
 }
 
-// Each user who joins through an invite link creates a notification for the owner and for nobody else.
-func TestOwnerHearsOfEachArrival(t *testing.T) {
+// Each user who joins through an invite link creates a notification for the
+// owner and every moderator, and for nobody else (Raphael, 2026-11-08).
+func TestStaffHearOfEachArrival(t *testing.T) {
 	ts, owner := newTestServer(t)
-	_, kitID := registerMember(t, ts, owner, "kit")
-	kit, _ := registerMember(t, ts, owner, "mo")
-	got := owner.mustStatus(200, "GET", "/api/notifications", nil)["notifications"].([]any)
-	if len(got) != 2 {
-		t.Fatalf("owner's notifications after two joins: %v", got)
+	kit, kitID := registerMember(t, ts, owner, "kit")
+	jo, _ := registerMember(t, ts, owner, "jo")
+	owner.mustStatus(200, "PUT", rootPath+"/members/"+kitID, map[string]string{"role": "moderator"})
+	registerMember(t, ts, owner, "mo")
+	for name, c := range map[string]*client{"the owner": owner, "a moderator": kit} {
+		newest := c.mustStatus(200, "GET", "/api/notifications", nil)["notifications"].([]any)[0].(map[string]any)
+		if newest["kind"] != NotifyJoined || newest["actor"].(map[string]any)["username"] != "mo" || newest["post_id"] != nil {
+			t.Fatalf("%s's joined notification: %v", name, newest)
+		}
 	}
-	newest := got[0].(map[string]any)
-	if newest["kind"] != NotifyJoined || newest["actor"].(map[string]any)["username"] != "mo" || newest["post_id"] != nil {
-		t.Fatalf("joined notification: %v", newest)
-	}
-	if n := len(kit.mustStatus(200, "GET", "/api/notifications", nil)["notifications"].([]any)); n != 0 {
+	if n := len(jo.mustStatus(200, "GET", "/api/notifications", nil)["notifications"].([]any)); n != 0 {
 		t.Fatalf("a member hears of arrivals: %d", n)
 	}
-	_ = kitID
 }
 
 // The setup page's password is optional (architecture.md, Accounts). Without

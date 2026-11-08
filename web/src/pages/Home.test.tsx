@@ -167,8 +167,8 @@ describe('Home', () => {
     const { container } = await home()
     expect(nav().getByRole('button', { name: 'Knitting' })).toBeTruthy()
     expect(nav().getByRole('button', { name: 'kit' })).toBeTruthy()
-    // There is one conversation, so there is no All messages button. The section already shows every conversation.
-    expect(nav().queryByRole('button', { name: 'All messages' })).toBeNull()
+    // There is one conversation, so there is no All conversations button. The section already shows every conversation.
+    expect(nav().queryByRole('button', { name: 'All conversations' })).toBeNull()
     expect(nav().getByRole('button', { name: 'New room' })).toBeTruthy()
 
     fireEvent.click(nav().getByRole('button', { name: 'Knitting' }))
@@ -196,9 +196,9 @@ describe('Home', () => {
 
   it('the Messages page lists my conversations, and a conversation opens like a room and is marked as current in the nav', async () => {
     const { getMessages } = await import('../api')
-    const { container } = await home('/messages')
-    expect(window.location.pathname).toBe('/messages')
-    await screen.findByRole('heading', { name: 'Messages' })
+    const { container } = await home('/conversations')
+    expect(window.location.pathname).toBe('/conversations')
+    await screen.findByRole('heading', { name: 'Conversations' })
     // The posts and chat panes stay mounted behind the page.
     expect(container.querySelector('.ProseMirror')!.closest('.hidden')).not.toBeNull()
 
@@ -230,7 +230,7 @@ describe('Home', () => {
     expect(within(dialog).getByText('Hide this conversation?')).toBeTruthy()
     fireEvent.click(within(dialog).getByRole('button', { name: 'Hide' }))
     expect(removeMember).toHaveBeenCalledWith('d1', 'raphael')
-    await vi.waitFor(() => expect(window.location.pathname).toBe('/messages'))
+    await vi.waitFor(() => expect(window.location.pathname).toBe('/conversations'))
     expect(nav().queryByRole('button', { name: 'kit' })).toBeNull()
   })
 

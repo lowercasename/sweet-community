@@ -7,8 +7,8 @@ import { ROOT, dm, group, marker, nameOf, notification, renderWithQuery, user } 
 /**
  * The nav column has three blocks (architecture.md, Layout). The first block
  * lists the groups. It has Home, the Rooms section with its own New room
- * control, and the Messages section with the user's five latest conversations
- * and All messages at the bottom. The second block has the tools, which are
+ * control, and the Conversations section with the user's five latest conversations
+ * and All conversations at the bottom. The second block has the tools, which are
  * Search and Notifications. The third block has the community items, which
  * are People and the user's own account.
  */
@@ -48,7 +48,7 @@ async function draw(groups: Group[], location = '/', expanded = true) {
 
 const names = () => screen.getAllByRole('button').map(nameOf)
 const groupsSection = () => screen.getByRole('group', { name: 'Rooms' })
-const messages = () => screen.getByRole('group', { name: 'Messages' })
+const messages = () => screen.getByRole('group', { name: 'Conversations' })
 
 describe('Sidebar', () => {
   it('names the release under Collapse when expanded, and not when collapsed (architecture.md, Updates)', async () => {
@@ -67,7 +67,7 @@ describe('Sidebar', () => {
       'Home',
       'New room',
       'Knitting',
-      'New message',
+      'New conversation',
       'kit',
       'Search',
       'Notifications',
@@ -83,49 +83,53 @@ describe('Sidebar', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'New room' }))
     expect(onGo).toHaveBeenCalledWith('/rooms/new')
-    fireEvent.click(screen.getByRole('button', { name: 'New message' }))
-    expect(onGo).toHaveBeenCalledWith('/messages/new')
+    fireEvent.click(screen.getByRole('button', { name: 'New conversation' }))
+    expect(onGo).toHaveBeenCalledWith('/conversations/new')
     fireEvent.click(screen.getByRole('button', { name: 'kit' }))
     expect(onGo).toHaveBeenCalledWith('/r/d1')
     fireEvent.click(screen.getByRole('button', { name: 'Knitting' }))
     expect(onGo).toHaveBeenCalledWith('/r/knit')
   })
 
-  it('lists the five latest conversations, plus the open one, and All messages at the bottom', async () => {
+  it('lists the five latest conversations, plus the open one, and All conversations at the bottom', async () => {
     await draw([root(true), ...many])
     expect(within(messages()).getAllByRole('button').map(nameOf)).toEqual([
-      'New message',
+      'New conversation',
       'p7',
       'p6',
       'p5',
       'p4',
       'p3',
-      'All messages',
+      'All conversations',
     ])
     cleanup()
     // An older conversation opened from the full list is added after the five while it is open.
     await draw([root(true), ...many], '/r/d1')
     expect(within(messages()).getAllByRole('button').map(nameOf)).toEqual([
-      'New message',
+      'New conversation',
       'p7',
       'p6',
       'p5',
       'p4',
       'p3',
       'p1',
-      'All messages',
+      'All conversations',
     ])
     expect(within(messages()).getByRole('button', { name: 'p1' }).getAttribute('aria-current')).toBe('page')
     cleanup()
-    // With no conversations, the section still shows New message. All messages is not shown, because it would list
+    // With no conversations, the section still shows New conversation. All conversations is not shown, because it would list
     // nothing more.
     await draw([root(true), knitting])
-    expect(within(messages()).getAllByRole('button').map(nameOf)).toEqual(['New message'])
+    expect(within(messages()).getAllByRole('button').map(nameOf)).toEqual(['New conversation'])
   })
 
   it('a hidden conversation is not in the nav', async () => {
     await draw([root(true), withKit, dm('out', [mo, raphael], { last_message_at: 100, hidden_at: 5 })])
-    expect(within(messages()).getAllByRole('button').map(nameOf)).toEqual(['New message', 'kit', 'All messages'])
+    expect(within(messages()).getAllByRole('button').map(nameOf)).toEqual([
+      'New conversation',
+      'kit',
+      'All conversations',
+    ])
   })
 
   it("labels a conversation with the other user's name and shows their avatar", async () => {
@@ -162,18 +166,18 @@ describe('Sidebar', () => {
     expect(within(groupsSection()).getByRole('button', { name: 'New room' })).toBeTruthy()
   })
 
-  it('marks All messages as current on its page and a conversation as current on its route', async () => {
+  it('marks All conversations as current on its page and a conversation as current on its route', async () => {
     const current = () =>
       screen
         .getAllByRole('button')
         .filter((b) => b.getAttribute('aria-current') === 'page')
         .map(nameOf)
-    // All messages is shown, and can be current, only when the section does not list every conversation.
-    await draw([root(true), knitting, ...many], '/messages')
-    expect(current()).toEqual(['All messages'])
+    // All conversations is shown, and can be current, only when the section does not list every conversation.
+    await draw([root(true), knitting, ...many], '/conversations')
+    expect(current()).toEqual(['All conversations'])
     cleanup()
-    await draw([root(true), knitting, withKit], '/messages/new')
-    expect(current()).toEqual(['New message'])
+    await draw([root(true), knitting, withKit], '/conversations/new')
+    expect(current()).toEqual(['New conversation'])
     cleanup()
     await draw([root(true), knitting, withKit], '/r/d1')
     expect(current()).toEqual(['kit'])
@@ -201,7 +205,7 @@ describe('Sidebar', () => {
       'Expand',
     ])
     expect(screen.queryByText('Rooms')).toBeNull()
-    expect(screen.queryByText('Messages')).toBeNull()
+    expect(screen.queryByText('Conversations')).toBeNull()
     expect(screen.getByRole('button', { name: 'Knitting' }).textContent).toBe('K')
     expect(nameOf(screen.getByRole('button', { name: 'Knitting' }))).toBe('Knitting')
     expect(screen.getByRole('navigation').querySelectorAll('hr').length).toBe(2)

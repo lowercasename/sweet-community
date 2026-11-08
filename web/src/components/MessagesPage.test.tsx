@@ -4,7 +4,7 @@ import { cleanup, fireEvent, screen, within } from '@testing-library/react'
 import { ROOT, dm, group, renderWithQuery, user } from '../test-utils'
 
 /**
- * The Messages page (architecture.md, Layout) lists only the user's DMs, with
+ * The Conversations page (architecture.md, Layout) lists only the user's DMs, with
  * the most recent message first. Each DM is labelled with the names of its
  * other members. With no DMs, the page shows where to start a conversation.
  */
@@ -92,7 +92,7 @@ describe('MessagesPage', () => {
     const { listGroups } = await import('../api')
     vi.mocked(listGroups).mockResolvedValue({ groups: [group(ROOT, 'member')] })
     const onGo = await draw()
-    await screen.findByText(/No messages yet/)
+    await screen.findByText(/No conversations yet/)
     expect(screen.queryByRole('list')).toBeNull()
     fireEvent.click(screen.getByRole('button', { name: 'People' }))
     expect(onGo).toHaveBeenCalledWith('/people')
