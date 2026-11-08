@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import type { Message } from '../api'
 import { useAuthor } from '../data/hooks'
-import { Box, ConfirmDialog, Menu, MessageBlock, Row, Stack, Text, Time } from '../ui'
+import { Box, Button, ConfirmDialog, Menu, MessageBlock, ReplyQuote, Row, Stack, Text, Time } from '../ui'
 import { Body } from './Body'
 import { PersonName } from './PersonName'
 
@@ -10,6 +10,12 @@ interface MessageGroupProps {
   messages: Message[]
   /** Resolves when the server has deleted the message. The message is then removed from the query cache. */
   onDelete: (id: string) => Promise<void>
+  /** Attaches a message to the chat editor as the message being replied to. Without it, no Reply button is shown. */
+  onReply?: (m: Message) => void
+  /** Scrolls to a message by id, from a reply's quote. */
+  onJump?: (id: string) => void
+  /** The id of the message to highlight briefly, after a quote was clicked. */
+  highlight?: string | null
 }
 
 /**
@@ -19,7 +25,7 @@ interface MessageGroupProps {
  * includes the first message, whose menu is never on the author's line. The
  * block gets the blush background while hovered (Raphael, 2026-11-06).
  */
-export function MessageGroup({ messages, onDelete }: MessageGroupProps) {
+export function MessageGroup({ messages, onDelete, onReply, onJump, highlight }: MessageGroupProps) {
   const first = messages[0]
   const author = useAuthor(first.author)
   const [confirming, setConfirming] = useState<string | null>(null)
@@ -48,16 +54,40 @@ export function MessageGroup({ messages, onDelete }: MessageGroupProps) {
         {messages.map((m) => (
           <MessageBlock
             key={m.id}
+            id={`message-${m.id}`}
+            highlight={highlight === m.id}
             menu={
-              m.can.delete ? (
-                <Menu
-                  label="Message options"
-                  items={[{ label: 'Delete', icon: 'trash', danger: true, onSelect: () => setConfirming(m.id) }]}
-                  reveal="message"
-                />
+              onReply || m.can.delete ? (
+                <>
+                  {onReply && (
+                    <Button
+                      variant="ghost"
+                      icon="reply"
+                      label="Reply to this message"
+                      compact
+                      reveal="message"
+                      onClick={() => onReply(m)}
+                    />
+                  )}
+                  {m.can.delete && (
+                    <Menu
+                      label="Message options"
+                      items={[{ label: 'Delete', icon: 'trash', danger: true, onSelect: () => setConfirming(m.id) }]}
+                      reveal="message"
+                    />
+                  )}
+                </>
               ) : undefined
             }
           >
+            {m.reply_to && (
+              <ReplyQuote
+                author={m.reply_to.author?.username}
+                text={m.reply_to.text}
+                deleted={m.reply_to.deleted}
+                onClick={onJump ? () => onJump(m.reply_to!.id) : undefined}
+              />
+            )}
             <Body html={m.body_html} />
           </MessageBlock>
         ))}

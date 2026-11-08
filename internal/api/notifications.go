@@ -30,7 +30,9 @@ type Notification struct {
 	GroupID string  `json:"group_id"`
 	PostID  *string `json:"post_id"`
 	// TopicID is the topic, for a post in a topic the user follows.
-	TopicID   *string `json:"topic_id"`
+	TopicID *string `json:"topic_id"`
+	// MessageID is the chat message a mention or reply is in, for scrolling to it.
+	MessageID *string `json:"message_id"`
 	CreatedAt int64   `json:"created_at"`
 	// ReadAt is when the user opened the notification. It is null until then.
 	ReadAt *int64 `json:"read_at"`
@@ -48,6 +50,8 @@ const (
 	// chat marker moves past it (architecture.md, Notifications, 2026-11-08).
 	// Room chat does not produce notifications.
 	NotifyMessage = "message"
+	// NotifyReply: a reply to the user's message in a room's chat (architecture.md, Chat).
+	NotifyReply = "reply"
 )
 
 // Marker records how far a user has read a stream, as the newest time they
@@ -110,6 +114,26 @@ func notifyMessage(r *http.Request, qtx *store.Queries, g Group, author string, 
 	return told, nil
 }
 
+// notifyReply writes a reply notification to the author of the message
+// replied to. It writes nothing in a conversation, where the message
+// notification covers a reply, nothing for a reply to one's own message, and
+// nothing when the author is no longer in the group.
+func notifyReply(r *http.Request, qtx *store.Queries, g Group, answered, author, messageID string, now int64) ([]events.Entry, error) {
+	if answered == "" || answered == author || g.Kind == perm.KindDM {
+		return nil, nil
+	}
+	if _, err := qtx.GetMembership(r.Context(), store.GetMembershipParams{GroupID: g.ID, UserID: answered}); errors.Is(err, sql.ErrNoRows) {
+		return nil, nil
+	} else if err != nil {
+		return nil, err
+	}
+	e, err := notifyAbout(r, qtx, NotifyReply, answered, author, g.ID, nil, nil, &messageID, now)
+	if err != nil || e == nil {
+		return nil, err
+	}
+	return []events.Entry{*e}, nil
+}
+
 // readMessageNotifications marks the user's unread message notifications for a
 // conversation as read, up to the chat marker's time, and returns each updated
 // row as a notification event.
@@ -134,6 +158,12 @@ func readMessageNotifications(r *http.Request, qtx *store.Queries, me, groupID s
 
 // notifyIn is notify with the topic of a topic_post notification.
 func notifyIn(r *http.Request, qtx *store.Queries, kind, to, actor, groupID string, postID, topicID *string, now int64) (*events.Entry, error) {
+	return notifyAbout(r, qtx, kind, to, actor, groupID, postID, topicID, nil, now)
+}
+
+// notifyAbout is notifyIn with the chat message a mention or reply is in, so
+// opening the notification can scroll the chat to it.
+func notifyAbout(r *http.Request, qtx *store.Queries, kind, to, actor, groupID string, postID, topicID, messageID *string, now int64) (*events.Entry, error) {
 	if to == actor {
 		return nil, nil
 	}
@@ -149,8 +179,12 @@ func notifyIn(r *http.Request, qtx *store.Queries, kind, to, actor, groupID stri
 	if topicID != nil {
 		tid = sql.NullString{String: *topicID, Valid: true}
 	}
+	mid := sql.NullString{}
+	if messageID != nil {
+		mid = sql.NullString{String: *messageID, Valid: true}
+	}
 	if err := qtx.CreateNotification(r.Context(), store.CreateNotificationParams{
-		ID: id.String(), UserID: to, Kind: kind, ActorID: actor, GroupID: groupID, PostID: pid, TopicID: tid, CreatedAt: now,
+		ID: id.String(), UserID: to, Kind: kind, ActorID: actor, GroupID: groupID, PostID: pid, TopicID: tid, MessageID: mid, CreatedAt: now,
 	}); err != nil {
 		return nil, err
 	}

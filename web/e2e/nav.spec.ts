@@ -44,7 +44,7 @@ test.describe('nav', () => {
     // The section's New message button starts a conversation. After a user is chosen, the conversation opens.
     await conversations.getByRole('button', { name: 'New message' }).click()
     await expect(kit.page).toHaveURL(/\/messages\/new$/)
-    await kit.page.getByLabel('To').selectOption({ label: jo.username })
+    await kit.page.getByLabel('To', { exact: true }).selectOption({ label: jo.username })
     await kit.page.getByRole('button', { name: 'Message', exact: true }).click()
     await expect(kit.page).toHaveURL(/\/r\/[^/]+$/)
     await expect(kit.page.getByRole('heading', { name: jo.username })).toBeVisible()

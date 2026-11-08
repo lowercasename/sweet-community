@@ -119,7 +119,7 @@ func (s *Server) createComment(w http.ResponseWriter, r *http.Request) {
 		if told != nil {
 			skip = owners.AuthorID
 		}
-		mentioned, err := mentionEvents(r, qtx, clean, author.ID, owners.GroupID, &postID, now, skip)
+		mentioned, err := mentionEvents(r, qtx, clean, author.ID, owners.GroupID, &postID, nil, now, skip)
 		if err != nil {
 			return nil, nil, http.StatusInternalServerError, err
 		}

@@ -24,6 +24,7 @@ import {
   Newspaper,
   Pencil,
   Plus,
+  Reply,
   Search,
   Settings,
   TabletSmartphone,
@@ -67,6 +68,7 @@ export type IconName =
   | 'check'
   | 'user'
   | 'spinner'
+  | 'reply'
 
 const ICONS: Record<IconName, LucideIcon> = {
   bold: Bold,
@@ -101,6 +103,7 @@ const ICONS: Record<IconName, LucideIcon> = {
   check: Check,
   user: User,
   spinner: LoaderCircle,
+  reply: Reply,
 }
 
 interface IconProps {

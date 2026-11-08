@@ -180,7 +180,20 @@ export interface Message {
   body_html: string
   body_text: string
   created_at: number
+  /** The message this one replies to, or null (architecture.md, Chat). */
+  reply_to: ReplyTo | null
   can: Can
+}
+
+/**
+ * A snippet of the message a reply answers, built by the server from the original. Once the original is deleted, the
+ * author is null, the text is empty and deleted is true.
+ */
+export interface ReplyTo {
+  id: string
+  author: User | null
+  text: string
+  deleted: boolean
 }
 
 /**
@@ -190,12 +203,14 @@ export interface Message {
 export interface Notification {
   id: string
   user_id: string
-  kind: 'comment' | 'added' | 'mention' | 'joined' | 'topic_post' | 'message'
+  kind: 'comment' | 'added' | 'mention' | 'joined' | 'topic_post' | 'message' | 'reply'
   actor: User
   group_id: string
   post_id: string | null
   /** The topic, for a post in a topic I follow. */
   topic_id?: string | null
+  /** The chat message a mention or reply is in, for scrolling to it. */
+  message_id?: string | null
   created_at: number
   /** When I opened the notification, or null if I have not opened it. */
   read_at: number | null
@@ -441,8 +456,8 @@ export function getMessages(groupId: string, before?: number | null, limit = 50)
   return request<MessagePage>(`${g(groupId)}/messages?${params}`)
 }
 
-export function createMessage(groupId: string, bodyHtml: string): Promise<Message> {
-  return request<Message>(`${g(groupId)}/messages`, json('POST', { body_html: bodyHtml }))
+export function createMessage(groupId: string, bodyHtml: string, replyTo?: string): Promise<Message> {
+  return request<Message>(`${g(groupId)}/messages`, json('POST', { body_html: bodyHtml, reply_to: replyTo ?? null }))
 }
 
 export async function deleteMessage(id: string): Promise<void> {

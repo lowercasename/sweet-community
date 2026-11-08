@@ -274,8 +274,14 @@ function upsertMessage(qc: QueryClient, m: Message) {
 }
 
 function deleteMessage(qc: QueryClient, id: string, groupId: string) {
+  // The message goes, and each reply to it shows only that it replied to a deleted message, as the server's
+  // snippet does once the original is deleted.
+  const gone = (m: Message): Message =>
+    m.reply_to?.id === id ? { ...m, reply_to: { id, author: null, text: '', deleted: true } } : m
   qc.setQueryData<Messages>(keys.messages(groupId), (old) =>
-    old ? { ...old, pages: old.pages.map((p) => ({ ...p, messages: p.messages.filter((x) => x.id !== id) })) } : old,
+    old
+      ? { ...old, pages: old.pages.map((p) => ({ ...p, messages: p.messages.filter((x) => x.id !== id).map(gone) })) }
+      : old,
   )
 }
 
@@ -318,7 +324,14 @@ function upsertUser(qc: QueryClient, u: User) {
     (old) =>
       old && {
         ...old,
-        pages: old.pages.map((p) => ({ ...p, messages: p.messages.map((m) => ({ ...m, author: as(m.author) })) })),
+        pages: old.pages.map((p) => ({
+          ...p,
+          messages: p.messages.map((m) => ({
+            ...m,
+            author: as(m.author),
+            reply_to: m.reply_to?.author ? { ...m.reply_to, author: as(m.reply_to.author) } : m.reply_to,
+          })),
+        })),
       },
   )
 }
@@ -470,19 +483,24 @@ function upsertMembership(qc: QueryClient, m: Membership) {
     // The server computes who may remove whom per viewer, and a role change affects it, so refetch.
     void qc.invalidateQueries({ queryKey: keys.users })
   }
-  // A change to the user's own role in a group changes every can flag in it. The server recomputes them on refetch.
   const me = qc.getQueryData<User | null>(keys.me)
-  if (me && me.id === m.user.id) {
-    // The user joined or rejoined a group, which now has a chat marker.
-    void qc.invalidateQueries({ queryKey: keys.markers })
-    void qc.invalidateQueries({ queryKey: keys.groups })
-    void qc.invalidateQueries({ queryKey: keys.posts(m.group_id) })
-    void qc.invalidateQueries({ queryKey: keys.messages(m.group_id) })
-    void qc.invalidateQueries({ queryKey: keys.members(m.group_id) })
-    void qc.invalidateQueries({
-      predicate: (q) => q.queryKey[0] === 'comments' && inGroup(qc, q.queryKey[1], m.group_id),
-    })
-  }
+  if (me && me.id === m.user.id) refetchForOwnRole(qc, m.group_id)
+}
+
+/**
+ * Refetches what the client holds for a group after the user's own membership in it changed. A change to the
+ * user's role changes every can flag in the group, and the server recomputes them on refetch. A user who joined
+ * or rejoined the group now has a chat marker for it.
+ */
+export function refetchForOwnRole(qc: QueryClient, groupId: string) {
+  void qc.invalidateQueries({ queryKey: keys.markers })
+  void qc.invalidateQueries({ queryKey: keys.groups })
+  void qc.invalidateQueries({ queryKey: keys.posts(groupId) })
+  void qc.invalidateQueries({ queryKey: keys.messages(groupId) })
+  void qc.invalidateQueries({ queryKey: keys.members(groupId) })
+  void qc.invalidateQueries({
+    predicate: (q) => q.queryKey[0] === 'comments' && inGroup(qc, q.queryKey[1], groupId),
+  })
 }
 
 function deleteMembership(qc: QueryClient, groupId: string, userId: string) {

@@ -83,6 +83,8 @@ export function Home({ me, onSignOut }: HomeProps) {
   const searched = search.get('q') ?? ''
   const atRoot = location === '/'
   const topicId = atRoot ? search.get('topic') : null
+  // The chat message to scroll to, from a notification (architecture.md, Notifications).
+  const focusMessage = search.get('message')
   const { topics, loading: topicsLoading } = useTopics()
   // A post's page sits over the room the post is in, once the post is known.
   const { post: openPost } = usePost(postParams?.id ?? '', atPost)
@@ -259,7 +261,16 @@ export function Home({ me, onSignOut }: HomeProps) {
             <Redirect to="/" replace />
           </Route>
         </Switch>
-        {current && <GroupView key={current.id} group={current} hidden={!viewing} topicId={topicId} />}
+        {current && (
+          <GroupView
+            key={current.id}
+            group={current}
+            hidden={!viewing}
+            topicId={topicId}
+            focusMessage={viewing ? focusMessage : null}
+            onFocused={() => navigate(location, { replace: true })}
+          />
+        )}
         <ConfirmDialog
           open={hiding}
           title="Hide this conversation?"

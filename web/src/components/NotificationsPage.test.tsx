@@ -81,6 +81,20 @@ describe('NotificationsPage', () => {
     expect(readNotification).toHaveBeenCalledTimes(1)
   })
 
+  it('shows "replied to your message" for a reply in chat and opens the chat at that message', async () => {
+    const { listNotifications, readNotification } = await import('../api')
+    vi.mocked(listNotifications).mockResolvedValue({
+      notifications: [notification('n40', 'reply', mo, { group_id: 'knit', message_id: 'm7' })],
+      next_before: null,
+    })
+    vi.mocked(readNotification).mockImplementation((id) =>
+      Promise.resolve(notification(id, 'reply', mo, { group_id: 'knit', message_id: 'm7', read_at: 41 })),
+    )
+    const onGo = await draw()
+    fireEvent.click(await screen.findByRole('button', { name: 'mo replied to your message in Knitting, new' }))
+    expect(onGo).toHaveBeenCalledWith('/r/knit?message=m7')
+  })
+
   it('shows "messaged you" for a message notification and opens the conversation', async () => {
     const { listNotifications, readNotification } = await import('../api')
     vi.mocked(listNotifications).mockResolvedValue({

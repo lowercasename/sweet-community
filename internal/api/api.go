@@ -358,6 +358,28 @@ func readBody(w http.ResponseWriter, r *http.Request) (clean string, ok bool) {
 	return clean, true
 }
 
+// readMessageBody is readBody with the message's optional reply_to.
+func readMessageBody(w http.ResponseWriter, r *http.Request) (clean string, replyTo *string, ok bool) {
+	var in struct {
+		BodyHTML string  `json:"body_html"`
+		ReplyTo  *string `json:"reply_to"`
+	}
+	r.Body = http.MaxBytesReader(w, r.Body, sanitize.MaxBodyBytes)
+	if err := json.NewDecoder(r.Body).Decode(&in); err != nil {
+		writeErr(w, http.StatusBadRequest, "Bad request")
+		return "", nil, false
+	}
+	clean = sanitize.Body(in.BodyHTML)
+	if sanitize.IsEmpty(clean) {
+		writeErr(w, http.StatusBadRequest, "The body is empty")
+		return "", nil, false
+	}
+	if in.ReplyTo != nil && *in.ReplyTo == "" {
+		in.ReplyTo = nil
+	}
+	return clean, in.ReplyTo, true
+}
+
 // readPostBody is readBody with the post's optional topic_id.
 func readPostBody(w http.ResponseWriter, r *http.Request) (clean string, topicID *string, ok bool) {
 	var in struct {
@@ -503,7 +525,7 @@ func (s *Server) createPost(w http.ResponseWriter, r *http.Request) {
 		p := wirePost(row)
 		pid := p.ID
 		entries := []events.Entry{{Kind: "post", Payload: &p}}
-		told, err := mentionEvents(r, qtx, clean, author.ID, g.ID, &pid, now, "")
+		told, err := mentionEvents(r, qtx, clean, author.ID, g.ID, &pid, nil, now, "")
 		if err != nil {
 			return nil, nil, http.StatusInternalServerError, err
 		}

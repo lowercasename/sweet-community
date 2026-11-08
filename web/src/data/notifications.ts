@@ -57,6 +57,10 @@ export function describe(n: Notification, groups: Group[], topics: Topic[] = [])
       return 'joined the community'
     case 'message':
       return 'messaged you'
+    case 'reply': {
+      const room = groups.find((g) => g.id === n.group_id)
+      return `replied to your message in ${room ? (room.kind === 'root' ? 'the chat' : room.name) : 'a room'}`
+    }
   }
 }
 
@@ -64,5 +68,7 @@ export function describe(n: Notification, groups: Group[], topics: Topic[] = [])
 export function targetOf(n: Notification, rootId?: string): string {
   if (n.post_id) return postPath(n.post_id)
   if (n.kind === 'joined') return profilePath(n.actor.username)
+  // A mention or reply in chat opens the chat at its message.
+  if (n.message_id) return `${groupPath(n.group_id, rootId)}?message=${encodeURIComponent(n.message_id)}`
   return groupPath(n.group_id, rootId)
 }

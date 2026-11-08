@@ -22,7 +22,19 @@ type Message struct {
 	BodyHTML  string `json:"body_html"`
 	BodyText  string `json:"body_text"`
 	CreatedAt int64  `json:"created_at"`
-	Can       Can    `json:"can"`
+	// ReplyTo is the message this one replies to, or nil (architecture.md, Chat).
+	ReplyTo *ReplyTo `json:"reply_to"`
+	Can     Can      `json:"can"`
+}
+
+// ReplyTo is a snippet of the message a reply answers, built from the
+// original row when the reply is read. Once the original is deleted, only its
+// id and Deleted are sent, so the deleted text is not shown.
+type ReplyTo struct {
+	ID      string `json:"id"`
+	Author  *User  `json:"author"`
+	Text    string `json:"text"`
+	Deleted bool   `json:"deleted"`
 }
 
 // listMessages returns the newest page first, like posts, and the client
@@ -59,7 +71,7 @@ func (s *Server) createMessage(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusForbidden, "This room has no chat")
 		return
 	}
-	clean, ok := readBody(w, r)
+	clean, replyTo, ok := readMessageBody(w, r)
 	if !ok {
 		return
 	}
@@ -70,11 +82,25 @@ func (s *Server) createMessage(w http.ResponseWriter, r *http.Request) {
 	}
 	author, _ := userFrom(r.Context())
 	now := db.Now()
-	// The message, a notification to each user it mentions, and in a
-	// conversation a notification to the other member, are written in one
-	// transaction.
+	// One transaction writes the message, a notification to each user it
+	// mentions, a reply notification to the author of the message it replies
+	// to, and in a conversation a notification to the other member.
 	s.loggedMany(w, r, now, func(qtx *store.Queries) ([]events.Entry, any, int, error) {
-		if err := qtx.CreateMessage(r.Context(), store.CreateMessageParams{ID: id.String(), GroupID: g.ID, AuthorID: author.ID, BodyHtml: clean, BodyText: sanitize.Text(clean), CreatedAt: now}); err != nil {
+		// A reply must point at a live message in this chat.
+		answered := "" // the author of the message replied to
+		reply := sql.NullString{}
+		if replyTo != nil {
+			owners, err := qtx.GetMessageOwners(r.Context(), *replyTo)
+			if errors.Is(err, sql.ErrNoRows) || (err == nil && owners.GroupID != g.ID) {
+				return nil, nil, http.StatusBadRequest, errors.New("You can only reply to a message in this chat")
+			}
+			if err != nil {
+				return nil, nil, http.StatusInternalServerError, err
+			}
+			answered = owners.AuthorID
+			reply = sql.NullString{String: *replyTo, Valid: true}
+		}
+		if err := qtx.CreateMessage(r.Context(), store.CreateMessageParams{ID: id.String(), GroupID: g.ID, AuthorID: author.ID, BodyHtml: clean, BodyText: sanitize.Text(clean), CreatedAt: now, ReplyTo: reply}); err != nil {
 			return nil, nil, http.StatusInternalServerError, err
 		}
 		row, err := qtx.GetMessage(r.Context(), id.String())
@@ -82,10 +108,22 @@ func (s *Server) createMessage(w http.ResponseWriter, r *http.Request) {
 			return nil, nil, http.StatusInternalServerError, err
 		}
 		m := wireMessage(row)
-		told, err := mentionEvents(r, qtx, clean, author.ID, g.ID, nil, now, "")
+		// In a room's chat the author of the original gets a reply notification and
+		// no mention notification as well. In a conversation the message
+		// notification covers a reply.
+		replied, err := notifyReply(r, qtx, g, answered, author.ID, m.ID, now)
 		if err != nil {
 			return nil, nil, http.StatusInternalServerError, err
 		}
+		skip := ""
+		if len(replied) > 0 {
+			skip = answered
+		}
+		told, err := mentionEvents(r, qtx, clean, author.ID, g.ID, nil, &m.ID, now, skip)
+		if err != nil {
+			return nil, nil, http.StatusInternalServerError, err
+		}
+		told = append(replied, told...)
 		messaged, err := notifyMessage(r, qtx, g, author.ID, now)
 		if err != nil {
 			return nil, nil, http.StatusInternalServerError, err

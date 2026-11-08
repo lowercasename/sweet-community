@@ -12,7 +12,7 @@ test.describe('search', () => {
     await article(kit.page, word).getByRole('button', { name: 'Show comments' }).click()
     await article(kit.page, word).locator('.editor-line .ProseMirror').click()
     await kit.page.keyboard.type(`${word} for everyone`)
-    await kit.page.getByRole('button', { name: 'Reply' }).click()
+    await kit.page.getByRole('button', { name: 'Reply', exact: true }).click()
     await article(kit.page, word).getByRole('button', { name: 'Hide comments' }).click()
     await sendMessage(kit.page, `who wants ${word}?`)
     const room = await kit.context.request.post('/api/groups', {

@@ -13,6 +13,10 @@ interface ButtonProps {
   disabled?: boolean
   /** True while the action runs. The button is disabled, shows a spinner and keeps its label and colour. */
   busy?: boolean
+  /** The 26px icon-only size, for a control inside a chat message line. */
+  compact?: boolean
+  /** Hide the button until its block is hovered or focused, on devices with a pointer, like a revealed menu. */
+  reveal?: 'post' | 'comment' | 'message'
   /** For a toggle button. Whether the toggle is on (aria-pressed). */
   pressed?: boolean
   /** Whether this button opens the page being viewed (aria-current). Used for a nav section's action control. */
@@ -39,6 +43,19 @@ const BASE =
   'inline-flex items-center justify-center gap-1.5 rounded-[4px] font-sans text-[15px] leading-[22px] ' +
   'cursor-pointer appearance-none transition-colors duration-150 ' +
   'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-pink disabled:cursor-default'
+
+/**
+ * The classes that hide a revealed control (a menu trigger or a reply button) until its block is hovered or focused, on devices with a pointer only. The
+ * blocks have the classes `block-post` (Card as article), `block-comment` (Box as article) and `block-message`
+ * (MessageBlock).
+ */
+export const REVEAL: Record<'post' | 'comment' | 'message', string> = {
+  post: 'pointer-fine:opacity-0 pointer-fine:[.block-post:hover:not(:has(.block-comment:hover))_&]:opacity-100 pointer-fine:[.block-post:focus-within:not(:has(.block-comment:focus-within))_&]:opacity-100',
+  comment:
+    'pointer-fine:opacity-0 pointer-fine:[.block-comment:hover_&]:opacity-100 pointer-fine:[.block-comment:focus-within_&]:opacity-100',
+  message:
+    'pointer-fine:opacity-0 pointer-fine:[.block-message:hover_&]:opacity-100 pointer-fine:[.block-message:focus-within_&]:opacity-100',
+}
 
 /**
  * The ghost hover and current classes, shared by the nav items and list rows that are drawn like ghost buttons. The
@@ -89,6 +106,8 @@ export function Button({
   type = 'button',
   disabled,
   busy = false,
+  compact = false,
+  reveal,
   pressed,
   current,
   label,
@@ -108,7 +127,7 @@ export function Button({
     <>
       <button
         ref={tip.ref}
-        className={buttonClass(variant, iconOnly, busy)}
+        className={`${buttonClass(variant, iconOnly, busy, compact)} ${reveal ? REVEAL[reveal] : ''}`}
         type={type}
         disabled={disabled || busy}
         aria-busy={busy || undefined}

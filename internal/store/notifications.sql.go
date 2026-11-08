@@ -32,8 +32,8 @@ func (q *Queries) CountUnreadNotificationsInGroup(ctx context.Context, arg Count
 
 const createNotification = `-- name: CreateNotification :exec
 
-INSERT INTO notifications (id, user_id, kind, actor_id, group_id, post_id, topic_id, created_at)
-VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)
+INSERT INTO notifications (id, user_id, kind, actor_id, group_id, post_id, topic_id, message_id, created_at)
+VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)
 `
 
 type CreateNotificationParams struct {
@@ -44,6 +44,7 @@ type CreateNotificationParams struct {
 	GroupID   string
 	PostID    sql.NullString
 	TopicID   sql.NullString
+	MessageID sql.NullString
 	CreatedAt int64
 }
 
@@ -58,6 +59,7 @@ func (q *Queries) CreateNotification(ctx context.Context, arg CreateNotification
 		arg.GroupID,
 		arg.PostID,
 		arg.TopicID,
+		arg.MessageID,
 		arg.CreatedAt,
 	)
 	return err
@@ -151,7 +153,7 @@ func (q *Queries) GetFeedMarker(ctx context.Context, arg GetFeedMarkerParams) (G
 }
 
 const getNotification = `-- name: GetNotification :one
-SELECT n.id, n.user_id, n.kind, n.group_id, n.post_id, n.topic_id, n.created_at, n.read_at,
+SELECT n.id, n.user_id, n.kind, n.group_id, n.post_id, n.topic_id, n.message_id, n.created_at, n.read_at,
        u.id AS actor_id, u.username AS actor_username, u.picture_id AS actor_picture_id
 FROM notifications n JOIN users u ON u.id = n.actor_id
 WHERE n.id = ?1
@@ -164,6 +166,7 @@ type GetNotificationRow struct {
 	GroupID        string
 	PostID         sql.NullString
 	TopicID        sql.NullString
+	MessageID      sql.NullString
 	CreatedAt      int64
 	ReadAt         sql.NullInt64
 	ActorID        string
@@ -181,6 +184,7 @@ func (q *Queries) GetNotification(ctx context.Context, id string) (GetNotificati
 		&i.GroupID,
 		&i.PostID,
 		&i.TopicID,
+		&i.MessageID,
 		&i.CreatedAt,
 		&i.ReadAt,
 		&i.ActorID,
@@ -277,7 +281,7 @@ func (q *Queries) ListMarkers(ctx context.Context, userID string) ([]ListMarkers
 }
 
 const listNotifications = `-- name: ListNotifications :many
-SELECT n.id, n.user_id, n.kind, n.group_id, n.post_id, n.topic_id, n.created_at, n.read_at,
+SELECT n.id, n.user_id, n.kind, n.group_id, n.post_id, n.topic_id, n.message_id, n.created_at, n.read_at,
        u.id AS actor_id, u.username AS actor_username, u.picture_id AS actor_picture_id
 FROM notifications n JOIN users u ON u.id = n.actor_id
 WHERE n.user_id = ?1 AND n.created_at < ?2
@@ -298,6 +302,7 @@ type ListNotificationsRow struct {
 	GroupID        string
 	PostID         sql.NullString
 	TopicID        sql.NullString
+	MessageID      sql.NullString
 	CreatedAt      int64
 	ReadAt         sql.NullInt64
 	ActorID        string
@@ -321,6 +326,7 @@ func (q *Queries) ListNotifications(ctx context.Context, arg ListNotificationsPa
 			&i.GroupID,
 			&i.PostID,
 			&i.TopicID,
+			&i.MessageID,
 			&i.CreatedAt,
 			&i.ReadAt,
 			&i.ActorID,

@@ -63,7 +63,7 @@ import {
   type Topic,
   type User,
 } from '../api'
-import { applyEvent, applyFollowing, findPost } from './apply'
+import { applyEvent, applyFollowing, findPost, refetchForOwnRole } from './apply'
 import { ROOT_ID, keys } from './keys'
 import { NOTIFICATIONS, unreadPlaces, type UnreadPlace } from './notifications'
 
@@ -244,8 +244,8 @@ export function useMessages(groupId: string) {
 export function useMessageActions(groupId: string) {
   const qc = useQueryClient()
   return {
-    async send(html: string) {
-      applyEvent(qc, 'message', await createMessage(groupId, html))
+    async send(html: string, replyTo?: string) {
+      applyEvent(qc, 'message', await createMessage(groupId, html, replyTo))
     },
     async remove(id: string) {
       await deleteMessage(id)
@@ -280,9 +280,10 @@ export function useSetRole(groupId: string) {
   const qc = useQueryClient()
   return async (userId: string, role: Role) => {
     applyEvent(qc, 'membership', await setMemberRole(groupId, userId, role))
-    // A transfer of ownership changed the viewer's own membership too. The server logged both changes, and the
-    // stream will deliver the viewer's.
-    if (role === 'owner') void qc.invalidateQueries({ queryKey: keys.groups })
+    // A transfer of ownership also makes the viewer a moderator. The response carries only the new owner's
+    // membership, so the client refetches what depends on the viewer's role now. It does not wait for the stream's
+    // event for the viewer's membership, which may be late or never arrive while the stream is disconnected.
+    if (role === 'owner') refetchForOwnRole(qc, groupId)
   }
 }
 

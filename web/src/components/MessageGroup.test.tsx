@@ -12,6 +12,35 @@ vi.mock('../api', () => ({
 
 afterEach(cleanup)
 
+describe('MessageGroup replies', () => {
+  it('shows a quote of the message a reply answers, says when it was deleted, and offers Reply on every message', async () => {
+    const { MessageGroup } = await import('./MessageGroup')
+    const onReply = vi.fn()
+    const onJump = vi.fn()
+    renderWithQuery(
+      <MessageGroup
+        messages={[
+          message('m3', user('mo'), {
+            reply_to: { id: 'm1', author: user('kit'), text: 'Who has the projector?', deleted: false },
+          }),
+          message('m4', user('mo'), { reply_to: { id: 'm2', author: null, text: '', deleted: true } }),
+        ]}
+        onDelete={() => Promise.resolve()}
+        onReply={onReply}
+        onJump={onJump}
+      />,
+    )
+    const quote = screen.getByRole('button', { name: /kit: Who has the projector\?/ })
+    fireEvent.click(quote)
+    expect(onJump).toHaveBeenCalledWith('m1')
+    expect(screen.getByText('Message deleted')).toBeTruthy()
+    const replies = screen.getAllByRole('button', { name: 'Reply to this message' })
+    expect(replies).toHaveLength(2)
+    fireEvent.click(replies[0])
+    expect(onReply).toHaveBeenCalledWith(expect.objectContaining({ id: 'm3' }))
+  })
+})
+
 describe('MessageGroup', () => {
   it('offers Delete only on messages the server allows, and confirms before deleting', async () => {
     const { MessageGroup } = await import('./MessageGroup')

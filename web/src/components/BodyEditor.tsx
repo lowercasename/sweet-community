@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { useEditor, useEditorState, type Extensions } from '@tiptap/react'
 import { withPlaceholder } from '../editor/extensions'
 import { mentionSuggestionKey, withMentions } from '../editor/mentions'
@@ -49,6 +49,12 @@ interface BodyEditorProps {
    * does not pass it. Nothing is shown while no topics exist.
    */
   topic?: { topics: Topic[]; value: string | null; onChange: (topicId: string | null) => void }
+  /** Shown above the editor, such as the message being replied to. */
+  head?: ReactNode
+  /** Called on Escape in a new message, such as to cancel a reply. An edit's Escape calls onCancel instead. */
+  onEscape?: () => void
+  /** When this value changes to a new non-empty value, the editor takes focus, such as when Reply is clicked. */
+  focus?: string
 }
 
 /**
@@ -69,6 +75,9 @@ export function BodyEditor({
   onCancel,
   allowEmpty = false,
   topic,
+  head,
+  onEscape,
+  focus,
 }: BodyEditorProps) {
   const editing = initialHtml !== undefined
   const [busy, setBusy] = useState(false)
@@ -77,8 +86,8 @@ export function BodyEditor({
 
   // TipTap creates the keydown handler once, so the handler reads the latest callbacks through refs.
   const submitRef = useRef<() => void>(() => {})
-  const cancelRef = useRef<(() => void) | undefined>(onCancel)
-  cancelRef.current = onCancel
+  const cancelRef = useRef<(() => void) | undefined>(onCancel ?? onEscape)
+  cancelRef.current = onCancel ?? onEscape
 
   // The users the @ list can suggest. These are the group's members, read from the query cache when the list opens.
   const { members } = useMembers(groupId)
@@ -130,6 +139,9 @@ export function BodyEditor({
       },
     },
   })
+  useEffect(() => {
+    if (focus) editor?.commands.focus('end')
+  }, [focus, editor])
 
   const addImagesRef = useRef<(files: File[]) => void>(() => {})
   addImagesRef.current = (files: File[]) => {
@@ -175,6 +187,7 @@ export function BodyEditor({
   return (
     <Form onSubmit={() => void submit()}>
       <Stack gap={size === 'line' ? 1 : 2}>
+        {head}
         {attached.length > 0 && (
           <Stack gap={0}>
             {attached.map((img, i) => (

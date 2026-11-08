@@ -33,7 +33,7 @@ test.describe('posts and comments', () => {
     await article(mo.page, text).getByRole('button', { name: 'Show comments' }).click()
     await article(mo.page, text).locator('.editor-line .ProseMirror').click()
     await mo.page.keyboard.type('Boats are fine too')
-    await mo.page.getByRole('button', { name: 'Reply' }).click()
+    await mo.page.getByRole('button', { name: 'Reply', exact: true }).click()
     await expect(article(mo.page, text)).toContainText('Boats are fine too')
     await expect(article(kit.page, text).getByRole('button', { name: 'Show comments' })).toContainText('1')
     await article(kit.page, text).getByRole('button', { name: 'Show comments' }).click()
@@ -91,7 +91,7 @@ test.describe('post page', () => {
     await expect(shown.locator('[data-placeholder]')).toHaveAttribute('data-placeholder', `Reply to ${kit.username}…`)
     await shown.locator('.editor-line .ProseMirror').click()
     await kit.page.keyboard.type('From the page')
-    await kit.page.getByRole('button', { name: 'Reply' }).click()
+    await kit.page.getByRole('button', { name: 'Reply', exact: true }).click()
     await expect(shown).toContainText('From the page')
 
     // The URL still works after a reload and for another user.
@@ -152,7 +152,7 @@ test.describe('menus', () => {
     await post.getByRole('button', { name: 'Show comments' }).click()
     await post.locator('.editor-line .ProseMirror').click()
     await kit.page.keyboard.type('A reply')
-    await kit.page.getByRole('button', { name: 'Reply' }).click()
+    await kit.page.getByRole('button', { name: 'Reply', exact: true }).click()
     const comment = post.getByRole('article').filter({ hasText: 'A reply' })
     await comment.hover()
     await expect(comment.getByRole('button', { name: 'Comment options' })).toHaveCSS('opacity', '1')

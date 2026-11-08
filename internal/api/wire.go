@@ -61,7 +61,7 @@ func wireComment(row store.GetCommentRow) Comment {
 }
 
 func wireMessage(row store.GetMessageRow) Message {
-	return Message{
+	m := Message{
 		ID:        row.ID,
 		GroupID:   row.GroupID,
 		Author:    wireUser(row.AuthorID, row.AuthorUsername, row.AuthorPictureID),
@@ -69,6 +69,27 @@ func wireMessage(row store.GetMessageRow) Message {
 		BodyText:  row.BodyText,
 		CreatedAt: row.CreatedAt,
 	}
+	if row.ReplyTo.Valid {
+		rt := &ReplyTo{ID: row.ReplyTo.String}
+		if row.ReplyDeletedAt.Valid || !row.ReplyAuthorID.Valid {
+			rt.Deleted = true
+		} else {
+			u := wireUser(row.ReplyAuthorID.String, row.ReplyAuthorUsername.String, row.ReplyAuthorPictureID)
+			rt.Author = &u
+			rt.Text = excerpt(row.ReplyText.String, 200)
+		}
+		m.ReplyTo = rt
+	}
+	return m
+}
+
+// excerpt returns the first n characters of s, cut at a character boundary.
+func excerpt(s string, n int) string {
+	r := []rune(s)
+	if len(r) <= n {
+		return s
+	}
+	return string(r[:n])
 }
 
 func wireNotification(row store.GetNotificationRow) Notification {
@@ -85,6 +106,7 @@ func wireNotification(row store.GetNotificationRow) Notification {
 		GroupID:   row.GroupID,
 		PostID:    pid,
 		TopicID:   nullStr(row.TopicID),
+		MessageID: nullStr(row.MessageID),
 		CreatedAt: row.CreatedAt,
 		ReadAt:    nullInt(row.ReadAt),
 	}

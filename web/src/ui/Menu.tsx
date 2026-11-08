@@ -14,7 +14,7 @@ import {
   useRole,
 } from '@floating-ui/react'
 import type { ReactNode } from 'react'
-import { buttonClass } from './Button'
+import { REVEAL, buttonClass } from './Button'
 import { Icon, type IconName } from './Icon'
 import { PILL_ICON, pillClass, type PillSize } from './Pill'
 import { useTooltip } from './Tooltip'
@@ -57,19 +57,6 @@ interface MenuProps {
    * is hovered. A message's menu shows while its own row is hovered.
    */
   reveal?: 'post' | 'comment' | 'message'
-}
-
-/**
- * The classes that hide a revealed menu until its block is hovered or focused, on devices with a pointer only. The
- * blocks have the classes `block-post` (Card as article), `block-comment` (Box as article) and `block-message`
- * (MessageBlock).
- */
-const REVEAL: Record<NonNullable<MenuProps['reveal']>, string> = {
-  post: 'pointer-fine:opacity-0 pointer-fine:[.block-post:hover:not(:has(.block-comment:hover))_&]:opacity-100 pointer-fine:[.block-post:focus-within:not(:has(.block-comment:focus-within))_&]:opacity-100',
-  comment:
-    'pointer-fine:opacity-0 pointer-fine:[.block-comment:hover_&]:opacity-100 pointer-fine:[.block-comment:focus-within_&]:opacity-100',
-  message:
-    'pointer-fine:opacity-0 pointer-fine:[.block-message:hover_&]:opacity-100 pointer-fine:[.block-message:focus-within_&]:opacity-100',
 }
 
 /**

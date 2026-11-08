@@ -11,8 +11,8 @@ import (
 )
 
 const createMessage = `-- name: CreateMessage :exec
-INSERT INTO messages (id, group_id, author_id, body_html, body_text, created_at)
-VALUES (?1, ?2, ?3, ?4, ?5, ?6)
+INSERT INTO messages (id, group_id, author_id, body_html, body_text, created_at, reply_to)
+VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)
 `
 
 type CreateMessageParams struct {
@@ -22,6 +22,7 @@ type CreateMessageParams struct {
 	BodyHtml  string
 	BodyText  string
 	CreatedAt int64
+	ReplyTo   sql.NullString
 }
 
 func (q *Queries) CreateMessage(ctx context.Context, arg CreateMessageParams) error {
@@ -32,6 +33,7 @@ func (q *Queries) CreateMessage(ctx context.Context, arg CreateMessageParams) er
 		arg.BodyHtml,
 		arg.BodyText,
 		arg.CreatedAt,
+		arg.ReplyTo,
 	)
 	return err
 }
@@ -52,20 +54,30 @@ func (q *Queries) DeleteMessage(ctx context.Context, arg DeleteMessageParams) er
 
 const getMessage = `-- name: GetMessage :one
 SELECT m.id, m.group_id, m.body_html, m.body_text, m.created_at,
-       u.id AS author_id, u.username AS author_username, u.picture_id AS author_picture_id
+       u.id AS author_id, u.username AS author_username, u.picture_id AS author_picture_id,
+       m.reply_to, r.body_text AS reply_text, r.deleted_at AS reply_deleted_at,
+       ru.id AS reply_author_id, ru.username AS reply_author_username, ru.picture_id AS reply_author_picture_id
 FROM messages m JOIN users u ON u.id = m.author_id
+LEFT JOIN messages r ON r.id = m.reply_to
+LEFT JOIN users ru ON ru.id = r.author_id
 WHERE m.id = ?1 AND m.deleted_at IS NULL
 `
 
 type GetMessageRow struct {
-	ID              string
-	GroupID         string
-	BodyHtml        string
-	BodyText        string
-	CreatedAt       int64
-	AuthorID        string
-	AuthorUsername  string
-	AuthorPictureID sql.NullString
+	ID                   string
+	GroupID              string
+	BodyHtml             string
+	BodyText             string
+	CreatedAt            int64
+	AuthorID             string
+	AuthorUsername       string
+	AuthorPictureID      sql.NullString
+	ReplyTo              sql.NullString
+	ReplyText            sql.NullString
+	ReplyDeletedAt       sql.NullInt64
+	ReplyAuthorID        sql.NullString
+	ReplyAuthorUsername  sql.NullString
+	ReplyAuthorPictureID sql.NullString
 }
 
 func (q *Queries) GetMessage(ctx context.Context, id string) (GetMessageRow, error) {
@@ -80,6 +92,12 @@ func (q *Queries) GetMessage(ctx context.Context, id string) (GetMessageRow, err
 		&i.AuthorID,
 		&i.AuthorUsername,
 		&i.AuthorPictureID,
+		&i.ReplyTo,
+		&i.ReplyText,
+		&i.ReplyDeletedAt,
+		&i.ReplyAuthorID,
+		&i.ReplyAuthorUsername,
+		&i.ReplyAuthorPictureID,
 	)
 	return i, err
 }
@@ -104,8 +122,12 @@ func (q *Queries) GetMessageOwners(ctx context.Context, id string) (GetMessageOw
 const listMessages = `-- name: ListMessages :many
 
 SELECT m.id, m.group_id, m.body_html, m.body_text, m.created_at,
-       u.id AS author_id, u.username AS author_username, u.picture_id AS author_picture_id
+       u.id AS author_id, u.username AS author_username, u.picture_id AS author_picture_id,
+       m.reply_to, r.body_text AS reply_text, r.deleted_at AS reply_deleted_at,
+       ru.id AS reply_author_id, ru.username AS reply_author_username, ru.picture_id AS reply_author_picture_id
 FROM messages m JOIN users u ON u.id = m.author_id
+LEFT JOIN messages r ON r.id = m.reply_to
+LEFT JOIN users ru ON ru.id = r.author_id
 WHERE m.group_id = ?1 AND m.deleted_at IS NULL AND m.created_at < ?2
 ORDER BY m.created_at DESC, m.id DESC
 LIMIT ?3
@@ -118,17 +140,25 @@ type ListMessagesParams struct {
 }
 
 type ListMessagesRow struct {
-	ID              string
-	GroupID         string
-	BodyHtml        string
-	BodyText        string
-	CreatedAt       int64
-	AuthorID        string
-	AuthorUsername  string
-	AuthorPictureID sql.NullString
+	ID                   string
+	GroupID              string
+	BodyHtml             string
+	BodyText             string
+	CreatedAt            int64
+	AuthorID             string
+	AuthorUsername       string
+	AuthorPictureID      sql.NullString
+	ReplyTo              sql.NullString
+	ReplyText            sql.NullString
+	ReplyDeletedAt       sql.NullInt64
+	ReplyAuthorID        sql.NullString
+	ReplyAuthorUsername  sql.NullString
+	ReplyAuthorPictureID sql.NullString
 }
 
 // Chat messages belong to a group's chat. The handler checks membership.
+// Each message with the message it replies to, if any: its author and text, or
+// its deleted time once deleted. The columns match GetMessage.
 func (q *Queries) ListMessages(ctx context.Context, arg ListMessagesParams) ([]ListMessagesRow, error) {
 	rows, err := q.db.QueryContext(ctx, listMessages, arg.GroupID, arg.Before, arg.PageSize)
 	if err != nil {
@@ -147,6 +177,12 @@ func (q *Queries) ListMessages(ctx context.Context, arg ListMessagesParams) ([]L
 			&i.AuthorID,
 			&i.AuthorUsername,
 			&i.AuthorPictureID,
+			&i.ReplyTo,
+			&i.ReplyText,
+			&i.ReplyDeletedAt,
+			&i.ReplyAuthorID,
+			&i.ReplyAuthorUsername,
+			&i.ReplyAuthorPictureID,
 		); err != nil {
 			return nil, err
 		}

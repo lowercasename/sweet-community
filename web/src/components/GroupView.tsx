@@ -1,3 +1,4 @@
+import { useEffect } from 'react'
 import type { Group, User } from '../api'
 import { useUnreadPlaces } from '../data/hooks'
 import { useLayout } from '../hooks/useLayout'
@@ -11,6 +12,10 @@ interface GroupViewProps {
   hidden: boolean
   /** The topic that the community's feed is filtered to (architecture.md, Topics). */
   topicId?: string | null
+  /** A chat message to scroll to, from a notification. The chat pane is shown if it is hidden. */
+  focusMessage?: string | null
+  /** Called once the chat has shown the message, or could not find it. */
+  onFocused?: () => void
 }
 
 /**
@@ -28,10 +33,14 @@ export function groupLabel(g: Group, me: User): string {
  * pane takes the whole width. Home renders the bar above the panes (GroupBar),
  * because the bar stays mounted after the view unmounts.
  */
-export function GroupView({ group, hidden, topicId = null }: GroupViewProps) {
+export function GroupView({ group, hidden, topicId = null, focusMessage = null, onFocused }: GroupViewProps) {
   const { layout, narrow, ratio, setLayout, setRatio } = useLayout()
   const both = group.mode === 'both'
   const show = layout === 'both' ? 'both' : layout === 'posts' ? 'left' : 'right'
+  // A notification for a chat message opens the chat, on a phone in place of the posts.
+  useEffect(() => {
+    if (focusMessage && both && show === 'left') setLayout(narrow ? 'chat' : 'both')
+  }, [focusMessage, both, show, narrow, setLayout])
   const rails = !narrow
   const unread = useUnreadPlaces().get(group.id)
 
@@ -78,13 +87,15 @@ export function GroupView({ group, hidden, topicId = null }: GroupViewProps) {
               groupId={group.id}
               side={show === 'both' ? 'right' : 'full'}
               watching={!hidden && show !== 'left'}
+              focusMessage={focusMessage}
+              onFocused={onFocused}
             />
           }
         />
       ) : group.mode === 'posts' ? (
         <PostsPane groupId={group.id} watching={!hidden} topicId={topicId} />
       ) : (
-        <ChatPane groupId={group.id} watching={!hidden} />
+        <ChatPane groupId={group.id} watching={!hidden} focusMessage={focusMessage} onFocused={onFocused} />
       )}
     </Stack>
   )

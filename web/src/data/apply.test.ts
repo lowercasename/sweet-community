@@ -5,7 +5,7 @@ import { makeQueryClient } from './client'
 import { keys } from './keys'
 import { applyEvent } from './apply'
 import { ROOT, comment, dm, group, marker, member, message, mine, notification, post, user } from '../test-utils'
-import type { Group, Marker, Member, Notification, Post, PostPage, User } from '../api'
+import type { Group, Marker, Member, Message, Notification, Post, PostPage, User } from '../api'
 
 /**
  * The event stream is the cache's write path. Each resource has one upsert
@@ -202,6 +202,29 @@ describe('applyEvent', () => {
     expect(ids()).not.toContain('m2')
     applyEvent(qc, 'message', message('x1', kit, { group_id: 'elsewhere' }))
     expect(qc.getQueryData(keys.messages('elsewhere'))).toBeUndefined()
+  })
+
+  it('a deleted message turns the snippet in each reply to it into a deleted one, and a renamed author is renamed in snippets', () => {
+    qc.setQueryData(keys.messages(ROOT), {
+      pages: [
+        {
+          messages: [
+            message('m2', mo, { reply_to: { id: 'm1', author: kit, text: 'hi', deleted: false } }),
+            message('m1', kit),
+          ],
+          next_before: null,
+        },
+      ],
+      pageParams: [null],
+    })
+    const reply = () =>
+      (qc.getQueryData(keys.messages(ROOT)) as { pages: { messages: Message[] }[] }).pages[0].messages.find(
+        (m) => m.id === 'm2',
+      )?.reply_to
+    applyEvent(qc, 'user', user('kit', '/img/new'))
+    expect(reply()?.author?.picture).toBe('/img/new')
+    applyEvent(qc, 'message_delete', { id: 'm1', group_id: ROOT })
+    expect(reply()).toEqual({ id: 'm1', author: null, text: '', deleted: true })
   })
 
   it('updates a user in every place the cache holds them, including the signed-in user', () => {

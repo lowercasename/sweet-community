@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { cleanup, screen } from '@testing-library/react'
+import { cleanup, fireEvent, screen } from '@testing-library/react'
 import { ROOT, marker, message, renderWithQuery, user } from '../test-utils'
 
 /**
@@ -50,5 +50,15 @@ describe('ChatPane read marker', () => {
     await draw(false)
     await new Promise((r) => setTimeout(r, 1200))
     expect(setMarker).not.toHaveBeenCalled()
+  })
+})
+
+describe('ChatPane replies', () => {
+  it('attaches the message to the editor on Reply, and Cancel reply removes it', async () => {
+    await draw(true)
+    fireEvent.click(screen.getAllByRole('button', { name: 'Reply to this message' })[1])
+    expect(screen.getByText(/Replying to/)).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel reply' }))
+    expect(screen.queryByText(/Replying to/)).toBeNull()
   })
 })

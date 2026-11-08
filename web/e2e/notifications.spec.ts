@@ -17,7 +17,7 @@ test.describe('notifications', () => {
     await article(mo.page, text).getByRole('button', { name: 'Show comments' }).click()
     await article(mo.page, text).locator('.editor-line .ProseMirror').click()
     await mo.page.keyboard.type('Answered')
-    await mo.page.getByRole('button', { name: 'Reply' }).click()
+    await mo.page.getByRole('button', { name: 'Reply', exact: true }).click()
 
     // The event arrives live over the stream. Kit's notifications button shows a dot, and mo's does not.
     await expect(nav.getByRole('button', { name: 'Notifications, unread' })).toBeVisible()

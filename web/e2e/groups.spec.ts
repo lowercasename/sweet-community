@@ -116,9 +116,11 @@ test.describe('groups', () => {
     await confirm(kit.page, 'Make owner')
     await expect(moRow).toContainText('owner')
     await expect(moRow).toContainText(/joined (just now|\d+m ago)/)
-    await expect(kit.page.getByRole('listitem').filter({ hasText: kit.username })).toContainText(
-      /joined (just now|\d+m ago)/,
-    )
+    // Kit's own row shows the new role at once, without a reload.
+    const kitRow = kit.page.getByRole('listitem').filter({ hasText: kit.username })
+    await expect(kitRow).toContainText('moderator')
+    await expect(kitRow).not.toContainText('owner')
+    await expect(kitRow).toContainText(/joined (just now|\d+m ago)/)
     await expect(kit.page.getByRole('button', { name: 'Leave room' })).toBeVisible()
     await expect(kit.page.getByRole('heading', { name: 'Room settings' })).toHaveCount(0)
     // Mo is now the owner, sees the settings, and cannot leave.
@@ -135,6 +137,32 @@ test.describe('groups', () => {
     await confirm(mo.page, 'Delete room')
     await expect(mo.page).toHaveURL(/\/$/)
     await expect(nav(mo.page).getByRole('button', { name })).toHaveCount(0)
+    await kit.context.close()
+    await mo.context.close()
+  })
+
+  test('after a handover the old owner is shown as a moderator at once, even when the event stream is down', async ({
+    browser,
+  }, testInfo) => {
+    const kit = await member(browser, testInfo, 'kit')
+    const mo = await member(browser, testInfo, 'mo')
+    const name = uniq('Handover offline ')
+    const room = (await (
+      await kit.context.request.post('/api/groups', { data: { kind: 'group', name, mode: 'both' } })
+    ).json()) as { id: string }
+    const moId = ((await (await mo.context.request.get('/api/me')).json()) as { id: string }).id
+    await kit.context.request.post(`/api/groups/${room.id}/members`, { data: { user_id: moId } })
+    // Kit's event stream never connects, so the page knows only what its own requests return.
+    await kit.page.route('**/api/events*', (route) => route.abort())
+    await open(kit.page, `/r/${room.id}/members`)
+    const moRow = kit.page.getByRole('listitem').filter({ hasText: mo.username })
+    await pick(kit.page, moRow, `Options for ${mo.username}`, 'Make owner')
+    await confirm(kit.page, 'Make owner')
+    await expect(moRow).toContainText('owner')
+    const kitRow = kit.page.getByRole('listitem').filter({ hasText: kit.username })
+    await expect(kitRow).toContainText('moderator')
+    await expect(kitRow).not.toContainText('owner')
+    await expect(kit.page.getByRole('heading', { name: 'Room settings' })).toHaveCount(0)
     await kit.context.close()
     await mo.context.close()
   })

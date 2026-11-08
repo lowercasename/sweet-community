@@ -19,7 +19,7 @@ const NotifyMention = "mention"
 // returns the notification events (architecture.md, Posts: extraction;
 // Notifications). A mention of a user outside the group is left as text,
 // because that user could not see the body anyway.
-func mentionEvents(r *http.Request, qtx *store.Queries, body, author, groupID string, postID *string, now int64, skip string) ([]events.Entry, error) {
+func mentionEvents(r *http.Request, qtx *store.Queries, body, author, groupID string, postID, messageID *string, now int64, skip string) ([]events.Entry, error) {
 	var out []events.Entry
 	for _, uid := range sanitize.Mentions(body) {
 		if uid == author || uid == skip {
@@ -30,7 +30,7 @@ func mentionEvents(r *http.Request, qtx *store.Queries, body, author, groupID st
 		} else if err != nil {
 			return nil, err
 		}
-		told, err := notify(r, qtx, NotifyMention, uid, author, groupID, postID, now)
+		told, err := notifyAbout(r, qtx, NotifyMention, uid, author, groupID, postID, nil, messageID, now)
 		if err != nil {
 			return nil, err
 		}

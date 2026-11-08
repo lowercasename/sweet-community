@@ -1,10 +1,10 @@
-import { useEffect, useLayoutEffect, useRef } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import type { Message as MessageData } from '../api'
 import { useMarkRead, useMarkers, useMessageActions, useMessages } from '../data/hooks'
 import { chatStream, markerOf } from '../data/notifications'
 import { usePageVisible } from '../hooks/usePageVisible'
 import { useStreamStatus } from '../hooks/StreamContext'
-import { Alert, Bar, Button, Card, Pane, Row, ScrollArea, Stack } from '../ui'
+import { Alert, Bar, Button, Card, Pane, ReplyStrip, Row, ScrollArea, Stack } from '../ui'
 import { chatExtensions } from '../editor/extensions'
 import { BodyEditor } from './BodyEditor'
 import { ConnectionStatus } from './ConnectionStatus'
@@ -17,6 +17,10 @@ interface ChatPaneProps {
   side?: 'left' | 'right' | 'full'
   /** True while the pane is open and not behind another page. A visible pane marks its chat as read. */
   watching: boolean
+  /** A message to scroll to and highlight, from a notification. Earlier pages are loaded until it is found. */
+  focusMessage?: string | null
+  /** Called once the message has been shown, or when it cannot be found. */
+  onFocused?: () => void
 }
 
 const GROUP_WINDOW_MS = 5 * 60_000
@@ -37,7 +41,7 @@ function group(list: MessageData[]): MessageData[][] {
 /** The delay after the last shown message before the chat is marked read, so a busy chat sends one PUT. */
 const READ_DEBOUNCE_MS = 800
 
-export function ChatPane({ groupId, side = 'full', watching }: ChatPaneProps) {
+export function ChatPane({ groupId, side = 'full', watching, focusMessage = null, onFocused }: ChatPaneProps) {
   const status = useStreamStatus()
   const { messages, loading, error, hasEarlier, loadEarlier } = useMessages(groupId)
   const { send: sendMessage, remove } = useMessageActions(groupId)
@@ -102,10 +106,45 @@ export function ChatPane({ groupId, side = 'full', watching }: ChatPaneProps) {
     await loadEarlier()
   }
 
+  // The message being replied to, attached above the editor until the reply is sent or cancelled.
+  const [replying, setReplying] = useState<MessageData | null>(null)
+  // The message a clicked quote scrolled to, highlighted briefly.
+  const [highlight, setHighlight] = useState<string | null>(null)
   const send = async (bodyHtml: string) => {
     stickRef.current = true // The user's own message always scrolls into view.
-    await sendMessage(bodyHtml)
+    await sendMessage(bodyHtml, replying?.id)
+    setReplying(null)
   }
+  // Scrolls to a message, if it is loaded, and highlights it for a moment. The view stops following new
+  // messages first. Otherwise the re-render for the highlight scrolled back to the bottom, and the quote
+  // needed several clicks.
+  const jump = (id: string): boolean => {
+    const el = document.getElementById(`message-${id}`)
+    if (!el) return false
+    stickRef.current = false
+    el.scrollIntoView({ block: 'center' })
+    setHighlight(id)
+    window.setTimeout(() => setHighlight((h) => (h === id ? null : h)), 1500)
+    return true
+  }
+  // A message a clicked quote names. It is set only when the message is not loaded yet.
+  const [seeking, setSeeking] = useState<string | null>(null)
+  const quoted = (id: string) => {
+    if (!jump(id)) setSeeking(id)
+  }
+  // Shows the message that a notification or a quote names. Earlier pages load until the message is found. When
+  // no earlier pages are left, the message is not in the chat, and the search stops.
+  const target = focusMessage ?? seeking
+  useEffect(() => {
+    if (!target || loading) return
+    if (!jump(target) && hasEarlier) {
+      void earlier()
+      return
+    }
+    if (target === focusMessage) onFocused?.()
+    else setSeeking(null)
+    // jump and earlier are recreated each render, and only these values decide whether to act again.
+  }, [target, loading, hasEarlier, messages.length])
 
   return (
     <Pane side={side} flush>
@@ -122,7 +161,14 @@ export function ChatPane({ groupId, side = 'full', watching }: ChatPaneProps) {
             {error && <Alert tone="error">{error.message}</Alert>}
             {!loading && messages.length === 0 && <Alert>Nobody has said anything yet. Say hello.</Alert>}
             {group(messages).map((run) => (
-              <MessageGroup key={run[0].id} messages={run} onDelete={remove} />
+              <MessageGroup
+                key={run[0].id}
+                messages={run}
+                onDelete={remove}
+                onReply={setReplying}
+                onJump={quoted}
+                highlight={highlight}
+              />
             ))}
           </Stack>
         </ScrollArea>
@@ -138,6 +184,17 @@ export function ChatPane({ groupId, side = 'full', watching }: ChatPaneProps) {
               submitLabel="Send"
               disabled={status === 'offline'}
               onSubmit={send}
+              head={
+                replying && (
+                  <ReplyStrip
+                    author={replying.author.username}
+                    text={replying.body_text}
+                    onCancel={() => setReplying(null)}
+                  />
+                )
+              }
+              onEscape={replying ? () => setReplying(null) : undefined}
+              focus={replying?.id}
             />
           </Stack>
         </Bar>
