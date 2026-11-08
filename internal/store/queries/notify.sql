@@ -61,7 +61,7 @@ UPDATE users SET digest_sent_at = sqlc.arg(sent_at) WHERE id = sqlc.arg(id);
 -- name: CreatePushSubscription :exec
 INSERT INTO push_subscriptions (id, user_id, endpoint, p256dh, auth, created_at)
 VALUES (sqlc.arg(id), sqlc.arg(user_id), sqlc.arg(endpoint), sqlc.arg(p256dh), sqlc.arg(auth), sqlc.arg(created_at))
-ON CONFLICT (endpoint) DO UPDATE SET user_id = excluded.user_id, p256dh = excluded.p256dh, auth = excluded.auth;
+ON CONFLICT (endpoint) DO UPDATE SET user_id = excluded.user_id, p256dh = excluded.p256dh, auth = excluded.auth, created_at = excluded.created_at;
 
 -- name: DeletePushSubscription :exec
 -- A device subscription is deleted by its owner, or by the sender when the push service reports it as gone.
@@ -72,3 +72,10 @@ SELECT id, user_id, endpoint, p256dh, auth, created_at FROM push_subscriptions W
 
 -- name: DeleteUserPushSubscriptions :exec
 DELETE FROM push_subscriptions WHERE user_id = sqlc.arg(user_id);
+
+-- name: TrimPushSubscriptions :exec
+-- Keeps a user's newest subscriptions and deletes the rest.
+DELETE FROM push_subscriptions WHERE push_subscriptions.user_id = sqlc.arg(user_id) AND push_subscriptions.id NOT IN (
+    SELECT newest.id FROM push_subscriptions AS newest WHERE newest.user_id = sqlc.arg(user_id)
+    ORDER BY newest.created_at DESC, newest.id DESC LIMIT sqlc.arg(keep)
+);

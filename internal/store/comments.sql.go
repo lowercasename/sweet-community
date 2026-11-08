@@ -137,6 +137,34 @@ func (q *Queries) GetCommentOwners(ctx context.Context, id string) (GetCommentOw
 	return i, err
 }
 
+const listCommentIDsOfPost = `-- name: ListCommentIDsOfPost :many
+SELECT id FROM comments WHERE post_id = ?1
+`
+
+// The ids of a post's comments, deleted or not. Deleting the post removes their events from the log.
+func (q *Queries) ListCommentIDsOfPost(ctx context.Context, postID string) ([]string, error) {
+	rows, err := q.db.QueryContext(ctx, listCommentIDsOfPost, postID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []string{}
+	for rows.Next() {
+		var id string
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		items = append(items, id)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listComments = `-- name: ListComments :many
 
 SELECT c.id, c.post_id, c.body_html, c.body_text, c.created_at, c.edited_at, p.author_id AS post_author_id, p.group_id,

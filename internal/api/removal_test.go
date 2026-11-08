@@ -6,7 +6,11 @@ import (
 	"errors"
 	"testing"
 
+	"sweet/internal/auth"
+	"sweet/internal/db"
 	"sweet/internal/perm"
+	"sweet/internal/push"
+	"sweet/internal/store"
 )
 
 // Removing a user from the instance (architecture.md, Admin tools). Staff
@@ -134,5 +138,51 @@ func TestRemoveFromInstance(t *testing.T) {
 	code := owner.mustStatus(201, "POST", "/api/invites", nil)["code"].(string)
 	if status, body := newClient(t, ts).do("POST", "/api/register", map[string]string{"code": code, "username": "removed-anyone", "password": "longenough", "email": "anyone@example.test"}); status != 400 {
 		t.Fatalf("registering a removed name: %d %v", status, body)
+	}
+}
+
+// A removed account cannot come back and is not notified (architecture.md,
+// Admin tools). Removal deletes the account's email links and push
+// subscriptions. A session of a removed account is refused. A comment on a
+// removed user's post notifies nobody.
+func TestRemovedUserCannotComeBackAndIsNotNotified(t *testing.T) {
+	ts, owner, srv := newTestServerWith(t)
+	fake := &fakePush{gone: map[string]bool{}}
+	srv.Push = &push.Pusher{DB: srv.DB, Send: fake}
+	srv.PushKey = "test-public-key"
+	kit, _ := registerMember(t, ts, owner, "kit")
+	mo, moID := registerMember(t, ts, owner, "mo")
+	ctx := context.Background()
+
+	post := mo.mustStatus(201, "POST", rootPath+"/posts", map[string]string{"body_html": "<p>mine</p>"})
+	mo.mustStatus(201, "POST", "/api/push/subscriptions", map[string]any{"endpoint": "https://fcm.googleapis.com/fcm/send/mo-phone", "keys": map[string]string{"p256dh": "p", "auth": "a"}})
+	anon := newClient(t, ts)
+	anon.mustStatus(202, "POST", "/api/reset", map[string]string{"email": "mo@example.test"})
+	links := mailed(t, ts, "mo@example.test", "reset")
+	if len(links) != 1 {
+		t.Fatalf("reset mail: %v", links)
+	}
+	owner.mustStatus(204, "DELETE", "/api/users/"+moID, nil)
+
+	// The reset link sent before the removal no longer works.
+	anon.mustStatus(404, "POST", "/api/reset/"+linkToken(links[0]), map[string]string{"password": "anotherlongone"})
+	// The removed account has no push subscriptions left.
+	if subs, err := srv.q().ListPushSubscriptions(ctx, moID); err != nil || len(subs) != 0 {
+		t.Fatalf("push subscriptions after removal: %v %v", subs, err)
+	}
+	// A session of a removed account is refused, however it was made.
+	token, hash, _ := auth.NewToken()
+	now := db.Now()
+	if err := srv.q().CreateSession(ctx, store.CreateSessionParams{ID: hash, UserID: moID, CreatedAt: now, LastSeenAt: now, ExpiresAt: now + SessionTTL.Milliseconds()}); err != nil {
+		t.Fatal(err)
+	}
+	if status, _ := newClient(t, ts).do("GET", "/api/me", nil, "Authorization", "Bearer "+token); status != 401 {
+		t.Fatalf("a removed account's session: %d", status)
+	}
+	// A comment on the removed user's post creates no notification for them.
+	kit.mustStatus(201, "POST", "/api/posts/"+post["id"].(string)+"/comments", map[string]string{"body_html": "<p>nice</p>"})
+	var n int
+	if err := srv.DB.QueryRow("SELECT count(*) FROM notifications WHERE user_id = ?", moID).Scan(&n); err != nil || n != 0 {
+		t.Fatalf("notifications for a removed user: %d %v", n, err)
 	}
 }

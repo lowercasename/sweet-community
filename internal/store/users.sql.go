@@ -96,6 +96,16 @@ func (q *Queries) CreateUserWithEmail(ctx context.Context, arg CreateUserWithEma
 	return err
 }
 
+const deleteUserEmailTokens = `-- name: DeleteUserEmailTokens :exec
+DELETE FROM email_tokens WHERE user_id = ?1
+`
+
+// Deletes every email link of a user. Removal calls it, so a link sent before the removal cannot sign the account in.
+func (q *Queries) DeleteUserEmailTokens(ctx context.Context, userID string) error {
+	_, err := q.db.ExecContext(ctx, deleteUserEmailTokens, userID)
+	return err
+}
+
 const getAccount = `-- name: GetAccount :one
 SELECT id, username, password_hash, email, email_verified_at, pending_email, removed_at FROM users WHERE id = ?1
 `
@@ -311,7 +321,7 @@ func (q *Queries) GetUserPasswordHash(ctx context.Context, username string) (Get
 }
 
 const removeUser = `-- name: RemoveUser :exec
-UPDATE users SET username = ?1, password_hash = NULL, picture_id = NULL, removed_at = ?2
+UPDATE users SET username = ?1, password_hash = NULL, picture_id = NULL, bio_html = '', bio_text = '', removed_at = ?2
 WHERE id = ?3
 `
 
@@ -322,8 +332,8 @@ type RemoveUserParams struct {
 }
 
 // Anonymises a user (architecture.md, Admin tools). The username becomes
-// removed-<id prefix>, and the password and picture are cleared. The row and
-// the id stay so that the user's content keeps its author.
+// removed-<id prefix>, and the password, picture and bio are cleared. The row
+// and the id stay so that the user's content keeps its author.
 func (q *Queries) RemoveUser(ctx context.Context, arg RemoveUserParams) error {
 	_, err := q.db.ExecContext(ctx, removeUser, arg.Username, arg.RemovedAt, arg.ID)
 	return err

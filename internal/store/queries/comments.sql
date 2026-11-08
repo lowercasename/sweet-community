@@ -29,3 +29,7 @@ WHERE id = sqlc.arg(id) AND deleted_at IS NULL;
 
 -- name: DeleteComment :exec
 UPDATE comments SET deleted_at = sqlc.arg(deleted_at) WHERE id = sqlc.arg(id) AND deleted_at IS NULL;
+
+-- name: ListCommentIDsOfPost :many
+-- The ids of a post's comments, deleted or not. Deleting the post removes their events from the log.
+SELECT id FROM comments WHERE post_id = sqlc.arg(post_id);

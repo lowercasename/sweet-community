@@ -189,7 +189,7 @@ export function MembersPage({ group, me, onLeft }: MembersPageProps) {
             <Card>
               <Stack gap={2}>
                 <Heading level={2}>Members</Heading>
-                <Text variant="secondary">
+                <Text variant="small">
                   Moderators can delete anything in the room and add or remove members. The owner can also change its
                   settings and hand it over.
                 </Text>

@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"net/http"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -39,17 +40,120 @@ func NewHub(db *sql.DB) *Hub {
 
 // Log appends an event inside the caller's write transaction. The returned
 // seq is in commit order because it is assigned while the write lock is
-// held. Callers must broadcast after Commit, not before.
+// held. Callers must broadcast after Commit, not before. Log first deletes
+// the earlier events about the same resource, so the log keeps only the
+// newest event for each key.
 func Log(ctx context.Context, tx *sql.Tx, kind string, payload any, now int64) (Event, error) {
 	raw, err := json.Marshal(payload)
 	if err != nil {
 		return Event{}, err
 	}
-	seq, err := store.New(tx).InsertEvent(ctx, store.InsertEventParams{Kind: kind, Payload: string(raw), CreatedAt: now})
+	q := store.New(tx)
+	key := Key(kind, raw)
+	if key != "" {
+		if err := q.DeleteEventsByKey(ctx, sql.NullString{String: key, Valid: true}); err != nil {
+			return Event{}, err
+		}
+	}
+	seq, err := q.InsertEvent(ctx, store.InsertEventParams{Kind: kind, Payload: string(raw), Key: sql.NullString{String: key, Valid: key != ""}, CreatedAt: now})
 	if err != nil {
 		return Event{}, err
 	}
 	return Event{Seq: seq, Kind: kind, Payload: raw}, nil
+}
+
+// Key names the resource that an event describes, such as "post:<id>"
+// (architecture.md, Realtime). A resource's event and its delete event share
+// a key. A kind that describes no single resource, such as
+// notification_delete, has no key, and its events are never replaced.
+func Key(kind string, raw []byte) string {
+	var p struct {
+		ID      string `json:"id"`
+		GroupID string `json:"group_id"`
+		UserID  string `json:"user_id"`
+		Stream  string `json:"stream"`
+		User    struct {
+			ID string `json:"id"`
+		} `json:"user"`
+	}
+	if json.Unmarshal(raw, &p) != nil {
+		return ""
+	}
+	switch kind {
+	case "post", "post_delete", "comment", "comment_delete", "message", "message_delete", "group", "group_delete", "topic", "topic_delete":
+		if p.ID == "" {
+			return ""
+		}
+		return strings.TrimSuffix(kind, "_delete") + ":" + p.ID
+	case "user", "profile", "notification":
+		if p.ID == "" {
+			return ""
+		}
+		return kind + ":" + p.ID
+	case "membership", "membership_delete":
+		// A membership event carries the user, and a membership_delete event carries the user's id.
+		uid := p.UserID
+		if uid == "" {
+			uid = p.User.ID
+		}
+		if p.GroupID == "" || uid == "" {
+			return ""
+		}
+		return "membership:" + p.GroupID + ":" + uid
+	case "marker":
+		if p.UserID == "" || p.Stream == "" {
+			return ""
+		}
+		return "marker:" + p.UserID + ":" + p.Stream
+	case "settings":
+		return "settings"
+	}
+	return ""
+}
+
+// Forget deletes every logged event with one of the keys. A handler calls it
+// for resources that are deleted with another one and get no delete event of
+// their own, such as the comments of a deleted post.
+func Forget(ctx context.Context, q *store.Queries, keys ...string) error {
+	for _, k := range keys {
+		if err := q.DeleteEventsByKey(ctx, sql.NullString{String: k, Valid: true}); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// Window is how long the log keeps an event. A client that reconnects after a
+// longer absence receives only the events in the window, and refetches its
+// data as every reconnecting client does. The window also limits how long an
+// author's earlier name stays in the log inside older payloads.
+const Window = 24 * time.Hour
+
+// Prune deletes the events written more than Window before now, a time in
+// Unix milliseconds.
+func Prune(ctx context.Context, db *sql.DB, now int64) error {
+	return store.New(db).DeleteEventsBefore(ctx, now-Window.Milliseconds())
+}
+
+// PruneEvery calls Prune once at start and then at each interval, until ctx
+// ends.
+func PruneEvery(ctx context.Context, db *sql.DB, every time.Duration, logf func(string, ...any)) {
+	prune := func() {
+		if err := Prune(ctx, db, time.Now().UnixMilli()); err != nil && ctx.Err() == nil {
+			logf("events: prune: %v", err)
+		}
+	}
+	prune()
+	t := time.NewTicker(every)
+	defer t.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-t.C:
+			prune()
+		}
+	}
 }
 
 // Broadcast delivers a committed event to every connected subscriber. A

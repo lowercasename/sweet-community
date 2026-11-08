@@ -196,3 +196,32 @@ func (q *Queries) ListMessages(ctx context.Context, arg ListMessagesParams) ([]L
 	}
 	return items, nil
 }
+
+const listReplyIDs = `-- name: ListReplyIDs :many
+SELECT id FROM messages WHERE reply_to = ?1 AND deleted_at IS NULL
+`
+
+// The live messages that reply to a message. Deleting the message logs them again, so the log no longer holds the
+// deleted message's text in their quotes.
+func (q *Queries) ListReplyIDs(ctx context.Context, replyTo sql.NullString) ([]string, error) {
+	rows, err := q.db.QueryContext(ctx, listReplyIDs, replyTo)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []string{}
+	for rows.Next() {
+		var id string
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		items = append(items, id)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}

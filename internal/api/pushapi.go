@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"log"
 	"net/http"
-	"strings"
 
 	"sweet/internal/db"
 	"sweet/internal/perm"
@@ -34,8 +33,8 @@ func (s *Server) subscribePush(w http.ResponseWriter, r *http.Request) {
 		} `json:"keys"`
 	}
 	r.Body = http.MaxBytesReader(w, r.Body, 8192)
-	if err := json.NewDecoder(r.Body).Decode(&in); err != nil || !strings.HasPrefix(in.Endpoint, "https://") || in.Keys.P256dh == "" || in.Keys.Auth == "" {
-		writeErr(w, http.StatusBadRequest, "A push subscription needs an https endpoint and two keys")
+	if err := json.NewDecoder(r.Body).Decode(&in); err != nil || !push.AllowedEndpoint(in.Endpoint) || in.Keys.P256dh == "" || in.Keys.Auth == "" {
+		writeErr(w, http.StatusBadRequest, "This browser's notification service is not supported")
 		return
 	}
 	me, _ := userFrom(r.Context())

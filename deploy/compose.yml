@@ -9,7 +9,7 @@ services:
     env_file: .env
     environment:
       SWEET_BASE_URL: https://${SWEET_DOMAIN}
-      SWEET_TRUST_PROXY: "1"
+      SWEET_TRUST_PROXY: "${SWEET_TRUST_PROXY:-1}"
       SWEET_DATA: /data
     volumes:
       - data:/data

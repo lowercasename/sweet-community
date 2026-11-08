@@ -353,9 +353,11 @@ func TestPushForMentionsAndReplies(t *testing.T) {
 		return map[string]any{"endpoint": endpoint, "keys": map[string]string{"p256dh": "p", "auth": "a"}}
 	}
 	kit.mustStatus(400, "POST", "/api/push/subscriptions", sub("http://insecure.test/x"))
-	kit.mustStatus(201, "POST", "/api/push/subscriptions", sub("https://push.test/kit-phone"))
-	kit.mustStatus(201, "POST", "/api/push/subscriptions", sub("https://push.test/kit-laptop"))
-	kit.mustStatus(201, "POST", "/api/push/subscriptions", sub("https://push.test/kit-phone")) // the same device again is stored once
+	// Only a browser's push service is accepted, so a user cannot make the server send requests to other hosts.
+	kit.mustStatus(400, "POST", "/api/push/subscriptions", sub("https://192.168.1.1/admin"))
+	kit.mustStatus(201, "POST", "/api/push/subscriptions", sub("https://fcm.googleapis.com/fcm/send/kit-phone"))
+	kit.mustStatus(201, "POST", "/api/push/subscriptions", sub("https://fcm.googleapis.com/fcm/send/kit-laptop"))
+	kit.mustStatus(201, "POST", "/api/push/subscriptions", sub("https://fcm.googleapis.com/fcm/send/kit-phone")) // the same device again is stored once
 
 	wait := func(n int) []string {
 		t.Helper()
@@ -376,7 +378,7 @@ func TestPushForMentionsAndReplies(t *testing.T) {
 	mo.mustStatus(201, "POST", "/api/posts/"+pid+"/comments", map[string]string{"body_html": "<p>hi</p>"})
 	got := wait(2)
 	for _, s := range got {
-		if !strings.HasPrefix(s, "https://push.test/kit-") || !strings.Contains(s, " Thursday Group mo commented on your post http://sweet.test/p/"+pid) {
+		if !strings.HasPrefix(s, "https://fcm.googleapis.com/fcm/send/kit-") || !strings.Contains(s, " Thursday Group mo commented on your post http://sweet.test/p/"+pid) {
 			t.Fatalf("push: %q", s)
 		}
 	}
@@ -388,7 +390,7 @@ func TestPushForMentionsAndReplies(t *testing.T) {
 		t.Fatalf("pushed for an add: %v", fake.all())
 	}
 	// A mention is pushed. The push service now reports the phone as gone, so it is removed. Only the laptop receives the next push.
-	fake.gone["https://push.test/kit-phone"] = true
+	fake.gone["https://fcm.googleapis.com/fcm/send/kit-phone"] = true
 	mo.mustStatus(201, "POST", rootPath+"/posts", map[string]string{"body_html": "<p>" + mentionOf(kitID, "kit") + " look</p>"})
 	got = wait(3)
 	if !strings.Contains(got[2], "kit-laptop Thursday Group mo mentioned you http://sweet.test/p/") {
@@ -397,11 +399,11 @@ func TestPushForMentionsAndReplies(t *testing.T) {
 	time.Sleep(100 * time.Millisecond)
 	mo.mustStatus(201, "POST", "/api/posts/"+pid+"/comments", map[string]string{"body_html": "<p>again</p>"})
 	got = wait(4)
-	if len(got) != 4 || !strings.HasPrefix(got[3], "https://push.test/kit-laptop") {
+	if len(got) != 4 || !strings.HasPrefix(got[3], "https://fcm.googleapis.com/fcm/send/kit-laptop") {
 		t.Fatalf("after the phone went: %v", got)
 	}
 	// Kit removes the laptop subscription, so no more pushes are sent.
-	kit.mustStatus(200, "DELETE", "/api/push/subscriptions", map[string]string{"endpoint": "https://push.test/kit-laptop"})
+	kit.mustStatus(200, "DELETE", "/api/push/subscriptions", map[string]string{"endpoint": "https://fcm.googleapis.com/fcm/send/kit-laptop"})
 	mo.mustStatus(201, "POST", "/api/posts/"+pid+"/comments", map[string]string{"body_html": "<p>once more</p>"})
 	time.Sleep(150 * time.Millisecond)
 	if len(fake.all()) != 4 {
@@ -537,13 +539,13 @@ func TestPushForMessages(t *testing.T) {
 	kit, kitID := registerMember(t, ts, owner, "kit")
 	mo, _ := registerMember(t, ts, owner, "mo")
 	owner.mustStatus(200, "PUT", "/api/settings", map[string]string{"group_creation": "anyone", "name": "Thursday Group", "description": ""})
-	kit.mustStatus(201, "POST", "/api/push/subscriptions", map[string]any{"endpoint": "https://push.test/kit-phone", "keys": map[string]string{"p256dh": "p", "auth": "a"}})
+	kit.mustStatus(201, "POST", "/api/push/subscriptions", map[string]any{"endpoint": "https://fcm.googleapis.com/fcm/send/kit-phone", "keys": map[string]string{"p256dh": "p", "auth": "a"}})
 	dm := mo.mustStatus(201, "POST", "/api/groups", map[string]any{"kind": "dm", "members": []string{kitID}})
 	gid := dm["id"].(string)
 
 	mo.mustStatus(201, "POST", "/api/groups/"+gid+"/messages", map[string]string{"body_html": "<p>hello</p>"})
 	got := waitPushes(t, fake, 1)
-	if want := "https://push.test/kit-phone Thursday Group mo messaged you http://sweet.test/r/" + gid + " chat:" + gid; got[0] != want {
+	if want := "https://fcm.googleapis.com/fcm/send/kit-phone Thursday Group mo messaged you http://sweet.test/r/" + gid + " chat:" + gid; got[0] != want {
 		t.Fatalf("push:\n got %q\nwant %q", got[0], want)
 	}
 	// A second message while the first row is unread sends no second push, because no second row is written.

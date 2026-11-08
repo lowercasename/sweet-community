@@ -606,27 +606,34 @@ func TestPictureChangeIsAnEvent(t *testing.T) {
 	if status != 201 {
 		t.Fatalf("upload: %d %v", status, img)
 	}
+	// pictures returns the picture of each user event in the log.
+	pictures := func() []any {
+		rows, err := srv.q().ListEventsSince(context.Background(), store.ListEventsSinceParams{After: 0, PageSize: 100})
+		if err != nil {
+			t.Fatal(err)
+		}
+		var out []any
+		for _, e := range rows {
+			if e.Kind != "user" {
+				continue
+			}
+			var u map[string]any
+			json.Unmarshal([]byte(e.Payload), &u)
+			if u["username"] != "raphael" {
+				t.Fatalf("user event payload: %s", e.Payload)
+			}
+			out = append(out, u["picture"])
+		}
+		return out
+	}
 	owner.mustStatus(200, "PUT", "/api/me/picture", map[string]string{"image_id": img["id"].(string)})
+	if got := pictures(); len(got) != 1 || got[0] != img["url"] {
+		t.Fatalf("user events after setting a picture: %v", got)
+	}
+	// The log keeps only the newest event about the user, so the second change replaces the first.
 	owner.mustStatus(200, "PUT", "/api/me/picture", map[string]any{"image_id": nil})
-
-	rows, err := srv.q().ListEventsSince(context.Background(), store.ListEventsSinceParams{After: 0, PageSize: 100})
-	if err != nil {
-		t.Fatal(err)
-	}
-	var pictures []any
-	for _, e := range rows {
-		if e.Kind != "user" {
-			continue
-		}
-		var u map[string]any
-		json.Unmarshal([]byte(e.Payload), &u)
-		if u["username"] != "raphael" {
-			t.Fatalf("user event payload: %s", e.Payload)
-		}
-		pictures = append(pictures, u["picture"])
-	}
-	if len(pictures) != 2 || pictures[0] != img["url"] || pictures[1] != nil {
-		t.Fatalf("user events after two picture changes: %v", pictures)
+	if got := pictures(); len(got) != 1 || got[0] != nil {
+		t.Fatalf("user events after removing the picture: %v", got)
 	}
 }
 
@@ -780,14 +787,16 @@ func TestEventsAreUniformAndPersonalised(t *testing.T) {
 	c := kit.mustStatus(201, "POST", "/api/posts/"+pid+"/comments", map[string]string{"body_html": "<p>c1</p>"})
 	kit.mustStatus(200, "PUT", "/api/comments/"+c["id"].(string), map[string]string{"body_html": "<p>c2</p>"})
 
-	// Each resource has two event kinds, the whole resource or its deletion. An edit is another "post" or "comment" event, not a separate kind.
+	// Each resource has two event kinds, the whole resource or its deletion. An edit is another "post" or "comment"
+	// event, not a separate kind. The log keeps only the newest event for each resource, so the replay holds the
+	// edited post and the edited comment once each.
 	kinds := []string{}
 	for _, e := range kit.readEvents(6) {
 		if k := e["kind"].(string); k == "post" || k == "comment" {
-			kinds = append(kinds, k)
+			kinds = append(kinds, k+" "+e["payload"].(map[string]any)["body_html"].(string))
 		}
 	}
-	if strings.Join(kinds, ",") != "post,post,comment,comment" {
+	if strings.Join(kinds, ",") != "post <p>v2</p>,comment <p>c2</p>" {
 		t.Fatalf("event kinds: %v", kinds)
 	}
 
@@ -809,8 +818,8 @@ func TestEventsAreUniformAndPersonalised(t *testing.T) {
 	if e, d := can(ownersView); e || !d {
 		t.Fatalf("owner's view of kit's post over the stream: edit %v delete %v", e, d)
 	}
-	if ownersView["body_html"] != "<p>v1</p>" {
-		t.Fatalf("first post event body: %v", ownersView["body_html"])
+	if ownersView["body_html"] != "<p>v2</p>" {
+		t.Fatalf("the post event in the replay is not the edited post: %v", ownersView["body_html"])
 	}
 }
 

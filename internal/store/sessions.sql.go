@@ -68,7 +68,7 @@ func (q *Queries) DeleteUserSessions(ctx context.Context, userID string) error {
 const getSessionUser = `-- name: GetSessionUser :one
 SELECT u.id, u.username, u.picture_id, s.last_seen_at
 FROM sessions s JOIN users u ON u.id = s.user_id
-WHERE s.id = ?1 AND s.expires_at > ?2
+WHERE s.id = ?1 AND s.expires_at > ?2 AND u.removed_at IS NULL
 `
 
 type GetSessionUserParams struct {
@@ -83,6 +83,7 @@ type GetSessionUserRow struct {
 	LastSeenAt int64
 }
 
+// A session of a removed account is refused, however it was made.
 func (q *Queries) GetSessionUser(ctx context.Context, arg GetSessionUserParams) (GetSessionUserRow, error) {
 	row := q.db.QueryRowContext(ctx, getSessionUser, arg.ID, arg.Now)
 	var i GetSessionUserRow

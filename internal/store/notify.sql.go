@@ -96,7 +96,7 @@ func (q *Queries) CountRepliesSince(ctx context.Context, arg CountRepliesSincePa
 const createPushSubscription = `-- name: CreatePushSubscription :exec
 INSERT INTO push_subscriptions (id, user_id, endpoint, p256dh, auth, created_at)
 VALUES (?1, ?2, ?3, ?4, ?5, ?6)
-ON CONFLICT (endpoint) DO UPDATE SET user_id = excluded.user_id, p256dh = excluded.p256dh, auth = excluded.auth
+ON CONFLICT (endpoint) DO UPDATE SET user_id = excluded.user_id, p256dh = excluded.p256dh, auth = excluded.auth, created_at = excluded.created_at
 `
 
 type CreatePushSubscriptionParams struct {
@@ -323,5 +323,23 @@ type SetUserSettingParams struct {
 
 func (q *Queries) SetUserSetting(ctx context.Context, arg SetUserSettingParams) error {
 	_, err := q.db.ExecContext(ctx, setUserSetting, arg.UserID, arg.Key, arg.Value)
+	return err
+}
+
+const trimPushSubscriptions = `-- name: TrimPushSubscriptions :exec
+DELETE FROM push_subscriptions WHERE push_subscriptions.user_id = ?1 AND push_subscriptions.id NOT IN (
+    SELECT newest.id FROM push_subscriptions AS newest WHERE newest.user_id = ?1
+    ORDER BY newest.created_at DESC, newest.id DESC LIMIT ?2
+)
+`
+
+type TrimPushSubscriptionsParams struct {
+	UserID string
+	Keep   int64
+}
+
+// Keeps a user's newest subscriptions and deletes the rest.
+func (q *Queries) TrimPushSubscriptions(ctx context.Context, arg TrimPushSubscriptionsParams) error {
+	_, err := q.db.ExecContext(ctx, trimPushSubscriptions, arg.UserID, arg.Keep)
 	return err
 }

@@ -13,6 +13,8 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
+	"strings"
 	"time"
 
 	webpush "github.com/SherClockHolmes/webpush-go"
@@ -98,6 +100,7 @@ func (w WebPush) Send(ctx context.Context, sub Subscription, data []byte) (bool,
 		VAPIDPrivateKey: w.Keys.Private,
 		TTL:             int((24 * time.Hour).Seconds()),
 		Urgency:         webpush.UrgencyNormal,
+		HTTPClient:      noRedirects,
 	})
 	if err != nil {
 		return false, err
@@ -154,21 +157,62 @@ func (p *Pusher) Tell(ctx context.Context, userID string, payload Payload) error
 			continue
 		}
 		if err != nil {
-			errs = append(errs, fmt.Errorf("%s: %w", s.Endpoint, err))
+			// The endpoint's path identifies the device, so only its host is logged.
+			host := s.Endpoint
+			if u, perr := url.Parse(s.Endpoint); perr == nil {
+				host = u.Host
+			}
+			errs = append(errs, fmt.Errorf("%s: %w", host, err))
 		}
 	}
 	return errors.Join(errs...)
 }
 
-// Subscribe stores a device subscription for a user, replacing an older record with the same endpoint.
+// MaxSubscriptions is how many devices one user can subscribe. Subscribing
+// another device deletes the oldest subscription.
+const MaxSubscriptions = 10
+
+// Subscribe stores a device subscription for a user, replacing an older record with the same endpoint. The caller
+// checks the endpoint with AllowedEndpoint first.
 func Subscribe(ctx context.Context, d *sql.DB, userID string, sub Subscription, now int64) error {
 	id, err := uuid.NewV7()
 	if err != nil {
 		return err
 	}
-	return store.New(d).CreatePushSubscription(ctx, store.CreatePushSubscriptionParams{
+	q := store.New(d)
+	if err := q.CreatePushSubscription(ctx, store.CreatePushSubscriptionParams{
 		ID: id.String(), UserID: userID, Endpoint: sub.Endpoint, P256dh: sub.P256dh, Auth: sub.Auth, CreatedAt: now,
-	})
+	}); err != nil {
+		return err
+	}
+	return q.TrimPushSubscriptions(ctx, store.TrimPushSubscriptionsParams{UserID: userID, Keep: MaxSubscriptions})
+}
+
+// pushHosts are the push services of the browsers Sweet supports: Chrome and the other Chromium browsers, Firefox,
+// Safari, and Edge on Windows, whose hosts end in notify.windows.com.
+var pushHosts = map[string]bool{
+	"fcm.googleapis.com":                true,
+	"android.googleapis.com":            true,
+	"updates.push.services.mozilla.com": true,
+	"web.push.apple.com":                true,
+}
+
+// AllowedEndpoint reports whether a subscription's endpoint is an https address on a browser's push service, on the
+// default port. The server sends a request to every stored endpoint, so any other address would let a user make the
+// server send requests to hosts of their choice.
+func AllowedEndpoint(endpoint string) bool {
+	u, err := url.Parse(endpoint)
+	if err != nil || u.Scheme != "https" || u.User != nil || u.Port() != "" {
+		return false
+	}
+	host := strings.ToLower(u.Hostname())
+	return pushHosts[host] || strings.HasSuffix(host, ".notify.windows.com")
+}
+
+// noRedirects is the HTTP client for push deliveries. A push service answers directly and never redirects, so a
+// redirect is refused rather than followed to another host.
+var noRedirects = &http.Client{
+	CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse },
 }
 
 // Unsubscribe deletes one device subscription of a user.

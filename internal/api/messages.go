@@ -133,31 +133,47 @@ func (s *Server) createMessage(w http.ResponseWriter, r *http.Request) {
 }
 
 // deleteMessage soft-deletes a message. perm.DeleteMessage decides who may.
+// The replies to it are logged again, so the log no longer holds its text in
+// their quotes.
 func (s *Server) deleteMessage(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
 	me, _ := userFrom(r.Context())
 	now := db.Now()
-	s.logged(w, r, "message_delete", now, func(qtx *store.Queries) (any, int, error) {
+	s.loggedMany(w, r, now, func(qtx *store.Queries) ([]events.Entry, any, int, error) {
 		owners, err := qtx.GetMessageOwners(r.Context(), id)
 		if errors.Is(err, sql.ErrNoRows) {
-			return nil, http.StatusNotFound, errors.New("No such message")
+			return nil, nil, http.StatusNotFound, errors.New("No such message")
 		}
 		if err != nil {
-			return nil, http.StatusInternalServerError, err
+			return nil, nil, http.StatusInternalServerError, err
 		}
 		a, err := actorIn(r.Context(), qtx, me, owners.GroupID)
 		if err != nil {
-			return nil, http.StatusInternalServerError, err
+			return nil, nil, http.StatusInternalServerError, err
 		}
 		if !perm.CanSee(a) {
-			return nil, http.StatusNotFound, errors.New("No such message")
+			return nil, nil, http.StatusNotFound, errors.New("No such message")
 		}
 		if !perm.DeleteMessage(a, perm.Message{AuthorID: owners.AuthorID}) {
-			return nil, http.StatusForbidden, errors.New("Not your message")
+			return nil, nil, http.StatusForbidden, errors.New("Not your message")
 		}
 		if err := qtx.DeleteMessage(r.Context(), store.DeleteMessageParams{DeletedAt: sql.NullInt64{Int64: now, Valid: true}, ID: id}); err != nil {
-			return nil, http.StatusInternalServerError, err
+			return nil, nil, http.StatusInternalServerError, err
 		}
-		return map[string]string{"id": id, "group_id": owners.GroupID}, http.StatusOK, nil
+		gone := map[string]string{"id": id, "group_id": owners.GroupID}
+		entries := []events.Entry{{Kind: "message_delete", Payload: gone}}
+		replies, err := qtx.ListReplyIDs(r.Context(), sql.NullString{String: id, Valid: true})
+		if err != nil {
+			return nil, nil, http.StatusInternalServerError, err
+		}
+		for _, rid := range replies {
+			row, err := qtx.GetMessage(r.Context(), rid)
+			if err != nil {
+				return nil, nil, http.StatusInternalServerError, err
+			}
+			m := wireMessage(row)
+			entries = append(entries, events.Entry{Kind: "message", Payload: &m})
+		}
+		return entries, gone, http.StatusOK, nil
 	})
 }

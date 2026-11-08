@@ -22,7 +22,7 @@ func TestReplies(t *testing.T) {
 	kit, kitID := registerMember(t, ts, owner, "kit")
 	mo, moID := registerMember(t, ts, owner, "mo")
 	owner.mustStatus(200, "PUT", "/api/settings", map[string]string{"group_creation": "anyone", "name": "Thursday Group", "description": ""})
-	kit.mustStatus(201, "POST", "/api/push/subscriptions", map[string]any{"endpoint": "https://push.test/kit-phone", "keys": map[string]string{"p256dh": "p", "auth": "a"}})
+	kit.mustStatus(201, "POST", "/api/push/subscriptions", map[string]any{"endpoint": "https://fcm.googleapis.com/fcm/send/kit-phone", "keys": map[string]string{"p256dh": "p", "auth": "a"}})
 	notifications := func(c *client) []map[string]any {
 		t.Helper()
 		var out []map[string]any

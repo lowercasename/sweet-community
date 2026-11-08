@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
+	"log"
 	"net/http"
 	"strconv"
 
@@ -113,9 +114,10 @@ type Server struct {
 	// Mail sends verification and reset links. BaseURL is the URL they point to.
 	Mail    mail.Sender
 	BaseURL string
-	// TrustProxy means requests come through a reverse proxy that sets
-	// X-Forwarded-For, and the first address in that header is the client's.
-	TrustProxy bool
+	// ProxyHops is the number of reverse proxies in front of the server that
+	// add the address they saw to X-Forwarded-For. Zero means requests arrive
+	// directly and the header is ignored, because any client can send one.
+	ProxyHops int
 	// Push sends a push notification to a user's devices for a mention or a
 	// reply (architecture.md, Notifications). It is nil when push is not set
 	// up. PushKey is the public VAPID key.
@@ -277,8 +279,17 @@ func writeJSON(w http.ResponseWriter, status int, v any) {
 }
 
 func writeErr(w http.ResponseWriter, status int, msg string) {
+	// The client shows an error message as it is. A 500 carries an internal error, such as a SQLite or S3 message,
+	// so it is logged and the response says only that something went wrong.
+	if status == http.StatusInternalServerError {
+		log.Printf("server error: %s", msg)
+		msg = ServerErrorMessage
+	}
 	writeJSON(w, status, map[string]string{"error": msg})
 }
+
+// ServerErrorMessage is the whole body of every 500 response.
+const ServerErrorMessage = "Something went wrong on the server. Try again in a moment."
 
 // pageParams reads ?before= and ?limit= for the feeds ordered newest first.
 func pageParams(r *http.Request, defaultLimit, maxLimit int) (before int64, limit int) {
@@ -607,6 +618,18 @@ func (s *Server) deletePost(w http.ResponseWriter, r *http.Request) {
 			return nil, http.StatusForbidden, errors.New("Not your post")
 		}
 		if err := qtx.DeletePost(r.Context(), store.DeletePostParams{DeletedAt: sql.NullInt64{Int64: now, Valid: true}, ID: id}); err != nil {
+			return nil, http.StatusInternalServerError, err
+		}
+		// The comments go with the post and get no delete event of their own, so their events leave the log here.
+		comments, err := qtx.ListCommentIDsOfPost(r.Context(), id)
+		if err != nil {
+			return nil, http.StatusInternalServerError, err
+		}
+		keys := make([]string, len(comments))
+		for i, c := range comments {
+			keys[i] = "comment:" + c
+		}
+		if err := events.Forget(r.Context(), qtx, keys...); err != nil {
 			return nil, http.StatusInternalServerError, err
 		}
 		return map[string]string{"id": id, "group_id": owners.GroupID}, http.StatusOK, nil

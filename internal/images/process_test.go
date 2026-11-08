@@ -70,3 +70,34 @@ func TestProcess(t *testing.T) {
 		t.Fatalf("text: %v", err)
 	}
 }
+
+// bombGIF is a GIF whose frames each cover a 2000 by 2000 canvas, with almost
+// no image data. A decoder would allocate four million bytes for each frame.
+// Only the block structure is real, so a decoder that reads the image data
+// fails, and a scanner that reads only the structure does not.
+func bombGIF(frames int) []byte {
+	b := []byte("GIF89a")
+	b = append(b, 0xd0, 0x07, 0xd0, 0x07, 0x00, 0x00, 0x00) // 2000 by 2000, no global colour table
+	for i := 0; i < frames; i++ {
+		b = append(b, 0x2c, 0, 0, 0, 0, 0xd0, 0x07, 0xd0, 0x07, 0x00) // image descriptor, no local colour table
+		b = append(b, 0x02, 0x01, 0x00, 0x00)                         // LZW code size, one data sub-block, terminator
+	}
+	return append(b, 0x3b)
+}
+
+// An animated GIF is refused when its frames add up to more than
+// maxAnimationPixels, before any frame is decoded (architecture.md, Images).
+// Before 2026-11-08 every frame was decoded, and one small file could take
+// gigabytes of memory.
+func TestAnimatedGIFIsLimitedByItsFramesBeforeDecoding(t *testing.T) {
+	if _, err := Process(bytes.NewReader(bombGIF(30))); err != ErrTooLarge {
+		t.Fatalf("a GIF of thirty 2000 by 2000 frames: %v", err)
+	}
+	frames, area, err := gifFrames(gifOf(3))
+	if err != nil || frames != 3 || area != 3*8*8 {
+		t.Fatalf("gifFrames of a three-frame 8 by 8 GIF: %d %d %v", frames, area, err)
+	}
+	if _, _, err := gifFrames([]byte("GIF89a\x01")); err == nil {
+		t.Fatal("a truncated GIF was accepted")
+	}
+}

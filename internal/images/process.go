@@ -21,9 +21,18 @@ const (
 	// MaxSide is the maximum length of the longer edge after processing.
 	MaxSide = 2000
 	// maxPixels guards against decompression bombs before decoding.
-	maxPixels   = 40_000_000
-	jpegQuality = 85
+	maxPixels = 40_000_000
+	// maxAnimationPixels caps the sum of an animated GIF's frame areas. An
+	// animated GIF is stored as uploaded and the server never decodes all of
+	// its frames, so the cap protects the browsers that show it.
+	maxAnimationPixels = 100_000_000
+	jpegQuality        = 85
 )
+
+// slots limits how many images are decoded at once. Decoding a 40-megapixel
+// image takes about 160 MB, so two at a time bound the memory that uploads
+// can use.
+var slots = make(chan struct{}, 2)
 
 var (
 	ErrNotImage = errors.New("That is not a JPEG, PNG, WebP or GIF")
@@ -64,6 +73,8 @@ func Process(r io.Reader) (Processed, error) {
 	if len(data) > MaxUpload {
 		return Processed{}, ErrTooLarge
 	}
+	slots <- struct{}{}
+	defer func() { <-slots }()
 	switch http.DetectContentType(data) {
 	case "image/jpeg", "image/png", "image/gif", "image/webp":
 	default:
@@ -77,7 +88,18 @@ func Process(r io.Reader) (Processed, error) {
 		return Processed{}, ErrTooLarge
 	}
 	if http.DetectContentType(data) == "image/gif" {
-		if g, err := gif.DecodeAll(bytes.NewReader(data)); err == nil && len(g.Image) > 1 {
+		frames, area, err := gifFrames(data)
+		if err != nil {
+			return Processed{}, ErrNotImage
+		}
+		if frames > 1 {
+			if area > maxAnimationPixels {
+				return Processed{}, ErrTooLarge
+			}
+			// Only the first frame is decoded, to check that the file is a GIF. Its size is bounded by maxPixels.
+			if _, err := gif.Decode(bytes.NewReader(data)); err != nil {
+				return Processed{}, ErrNotImage
+			}
 			return Processed{Data: data, ContentType: "image/gif", Ext: "gif", Width: cfg.Width, Height: cfg.Height}, nil
 		}
 	}
@@ -129,4 +151,66 @@ func opaque(img image.Image) bool {
 		return o.Opaque()
 	}
 	return true
+}
+
+// gifFrames reads a GIF's block structure and returns the number of frames and
+// the sum of their areas. It skips the compressed image data without
+// decompressing it, so a file whose frames would take gigabytes to decode
+// costs one pass over its bytes. A file that ends without the trailer byte is
+// accepted if it has a frame, because browsers show such files.
+func gifFrames(data []byte) (frames int, area int64, err error) {
+	bad := errors.New("malformed GIF")
+	if len(data) < 13 || (string(data[:6]) != "GIF87a" && string(data[:6]) != "GIF89a") {
+		return 0, 0, bad
+	}
+	i := 13
+	if data[10]&0x80 != 0 {
+		i += 3 << ((data[10] & 7) + 1) // the global colour table
+	}
+	// skip moves past a run of data sub-blocks and the zero byte that ends it.
+	skip := func() bool {
+		for i < len(data) {
+			n := int(data[i])
+			i++
+			if n == 0 {
+				return true
+			}
+			i += n
+		}
+		return false
+	}
+	for i < len(data) {
+		switch data[i] {
+		case 0x3b: // trailer
+			return frames, area, nil
+		case 0x21: // extension: introducer, label, sub-blocks
+			i += 2
+			if !skip() {
+				return 0, 0, bad
+			}
+		case 0x2c: // image descriptor
+			if i+10 > len(data) {
+				return 0, 0, bad
+			}
+			w := int(data[i+5]) | int(data[i+6])<<8
+			h := int(data[i+7]) | int(data[i+8])<<8
+			packed := data[i+9]
+			i += 10
+			if packed&0x80 != 0 {
+				i += 3 << ((packed & 7) + 1) // the local colour table
+			}
+			i++ // the LZW minimum code size
+			if !skip() {
+				return 0, 0, bad
+			}
+			frames++
+			area += int64(w) * int64(h)
+		default:
+			return 0, 0, bad
+		}
+	}
+	if frames == 0 {
+		return 0, 0, bad
+	}
+	return frames, area, nil
 }

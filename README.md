@@ -99,7 +99,7 @@ docker compose up -d
 
 ### Without Docker
 
-`make build` produces `bin/sweet`, one file with the frontend and the migrations inside it. It takes the same settings from the environment, and `./bin/sweet -help` lists its flags. Put a reverse proxy in front of it with `SWEET_TRUST_PROXY=1`. If you run Litestream yourself, start Sweet with `SWEET_LITESTREAM=1` so it leaves checkpointing to Litestream.
+`make build` produces `bin/sweet`, one file with the frontend and the migrations inside it. It takes the same settings from the environment, and `./bin/sweet -help` lists its flags. Put a reverse proxy in front of it and set `SWEET_TRUST_PROXY` to the number of proxies in front of Sweet, usually `1`. Sweet uses that number to find the visitor's address in `X-Forwarded-For` for its rate limits. It counts that many entries from the right, because each proxy adds the address it saw to the right and a visitor can write only the entries on the left. Caddy, by default, replaces the header from a client it does not trust, so a proxy in front of Caddy counts only if Caddy lists it in `trusted_proxies`. If you run Litestream yourself, start Sweet with `SWEET_LITESTREAM=1` so it leaves checkpointing to Litestream.
 
 ## Develop
 

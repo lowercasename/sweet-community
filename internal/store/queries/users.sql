@@ -9,9 +9,9 @@ SELECT id, username, picture_id, removed_at FROM users WHERE id = ?;
 
 -- name: RemoveUser :exec
 -- Anonymises a user (architecture.md, Admin tools). The username becomes
--- removed-<id prefix>, and the password and picture are cleared. The row and
--- the id stay so that the user's content keeps its author.
-UPDATE users SET username = sqlc.arg(username), password_hash = NULL, picture_id = NULL, removed_at = sqlc.arg(removed_at)
+-- removed-<id prefix>, and the password, picture and bio are cleared. The row
+-- and the id stay so that the user's content keeps its author.
+UPDATE users SET username = sqlc.arg(username), password_hash = NULL, picture_id = NULL, bio_html = '', bio_text = '', removed_at = sqlc.arg(removed_at)
 WHERE id = sqlc.arg(id);
 
 -- name: CreateUser :exec
@@ -68,3 +68,7 @@ UPDATE users SET email = sqlc.arg(email) WHERE id = sqlc.arg(id) AND email_verif
 
 -- name: RenameUser :exec
 UPDATE users SET username = sqlc.arg(username) WHERE id = sqlc.arg(id);
+
+-- name: DeleteUserEmailTokens :exec
+-- Deletes every email link of a user. Removal calls it, so a link sent before the removal cannot sign the account in.
+DELETE FROM email_tokens WHERE user_id = sqlc.arg(user_id);

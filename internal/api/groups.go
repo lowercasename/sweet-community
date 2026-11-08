@@ -846,6 +846,16 @@ func filterEvent(viewer User, roles map[string]string, st *Settings, e events.Ev
 			return e, false
 		}
 		return encode(forViewer(a, &g, *st))
+	case "post_delete", "comment_delete", "message_delete":
+		// Sent to the group's members only, so the event does not show activity in a group the viewer is not in.
+		var d struct {
+			GroupID string `json:"group_id"`
+		}
+		if json.Unmarshal(e.Payload, &d) != nil {
+			return e, false
+		}
+		_, ok := roles[d.GroupID]
+		return e, ok
 	case "group_delete":
 		var d struct {
 			ID string `json:"id"`

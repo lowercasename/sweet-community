@@ -167,6 +167,12 @@ func notifyAbout(r *http.Request, qtx *store.Queries, kind, to, actor, groupID s
 	if to == actor {
 		return nil, nil
 	}
+	// A removed user is notified of nothing, for example of a comment on a post they wrote before the removal.
+	if u, err := qtx.GetUser(r.Context(), to); errors.Is(err, sql.ErrNoRows) || (err == nil && u.RemovedAt.Valid) {
+		return nil, nil
+	} else if err != nil {
+		return nil, err
+	}
 	id, err := uuid.NewV7()
 	if err != nil {
 		return nil, err

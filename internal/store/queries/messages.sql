@@ -34,3 +34,8 @@ WHERE m.id = sqlc.arg(id) AND m.deleted_at IS NULL AND g.deleted_at IS NULL;
 
 -- name: DeleteMessage :exec
 UPDATE messages SET deleted_at = sqlc.arg(deleted_at) WHERE id = sqlc.arg(id) AND deleted_at IS NULL;
+
+-- name: ListReplyIDs :many
+-- The live messages that reply to a message. Deleting the message logs them again, so the log no longer holds the
+-- deleted message's text in their quotes.
+SELECT id FROM messages WHERE reply_to = sqlc.arg(reply_to) AND deleted_at IS NULL;

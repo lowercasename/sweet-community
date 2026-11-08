@@ -223,17 +223,31 @@ func (l *loginLimiter) allow(addr string) bool { return l.get(addr).Allow() }
 func (l *loginLimiter) open(addr string) bool { return l.get(addr).Tokens() >= 1 }
 func (l *loginLimiter) spend(addr string)     { l.get(addr).Allow() }
 
-// clientAddr returns the client's address for the limiters. It is the
-// socket's remote address or, behind a trusted proxy, the first address in
-// X-Forwarded-For. Without TrustProxy the header is ignored, because any
-// client can send one.
+// clientAddr returns the client's address for the limiters. Without proxies
+// it is the socket's remote address. Behind ProxyHops proxies it is the entry
+// that many places from the right of X-Forwarded-For. Each proxy adds the
+// address it saw to the right, after whatever the client sent, so the client
+// can write the entries on the left but not that one. Until 2026-11-08 the
+// first entry was used, which any client could choose (security audit). A
+// header with fewer entries than proxies came through fewer proxies, and its
+// first entry is used.
 func (s *Server) clientAddr(r *http.Request) string {
-	if s.TrustProxy {
-		if first, _, _ := strings.Cut(r.Header.Get("X-Forwarded-For"), ","); strings.TrimSpace(first) != "" {
-			return strings.TrimSpace(first)
+	if s.ProxyHops <= 0 {
+		return r.RemoteAddr
+	}
+	var entries []string
+	for _, e := range strings.Split(r.Header.Get("X-Forwarded-For"), ",") {
+		if e = strings.TrimSpace(e); e != "" {
+			entries = append(entries, e)
 		}
 	}
-	return r.RemoteAddr
+	if len(entries) == 0 {
+		return r.RemoteAddr
+	}
+	if len(entries) < s.ProxyHops {
+		return entries[0]
+	}
+	return entries[len(entries)-s.ProxyHops]
 }
 
 type credentials struct {

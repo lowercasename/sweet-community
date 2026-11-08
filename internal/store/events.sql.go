@@ -7,20 +7,47 @@ package store
 
 import (
 	"context"
+	"database/sql"
 )
 
+const deleteEventsBefore = `-- name: DeleteEventsBefore :exec
+DELETE FROM events WHERE created_at < ?1
+`
+
+// Deletes the events older than the replay window.
+func (q *Queries) DeleteEventsBefore(ctx context.Context, before int64) error {
+	_, err := q.db.ExecContext(ctx, deleteEventsBefore, before)
+	return err
+}
+
+const deleteEventsByKey = `-- name: DeleteEventsByKey :exec
+DELETE FROM events WHERE key = ?1
+`
+
+// Deletes every logged event about one resource. Log calls it before it writes the resource's newest event.
+func (q *Queries) DeleteEventsByKey(ctx context.Context, key sql.NullString) error {
+	_, err := q.db.ExecContext(ctx, deleteEventsByKey, key)
+	return err
+}
+
 const insertEvent = `-- name: InsertEvent :one
-INSERT INTO events (kind, payload, created_at) VALUES (?, ?, ?) RETURNING seq
+INSERT INTO events (kind, payload, key, created_at) VALUES (?, ?, ?, ?) RETURNING seq
 `
 
 type InsertEventParams struct {
 	Kind      string
 	Payload   string
+	Key       sql.NullString
 	CreatedAt int64
 }
 
 func (q *Queries) InsertEvent(ctx context.Context, arg InsertEventParams) (int64, error) {
-	row := q.db.QueryRowContext(ctx, insertEvent, arg.Kind, arg.Payload, arg.CreatedAt)
+	row := q.db.QueryRowContext(ctx, insertEvent,
+		arg.Kind,
+		arg.Payload,
+		arg.Key,
+		arg.CreatedAt,
+	)
 	var seq int64
 	err := row.Scan(&seq)
 	return seq, err

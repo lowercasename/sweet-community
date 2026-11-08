@@ -90,6 +90,11 @@ func (s *Server) removeUser(w http.ResponseWriter, r *http.Request) {
 			return nil, nil, http.StatusInternalServerError, err
 		}
 		entries := []events.Entry{{Kind: "user", Payload: wireUser(u.ID, u.Username, u.PictureID)}}
+		// A removed account has no profile, so its profile events leave the log. The user event above replaces the
+		// earlier user events, which held the old name and picture.
+		if err := events.Forget(ctx, qtx, "profile:"+uid); err != nil {
+			return nil, nil, http.StatusInternalServerError, err
+		}
 		rows, err := qtx.ListUserMemberships(ctx, uid)
 		if err != nil {
 			return nil, nil, http.StatusInternalServerError, err
@@ -134,6 +139,14 @@ func (s *Server) removeUser(w http.ResponseWriter, r *http.Request) {
 					entries = append(entries, events.Entry{Kind: "group_delete", Payload: map[string]string{"id": m.GroupID}})
 				}
 			}
+		}
+		// The account's email links and push subscriptions go with its sessions. A link sent before the removal
+		// cannot sign the account in, and its devices receive no more pushes.
+		if err := qtx.DeleteUserEmailTokens(ctx, uid); err != nil {
+			return nil, nil, http.StatusInternalServerError, err
+		}
+		if err := qtx.DeleteUserPushSubscriptions(ctx, uid); err != nil {
+			return nil, nil, http.StatusInternalServerError, err
 		}
 		if err := qtx.DeleteUserSessions(ctx, uid); err != nil {
 			return nil, nil, http.StatusInternalServerError, err
