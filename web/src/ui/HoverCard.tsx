@@ -81,7 +81,7 @@ export function HoverCard({ name, card, children, small = false }: HoverCardProp
             <div
               ref={refs.setFloating}
               style={floatingStyles}
-              className="z-50 w-64 rounded-card border border-line bg-card p-3"
+              className="z-50 w-80 max-w-[calc(100vw-2rem)] rounded-card border border-line bg-card p-3"
               aria-label={`About ${name}`}
               {...getFloatingProps()}
             >

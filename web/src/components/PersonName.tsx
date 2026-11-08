@@ -39,7 +39,8 @@ function PersonCard({ person, me }: { person: Member | User; me: User | null | u
   }
   return (
     <Stack gap={2}>
-      <Row gap={2} align="center">
+      {/* The picture and the name stay on one line. A long name wraps beside the picture. */}
+      <Row gap={2} align="center" wrap="never">
         <Avatar name={person.username} picture={person.picture} size="lg" />
         <Stack gap={0}>
           <Text as="span" variant="name">
