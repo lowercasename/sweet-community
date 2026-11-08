@@ -16,6 +16,8 @@ type Content struct {
 	Community string
 	Heading   string
 	Lines     []string
+	// Code is a sign-in code, shown on its own line before the action. It is optional.
+	Code string
 	// Action is the one link in the message, with its label and URL. It is optional.
 	Action *Action
 	// Note is small print after the action. It says how long a link works and
@@ -37,6 +39,9 @@ func (c Content) Text() string {
 	for _, l := range c.Lines {
 		b.WriteString(l)
 		b.WriteString("\n")
+	}
+	if c.Code != "" {
+		fmt.Fprintf(&b, "\nCode: %s\n", c.Code)
 	}
 	if c.Action != nil {
 		fmt.Fprintf(&b, "\n%s:\n%s\n", c.Action.Label, c.Action.URL)
@@ -64,6 +69,9 @@ func (c Content) HTML() string {
 	fmt.Fprintf(&b, `<h1 style="margin:0 0 16px;font-size:20px;line-height:1.3;font-weight:700">%s</h1>`, esc(c.Heading))
 	for _, l := range c.Lines {
 		fmt.Fprintf(&b, `<p style="margin:0 0 12px">%s</p>`, esc(l))
+	}
+	if c.Code != "" {
+		fmt.Fprintf(&b, `<p style="margin:20px 0 4px;font-size:14px;color:#7a7a7a">Your code</p><p style="margin:0 0 20px;font-size:28px;font-weight:700;letter-spacing:6px">%s</p>`, esc(c.Code))
 	}
 	if c.Action != nil {
 		fmt.Fprintf(&b, `<p style="margin:20px 0"><a href="%s" style="color:#ce1717;font-weight:700;text-decoration:underline">%s</a></p>`, esc(c.Action.URL), esc(c.Action.Label))

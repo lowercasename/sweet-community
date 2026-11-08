@@ -1,218 +1,288 @@
 package api
 
 import (
-	"context"
-	"database/sql"
+	"fmt"
 	"net/http/httptest"
+	"regexp"
+	"strconv"
+	"strings"
 	"testing"
-	"time"
 
-	"sweet/internal/auth"
 	"sweet/internal/db"
-	"sweet/internal/store"
 )
 
-// These tests cover the account flows (architecture.md, Accounts). An email
-// address is verified by a link before the account can be used. A user logs
-// in with their username or email address. A password is reset by a link. A
-// new address is verified before it replaces the old one. A password change
-// requires the current password. Each test has its own server, so the rate
-// limiters keyed by client address start empty.
+// These tests cover the account flows (architecture.md, Accounts). A password
+// is optional. A user signs in with an email that holds a link and a
+// six-digit code. The code works only in the browser that asked for it. The
+// link opens a page whose button uses it, in any browser. Joining sends the
+// first sign-in email, and using it verifies the address. A changed address
+// is confirmed by a link that signs nobody in. Each test has its own server,
+// so the rate limiters keyed by client address start empty. The endpoints
+// that send mail allow five calls at once from one address.
 
 func invite(t *testing.T, owner *client) string {
 	t.Helper()
 	return owner.mustStatus(201, "POST", "/api/invites", nil)["code"].(string)
 }
 
-func TestRegisterNeedsAVerifiedAddress(t *testing.T) {
+var codeLine = regexp.MustCompile(`Code: (\d{6})`)
+
+// signinMail returns the link token and the code in the newest email to an address.
+func signinMail(t *testing.T, ts *httptest.Server, to string) (token, code string) {
+	t.Helper()
+	links := mailed(t, ts, to, "signin")
+	m := codeLine.FindStringSubmatch(newestMail(t, ts, to))
+	if len(links) != 1 || m == nil {
+		t.Fatalf("sign-in mail to %s: links %v, code %v", to, links, m)
+	}
+	return linkToken(links[0]), m[1]
+}
+
+// otherCode is a code that differs from the given one.
+func otherCode(code string) string {
+	n, _ := strconv.Atoi(code)
+	return fmt.Sprintf("%06d", (n+1)%1000000)
+}
+
+// signIn signs a new client in with the code from a sign-in email.
+func signIn(t *testing.T, ts *httptest.Server, login, email string) *client {
+	t.Helper()
+	c := newClient(t, ts)
+	c.mustStatus(202, "POST", "/api/signin/email", map[string]string{"login": login})
+	_, code := signinMail(t, ts, email)
+	c.mustStatus(200, "POST", "/api/signin/code", map[string]string{"code": code})
+	return c
+}
+
+func TestJoinWithoutAPassword(t *testing.T) {
 	ts, owner := newTestServer(t)
 	code := invite(t, owner)
 	kit := newClient(t, ts)
-	reg := map[string]string{"code": code, "username": "kit", "password": "longenough"}
+	reg := map[string]string{"code": code, "username": "kit"}
 
 	// A registration with no address, or an invalid one, is rejected and does not use the invite.
 	kit.mustStatus(400, "POST", "/api/register", reg)
 	reg["email"] = "not an address"
 	kit.mustStatus(400, "POST", "/api/register", reg)
 	reg["email"] = "kit@example.test"
-	res := kit.mustStatus(202, "POST", "/api/register", reg)
-	if res["email"] != "kit@example.test" {
+	if res := kit.mustStatus(202, "POST", "/api/register", reg); res["email"] != "kit@example.test" {
 		t.Fatalf("register: %v", res)
 	}
-	// The user is not logged in and cannot log in, because the address is unverified.
 	kit.mustStatus(401, "GET", "/api/me", nil)
-	status, body := kit.do("POST", "/api/login", map[string]string{"username": "kit", "password": "longenough"})
-	if status != 403 || body["error"] != "unverified" || body["email"] != "kit@example.test" {
-		t.Fatalf("login before verifying: %d %v", status, body)
-	}
-	// The registration still uses the invite, and the invite stays valid for the next user.
-	kit.mustStatus(202, "POST", "/api/register", map[string]string{"code": code, "username": "kit2", "password": "longenough", "email": "kit2@example.test"})
+	// The account has no password, so password sign-in answers as for a wrong password.
+	newClient(t, ts).mustStatus(401, "POST", "/api/login", map[string]string{"username": "kit", "password": "anything at all"})
 
-	// The verification link logs the user in. It works only once.
-	links := mailed(t, ts, "kit@example.test", "verify")
-	if len(links) != 1 {
-		t.Fatalf("verification links: %v", links)
-	}
-	token := linkToken(links[0])
-	kit.mustStatus(404, "POST", "/api/verify", map[string]string{"token": "nope"})
-	v := kit.mustStatus(200, "POST", "/api/verify", map[string]string{"token": token})
+	// The first sign-in email holds a code that works only in the browser that joined.
+	_, c := signinMail(t, ts, "kit@example.test")
+	newClient(t, ts).mustStatus(400, "POST", "/api/signin/code", map[string]string{"code": c})
+	v := kit.mustStatus(200, "POST", "/api/signin/code", map[string]string{"code": c})
 	if v["user"].(map[string]any)["username"] != "kit" || v["token"] == "" {
-		t.Fatalf("verify: %v", v)
+		t.Fatalf("sign-in by code: %v", v)
 	}
 	kit.mustStatus(200, "GET", "/api/me", nil)
-	newClient(t, ts).mustStatus(404, "POST", "/api/verify", map[string]string{"token": token})
 	acct := kit.mustStatus(200, "GET", "/api/me/account", nil)
-	if acct["email"] != "kit@example.test" || acct["email_verified"] != true || acct["pending_email"] != nil {
-		t.Fatalf("account: %v", acct)
+	if acct["email"] != "kit@example.test" || acct["email_verified"] != true || acct["has_password"] != false {
+		t.Fatalf("account after the first sign-in: %v", acct)
 	}
+	// The code works once.
+	kit.mustStatus(400, "POST", "/api/signin/code", map[string]string{"code": c})
 
-	// A user can also log in with their email address, in any letter case.
-	newClient(t, ts).login("KIT@Example.test", "longenough")
+	// A user can sign in with their email address in any letter case.
+	signIn(t, ts, "KIT@Example.test", "kit@example.test")
 	// An address belongs to one account. A second registration with it gets the same 202 as the first (see api_test).
-	newClient(t, ts).mustStatus(202, "POST", "/api/register", map[string]string{"code": invite(t, owner), "username": "mo", "password": "longenough", "email": "Kit@example.test"})
-	// The owner created from the command line has no address and can still log in (newTestServer logged them in).
+	newClient(t, ts).mustStatus(202, "POST", "/api/register", map[string]string{"code": invite(t, owner), "username": "mo", "email": "Kit@example.test"})
 }
 
-func TestResendVerification(t *testing.T) {
+func TestSignInByLink(t *testing.T) {
 	ts, owner := newTestServer(t)
-	kit := newClient(t, ts)
-	kit.mustStatus(202, "POST", "/api/register", map[string]string{"code": invite(t, owner), "username": "kit", "password": "longenough", "email": "kit@example.test"})
+	registerMember(t, ts, owner, "kit")
+	// A login that matches no account gets the same 202, and no email is sent.
 	anon := newClient(t, ts)
-	// The response is the same whether or not the address is known. Mail goes only to a known, unverified address.
-	anon.mustStatus(202, "POST", "/api/verify/resend", map[string]string{"email": "nobody@example.test"})
-	anon.mustStatus(202, "POST", "/api/verify/resend", map[string]string{"email": "kit@example.test"})
+	anon.mustStatus(202, "POST", "/api/signin/email", map[string]string{"login": "nobody"})
+	anon.mustStatus(202, "POST", "/api/signin/email", map[string]string{"login": "nobody@example.test"})
 	if n := mailCount(ts, "nobody@example.test"); n != 0 {
 		t.Fatalf("mail to an unknown address: %d", n)
 	}
-	if n := mailCount(ts, "kit@example.test"); n != 2 {
-		t.Fatalf("mail to kit after a resend: %d", n)
+
+	// The link works in any browser, once. Using it also uses the code.
+	asker := newClient(t, ts)
+	asker.mustStatus(202, "POST", "/api/signin/email", map[string]string{"login": "kit"})
+	token, code := signinMail(t, ts, "kit@example.test")
+	other := newClient(t, ts)
+	newClient(t, ts).mustStatus(404, "POST", "/api/signin/link", map[string]string{"token": "nope"})
+	if res := other.mustStatus(200, "POST", "/api/signin/link", map[string]string{"token": token}); res["user"].(map[string]any)["username"] != "kit" || res["token"] == "" {
+		t.Fatalf("sign-in by link: %v", res)
 	}
-	// The newest link works, and so does the first. Each link is single-use, and no link revokes another within the day.
-	kit.mustStatus(200, "POST", "/api/verify", map[string]string{"token": linkToken(mailed(t, ts, "kit@example.test", "verify")[0])})
-	// After verification, a resend sends no more mail, and the address cannot be changed from the login page.
-	kit.mustStatus(403, "POST", "/api/verify/change", map[string]string{"username": "kit", "password": "longenough", "email": "else@example.test"})
-	anon.mustStatus(202, "POST", "/api/verify/resend", map[string]string{"email": "kit@example.test"})
-	if n := mailCount(ts, "kit@example.test"); n != 2 {
-		t.Fatalf("mail to kit after verifying: %d", n)
-	}
+	other.mustStatus(200, "GET", "/api/me", nil)
+	newClient(t, ts).mustStatus(404, "POST", "/api/signin/link", map[string]string{"token": token})
+	asker.mustStatus(400, "POST", "/api/signin/code", map[string]string{"code": code})
 }
 
-func TestChangeUnverifiedEmail(t *testing.T) {
+func TestSignInByCode(t *testing.T) {
+	ts, owner, srv := newTestServerWith(t)
+	registerMember(t, ts, owner, "kit")
+	asker := newClient(t, ts)
+
+	// Five wrong codes void the token, so the right code no longer works.
+	asker.mustStatus(202, "POST", "/api/signin/email", map[string]string{"login": "kit@example.test"})
+	_, code := signinMail(t, ts, "kit@example.test")
+	for i := 0; i < 5; i++ {
+		asker.mustStatus(400, "POST", "/api/signin/code", map[string]string{"code": otherCode(code)})
+	}
+	asker.mustStatus(400, "POST", "/api/signin/code", map[string]string{"code": code})
+
+	// An expired token works neither by code nor by link.
+	asker.mustStatus(202, "POST", "/api/signin/email", map[string]string{"login": "kit"})
+	token, code := signinMail(t, ts, "kit@example.test")
+	if _, err := srv.DB.Exec("UPDATE email_tokens SET expires_at = ? WHERE kind = 'signin'", db.Now()-1); err != nil {
+		t.Fatal(err)
+	}
+	asker.mustStatus(400, "POST", "/api/signin/code", map[string]string{"code": code})
+	newClient(t, ts).mustStatus(404, "POST", "/api/signin/link", map[string]string{"token": token})
+
+	// A code may be typed with a space in the middle.
+	asker.mustStatus(202, "POST", "/api/signin/email", map[string]string{"login": "kit"})
+	_, code = signinMail(t, ts, "kit@example.test")
+	asker.mustStatus(200, "POST", "/api/signin/code", map[string]string{"code": code[:3] + " " + code[3:]})
+}
+
+// A user can enter at most ten wrong codes in a day across all their tokens.
+// After that a code is refused even when it is right, and only the link works.
+func TestWrongCodesAreCappedPerDay(t *testing.T) {
+	ts, owner := newTestServer(t)
+	registerMember(t, ts, owner, "kit")
+	for round := 0; round < 2; round++ {
+		asker := newClient(t, ts)
+		asker.mustStatus(202, "POST", "/api/signin/email", map[string]string{"login": "kit"})
+		_, code := signinMail(t, ts, "kit@example.test")
+		for i := 0; i < 5; i++ {
+			asker.mustStatus(400, "POST", "/api/signin/code", map[string]string{"code": otherCode(code)})
+		}
+	}
+	asker := newClient(t, ts)
+	asker.mustStatus(202, "POST", "/api/signin/email", map[string]string{"login": "kit"})
+	token, code := signinMail(t, ts, "kit@example.test")
+	asker.mustStatus(429, "POST", "/api/signin/code", map[string]string{"code": code})
+	newClient(t, ts).mustStatus(200, "POST", "/api/signin/link", map[string]string{"token": token})
+}
+
+func TestChangeAddressAfterJoining(t *testing.T) {
 	ts, owner := newTestServer(t)
 	kit := newClient(t, ts)
-	kit.mustStatus(202, "POST", "/api/register", map[string]string{"code": invite(t, owner), "username": "kit", "password": "longenough", "email": "typo@example.test"})
-	anon := newClient(t, ts)
-	anon.mustStatus(403, "POST", "/api/verify/change", map[string]string{"username": "kit", "password": "wrong", "email": "right@example.test"})
-	anon.mustStatus(400, "POST", "/api/verify/change", map[string]string{"username": "kit", "password": "longenough", "email": "nope"})
-	anon.mustStatus(202, "POST", "/api/verify/change", map[string]string{"username": "kit", "password": "longenough", "email": "right@example.test"})
-	// The old address and its link are removed. The new address gets a link that logs the user in.
-	anon.mustStatus(202, "POST", "/api/verify/resend", map[string]string{"email": "typo@example.test"})
-	if n := mailCount(ts, "typo@example.test"); n != 1 {
-		t.Fatalf("mail to the mistyped address after the change: %d", n)
-	}
-	kit.mustStatus(200, "POST", "/api/verify", map[string]string{"token": linkToken(mailed(t, ts, "right@example.test", "verify")[0])})
-	if acct := kit.mustStatus(200, "GET", "/api/me/account", nil); acct["email"] != "right@example.test" {
+	kit.mustStatus(202, "POST", "/api/register", map[string]string{"code": invite(t, owner), "username": "kit", "email": "typo@example.test"})
+	// Only the browser that joined can change the address.
+	newClient(t, ts).mustStatus(403, "POST", "/api/signin/address", map[string]string{"email": "right@example.test"})
+	kit.mustStatus(400, "POST", "/api/signin/address", map[string]string{"email": "nope"})
+	kit.mustStatus(202, "POST", "/api/signin/address", map[string]string{"email": "right@example.test"})
+	// The mistyped address's link no longer works. The new address's code works in this browser.
+	typoToken, _ := signinMail(t, ts, "typo@example.test")
+	newClient(t, ts).mustStatus(404, "POST", "/api/signin/link", map[string]string{"token": typoToken})
+	_, code := signinMail(t, ts, "right@example.test")
+	kit.mustStatus(200, "POST", "/api/signin/code", map[string]string{"code": code})
+	if acct := kit.mustStatus(200, "GET", "/api/me/account", nil); acct["email"] != "right@example.test" || acct["email_verified"] != true {
 		t.Fatalf("account: %v", acct)
 	}
-	// Another account's address cannot be claimed this way. The response is 202, the same as for an unused
-	// address. Jo's address is unchanged, and mo is emailed about the attempt.
+	// Once the address is verified, it is changed only from Settings.
+	kit.mustStatus(403, "POST", "/api/signin/address", map[string]string{"email": "other@example.test"})
+
+	// Another account's address cannot be claimed this way. The answer is the same 202, jo's address is
+	// unchanged, and mo is emailed about the attempt.
 	registerMember(t, ts, owner, "mo")
 	jo := newClient(t, ts)
-	jo.mustStatus(202, "POST", "/api/register", map[string]string{"code": invite(t, owner), "username": "jo", "password": "longenough", "email": "jo@example.test"})
+	jo.mustStatus(202, "POST", "/api/register", map[string]string{"code": invite(t, owner), "username": "jo", "email": "jo@example.test"})
 	moHad := mailCount(ts, "mo@example.test")
-	anon.mustStatus(202, "POST", "/api/verify/change", map[string]string{"username": "jo", "password": "longenough", "email": "MO@example.test"})
-	if mailCount(ts, "mo@example.test") != moHad+1 || mailCount(ts, "MO@example.test") != 0 || len(mailed(t, ts, "jo@example.test", "verify")) == 0 {
+	jo.mustStatus(202, "POST", "/api/signin/address", map[string]string{"email": "MO@example.test"})
+	if mailCount(ts, "mo@example.test") != moHad+1 || mailCount(ts, "MO@example.test") != 0 {
 		t.Fatalf("taken address on change: mo got %d (had %d)", mailCount(ts, "mo@example.test"), moHad)
 	}
+	joToken, _ := signinMail(t, ts, "jo@example.test")
+	newClient(t, ts).mustStatus(200, "POST", "/api/signin/link", map[string]string{"token": joToken})
 }
 
-func TestPasswordReset(t *testing.T) {
+func TestPasswordIsOptional(t *testing.T) {
 	ts, owner := newTestServer(t)
 	kit, _ := registerMember(t, ts, owner, "kit")
-	anon := newClient(t, ts)
-	anon.mustStatus(202, "POST", "/api/reset", map[string]string{"email": "nobody@example.test"})
-	anon.mustStatus(202, "POST", "/api/reset", map[string]string{"email": "kit@example.test"})
-	links := mailed(t, ts, "kit@example.test", "reset")
-	if len(links) != 1 {
-		t.Fatalf("reset links: %v", links)
+	if acct := kit.mustStatus(200, "GET", "/api/me/account", nil); acct["has_password"] != false {
+		t.Fatalf("a new account has a password: %v", acct)
 	}
-	token := linkToken(links[0])
-	// A verify token does not work as a reset token, and trying it as one does not use it up.
-	kit.mustStatus(200, "PUT", "/api/me/email", map[string]string{"email": "kit2@example.test", "password": "longenough"})
-	verifyToken := linkToken(mailed(t, ts, "kit2@example.test", "verify")[0])
-	anon.mustStatus(404, "POST", "/api/reset/"+verifyToken, map[string]string{"password": "anotherlongone"})
-	kit.mustStatus(200, "POST", "/api/verify", map[string]string{"token": verifyToken})
-	// Password rules are checked first, and a rejected password does not use up the token.
-	anon.mustStatus(400, "POST", "/api/reset/"+token, map[string]string{"password": "short"})
-	fresh := newClient(t, ts)
-	res := fresh.mustStatus(200, "POST", "/api/reset/"+token, map[string]string{"password": "anotherlongone"})
-	if res["user"].(map[string]any)["username"] != "kit" {
-		t.Fatalf("reset: %v", res)
-	}
-	// The reset logs this client in. Every earlier session ends. The link is used up.
-	fresh.mustStatus(200, "GET", "/api/me", nil)
-	kit.mustStatus(401, "GET", "/api/me", nil)
-	newClient(t, ts).mustStatus(404, "POST", "/api/reset/"+token, map[string]string{"password": "anotherlongone"})
-	status, _ := newClient(t, ts).do("POST", "/api/login", map[string]string{"username": "kit", "password": "longenough"})
-	if status != 401 {
-		t.Fatalf("old password after reset: %d", status)
-	}
-	newClient(t, ts).login("kit", "anotherlongone")
-}
+	kit.mustStatus(400, "PUT", "/api/me/password", map[string]string{"password": "short"})
+	elsewhere := signIn(t, ts, "kit", "kit@example.test")
 
-func TestChangePassword(t *testing.T) {
-	ts, owner := newTestServer(t)
-	kit, _ := registerMember(t, ts, owner, "kit")
-	elsewhere := newClient(t, ts)
-	elsewhere.login("kit", "longenough")
-	kit.mustStatus(403, "PUT", "/api/me/password", map[string]string{"current": "wrong", "password": "anotherlongone"})
-	kit.mustStatus(400, "PUT", "/api/me/password", map[string]string{"current": "longenough", "password": "short"})
-	kit.mustStatus(204, "PUT", "/api/me/password", map[string]string{"current": "longenough", "password": "anotherlongone"})
-	// This session continues. The other session ends.
+	// Setting a password needs no current password. It ends every other session and emails a notice.
+	kit.mustStatus(204, "PUT", "/api/me/password", map[string]string{"password": "longenough"})
 	kit.mustStatus(200, "GET", "/api/me", nil)
 	elsewhere.mustStatus(401, "GET", "/api/me", nil)
+	if acct := kit.mustStatus(200, "GET", "/api/me/account", nil); acct["has_password"] != true {
+		t.Fatalf("account after setting a password: %v", acct)
+	}
+	if m := newestMail(t, ts, "kit@example.test"); !strings.Contains(m, "Your password was set") {
+		t.Fatalf("notice after setting a password: %s", m)
+	}
+	newClient(t, ts).login("kit", "longenough")
+
+	kit.mustStatus(204, "PUT", "/api/me/password", map[string]string{"password": "anotherlongone"})
 	newClient(t, ts).login("kit", "anotherlongone")
+	if m := newestMail(t, ts, "kit@example.test"); !strings.Contains(m, "Your password was changed") {
+		t.Fatalf("notice after changing the password: %s", m)
+	}
+
+	// Removing the password leaves sign-in by email.
+	kit.mustStatus(204, "DELETE", "/api/me/password", nil)
+	newClient(t, ts).mustStatus(401, "POST", "/api/login", map[string]string{"username": "kit", "password": "anotherlongone"})
+	if acct := kit.mustStatus(200, "GET", "/api/me/account", nil); acct["has_password"] != false {
+		t.Fatalf("account after removing the password: %v", acct)
+	}
+	if m := newestMail(t, ts, "kit@example.test"); !strings.Contains(m, "Your password was removed") {
+		t.Fatalf("notice after removing the password: %s", m)
+	}
+	// The owner made at the command line has no email address, so they cannot remove their password.
+	owner.mustStatus(400, "DELETE", "/api/me/password", nil)
 }
 
-func TestChangeEmail(t *testing.T) {
+func TestChangeEmailConfirmsOnly(t *testing.T) {
 	ts, owner := newTestServer(t)
 	kit, _ := registerMember(t, ts, owner, "kit")
-	kit.mustStatus(403, "PUT", "/api/me/email", map[string]string{"email": "new@example.test", "password": "wrong"})
-	kit.mustStatus(400, "PUT", "/api/me/email", map[string]string{"email": "nope", "password": "longenough"})
-	acct := kit.mustStatus(200, "PUT", "/api/me/email", map[string]string{"email": "new@example.test", "password": "longenough"})
+	kit.mustStatus(400, "PUT", "/api/me/email", map[string]string{"email": "nope"})
+	kit.mustStatus(200, "PUT", "/api/me/email", map[string]string{"email": "first@example.test"})
+	acct := kit.mustStatus(200, "PUT", "/api/me/email", map[string]string{"email": "new@example.test"})
 	if acct["email"] != "kit@example.test" || acct["pending_email"] != "new@example.test" {
 		t.Fatalf("account with a pending address: %v", acct)
 	}
-	// Until the new address is verified, the old address stays on the account. Login works with the old address and not with the new one.
-	newClient(t, ts).login("kit@example.test", "longenough")
-	if status, _ := newClient(t, ts).do("POST", "/api/login", map[string]string{"username": "new@example.test", "password": "longenough"}); status != 401 {
-		t.Fatalf("pending address signs in: %d", status)
+	// A newer change deletes the older confirmation link.
+	anon := newClient(t, ts)
+	anon.mustStatus(404, "POST", "/api/verify", map[string]string{"token": linkToken(mailed(t, ts, "first@example.test", "verify")[0])})
+	// Until the new address is confirmed, sign-in uses the old one.
+	signIn(t, ts, "kit@example.test", "kit@example.test")
+
+	// The link confirms the address from any browser and signs nobody in.
+	res := anon.mustStatus(200, "POST", "/api/verify", map[string]string{"token": linkToken(mailed(t, ts, "new@example.test", "verify")[0])})
+	if res["email"] != "new@example.test" || res["token"] != nil || res["user"] != nil {
+		t.Fatalf("confirming an address: %v", res)
 	}
-	links := mailed(t, ts, "new@example.test", "verify")
-	if len(links) != 1 {
-		t.Fatalf("verification links to the new address: %v", links)
-	}
-	kit.mustStatus(200, "POST", "/api/verify", map[string]string{"token": linkToken(links[0])})
+	anon.mustStatus(401, "GET", "/api/me", nil)
 	acct = kit.mustStatus(200, "GET", "/api/me/account", nil)
 	if acct["email"] != "new@example.test" || acct["email_verified"] != true || acct["pending_email"] != nil {
-		t.Fatalf("account after verifying the new address: %v", acct)
+		t.Fatalf("account after confirming: %v", acct)
 	}
-	newClient(t, ts).login("new@example.test", "longenough")
-	if status, _ := newClient(t, ts).do("POST", "/api/login", map[string]string{"username": "kit@example.test", "password": "longenough"}); status != 401 {
-		t.Fatalf("old address still signs in: %d", status)
+	// A notice goes to the old address.
+	if m := newestMail(t, ts, "kit@example.test"); !strings.Contains(m, "new@example.test") {
+		t.Fatalf("notice to the old address: %s", m)
 	}
+	signIn(t, ts, "new@example.test", "new@example.test")
+
 	// An address that belongs to another account cannot be claimed, even with a link sent before that account had it.
 	mo, _ := registerMember(t, ts, owner, "mo")
-	mo.mustStatus(200, "PUT", "/api/me/email", map[string]string{"email": "taken@example.test", "password": "longenough"})
+	mo.mustStatus(200, "PUT", "/api/me/email", map[string]string{"email": "taken@example.test"})
 	moLink := linkToken(mailed(t, ts, "taken@example.test", "verify")[0])
-	kit.mustStatus(200, "PUT", "/api/me/email", map[string]string{"email": "taken@example.test", "password": "longenough"})
+	kit.mustStatus(200, "PUT", "/api/me/email", map[string]string{"email": "taken@example.test"})
 	kit.mustStatus(200, "POST", "/api/verify", map[string]string{"token": linkToken(mailed(t, ts, "taken@example.test", "verify")[0])})
 	mo.mustStatus(409, "POST", "/api/verify", map[string]string{"token": moLink})
 }
 
 func TestSignInPaysOnlyForWrongGuesses(t *testing.T) {
 	ts, owner := newTestServer(t)
-	registerMember(t, ts, owner, "kit")
+	kit, _ := registerMember(t, ts, owner, "kit")
+	kit.mustStatus(204, "PUT", "/api/me/password", map[string]string{"password": "longenough"})
 	// Logins with the correct password are not limited.
 	for i := 0; i < 8; i++ {
 		newClient(t, ts).login("kit", "longenough")
@@ -224,38 +294,19 @@ func TestSignInPaysOnlyForWrongGuesses(t *testing.T) {
 	newClient(t, ts).mustStatus(429, "POST", "/api/login", map[string]string{"username": "kit", "password": "longenough"})
 }
 
-func TestEmailTokensExpireAndAreRationed(t *testing.T) {
-	ts, owner, srv := newTestServerWith(t)
-	kit, id := registerMember(t, ts, owner, "kit")
-	// An expired token is rejected.
-	token, hash, _ := auth.NewToken()
-	now := db.Now()
-	q := store.New(srv.DB)
-	if err := q.CreateEmailToken(context.Background(), store.CreateEmailTokenParams{Hash: hash, UserID: id, Kind: TokenReset, Email: "kit@example.test", CreatedAt: now - 2*time.Hour.Milliseconds(), ExpiresAt: now - time.Hour.Milliseconds()}); err != nil {
-		t.Fatal(err)
-	}
-	newClient(t, ts).mustStatus(404, "POST", "/api/reset/"+token, map[string]string{"password": "anotherlongone"})
-	kit.mustStatus(200, "GET", "/api/me", nil)
-
-	// At most five links of one kind are sent to a user per hour. The response
-	// does not show when this limit is reached. The endpoint is also rate
-	// limited per client address, like login.
-	sent := 0
+// At most five sign-in emails are sent to a user per hour, including the one
+// sent on joining. The response does not show when this limit is reached.
+// The endpoint is also rate limited per client address.
+func TestSignInEmailsAreRationed(t *testing.T) {
+	ts, owner := newTestServer(t)
+	registerMember(t, ts, owner, "kit")
 	for i := 0; i < 8; i++ {
-		status, _ := newClient(t, ts).do("POST", "/api/reset", map[string]string{"email": "kit@example.test"})
-		if status == 202 {
-			sent++
-		} else if status != 429 {
-			t.Fatalf("reset request %d: %d", i, status)
+		status, _ := newClient(t, ts).do("POST", "/api/signin/email", map[string]string{"login": "kit"})
+		if status != 202 && status != 429 {
+			t.Fatalf("sign-in request %d: %d", i, status)
 		}
 	}
-	if sent < 5 {
-		t.Fatalf("accepted reset requests: %d", sent)
+	if n := mailCount(ts, "kit@example.test"); n != 5 {
+		t.Fatalf("sign-in mails to kit, including the one on joining: %d", n)
 	}
-	if n := mailCount(ts, "kit@example.test"); n != 1+5 {
-		t.Fatalf("reset mails to kit (plus the one verification): %d", n)
-	}
-	_ = sql.ErrNoRows
 }
-
-var _ = httptest.NewServer

@@ -61,26 +61,41 @@ export const FRESH_MAIL_DIR = join(process.cwd(), '..', 'data', 'e2e-fresh-mail'
 /** The email address a test user signs up with. */
 export const emailOf = (username: string) => `${username}@example.test`
 
-/**
- * Returns the path (`/verify/<token>` or `/reset/<token>`) in the newest message
- * sent to an address. The server writes the file before it responds, so the
- * file exists by the time the request that caused it returns.
- */
-export function mailLink(to: string, kind: 'verify' | 'reset', dir = MAIL_DIR): string {
+/** The files of the messages sent to an address, oldest first. */
+function mailFiles(to: string, dir: string): string[] {
   const suffix = `-${to.replace('@', '_at_')}.txt`
-  const files = readdirSync(dir)
+  return readdirSync(dir)
     .filter((f) => f.endsWith(suffix))
     .sort()
+}
+
+/** The text of the newest message sent to an address. */
+function newestMail(to: string, dir: string): string {
+  const files = mailFiles(to, dir)
   expect(files.length, `mail to ${to}`).toBeGreaterThan(0)
-  const text = readFileSync(join(dir, files[files.length - 1]), 'utf8')
-  const m = text.match(new RegExp(`https?://[^/\\s]+(/${kind}/\\S+)`))
+  return readFileSync(join(dir, files[files.length - 1]), 'utf8')
+}
+
+/**
+ * Returns the path (`/signin/<token>` or `/verify/<token>`) in the newest message sent to an address. The server
+ * writes the file before it responds, so the file exists by the time the request that caused it returns.
+ */
+export function mailLink(to: string, kind: 'signin' | 'verify', dir = MAIL_DIR): string {
+  const m = newestMail(to, dir).match(new RegExp(`https?://[^/\\s]+(/${kind}/\\S+)`))
   expect(m, `a ${kind} link in the mail to ${to}`).toBeTruthy()
   return m![1]
 }
 
+/** Returns the six-digit code in the newest sign-in email sent to an address. */
+export function mailCode(to: string, dir = MAIL_DIR): string {
+  const m = newestMail(to, dir).match(/Code: (\d{6})/)
+  expect(m, `a code in the mail to ${to}`).toBeTruthy()
+  return m![1]
+}
+
 /**
- * Creates a new member. The owner creates an invite, the new user registers with it and opens the verification link
- * they were sent, and their browser context is then signed in.
+ * Creates a new member. The owner creates an invite, the new user registers with it, with no password, and uses the
+ * sign-in link they were sent. Their browser context is then signed in.
  */
 export async function member(browser: Browser, info: TestInfo, prefix = 'kit'): Promise<Person> {
   const o = await owner(browser, info)
@@ -91,13 +106,11 @@ export async function member(browser: Browser, info: TestInfo, prefix = 'kit'): 
 
   const context = await browser.newContext(options(info))
   const username = uniq(prefix)
-  const res = await context.request.post('/api/register', {
-    data: { code, username, password: 'longenough', email: emailOf(username) },
-  })
+  const res = await context.request.post('/api/register', { data: { code, username, email: emailOf(username) } })
   expect(res.ok(), await res.text()).toBeTruthy()
-  const token = mailLink(emailOf(username), 'verify').split('/').pop()!
-  const verified = await context.request.post('/api/verify', { data: { token } })
-  expect(verified.ok(), await verified.text()).toBeTruthy()
+  const token = mailLink(emailOf(username), 'signin').split('/').pop()!
+  const signedIn = await context.request.post('/api/signin/link', { data: { token } })
+  expect(signedIn.ok(), await signedIn.text()).toBeTruthy()
   const page = await context.newPage()
   await prepare(page)
   return { context, page, username }

@@ -524,46 +524,47 @@ export function login(username: string, password: string): Promise<Session> {
 }
 
 /**
- * My own account (architecture.md, Accounts): the email address, whether it is verified, and a new address that is
- * waiting to be verified.
+ * My own account (architecture.md, Accounts): the email address, whether it is verified, a new address that is waiting
+ * to be confirmed, and whether the account has a password. A password is optional.
  */
 export interface Account {
   email: string | null
   email_verified: boolean
   pending_email: string | null
+  has_password: boolean
 }
 
-/** Creates the account and sends a link to the email address. Opening the link signs the user in (verifyEmail). */
-export function register(code: string, username: string, password: string, email: string): Promise<{ email: string }> {
-  return request('/api/register', json('POST', { code, username, password, email }))
-}
-
-export function verifyEmail(token: string): Promise<Session> {
-  return request<Session>('/api/verify', json('POST', { token }))
+/** Creates an account with no password and sends the first sign-in email. Its code works in this browser. */
+export function register(code: string, username: string, email: string): Promise<{ email: string }> {
+  return request('/api/register', json('POST', { code, username, email }))
 }
 
 /**
- * Sends a new link to an unverified address. The server gives the same response whether or not it knows the
- * address.
+ * Asks for a sign-in email, with a link and a code. The login is a username or an email address. The server answers
+ * the same whether or not an account matches.
  */
-export async function resendVerification(email: string): Promise<void> {
-  await request('/api/verify/resend', json('POST', { email }))
+export async function requestSignin(login: string): Promise<void> {
+  await request('/api/signin/email', json('POST', { login }))
 }
 
-/**
- * Replaces the mistyped address of an account that has never been verified. The password is used instead of a
- * session.
- */
-export async function changeUnverifiedEmail(username: string, password: string, email: string): Promise<void> {
-  await request('/api/verify/change', json('POST', { username, password, email }))
+/** Signs in with the code from a sign-in email. It works only in the browser that asked for the email. */
+export function signinWithCode(code: string): Promise<Session> {
+  return request<Session>('/api/signin/code', json('POST', { code }))
 }
 
-export async function requestReset(email: string): Promise<void> {
-  await request('/api/reset', json('POST', { email }))
+/** Signs in with the token from a sign-in link. The link's page calls it when its button is pressed. */
+export function signinWithLink(token: string): Promise<Session> {
+  return request<Session>('/api/signin/link', json('POST', { token }))
 }
 
-export function resetPassword(token: string, password: string): Promise<Session> {
-  return request<Session>(`/api/reset/${encodeURIComponent(token)}`, json('POST', { password }))
+/** Replaces the mistyped address of an account that has just joined. It works only in the browser that joined. */
+export async function changeJoiningAddress(email: string): Promise<void> {
+  await request('/api/signin/address', json('POST', { email }))
+}
+
+/** Confirms a changed address with the token from the link sent to it. It signs nobody in. */
+export function confirmEmail(token: string): Promise<{ email: string }> {
+  return request('/api/verify', json('POST', { token }))
 }
 
 /** My own settings (architecture.md, Notifications): whether the weekly digest is on or off. */
@@ -600,12 +601,18 @@ export function getAccount(): Promise<Account> {
   return request('/api/me/account')
 }
 
-export function changeEmail(email: string, password: string): Promise<Account> {
-  return request<Account>('/api/me/email', json('PUT', { email, password }))
+export function changeEmail(email: string): Promise<Account> {
+  return request<Account>('/api/me/email', json('PUT', { email }))
 }
 
-export async function changePassword(current: string, password: string): Promise<void> {
-  await request('/api/me/password', json('PUT', { current, password }))
+/** Sets a password, or changes the one the account has. Every other device is signed out. */
+export async function setPassword(password: string): Promise<void> {
+  await request('/api/me/password', json('PUT', { password }))
+}
+
+/** Removes the password, so the account signs in by email only. Every other device is signed out. */
+export async function removePassword(): Promise<void> {
+  await request('/api/me/password', { method: 'DELETE' })
 }
 
 export async function logout(): Promise<void> {

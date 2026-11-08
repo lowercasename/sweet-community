@@ -72,12 +72,11 @@ test.describe('roles', () => {
     await pick(o.page, row, `Options for ${kit.username}`, 'Remove')
     await confirm(o.page, 'Remove')
     await expect(o.page.getByRole('listitem').filter({ hasText: kit.username })).toHaveCount(0)
-    // Kit's open page signs itself out. The account cannot sign in again.
-    await expect(kit.page.getByRole('button', { name: 'Sign in' })).toBeVisible()
-    await kit.page.getByLabel('Username').fill(kit.username)
-    await kit.page.getByLabel('Password').fill('longenough')
-    await kit.page.getByRole('button', { name: 'Sign in' }).click()
-    await expect(kit.page.getByRole('button', { name: 'Sign in' })).toBeVisible()
+    // Kit's open page signs itself out, and a reload stays on the sign-in page. The server test
+    // TestRemovedUserCannotComeBackAndIsNotNotified checks that the account is sent no sign-in email.
+    await expect(kit.page.getByRole('button', { name: 'Send a sign-in email' })).toBeVisible()
+    await kit.page.reload()
+    await expect(kit.page.getByRole('button', { name: 'Send a sign-in email' })).toBeVisible()
     await expect(kit.page.getByRole('navigation', { name: 'Main' })).toHaveCount(0)
     // Kit's post stays in the feed under a removed- name. This holds on a page that was already open and after a
     // fresh load.
@@ -95,7 +94,7 @@ test.describe('roles', () => {
     await open(mo.page, '/settings')
     await mo.page.getByRole('button', { name: 'Remove my account' }).click()
     await confirm(mo.page, 'Remove my account')
-    await expect(mo.page.getByRole('button', { name: 'Sign in' })).toBeVisible()
+    await expect(mo.page.getByRole('button', { name: 'Send a sign-in email' })).toBeVisible()
     await open(o.page, '/people')
     await expect(o.page.getByRole('listitem').filter({ hasText: mo.username })).toHaveCount(0)
     await o.context.close()

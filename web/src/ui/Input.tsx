@@ -13,6 +13,8 @@ interface InputProps {
   label?: string
   placeholder?: string
   maxLength?: number
+  /** The keyboard a phone shows. `numeric` is for a code made of digits. */
+  inputMode?: 'text' | 'numeric' | 'email'
 }
 
 /** A single-line text input in the editor's style. */
@@ -29,6 +31,7 @@ export function Input({
   label,
   placeholder,
   maxLength,
+  inputMode,
 }: InputProps) {
   return (
     <input
@@ -45,6 +48,7 @@ export function Input({
       aria-label={label}
       placeholder={placeholder}
       maxLength={maxLength}
+      inputMode={inputMode}
       spellCheck={false}
     />
   )

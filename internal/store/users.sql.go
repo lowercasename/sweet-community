@@ -10,6 +10,24 @@ import (
 	"database/sql"
 )
 
+const addWrongCode = `-- name: AddWrongCode :exec
+UPDATE email_tokens SET attempts = attempts + 1,
+    used_at = CASE WHEN attempts + 1 >= ?1 THEN ?2 ELSE used_at END
+WHERE hash = ?3
+`
+
+type AddWrongCodeParams struct {
+	MaxAttempts int64
+	Now         sql.NullInt64
+	Hash        string
+}
+
+// Counts a wrong code against a token. The fifth wrong code voids it.
+func (q *Queries) AddWrongCode(ctx context.Context, arg AddWrongCodeParams) error {
+	_, err := q.db.ExecContext(ctx, addWrongCode, arg.MaxAttempts, arg.Now, arg.Hash)
+	return err
+}
+
 const countRecentEmailTokens = `-- name: CountRecentEmailTokens :one
 SELECT COUNT(*) FROM email_tokens WHERE user_id = ?1 AND kind = ?2 AND created_at > ?3
 `
@@ -27,25 +45,49 @@ func (q *Queries) CountRecentEmailTokens(ctx context.Context, arg CountRecentEma
 	return count, err
 }
 
+const countWrongCodesSince = `-- name: CountWrongCodesSince :one
+SELECT CAST(COALESCE(SUM(attempts), 0) AS INTEGER) FROM email_tokens
+WHERE user_id = ?1 AND kind = 'signin' AND created_at > ?2
+`
+
+type CountWrongCodesSinceParams struct {
+	UserID string
+	Since  int64
+}
+
+// The wrong codes entered for a user's sign-in tokens since a time.
+func (q *Queries) CountWrongCodesSince(ctx context.Context, arg CountWrongCodesSinceParams) (int64, error) {
+	row := q.db.QueryRowContext(ctx, countWrongCodesSince, arg.UserID, arg.Since)
+	var column_1 int64
+	err := row.Scan(&column_1)
+	return column_1, err
+}
+
 const createEmailToken = `-- name: CreateEmailToken :exec
-INSERT INTO email_tokens (hash, user_id, kind, email, created_at, expires_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6)
+INSERT INTO email_tokens (hash, user_id, kind, email, code_hash, request_hash, created_at, expires_at)
+VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)
 `
 
 type CreateEmailTokenParams struct {
-	Hash      string
-	UserID    string
-	Kind      string
-	Email     string
-	CreatedAt int64
-	ExpiresAt int64
+	Hash        string
+	UserID      string
+	Kind        string
+	Email       string
+	CodeHash    sql.NullString
+	RequestHash sql.NullString
+	CreatedAt   int64
+	ExpiresAt   int64
 }
 
+// A sign-in token also stores the hashes of its code and of the requesting browser's cookie. A verify token has neither.
 func (q *Queries) CreateEmailToken(ctx context.Context, arg CreateEmailTokenParams) error {
 	_, err := q.db.ExecContext(ctx, createEmailToken,
 		arg.Hash,
 		arg.UserID,
 		arg.Kind,
 		arg.Email,
+		arg.CodeHash,
+		arg.RequestHash,
 		arg.CreatedAt,
 		arg.ExpiresAt,
 	)
@@ -223,6 +265,32 @@ func (q *Queries) GetProfileByUsername(ctx context.Context, username string) (Ge
 	return i, err
 }
 
+const getRequestUser = `-- name: GetRequestUser :one
+SELECT u.id, u.email_verified_at, u.removed_at FROM email_tokens t JOIN users u ON u.id = t.user_id
+WHERE t.kind = 'signin' AND t.request_hash = ?1 AND t.expires_at > ?2
+ORDER BY t.created_at DESC LIMIT 1
+`
+
+type GetRequestUserParams struct {
+	RequestHash sql.NullString
+	Now         int64
+}
+
+type GetRequestUserRow struct {
+	ID              string
+	EmailVerifiedAt sql.NullInt64
+	RemovedAt       sql.NullInt64
+}
+
+// The account of the newest sign-in token that one browser asked for, used or not. Changing the address after joining
+// uses it, so the browser that joined is the one that can change it.
+func (q *Queries) GetRequestUser(ctx context.Context, arg GetRequestUserParams) (GetRequestUserRow, error) {
+	row := q.db.QueryRowContext(ctx, getRequestUser, arg.RequestHash, arg.Now)
+	var i GetRequestUserRow
+	err := row.Scan(&i.ID, &i.EmailVerifiedAt, &i.RemovedAt)
+	return i, err
+}
+
 const getUser = `-- name: GetUser :one
 SELECT id, username, picture_id, removed_at FROM users WHERE id = ?
 `
@@ -320,6 +388,53 @@ func (q *Queries) GetUserPasswordHash(ctx context.Context, username string) (Get
 	return i, err
 }
 
+const listSigninTokensForRequest = `-- name: ListSigninTokensForRequest :many
+SELECT hash, user_id, email, code_hash FROM email_tokens
+WHERE kind = 'signin' AND request_hash = ?1 AND used_at IS NULL AND expires_at > ?2
+ORDER BY created_at DESC
+`
+
+type ListSigninTokensForRequestParams struct {
+	RequestHash sql.NullString
+	Now         int64
+}
+
+type ListSigninTokensForRequestRow struct {
+	Hash     string
+	UserID   string
+	Email    string
+	CodeHash sql.NullString
+}
+
+// The usable sign-in tokens that one browser asked for, newest first.
+func (q *Queries) ListSigninTokensForRequest(ctx context.Context, arg ListSigninTokensForRequestParams) ([]ListSigninTokensForRequestRow, error) {
+	rows, err := q.db.QueryContext(ctx, listSigninTokensForRequest, arg.RequestHash, arg.Now)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListSigninTokensForRequestRow{}
+	for rows.Next() {
+		var i ListSigninTokensForRequestRow
+		if err := rows.Scan(
+			&i.Hash,
+			&i.UserID,
+			&i.Email,
+			&i.CodeHash,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const removeUser = `-- name: RemoveUser :exec
 UPDATE users SET username = ?1, password_hash = NULL, picture_id = NULL, bio_html = '', bio_text = '', removed_at = ?2
 WHERE id = ?3
@@ -400,6 +515,21 @@ func (q *Queries) SetUserEmailVerified(ctx context.Context, arg SetUserEmailVeri
 	return err
 }
 
+const setUserEmailVerifiedAt = `-- name: SetUserEmailVerifiedAt :exec
+UPDATE users SET email_verified_at = ?1 WHERE id = ?2 AND email_verified_at IS NULL
+`
+
+type SetUserEmailVerifiedAtParams struct {
+	VerifiedAt sql.NullInt64
+	ID         string
+}
+
+// Marks the account's current address verified. Completing a sign-in by email does this.
+func (q *Queries) SetUserEmailVerifiedAt(ctx context.Context, arg SetUserEmailVerifiedAtParams) error {
+	_, err := q.db.ExecContext(ctx, setUserEmailVerifiedAt, arg.VerifiedAt, arg.ID)
+	return err
+}
+
 const setUserPassword = `-- name: SetUserPassword :exec
 UPDATE users SET password_hash = ? WHERE id = ?
 `
@@ -444,4 +574,21 @@ func (q *Queries) UseEmailToken(ctx context.Context, arg UseEmailTokenParams) (i
 		return 0, err
 	}
 	return result.RowsAffected()
+}
+
+const voidUserTokensOfKind = `-- name: VoidUserTokensOfKind :exec
+UPDATE email_tokens SET used_at = ?1 WHERE user_id = ?2 AND kind = ?3 AND used_at IS NULL
+`
+
+type VoidUserTokensOfKindParams struct {
+	Now    sql.NullInt64
+	UserID string
+	Kind   string
+}
+
+// Marks a user's unused tokens of one kind as used. A newer address replaces the older address's links. The rows stay,
+// so they still count towards the emails sent in the last hour.
+func (q *Queries) VoidUserTokensOfKind(ctx context.Context, arg VoidUserTokensOfKindParams) error {
+	_, err := q.db.ExecContext(ctx, voidUserTokensOfKind, arg.Now, arg.UserID, arg.Kind)
+	return err
 }

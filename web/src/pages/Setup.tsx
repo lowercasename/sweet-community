@@ -12,7 +12,8 @@ interface SetupProps {
  * The setup link's page (architecture.md, New-instance lifecycle). A fresh
  * instance has no owner until the holder of the link creates their account
  * here. The email address is treated as verified, because holding the link
- * proves access to the mailbox.
+ * proves access to the mailbox. The password is optional (architecture.md,
+ * Accounts).
  */
 export function Setup({ token, onSetUp }: SetupProps) {
   const [username, setUsername] = useState('')
@@ -45,19 +46,15 @@ export function Setup({ token, onSetUp }: SetupProps) {
         <Field label="Email address">
           <Input type="email" name="email" value={email} onChange={setEmail} autoComplete="email" required />
         </Field>
-        <Field label="Password" hint="At least 8 characters.">
-          <Input
-            type="password"
-            name="password"
-            value={password}
-            onChange={setPassword}
-            autoComplete="new-password"
-            required
-          />
+        <Field
+          label="Password"
+          hint="Optional, at least 8 characters. Without one, you sign in with a link and a code sent to your email address."
+        >
+          <Input type="password" name="password" value={password} onChange={setPassword} autoComplete="new-password" />
         </Field>
         {error && <Alert tone="error">{error}</Alert>}
         <Row justify="end" align="center">
-          <Button type="submit" disabled={!username || !email || !password} busy={busy}>
+          <Button type="submit" disabled={!username || !email} busy={busy}>
             Set up
           </Button>
         </Row>

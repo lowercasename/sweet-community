@@ -527,10 +527,10 @@ export function useAccount() {
   return useQuery({ queryKey: keys.account, queryFn: getAccount })
 }
 
-/** Sets a new email address. It is pending until its verification link is opened. The reply is the current account state. */
+/** Sets a new email address. It is pending until its confirmation link is used. The reply is the current account state. */
 export function useChangeEmail() {
   const qc = useQueryClient()
-  return async (email: string, password: string) => {
-    qc.setQueryData(keys.account, await changeEmail(email, password))
+  return async (email: string) => {
+    qc.setQueryData(keys.account, await changeEmail(email))
   }
 }

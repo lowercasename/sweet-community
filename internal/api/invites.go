@@ -92,16 +92,16 @@ func (s *Server) getInvite(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{"invited_by": by})
 }
 
-// register (public) creates an account from a valid invite and sends the verification email.
+// register (public) creates an account with no password from a valid invite, and sends the first sign-in email.
 func (s *Server) register(w http.ResponseWriter, r *http.Request) {
 	if !s.registerLimiter.open(s.clientAddr(r)) {
 		writeErr(w, http.StatusTooManyRequests, "Too many attempts. Wait a moment and try again.")
 		return
 	}
 	var in struct {
-		Code  string `json:"code"`
-		Email string `json:"email"`
-		credentials
+		Code     string `json:"code"`
+		Username string `json:"username"`
+		Email    string `json:"email"`
 	}
 	r.Body = http.MaxBytesReader(w, r.Body, 4096)
 	if err := json.NewDecoder(r.Body).Decode(&in); err != nil {
@@ -115,15 +115,6 @@ func (s *Server) register(w http.ResponseWriter, r *http.Request) {
 	in.Email = strings.TrimSpace(in.Email)
 	if err := auth.ValidateEmail(in.Email); err != nil {
 		writeErr(w, http.StatusBadRequest, err.Error())
-		return
-	}
-	if err := auth.ValidatePassword(in.Password); err != nil {
-		writeErr(w, http.StatusBadRequest, err.Error())
-		return
-	}
-	hash, err := auth.HashPassword(in.Password)
-	if err != nil {
-		writeErr(w, http.StatusInternalServerError, err.Error())
 		return
 	}
 	id, err := uuid.NewV7()
@@ -172,7 +163,7 @@ func (s *Server) register(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err := qtx.CreateUserWithEmail(ctx, store.CreateUserWithEmailParams{
-		ID: u.ID, Username: u.Username, PasswordHash: sql.NullString{String: hash, Valid: true}, Email: sql.NullString{String: in.Email, Valid: true}, CreatedAt: now,
+		ID: u.ID, Username: u.Username, Email: sql.NullString{String: in.Email, Valid: true}, CreatedAt: now,
 	}); err != nil {
 		if db.IsUniqueViolation(err) {
 			writeErr(w, http.StatusConflict, "That username is taken")
@@ -224,9 +215,14 @@ func (s *Server) register(w http.ResponseWriter, r *http.Request) {
 	if told != nil {
 		s.Hub.Broadcast(*told)
 	}
-	// No session is issued yet. The address is verified first, and the link
-	// that verifies it signs the user in.
-	if err := s.sendToken(ctx, s.q(), u.ID, TokenVerify, in.Email); err != nil {
+	// No session is issued yet. The first sign-in email finishes joining, and using it verifies the address. Its code
+	// works in this browser, which the sign-in cookie identifies.
+	request, err := signinRequest(w, r)
+	if err != nil {
+		writeErr(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	if err := s.sendSignin(ctx, s.q(), u.ID, in.Email, request, true); err != nil {
 		writeErr(w, http.StatusInternalServerError, err.Error())
 		return
 	}

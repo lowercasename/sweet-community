@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { changeUnverifiedEmail, getInvite, register, type Settings } from '../api'
+import { getInvite, register, type Settings, type User } from '../api'
 import { AuthFrame } from '../components/AuthFrame'
 import { CheckEmail } from '../components/CheckEmail'
 import { Alert, Button, Field, Form, Input, Row, Text } from '../ui'
@@ -8,20 +8,20 @@ interface JoinProps {
   code: string
   /** The community's public settings. Undefined while they load. */
   community?: Settings
+  onSignedIn: (me: User) => void
 }
 
 /**
  * The page an invite link opens (architecture.md, Accounts). It shows who
- * invited the visitor and to which community. The visitor picks a username,
- * a password and an email address, and a verification link is sent to the
- * address. Opening the link signs them in.
+ * invited the visitor and to which community. The visitor picks a username
+ * and gives an email address. There is no password. The first sign-in email,
+ * with a link and a code, finishes joining.
  */
-export function Join({ code, community }: JoinProps) {
+export function Join({ code, community, onSignedIn }: JoinProps) {
   const [invitedBy, setInvitedBy] = useState<string | null>(null)
   const [invalid, setInvalid] = useState<string | null>(null)
   const [username, setUsername] = useState('')
   const [email, setEmail] = useState('')
-  const [password, setPassword] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [sentTo, setSentTo] = useState<string | null>(null)
@@ -45,7 +45,7 @@ export function Join({ code, community }: JoinProps) {
     setBusy(true)
     setError(null)
     try {
-      const res = await register(code, username.trim(), password, email.trim())
+      const res = await register(code, username.trim(), email.trim())
       setSentTo(res.email)
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Could not join')
@@ -61,8 +61,9 @@ export function Join({ code, community }: JoinProps) {
         <Text variant="secondary">{invalid}</Text>
       ) : sentTo ? (
         <CheckEmail
-          email={sentTo}
-          onChangeAddress={(to) => changeUnverifiedEmail(username.trim(), password, to)}
+          login={sentTo}
+          joinedWith={sentTo}
+          onSignedIn={onSignedIn}
           backLabel="Back to the start"
           onBack={() => setSentTo(null)}
         />
@@ -73,22 +74,12 @@ export function Join({ code, community }: JoinProps) {
           <Field label="Username" hint="Letters, digits and underscores.">
             <Input name="username" value={username} onChange={setUsername} autoComplete="username" autoFocus required />
           </Field>
-          <Field label="Email address" hint="A link to sign in will be sent here.">
+          <Field label="Email address" hint="You sign in with a link and a code sent to this address.">
             <Input type="email" name="email" value={email} onChange={setEmail} autoComplete="email" required />
-          </Field>
-          <Field label="Password" hint="At least 8 characters.">
-            <Input
-              type="password"
-              name="password"
-              value={password}
-              onChange={setPassword}
-              autoComplete="new-password"
-              required
-            />
           </Field>
           {error && <Alert tone="error">{error}</Alert>}
           <Row justify="end" align="center">
-            <Button type="submit" disabled={!invitedBy || !username || !email || !password} busy={busy}>
+            <Button type="submit" disabled={!invitedBy || !username || !email} busy={busy}>
               Join {name}
             </Button>
           </Row>

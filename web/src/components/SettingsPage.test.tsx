@@ -14,11 +14,14 @@ vi.mock('../api', () => ({
   uploadImage: vi.fn(),
   setPicture: vi.fn(),
   removeUser: vi.fn(() => Promise.resolve()),
-  getAccount: vi.fn(() => Promise.resolve({ email: 'kit@example.test', email_verified: true, pending_email: null })),
-  changeEmail: vi.fn((email: string) =>
-    Promise.resolve({ email: 'kit@example.test', email_verified: true, pending_email: email }),
+  getAccount: vi.fn(() =>
+    Promise.resolve({ email: 'kit@example.test', email_verified: true, pending_email: null, has_password: false }),
   ),
-  changePassword: vi.fn(() => Promise.resolve()),
+  changeEmail: vi.fn((email: string) =>
+    Promise.resolve({ email: 'kit@example.test', email_verified: true, pending_email: email, has_password: false }),
+  ),
+  setPassword: vi.fn(() => Promise.resolve()),
+  removePassword: vi.fn(() => Promise.resolve()),
   getMySettings: vi.fn(() => Promise.resolve({ digest: 'weekly' })),
   setMySettings: vi.fn(),
   getPushKey: vi.fn(),
@@ -50,23 +53,21 @@ describe('SettingsPage', () => {
     expect(screen.queryByRole('button', { name: 'Remove my account' })).toBeNull()
   })
 
-  it('shows the email, keeps a new one pending once its link is sent, and a new password needs the old', async () => {
-    const { changeEmail, changePassword } = await import('../api')
+  it('shows the email, keeps a new one pending once its link is sent, and sets a password without asking for one', async () => {
+    const { changeEmail, setPassword } = await import('../api')
     const { SettingsPage } = await import('./SettingsPage')
     renderWithQuery(<SettingsPage me={user('kit')} root={group(ROOT, 'member')} onSignOut={() => {}} />)
     await screen.findByText('kit@example.test')
     fireEvent.change(screen.getByLabelText('New email address'), { target: { value: 'new@example.test' } })
-    fireEvent.change(screen.getByLabelText('Your password'), { target: { value: 'longenough' } })
     fireEvent.click(screen.getByRole('button', { name: 'Change email address' }))
-    expect(changeEmail).toHaveBeenCalledWith('new@example.test', 'longenough')
+    expect(changeEmail).toHaveBeenCalledWith('new@example.test')
     await screen.findByText(/A link has been sent to new@example.test/)
     // The old address stays in use until the link is opened.
     expect(screen.getByText('kit@example.test')).toBeTruthy()
 
-    fireEvent.change(screen.getByLabelText('Current password'), { target: { value: 'longenough' } })
-    fireEvent.change(screen.getByLabelText('New password'), { target: { value: 'anotherlongone' } })
-    fireEvent.click(screen.getByRole('button', { name: 'Change password' }))
-    expect(changePassword).toHaveBeenCalledWith('longenough', 'anotherlongone')
-    await screen.findByText(/Password changed/)
+    fireEvent.change(screen.getByLabelText('Password'), { target: { value: 'anotherlongone' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Set password' }))
+    expect(setPassword).toHaveBeenCalledWith('anotherlongone')
+    await screen.findByText(/Password set/)
   })
 })

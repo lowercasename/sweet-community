@@ -1,9 +1,17 @@
-import { emailOf, expect, mailLink, member, open, owner, test, uniq } from './helpers'
+import { emailOf, expect, mailCode, mailLink, member, open, owner, test, uniq } from './helpers'
 
+/**
+ * Signing in and joining (architecture.md, Accounts). A password is optional. The usual way in is a sign-in email
+ * with a link and a six-digit code. The code works in the browser that asked for it. The link opens a page whose
+ * Finish signing in button uses it. The server allows five sign-in emails at once from one address, so these tests
+ * ask for few.
+ */
 test.describe('signing in and joining', () => {
-  test('a wrong password is refused, and the right password opens Home', async ({ page }) => {
+  test('a password is the other way in: a wrong one is refused, and the right one opens Home', async ({ page }) => {
     await page.goto('/')
-    await page.getByLabel('Username').fill('raphael')
+    await expect(page.getByLabel('Password')).toHaveCount(0)
+    await page.getByRole('button', { name: 'Use a password instead' }).click()
+    await page.getByLabel('Username or email address').fill('raphael')
     await page.getByLabel('Password').fill('wrong horse')
     await page.getByRole('button', { name: 'Sign in' }).click()
     await expect(page.getByText('Wrong username or password')).toBeVisible()
@@ -13,7 +21,7 @@ test.describe('signing in and joining', () => {
     await expect(page).toHaveURL(/\/$/)
   })
 
-  test('an invite link created on the People page lets a new user register, and the verification link in their email signs them in once', async ({
+  test('an invite link created on the People page lets a new user join without a password, and the code in their email finishes joining', async ({
     browser,
   }, testInfo) => {
     const o = await owner(browser, testInfo)
@@ -27,23 +35,25 @@ test.describe('signing in and joining', () => {
     const page = await stranger.newPage()
     await page.goto(path)
     await expect(page.getByText('raphael invited you to Sweet e2e.')).toBeVisible()
+    await expect(page.getByLabel('Password')).toHaveCount(0)
     const name = uniq('jo')
     await page.getByLabel('Username').fill(name)
     await page.getByLabel('Email address').fill(emailOf(name))
-    await page.getByLabel('Password').fill('longenough')
     await page.getByRole('button', { name: 'Join' }).click()
-    // The user is not signed in yet. The verification link is in the email.
+    // The user is not signed in yet. The email holds a link and a code.
     await expect(page.getByText('Check your email')).toBeVisible()
     await expect(page.getByText(emailOf(name))).toBeVisible()
-    await page.goto(mailLink(emailOf(name), 'verify'))
+    await page.getByLabel('Code').fill(mailCode(emailOf(name)))
+    await page.getByRole('button', { name: 'Finish joining' }).click()
     await expect(page.getByRole('navigation', { name: 'Main' })).toBeVisible()
     await expect(page).toHaveURL(/\/$/)
     await expect(page.getByRole('navigation', { name: 'Main' }).getByRole('button', { name })).toBeVisible()
-    // The verification link does not work a second time.
+    // The code used the token, so the link in the same email no longer works.
     const twice = await browser.newContext({ baseURL: testInfo.project.use.baseURL as string })
     const p3 = await twice.newPage()
-    await p3.goto(mailLink(emailOf(name), 'verify'))
-    await expect(p3.getByText('This link does not work')).toBeVisible()
+    await p3.goto(mailLink(emailOf(name), 'signin'))
+    await p3.getByRole('button', { name: 'Finish signing in' }).click()
+    await expect(p3.getByText('This link has been used or has expired')).toBeVisible()
     await twice.close()
 
     // The invite link still works for the next user during the week it is valid.
@@ -65,7 +75,7 @@ test.describe('signing in and joining', () => {
     await o.context.close()
   })
 
-  test('an unverified account is shown the check-your-email page at sign-in, and can send the link to a different address', async ({
+  test('a mistyped address can be changed from the page after joining, and the new address finishes joining', async ({
     browser,
   }, testInfo) => {
     const o = await owner(browser, testInfo)
@@ -74,92 +84,99 @@ test.describe('signing in and joining', () => {
     await o.context.close()
     const name = uniq('un')
     const ctx = await browser.newContext({ baseURL: testInfo.project.use.baseURL as string })
-    const res = await ctx.request.post('/api/register', {
-      data: { code, username: name, password: 'longenough', email: `typo-${emailOf(name)}` },
-    })
-    expect(res.status()).toBe(202)
     const page = await ctx.newPage()
-    await page.goto('/')
-    await page.getByLabel('Username or email').fill(name)
-    await page.getByLabel('Password').fill('longenough')
-    await page.getByRole('button', { name: 'Sign in' }).click()
-    await expect(page.getByText('Check your email')).toBeVisible()
+    await page.goto(`/join/${code}`)
+    await page.getByLabel('Username').fill(name)
+    await page.getByLabel('Email address').fill(`typo-${emailOf(name)}`)
+    await page.getByRole('button', { name: 'Join' }).click()
     await expect(page.getByText(`typo-${emailOf(name)}`)).toBeVisible()
     await page.getByRole('button', { name: 'Use a different address' }).click()
     await page.getByLabel('Email address').fill(emailOf(name))
-    await page.getByRole('button', { name: 'Send a new link' }).click()
-    await expect(page.getByText('Sent again')).toBeVisible()
-    await page.goto(mailLink(emailOf(name), 'verify'))
+    await page.getByRole('button', { name: 'Send to this address' }).click()
+    await expect(page.getByText(emailOf(name), { exact: true })).toBeVisible()
+    await page.getByLabel('Code').fill(mailCode(emailOf(name)))
+    await page.getByRole('button', { name: 'Finish joining' }).click()
     await expect(page.getByRole('navigation', { name: 'Main' })).toBeVisible()
     await ctx.close()
   })
 
-  test('a user can sign in with their email address', async ({ browser }, testInfo) => {
+  test('a user signs in with a sign-in email asked for by their email address, typing the code', async ({
+    browser,
+  }, testInfo) => {
     const m = await member(browser, testInfo)
     await m.context.close()
     const ctx = await browser.newContext({ baseURL: testInfo.project.use.baseURL as string })
     const page = await ctx.newPage()
     await page.goto('/')
-    await page.getByLabel('Username or email').fill(emailOf(m.username).toUpperCase())
-    await page.getByLabel('Password').fill('longenough')
-    await page.getByRole('button', { name: 'Sign in' }).click()
+    await page.getByLabel('Username or email address').fill(emailOf(m.username).toUpperCase())
+    await page.getByRole('button', { name: 'Send a sign-in email' }).click()
+    await expect(page.getByText('Check your email')).toBeVisible()
+    await page.getByLabel('Code').fill(mailCode(emailOf(m.username)))
+    await page.getByRole('button', { name: 'Sign in', exact: true }).click()
     await expect(page.getByRole('navigation', { name: 'Main' })).toBeVisible()
     await ctx.close()
   })
 
-  test('a forgotten password is reset through an emailed link, and the reset ends the other sessions @phone', async ({
+  test('the link in a sign-in email opens a page whose button signs in, in another browser @phone', async ({
     browser,
   }, testInfo) => {
-    const m = await member(browser, testInfo)
-    await open(m.page)
-    const ctx = await browser.newContext({ baseURL: testInfo.project.use.baseURL as string })
+    // The email sent on joining is a sign-in email. Asking for another would spend the server's allowance of five at
+    // once, which the built and dev projects share.
+    const o = await owner(browser, testInfo)
+    const invite = await o.context.request.post('/api/invites')
+    const code = ((await invite.json()) as { code: string }).code
+    await o.context.close()
+    const name = uniq('ph')
+    const joined = await browser.newContext({ baseURL: testInfo.project.use.baseURL as string })
+    expect(
+      (await joined.request.post('/api/register', { data: { code, username: name, email: emailOf(name) } })).status(),
+    ).toBe(202)
+    await joined.close()
+    // A phone opens the link. Opening it uses nothing. The button does.
+    const ctx = await browser.newContext({
+      baseURL: testInfo.project.use.baseURL as string,
+      viewport: testInfo.project.use.viewport ?? undefined,
+      isMobile: testInfo.project.use.isMobile,
+      hasTouch: testInfo.project.use.hasTouch,
+    })
     const page = await ctx.newPage()
-    await page.goto('/')
-    await page.getByRole('link', { name: 'Forgot your password?' }).click()
-    await expect(page).toHaveURL(/\/reset$/)
-    await page.getByLabel('Email address').fill(emailOf(m.username))
-    await page.getByRole('button', { name: 'Send a link' }).click()
-    await expect(page.getByText(/a link to choose a new password has been sent/)).toBeVisible()
-    await page.goto(mailLink(emailOf(m.username), 'reset'))
-    await page.getByLabel('New password').fill('anotherlongone')
-    await page.getByRole('button', { name: 'Save' }).click()
-    await expect(page.getByRole('navigation', { name: 'Main' })).toBeVisible()
-    // The earlier session has ended.
-    await m.page.reload()
-    await expect(m.page.getByRole('button', { name: 'Sign in' })).toBeVisible()
-    // The reset link does not work a second time. This is checked from a signed-out browser, because a
-    // signed-in user who opens a reset link sees Home.
-    await m.page.goto(mailLink(emailOf(m.username), 'reset'))
-    await m.page.getByLabel('New password').fill('yetanotherone')
-    await m.page.getByRole('button', { name: 'Save' }).click()
-    await expect(m.page.getByText(/used or has expired/)).toBeVisible()
+    await page.goto(mailLink(emailOf(name), 'signin'))
+    await expect(page.getByRole('button', { name: 'Finish signing in' })).toBeVisible()
+    await page.reload()
+    await page.getByRole('button', { name: 'Finish signing in' }).click()
+    await expect(page.getByRole('navigation', { name: 'Main' }).first()).toBeVisible()
+    await expect(page).toHaveURL(/\/$/)
     await ctx.close()
-    await m.context.close()
   })
 
-  test('on Settings, a new email address takes effect when its link is opened, and the password is changed by entering the old one', async ({
+  test('on Settings, a new email address takes effect when its link is confirmed, and a password is set and removed without the old one', async ({
     browser,
   }, testInfo) => {
-    // The server test TestChangePassword checks that the other sessions end. A second sign-in here would
-    // use up the suite's sign-in allowance.
     const m = await member(browser, testInfo)
     await open(m.page, '/settings')
     await expect(m.page.getByText(emailOf(m.username), { exact: true })).toBeVisible()
     const next = `new-${emailOf(m.username)}`
     await m.page.getByLabel('New email address').fill(next)
-    await m.page.getByLabel('Your password').fill('longenough')
     await m.page.getByRole('button', { name: 'Change email address' }).click()
     await expect(m.page.getByText(`A link has been sent to ${next}`)).toBeVisible()
     await expect(m.page.getByText(emailOf(m.username), { exact: true })).toBeVisible()
     await m.page.goto(mailLink(next, 'verify'))
-    await expect(m.page).toHaveURL(/\/settings$/)
+    await m.page.getByRole('button', { name: 'Confirm address' }).click()
+    await expect(m.page.getByText(`Your email address is now ${next}.`)).toBeVisible()
+    await m.page.getByRole('link', { name: 'Back to Settings' }).click()
     await expect(m.page.getByText(next, { exact: true })).toBeVisible()
     await expect(m.page.getByText(/A link has been sent/)).toHaveCount(0)
 
-    await m.page.getByLabel('Current password').fill('longenough')
-    await m.page.getByLabel('New password').fill('anotherlongone')
-    await m.page.getByRole('button', { name: 'Change password' }).click()
-    await expect(m.page.getByText(/Password changed/)).toBeVisible()
+    // The account has no password. Setting one asks for nothing else.
+    await expect(m.page.getByText(/You sign in with a link and a code/)).toBeVisible()
+    await m.page.getByLabel('Password', { exact: true }).fill('anotherlongone')
+    await m.page.getByRole('button', { name: 'Set password' }).click()
+    await expect(m.page.getByText(/Password set/)).toBeVisible()
+    await expect(m.page.getByText('You can sign in with your password or with a sign-in email.')).toBeVisible()
+    await m.page.getByRole('button', { name: 'Remove password' }).click()
+    await m.page.getByRole('dialog').getByRole('button', { name: 'Remove password' }).click()
+    await expect(m.page.getByText(/Password removed/)).toBeVisible()
+    await expect(m.page.getByRole('button', { name: 'Set password' })).toBeVisible()
     await m.context.close()
   })
 
@@ -169,9 +186,9 @@ test.describe('signing in and joining', () => {
     const m = await member(browser, testInfo)
     await open(m.page, '/settings')
     await m.page.getByRole('button', { name: 'Sign out', exact: true }).click()
-    await expect(m.page.getByRole('button', { name: 'Sign in' })).toBeVisible()
+    await expect(m.page.getByRole('button', { name: 'Send a sign-in email' })).toBeVisible()
     await m.page.reload()
-    await expect(m.page.getByRole('button', { name: 'Sign in' })).toBeVisible()
+    await expect(m.page.getByRole('button', { name: 'Send a sign-in email' })).toBeVisible()
     await m.context.close()
   })
 })

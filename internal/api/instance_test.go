@@ -126,3 +126,16 @@ func TestOwnerHearsOfEachArrival(t *testing.T) {
 	}
 	_ = kitID
 }
+
+// The setup page's password is optional (architecture.md, Accounts). Without
+// one, the owner signs in by email.
+func TestSetupWithoutAPassword(t *testing.T) {
+	ts, link := newFreshServer(t)
+	token := link[strings.LastIndex(link, "/")+1:]
+	owner := newClient(t, ts)
+	owner.mustStatus(201, "POST", "/api/setup", map[string]string{"token": token, "username": "raphael", "email": "r@example.test"})
+	if acct := owner.mustStatus(200, "GET", "/api/me/account", nil); acct["has_password"] != false || acct["email_verified"] != true {
+		t.Fatalf("the owner's account after a setup without a password: %v", acct)
+	}
+	newClient(t, ts).mustStatus(401, "POST", "/api/login", map[string]string{"username": "raphael", "password": "anything at all"})
+}

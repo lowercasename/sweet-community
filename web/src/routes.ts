@@ -21,9 +21,6 @@ export const SEARCH = '/search'
 /** The notifications page (architecture.md, Notifications). */
 export const NOTIFICATIONS = '/notifications'
 
-/** Password reset (architecture.md, Accounts). `/reset` requests a link, and `/reset/<token>` is the page the link opens. */
-export const RESET = '/reset'
-
 /** The owner's settings page for the community (architecture.md, Admin tools). Name, description, and who may create rooms. */
 export const COMMUNITY = '/community'
 

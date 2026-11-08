@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { FRESH_MAIL_DIR, emailOf, expect, mailLink, prepare, test, uniq } from './helpers'
+import { FRESH_MAIL_DIR, emailOf, expect, mailCode, prepare, test, uniq } from './helpers'
 
 /**
  * A new instance, tested end to end (architecture.md, New-instance lifecycle).
@@ -62,10 +62,10 @@ test.describe('a fresh instance', () => {
       await expect(p.getByText('Wool and gossip.')).toBeVisible()
       await p.getByLabel('Username').fill(name)
       await p.getByLabel('Email address').fill(emailOf(name))
-      await p.getByLabel('Password').fill('longenough')
       await p.getByRole('button', { name: 'Join Knitting Circle' }).click()
       await expect(p.getByText('Check your email')).toBeVisible()
-      await p.goto(mailLink(emailOf(name), 'verify', FRESH_MAIL_DIR))
+      await p.getByLabel('Code').fill(mailCode(emailOf(name), FRESH_MAIL_DIR))
+      await p.getByRole('button', { name: 'Finish joining' }).click()
       await expect(p.getByRole('navigation', { name: 'Main' })).toContainText('Knitting Circle')
       await stranger.close()
     }

@@ -47,7 +47,7 @@ func NeedsSetup(ctx context.Context, d *sql.DB) (bool, error) {
 	return !st.OwnerSet, err
 }
 
-// setup is `POST /api/setup {token, username, email, password}`. It creates
+// setup is `POST /api/setup {token, username, email, password}`, with the password optional. It creates
 // the owner's account from the setup link and signs them in. It works once,
 // because the token is deleted with it.
 func (s *Server) setup(w http.ResponseWriter, r *http.Request) {
@@ -74,14 +74,19 @@ func (s *Server) setup(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusBadRequest, err.Error())
 		return
 	}
-	if err := auth.ValidatePassword(in.Password); err != nil {
-		writeErr(w, http.StatusBadRequest, err.Error())
-		return
-	}
-	hash, err := auth.HashPassword(in.Password)
-	if err != nil {
-		writeErr(w, http.StatusInternalServerError, err.Error())
-		return
+	// The password is optional (architecture.md, Accounts). Without one, the owner signs in by email.
+	var hash sql.NullString
+	if in.Password != "" {
+		if err := auth.ValidatePassword(in.Password); err != nil {
+			writeErr(w, http.StatusBadRequest, err.Error())
+			return
+		}
+		h, err := auth.HashPassword(in.Password)
+		if err != nil {
+			writeErr(w, http.StatusInternalServerError, err.Error())
+			return
+		}
+		hash = sql.NullString{String: h, Valid: true}
 	}
 	ctx := r.Context()
 	tx, err := s.DB.BeginTx(ctx, nil)
@@ -153,7 +158,7 @@ func (s *Server) setup(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusInternalServerError, err.Error())
 		return
 	}
-	if err := qtx.SetUserPassword(ctx, store.SetUserPasswordParams{PasswordHash: sql.NullString{String: hash, Valid: true}, ID: id.String()}); err != nil {
+	if err := qtx.SetUserPassword(ctx, store.SetUserPasswordParams{PasswordHash: hash, ID: id.String()}); err != nil {
 		writeErr(w, http.StatusInternalServerError, err.Error())
 		return
 	}

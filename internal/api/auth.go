@@ -266,16 +266,9 @@ func (s *Server) login(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusBadRequest, "Bad request")
 		return
 	}
-	// The username field accepts a username or an email address.
-	var row store.GetUserByUsernameRow
-	var err error
-	if strings.Contains(in.Username, "@") {
-		var e store.GetUserByEmailRow
-		e, err = s.q().GetUserByEmail(r.Context(), strings.TrimSpace(in.Username))
-		row = store.GetUserByUsernameRow(e)
-	} else {
-		row, err = s.q().GetUserByUsername(r.Context(), in.Username)
-	}
+	// The username field accepts a username or an email address. An account with no password gets the same answer
+	// as a wrong password.
+	row, err := userByLogin(r.Context(), s.q(), in.Username)
 	u := wireUser(row.ID, row.Username, row.PictureID)
 	hash := row.PasswordHash
 	// An unknown user and a wrong password get the same response. The hash

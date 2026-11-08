@@ -136,7 +136,7 @@ func TestRemoveFromInstance(t *testing.T) {
 	jo.mustStatus(204, "DELETE", "/api/users/"+joID, nil)
 	jo.mustStatus(401, "GET", "/api/me", nil)
 	code := owner.mustStatus(201, "POST", "/api/invites", nil)["code"].(string)
-	if status, body := newClient(t, ts).do("POST", "/api/register", map[string]string{"code": code, "username": "removed-anyone", "password": "longenough", "email": "anyone@example.test"}); status != 400 {
+	if status, body := newClient(t, ts).do("POST", "/api/register", map[string]string{"code": code, "username": "removed-anyone", "email": "anyone@example.test"}); status != 400 {
 		t.Fatalf("registering a removed name: %d %v", status, body)
 	}
 }
@@ -157,15 +157,19 @@ func TestRemovedUserCannotComeBackAndIsNotNotified(t *testing.T) {
 	post := mo.mustStatus(201, "POST", rootPath+"/posts", map[string]string{"body_html": "<p>mine</p>"})
 	mo.mustStatus(201, "POST", "/api/push/subscriptions", map[string]any{"endpoint": "https://fcm.googleapis.com/fcm/send/mo-phone", "keys": map[string]string{"p256dh": "p", "auth": "a"}})
 	anon := newClient(t, ts)
-	anon.mustStatus(202, "POST", "/api/reset", map[string]string{"email": "mo@example.test"})
-	links := mailed(t, ts, "mo@example.test", "reset")
-	if len(links) != 1 {
-		t.Fatalf("reset mail: %v", links)
-	}
+	anon.mustStatus(202, "POST", "/api/signin/email", map[string]string{"login": "mo"})
+	token, code := signinMail(t, ts, "mo@example.test")
 	owner.mustStatus(204, "DELETE", "/api/users/"+moID, nil)
 
-	// The reset link sent before the removal no longer works.
-	anon.mustStatus(404, "POST", "/api/reset/"+linkToken(links[0]), map[string]string{"password": "anotherlongone"})
+	// The sign-in email sent before the removal no longer works, by link or by code.
+	anon.mustStatus(404, "POST", "/api/signin/link", map[string]string{"token": token})
+	anon.mustStatus(400, "POST", "/api/signin/code", map[string]string{"code": code})
+	// A removed account is sent no sign-in email.
+	had := mailCount(ts, "mo@example.test")
+	anon.mustStatus(202, "POST", "/api/signin/email", map[string]string{"login": "mo@example.test"})
+	if mailCount(ts, "mo@example.test") != had {
+		t.Fatal("a removed account was sent a sign-in email")
+	}
 	// The removed account has no push subscriptions left.
 	if subs, err := srv.q().ListPushSubscriptions(ctx, moID); err != nil || len(subs) != 0 {
 		t.Fatalf("push subscriptions after removal: %v %v", subs, err)
