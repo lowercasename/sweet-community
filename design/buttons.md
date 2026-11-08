@@ -1,5 +1,7 @@
 # Buttons
 
+Drawn at real size on the canvas https://claude.ai/artifact/YXR9jNVjYSQFY8abMpVfPi (variants and states, placement, phone width, surfaces before and after, labels and icons).
+
 A design for every button in Sweet, written 8 November 2026 from an inventory of all of them: about 130 uses of `Button`, plus the nav items, tab bar, rail, list rows, menu triggers, pills and dialog actions. The inventory found thirty inconsistencies. They are listed at the end with the rule that resolves each one. Nothing in this document is built yet. Once agreed, the rules go into `architecture.md` and the changes are made one surface per commit.
 
 ## The problem
@@ -66,7 +68,7 @@ A button label is a verb, plus an object when the verb alone would be ambiguous 
 | Copying | **Copy**, then **Copied** for two seconds | Same |
 | Continuing | **Next**, or the destination's name | Same |
 
-Sentence case. No full stop. No ellipsis in a label. A toggle's label at rest names the state when on (Subscribed, Weekly digest on, Notifying this device) and the action when off (Subscribe, Send me a weekly digest, Notify this device). On hover, the on state shows its action (Unsubscribe, Turn off, Stop). The three existing toggles do this with three different wordings. The rule uses the shortest.
+Sentence case. No full stop. No ellipsis in a label. A toggle's label at rest names the state when on (Subscribed, Weekly digest on, Notifying this device) and the action when off (Subscribe, Send me a weekly digest, Notify this device). On hover, the on state shows its action (Unsubscribe, Turn weekly digest off, Stop notifying this device, which is Raphael's wording from 8 November).
 
 ### Icons
 
@@ -102,7 +104,7 @@ Grouped by surface. Only buttons that change are listed. The rest already follow
 
 **Post, comment, message.** The menu trigger is unchanged. Delete in a menu becomes a danger item (red text and bin icon). Edit stays plain. "Show comments" stays an icon-only ghost with a count.
 
-**Person card and profile.** View profile becomes a ghost with the `user` icon. Message becomes a secondary with the `chat` icon, as the card's one action. On a profile: Edit bio is secondary with `pencil`, Settings is a ghost with `settings` (navigation), Message is secondary with `chat`. In the People list, Message stays a ghost with `chat`, because every row has one.
+**Person card and profile.** View profile becomes a ghost with the `user` icon. Message becomes a secondary with the `chat` icon, as the card's one action. On a profile: Edit bio is secondary with `pencil`, Settings is a ghost with `settings` (navigation), Message is secondary with `chat`. In the People list, Message stays a ghost with `chat`, because every row has one. On a phone it drops its label and keeps its icon, as Members and settings does in the bar, so a long username has room.
 
 **Settings.** Choose a picture is secondary with `image`. "Back to the donut" becomes "Remove picture", a danger. Account: both submit buttons become primary (each form is its own surface), right-aligned, pink when disabled. Notifications: the two toggles keep the Subscribe wording pattern, with "Turn off" and "Stop" as the hover text. Sign out: "Sign out" is secondary with `logout`. "Sign out everywhere" is a danger with `devices` and is confirmed, because it ends sessions the user cannot see. "Remove my account" is a danger with `remove` and is confirmed, as now.
 
@@ -133,6 +135,7 @@ Numbers refer to the inventory.
 ## Open points
 
 - White text on pink `#ed5e5e` has a contrast ratio of 3.3:1, and ghost text `#7a7a7a` on white has 4.3:1. Both are below the 4.5:1 guideline for 16px text. White on Sweet red `#ce1717` is 5.6:1. Changing either is a change to Sweet's colours, so it is listed here for a decision, not proposed.
+- Buttons are 34px tall. That is below the usual 44px touch-target guideline for phones. Raising it would make every row taller, so it is listed here for a decision.
 - A pressed ghost button uses a blush background, which is almost white. The pressed state is visible through the red text and the changed icon or label, not through the background.
 
 ## Order of work
