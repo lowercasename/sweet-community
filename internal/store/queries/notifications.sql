@@ -2,13 +2,14 @@
 -- own notifications. The same applies to markers.
 
 -- name: CreateNotification :exec
-INSERT INTO notifications (id, user_id, kind, actor_id, group_id, post_id, topic_id, message_id, created_at)
-VALUES (sqlc.arg(id), sqlc.arg(user_id), sqlc.arg(kind), sqlc.arg(actor_id), sqlc.arg(group_id), sqlc.arg(post_id), sqlc.narg(topic_id), sqlc.narg(message_id), sqlc.arg(created_at));
+INSERT INTO notifications (id, user_id, kind, actor_id, group_id, post_id, topic_id, message_id, report_id, created_at)
+VALUES (sqlc.arg(id), sqlc.arg(user_id), sqlc.arg(kind), sqlc.arg(actor_id), sqlc.arg(group_id), sqlc.arg(post_id), sqlc.narg(topic_id), sqlc.narg(message_id), sqlc.narg(report_id), sqlc.arg(created_at));
 
 -- name: GetNotification :one
+-- A report notification carries the kind of the reported item.
 SELECT n.id, n.user_id, n.kind, n.group_id, n.post_id, n.topic_id, n.message_id, n.created_at, n.read_at,
-       u.id AS actor_id, u.username AS actor_username, u.picture_id AS actor_picture_id
-FROM notifications n JOIN users u ON u.id = n.actor_id
+       u.id AS actor_id, u.username AS actor_username, u.picture_id AS actor_picture_id, rp.kind AS report_kind
+FROM notifications n JOIN users u ON u.id = n.actor_id LEFT JOIN reports rp ON rp.id = n.report_id
 WHERE n.id = sqlc.arg(id);
 
 -- name: ReadNotification :exec
@@ -17,8 +18,8 @@ UPDATE notifications SET read_at = sqlc.arg(read_at) WHERE id = sqlc.arg(id) AND
 
 -- name: ListNotifications :many
 SELECT n.id, n.user_id, n.kind, n.group_id, n.post_id, n.topic_id, n.message_id, n.created_at, n.read_at,
-       u.id AS actor_id, u.username AS actor_username, u.picture_id AS actor_picture_id
-FROM notifications n JOIN users u ON u.id = n.actor_id
+       u.id AS actor_id, u.username AS actor_username, u.picture_id AS actor_picture_id, rp.kind AS report_kind
+FROM notifications n JOIN users u ON u.id = n.actor_id LEFT JOIN reports rp ON rp.id = n.report_id
 WHERE n.user_id = sqlc.arg(user_id) AND n.created_at < sqlc.arg(before)
 ORDER BY n.created_at DESC, n.id DESC
 LIMIT sqlc.arg(page_size);

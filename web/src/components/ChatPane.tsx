@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import type { Message as MessageData } from '../api'
-import { useMarkRead, useMarkers, useMessageActions, useMessages } from '../data/hooks'
+import { useGroups, useMarkRead, useMarkers, useMessageActions, useMessages } from '../data/hooks'
 import { chatStream, markerOf } from '../data/notifications'
 import { usePageVisible } from '../hooks/usePageVisible'
 import { useStreamStatus } from '../hooks/StreamContext'
@@ -54,6 +54,8 @@ export function ChatPane({ groupId, side = 'full', watching, focusMessage = null
   const status = useStreamStatus()
   const { messages, loading, error, hasEarlier, loadEarlier } = useMessages(groupId)
   const { send: sendMessage, remove } = useMessageActions(groupId)
+  // In a conversation, the report dialog says that moderators will see the reported message.
+  const conversation = useGroups().groups.find((g) => g.id === groupId)?.kind === 'dm'
 
   // A visible chat is marked read (architecture.md, Notifications). While the
   // pane is watched and the page is in the foreground, the user's read marker
@@ -178,6 +180,7 @@ export function ChatPane({ groupId, side = 'full', watching, focusMessage = null
                   onReply={setReplying}
                   onJump={quoted}
                   highlight={highlight}
+                  conversation={conversation}
                 />
               ) : (
                 <ChatLine key={run[0].id} line={run[0]} />

@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, screen, within } from '@testing-library/react'
-import { ROOT, comment, mine, nobody, renderWithQuery, user } from '../test-utils'
+import { ROOT, comment, mine, nobody, renderWithQuery, reportable, user } from '../test-utils'
 
 /**
  * The menu on a comment shows exactly the actions that the server's can flags
@@ -27,9 +27,10 @@ beforeEach(async () => {
   const { getComments } = await import('../api')
   vi.mocked(getComments).mockResolvedValue({
     comments: [
-      comment('c-kit', 'p1', kit, { can: { edit: false, delete: true } }), // The viewer is the post's author.
+      comment('c-kit', 'p1', kit, { can: { edit: false, delete: true, report: true } }), // The viewer is the post's author.
       comment('c-mo', 'p1', mo, { can: mine }), // The viewer is mo.
       comment('c-jo', 'p1', user('jo'), { can: nobody }),
+      comment('c-bo', 'p1', user('bo'), { can: reportable }),
     ],
   })
 })
@@ -54,7 +55,12 @@ describe('CommentThread', () => {
     expect(screen.getAllByRole('menuitem').map((b) => b.textContent)).toEqual(['Edit', 'Delete'])
     fireEvent.keyDown(document.activeElement ?? document.body, { key: 'Escape' })
     fireEvent.click(menuOf('c-kit says hi')!)
-    expect(screen.getAllByRole('menuitem').map((b) => b.textContent)).toEqual(['Delete'])
+    expect(screen.getAllByRole('menuitem').map((b) => b.textContent)).toEqual(['Report', 'Delete'])
+    fireEvent.keyDown(document.activeElement ?? document.body, { key: 'Escape' })
+    fireEvent.click(menuOf('c-bo says hi')!)
+    expect(screen.getAllByRole('menuitem').map((b) => b.textContent)).toEqual(['Report'])
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Report' }))
+    expect(screen.getByRole('heading', { name: 'Report this comment?', hidden: true })).toBeTruthy()
     expect(menuOf('c-jo says hi')).toBeNull()
   })
 

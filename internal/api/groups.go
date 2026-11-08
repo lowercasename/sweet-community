@@ -64,6 +64,8 @@ type GroupCan struct {
 	ManageTopics bool `json:"manage_topics,omitempty"`
 	// ManageRules is meaningful on the root group only. The owner and moderators may write the rules.
 	ManageRules bool `json:"manage_rules,omitempty"`
+	// HandleReports is meaningful on the root group only. The owner and moderators read and close reports.
+	HandleReports bool `json:"handle_reports,omitempty"`
 }
 
 // Settings is the wire shape of the instance's settings (architecture.md,
@@ -153,6 +155,7 @@ func groupFor(a perm.Actor, g Group, st Settings) Group {
 		g.Can.ManageInstance = perm.ManageInstance(a)
 		g.Can.ManageTopics = perm.ManageTopics(a)
 		g.Can.ManageRules = perm.ManageRules(a)
+		g.Can.HandleReports = perm.HandleReports(a)
 	}
 	return g
 }
@@ -922,6 +925,21 @@ func filterEvent(viewer User, roles map[string]string, st *Settings, e events.Ev
 			*st = next
 		}
 		return e, true
+	case "report", "report_delete":
+		// Sent to the root group's owner and moderators only (architecture.md, Admin tools). A report is personalised
+		// with the viewer's role in the reported item's group, which decides whether they can open it.
+		if !perm.HandleReports(perm.Actor{ID: viewer.ID, Role: roles[perm.Root]}) {
+			return e, false
+		}
+		if e.Kind == "report_delete" {
+			return e, true
+		}
+		var rp Report
+		if json.Unmarshal(e.Payload, &rp) != nil {
+			return e, false
+		}
+		a, _ := inGroup(rp.GroupID)
+		return encode(forViewer(a, &rp, *st))
 	case "notification", "notification_delete", "marker":
 		// Sent to the owning user only. A notification belongs to its recipient, and a marker records how far its user has read.
 		var own struct {

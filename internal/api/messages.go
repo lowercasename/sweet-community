@@ -162,16 +162,25 @@ func (s *Server) deleteMessage(w http.ResponseWriter, r *http.Request) {
 		if owners.Kind != MessageKind || !perm.DeleteMessage(a, perm.Message{AuthorID: owners.AuthorID}) {
 			return nil, nil, http.StatusForbidden, errors.New("Not your message")
 		}
-		if err := qtx.DeleteMessage(r.Context(), store.DeleteMessageParams{DeletedAt: sql.NullInt64{Int64: now, Valid: true}, ID: id}); err != nil {
-			return nil, nil, http.StatusInternalServerError, err
-		}
-		gone := map[string]string{"id": id, "group_id": owners.GroupID}
-		replies, err := replyEvents(r.Context(), qtx, id)
+		gone, err := removeMessage(r.Context(), qtx, id, owners.GroupID, now)
 		if err != nil {
 			return nil, nil, http.StatusInternalServerError, err
 		}
-		return append([]events.Entry{{Kind: "message_delete", Payload: gone}}, replies...), gone, http.StatusOK, nil
+		return gone, gone[0].Payload, http.StatusOK, nil
 	})
+}
+
+// removeMessage deletes a live message. It returns the message_delete event, then the events of the replies to it.
+// The delete handler and a report's Delete action both use it.
+func removeMessage(ctx context.Context, qtx *store.Queries, id, groupID string, now int64) ([]events.Entry, error) {
+	if err := qtx.DeleteMessage(ctx, store.DeleteMessageParams{DeletedAt: sql.NullInt64{Int64: now, Valid: true}, ID: id}); err != nil {
+		return nil, err
+	}
+	replies, err := replyEvents(ctx, qtx, id)
+	if err != nil {
+		return nil, err
+	}
+	return append([]events.Entry{{Kind: "message_delete", Payload: map[string]string{"id": id, "group_id": groupID}}}, replies...), nil
 }
 
 // replyEvents logs the live replies to a deleted message again, so their quotes say the original is deleted and the

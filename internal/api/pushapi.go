@@ -65,8 +65,8 @@ func (s *Server) unsubscribePush(w http.ResponseWriter, r *http.Request) {
 
 // pushWords returns the text, path and tag for a push notification, or ok
 // false for kinds that are not pushed. The kinds that are pushed are a
-// mention, a comment on the user's post, a reply to the user's message, and a
-// message in a conversation.
+// mention, a comment on the user's post, a reply to the user's message, a
+// message in a conversation, and a report, which opens the Community page.
 // A message is tagged by conversation so that a device shows one
 // notification per conversation.
 func pushWords(n Notification) (body, path, tag string, ok bool) {
@@ -79,6 +79,11 @@ func pushWords(n Notification) (body, path, tag string, ok bool) {
 		body = n.Actor.Username + " replied to your message"
 	case NotifyMessage:
 		return n.Actor.Username + " messaged you", "/r/" + n.GroupID, streamChatPrefix + n.GroupID, true
+	case NotifyReport:
+		if n.ReportKind == nil {
+			return "", "", "", false
+		}
+		return n.Actor.Username + " reported a " + *n.ReportKind, "/community", "", true
 	default:
 		return "", "", "", false
 	}

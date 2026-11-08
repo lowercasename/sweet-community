@@ -3,9 +3,23 @@ import { beforeEach, describe, expect, it } from 'vitest'
 import type { QueryClient } from '@tanstack/react-query'
 import { makeQueryClient } from './client'
 import { keys } from './keys'
-import { applyEvent } from './apply'
-import { ROOT, comment, dm, group, marker, member, message, mine, notification, post, user } from '../test-utils'
-import type { Group, Marker, Member, Message, Notification, Post, PostPage, User } from '../api'
+import { readFileSync } from 'node:fs'
+import { EVENT_KINDS, applyEvent } from './apply'
+import {
+  ROOT,
+  comment,
+  dm,
+  group,
+  marker,
+  member,
+  message,
+  mine,
+  notification,
+  post,
+  report,
+  user,
+} from '../test-utils'
+import type { Group, Marker, Member, Message, Notification, Post, PostPage, Report, User } from '../api'
 
 /**
  * The event stream is the cache's write path. Each resource has one upsert
@@ -52,6 +66,26 @@ beforeEach(() => {
 })
 
 describe('applyEvent', () => {
+  it('the stream listens for every kind of event that applyEvent handles', () => {
+    // The browser receives an event only for a kind it listens for. A kind missing from the list is dropped, as the
+    // report and topic events were until 2026-11-08.
+    const source = readFileSync('src/data/apply.ts', 'utf8')
+    const handled = [...source.matchAll(/^\s+case '(\w+)':/gm)].map((m) => m[1])
+    expect(handled.length).toBeGreaterThan(10)
+    expect(handled.filter((k) => !(EVENT_KINDS as readonly string[]).includes(k))).toEqual([])
+  })
+
+  it('a report event puts its item first in the loaded reports, replacing its old entry, and report_delete removes it', () => {
+    const list = () => (qc.getQueryData(keys.reports) as { reports: Report[] }).reports.map((r) => `${r.kind}:${r.id}`)
+    qc.setQueryData(keys.reports, { reports: [report('post', 'p1'), report('message', 'm1')] })
+    applyEvent(qc, 'report', report('message', 'm1'))
+    applyEvent(qc, 'report', report('comment', 'c1'))
+    expect(list()).toEqual(['comment:c1', 'message:m1', 'post:p1'])
+    applyEvent(qc, 'report_delete', { kind: 'post', id: 'p1' })
+    applyEvent(qc, 'report_delete', { kind: 'post', id: 'p1' })
+    expect(list()).toEqual(['comment:c1', 'message:m1'])
+  })
+
   it('prepends a notification to the loaded list once, and only moves a marker forward', () => {
     const list = () =>
       (qc.getQueryData(keys.notifications) as { pages: { notifications: Notification[] }[] }).pages.flatMap(

@@ -1,29 +1,10 @@
 import { useEffect, useRef, useState } from 'react'
+import { EVENT_KINDS } from '../data/apply'
 
 export type StreamStatus = 'connecting' | 'live' | 'reconnecting' | 'offline'
 
 export type EventHandler = (kind: string, data: unknown, seq: number) => void
 
-// Two event kinds per resource (architecture.md, Realtime). The whole resource, or its deletion.
-const EVENT_KINDS = [
-  'post',
-  'post_delete',
-  'comment',
-  'comment_delete',
-  'message',
-  'message_delete',
-  'user',
-  'group',
-  'group_delete',
-  'membership',
-  'membership_delete',
-  'settings',
-  'rules',
-  'notification',
-  'notification_delete',
-  'marker',
-  'profile',
-] as const
 const HEALTH_INTERVAL_MS = 30_000
 const HEALTH_TIMEOUT_MS = 10_000
 

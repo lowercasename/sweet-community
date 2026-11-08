@@ -6,6 +6,7 @@ import { Alert, Box, Card, ConfirmDialog, Hairline, Menu, type MenuItem, Row, St
 import { Body } from './Body'
 import { BodyEditor } from './BodyEditor'
 import { PersonName } from './PersonName'
+import { ReportDialog } from './ReportDialog'
 
 interface CommentThreadProps {
   postId: string
@@ -29,6 +30,7 @@ function CommentItem({ comment, groupId, disabled, onEdit, onDelete }: CommentIt
   const [confirming, setConfirming] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [reporting, setReporting] = useState(false)
 
   const save = async (bodyHtml: string) => {
     await onEdit(bodyHtml)
@@ -49,6 +51,7 @@ function CommentItem({ comment, groupId, disabled, onEdit, onDelete }: CommentIt
 
   const items: MenuItem[] = []
   if (comment.can.edit) items.push({ label: 'Edit', icon: 'pencil', onSelect: () => setEditing(true) })
+  if (comment.can.report) items.push({ label: 'Report', icon: 'flag', onSelect: () => setReporting(true) })
   if (comment.can.delete)
     items.push({ label: 'Delete', icon: 'trash', danger: true, onSelect: () => setConfirming(true) })
 
@@ -97,6 +100,13 @@ function CommentItem({ comment, groupId, disabled, onEdit, onDelete }: CommentIt
       >
         <Text variant="secondary">This action cannot be undone.</Text>
       </ConfirmDialog>
+      <ReportDialog
+        kind="comment"
+        id={comment.id}
+        author={author.username}
+        open={reporting}
+        onClose={() => setReporting(false)}
+      />
     </Box>
   )
 }

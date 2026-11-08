@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, screen, within } from '@testing-library/react'
-import { message, nobody, renderWithQuery, user } from '../test-utils'
+import { message, nobody, renderWithQuery, reportable, user } from '../test-utils'
 
 /** A chat message offers Delete only when its can flag allows it, and asks for confirmation first. */
 vi.mock('../api', () => ({
@@ -48,7 +48,7 @@ describe('MessageGroup', () => {
     renderWithQuery(
       <MessageGroup
         messages={[
-          message('m1', user('mo'), { can: { edit: false, delete: true } }),
+          message('m1', user('mo'), { can: { edit: false, delete: true, report: false } }),
           message('m2', user('mo'), { can: nobody }),
         ]}
         onDelete={onDelete}
@@ -60,5 +60,14 @@ describe('MessageGroup', () => {
     expect(onDelete).not.toHaveBeenCalled()
     fireEvent.click(within(screen.getByRole('dialog', { hidden: true })).getByRole('button', { name: 'Delete' }))
     expect(onDelete).toHaveBeenCalledWith('m1')
+  })
+
+  it("offers Report on another member's message, which opens the report dialog for the message", async () => {
+    const { MessageGroup } = await import('./MessageGroup')
+    renderWithQuery(<MessageGroup messages={[message('m1', user('mo'), { can: reportable })]} onDelete={vi.fn()} />)
+    fireEvent.click(screen.getByLabelText('Message options'))
+    expect(screen.getAllByRole('menuitem').map((b) => b.textContent)).toEqual(['Report'])
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Report' }))
+    expect(screen.getByRole('heading', { name: 'Report this message?', hidden: true })).toBeTruthy()
   })
 })

@@ -13,8 +13,10 @@ test.describe('chat', () => {
     // After sending, the editor is empty and keeps focus for the next message.
     await expect(kit.page.locator('.editor-line .ProseMirror').first()).toHaveText('')
 
-    // Only the author (or staff) sees the message menu.
-    await expect(article(mo.page, text).getByRole('button', { name: 'Message options' })).toHaveCount(0)
+    // Another member's menu on the message holds only Report. Delete is for the author and staff.
+    await article(mo.page, text).getByRole('button', { name: 'Message options' }).click()
+    await expect(mo.page.getByRole('menuitem')).toHaveText(['Report'])
+    await mo.page.keyboard.press('Escape')
     await pick(kit.page, article(kit.page, text), 'Message options', 'Delete')
     await confirm(kit.page, 'Delete')
     await expect(kit.page.getByText(text)).toHaveCount(0)

@@ -10,6 +10,7 @@ import { ROOT, group, renderWithQuery } from '../test-utils'
 vi.mock('../api', () => ({
   listTopics: vi.fn(() => Promise.resolve({ topics: [] })),
   getRules: vi.fn(() => Promise.resolve({ body_html: '' })),
+  listReports: vi.fn(() => Promise.resolve({ reports: [] })),
   getSettings: vi.fn(() =>
     Promise.resolve({ group_creation: 'anyone', name: 'Knitting Circle', description: 'Wool.', owner_set: true }),
   ),
@@ -45,10 +46,15 @@ describe('CommunityPage', () => {
     expect(setSettings).not.toHaveBeenCalled()
   })
 
-  it('a moderator sees the topics and not the community settings', async () => {
+  it('a moderator sees the reports first, then the rules and topics, and not the community settings', async () => {
     const { CommunityPage } = await import('./CommunityPage')
     renderWithQuery(<CommunityPage root={group(ROOT, 'moderator')} />)
     await screen.findByRole('heading', { name: 'Topics' })
+    expect(screen.getAllByRole('heading', { level: 2 }).map((h) => h.textContent)).toEqual([
+      'Reports',
+      'Rules',
+      'Topics',
+    ])
     expect(screen.queryByRole('heading', { name: 'About this community' })).toBeNull()
     expect(screen.queryByLabelText('Community name')).toBeNull()
   })

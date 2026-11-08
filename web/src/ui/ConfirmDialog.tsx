@@ -18,6 +18,11 @@ interface ConfirmDialogProps {
   onConfirm: () => void
   /** Called on Cancel, on Escape, or on a click on the backdrop. */
   onClose: () => void
+  /**
+   * True once the action has finished and the dialog says so, as after a report is sent. The dialog then shows one
+   * Done button, which closes it, in place of Cancel and the confirm button. The caller changes the title and text.
+   */
+  done?: boolean
   children?: ReactNode
 }
 
@@ -30,6 +35,7 @@ export function ConfirmDialog({
   busy,
   onConfirm,
   onClose,
+  done = false,
   children,
 }: ConfirmDialogProps) {
   const ref = useRef<HTMLDialogElement>(null)
@@ -55,12 +61,18 @@ export function ConfirmDialog({
         <Heading level={2}>{title}</Heading>
         {children}
         <div className="flex items-center justify-end gap-2">
-          <Button variant="ghost" disabled={busy} onClick={onClose}>
-            Cancel
-          </Button>
-          <Button icon={icon} busy={busy} onClick={onConfirm}>
-            {confirmLabel}
-          </Button>
+          {done ? (
+            <Button onClick={onClose}>Done</Button>
+          ) : (
+            <>
+              <Button variant="ghost" disabled={busy} onClick={onClose}>
+                Cancel
+              </Button>
+              <Button icon={icon} busy={busy} onClick={onConfirm}>
+                {confirmLabel}
+              </Button>
+            </>
+          )}
         </div>
       </div>
     </dialog>

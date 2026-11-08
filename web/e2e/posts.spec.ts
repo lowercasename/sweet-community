@@ -18,8 +18,10 @@ test.describe('posts and comments', () => {
     await writePost(kit.page, text)
     await expect(article(mo.page, text)).toBeVisible()
 
-    // Edit. The author has the post menu, and another user does not.
-    await expect(article(mo.page, text).getByRole('button', { name: 'Post options' })).toHaveCount(0)
+    // Edit. The author's menu has Edit. Another member's menu holds only Report.
+    await article(mo.page, text).getByRole('button', { name: 'Post options' }).click()
+    await expect(mo.page.getByRole('menuitem')).toHaveText(['Report'])
+    await mo.page.keyboard.press('Escape')
     await pick(kit.page, article(kit.page, text), 'Post options', 'Edit')
     await kit.page.locator('article .editor-post .ProseMirror').first().click()
     await kit.page.keyboard.press('End')

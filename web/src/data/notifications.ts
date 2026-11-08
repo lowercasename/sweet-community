@@ -1,5 +1,5 @@
 import type { Group, Marker, Notification, Topic } from '../api'
-import { groupPath, postPath, profilePath } from '../routes'
+import { COMMUNITY, groupPath, postPath, profilePath } from '../routes'
 
 /** The notifications stream's marker name. A room's chat and feed each have their own stream name. */
 export const NOTIFICATIONS = 'notifications'
@@ -61,11 +61,17 @@ export function describe(n: Notification, groups: Group[], topics: Topic[] = [])
       const room = groups.find((g) => g.id === n.group_id)
       return `replied to your message in ${room ? (room.kind === 'root' ? 'the chat' : room.name) : 'a room'}`
     }
+    case 'report':
+      return `reported a ${n.report_kind ?? 'post'}`
   }
 }
 
-/** The path a notification opens. A notification about a post opens the post's page. A join opens the user's profile. Any other opens the room or conversation. */
+/**
+ * The path a notification opens. A notification about a post opens the post's page. A join opens the user's profile.
+ * A report opens the Community page, where the Reports card is. Any other opens the room or conversation.
+ */
 export function targetOf(n: Notification, rootId?: string): string {
+  if (n.kind === 'report') return COMMUNITY
   if (n.post_id) return postPath(n.post_id)
   if (n.kind === 'joined') return profilePath(n.actor.username)
   // A mention or reply in chat opens the chat at its message.

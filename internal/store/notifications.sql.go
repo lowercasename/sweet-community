@@ -32,8 +32,8 @@ func (q *Queries) CountUnreadNotificationsInGroup(ctx context.Context, arg Count
 
 const createNotification = `-- name: CreateNotification :exec
 
-INSERT INTO notifications (id, user_id, kind, actor_id, group_id, post_id, topic_id, message_id, created_at)
-VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)
+INSERT INTO notifications (id, user_id, kind, actor_id, group_id, post_id, topic_id, message_id, report_id, created_at)
+VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)
 `
 
 type CreateNotificationParams struct {
@@ -45,6 +45,7 @@ type CreateNotificationParams struct {
 	PostID    sql.NullString
 	TopicID   sql.NullString
 	MessageID sql.NullString
+	ReportID  sql.NullString
 	CreatedAt int64
 }
 
@@ -60,6 +61,7 @@ func (q *Queries) CreateNotification(ctx context.Context, arg CreateNotification
 		arg.PostID,
 		arg.TopicID,
 		arg.MessageID,
+		arg.ReportID,
 		arg.CreatedAt,
 	)
 	return err
@@ -154,8 +156,8 @@ func (q *Queries) GetFeedMarker(ctx context.Context, arg GetFeedMarkerParams) (G
 
 const getNotification = `-- name: GetNotification :one
 SELECT n.id, n.user_id, n.kind, n.group_id, n.post_id, n.topic_id, n.message_id, n.created_at, n.read_at,
-       u.id AS actor_id, u.username AS actor_username, u.picture_id AS actor_picture_id
-FROM notifications n JOIN users u ON u.id = n.actor_id
+       u.id AS actor_id, u.username AS actor_username, u.picture_id AS actor_picture_id, rp.kind AS report_kind
+FROM notifications n JOIN users u ON u.id = n.actor_id LEFT JOIN reports rp ON rp.id = n.report_id
 WHERE n.id = ?1
 `
 
@@ -172,8 +174,10 @@ type GetNotificationRow struct {
 	ActorID        string
 	ActorUsername  string
 	ActorPictureID sql.NullString
+	ReportKind     sql.NullString
 }
 
+// A report notification carries the kind of the reported item.
 func (q *Queries) GetNotification(ctx context.Context, id string) (GetNotificationRow, error) {
 	row := q.db.QueryRowContext(ctx, getNotification, id)
 	var i GetNotificationRow
@@ -190,6 +194,7 @@ func (q *Queries) GetNotification(ctx context.Context, id string) (GetNotificati
 		&i.ActorID,
 		&i.ActorUsername,
 		&i.ActorPictureID,
+		&i.ReportKind,
 	)
 	return i, err
 }
@@ -282,8 +287,8 @@ func (q *Queries) ListMarkers(ctx context.Context, userID string) ([]ListMarkers
 
 const listNotifications = `-- name: ListNotifications :many
 SELECT n.id, n.user_id, n.kind, n.group_id, n.post_id, n.topic_id, n.message_id, n.created_at, n.read_at,
-       u.id AS actor_id, u.username AS actor_username, u.picture_id AS actor_picture_id
-FROM notifications n JOIN users u ON u.id = n.actor_id
+       u.id AS actor_id, u.username AS actor_username, u.picture_id AS actor_picture_id, rp.kind AS report_kind
+FROM notifications n JOIN users u ON u.id = n.actor_id LEFT JOIN reports rp ON rp.id = n.report_id
 WHERE n.user_id = ?1 AND n.created_at < ?2
 ORDER BY n.created_at DESC, n.id DESC
 LIMIT ?3
@@ -308,6 +313,7 @@ type ListNotificationsRow struct {
 	ActorID        string
 	ActorUsername  string
 	ActorPictureID sql.NullString
+	ReportKind     sql.NullString
 }
 
 func (q *Queries) ListNotifications(ctx context.Context, arg ListNotificationsParams) ([]ListNotificationsRow, error) {
@@ -332,6 +338,7 @@ func (q *Queries) ListNotifications(ctx context.Context, arg ListNotificationsPa
 			&i.ActorID,
 			&i.ActorUsername,
 			&i.ActorPictureID,
+			&i.ReportKind,
 		); err != nil {
 			return nil, err
 		}

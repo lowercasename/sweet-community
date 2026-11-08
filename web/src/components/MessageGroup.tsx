@@ -4,6 +4,7 @@ import { useAuthor } from '../data/hooks'
 import { Box, Button, ConfirmDialog, Menu, MessageBlock, ReplyQuote, Row, Stack, Text, Time } from '../ui'
 import { Body } from './Body'
 import { PersonName } from './PersonName'
+import { ReportDialog } from './ReportDialog'
 
 interface MessageGroupProps {
   /** Consecutive messages from one user within a few minutes. Contains at least one message. */
@@ -16,6 +17,8 @@ interface MessageGroupProps {
   onJump?: (id: string) => void
   /** The id of the message to highlight briefly, after a quote was clicked. */
   highlight?: string | null
+  /** True in a conversation. The report dialog then says that moderators will see the message. */
+  conversation?: boolean
 }
 
 /**
@@ -25,11 +28,19 @@ interface MessageGroupProps {
  * includes the first message, whose menu is never on the author's line. The
  * block gets the blush background while hovered (Raphael, 2026-11-06).
  */
-export function MessageGroup({ messages, onDelete, onReply, onJump, highlight }: MessageGroupProps) {
+export function MessageGroup({
+  messages,
+  onDelete,
+  onReply,
+  onJump,
+  highlight,
+  conversation = false,
+}: MessageGroupProps) {
   const first = messages[0]
   const author = useAuthor(first.author)
   const [confirming, setConfirming] = useState<string | null>(null)
   const [deleting, setDeleting] = useState(false)
+  const [reporting, setReporting] = useState<string | null>(null)
 
   const remove = async () => {
     if (!confirming) return
@@ -57,7 +68,7 @@ export function MessageGroup({ messages, onDelete, onReply, onJump, highlight }:
             id={`message-${m.id}`}
             highlight={highlight === m.id}
             menu={
-              onReply || m.can.delete ? (
+              onReply || m.can.delete || m.can.report ? (
                 <>
                   {onReply && (
                     <Button
@@ -69,10 +80,24 @@ export function MessageGroup({ messages, onDelete, onReply, onJump, highlight }:
                       onClick={() => onReply(m)}
                     />
                   )}
-                  {m.can.delete && (
+                  {(m.can.delete || m.can.report) && (
                     <Menu
                       label="Message options"
-                      items={[{ label: 'Delete', icon: 'trash', danger: true, onSelect: () => setConfirming(m.id) }]}
+                      items={[
+                        ...(m.can.report
+                          ? [{ label: 'Report', icon: 'flag' as const, onSelect: () => setReporting(m.id) }]
+                          : []),
+                        ...(m.can.delete
+                          ? [
+                              {
+                                label: 'Delete',
+                                icon: 'trash' as const,
+                                danger: true,
+                                onSelect: () => setConfirming(m.id),
+                              },
+                            ]
+                          : []),
+                      ]}
                       reveal="message"
                     />
                   )}
@@ -103,6 +128,14 @@ export function MessageGroup({ messages, onDelete, onReply, onJump, highlight }:
       >
         <Text variant="secondary">This action cannot be undone.</Text>
       </ConfirmDialog>
+      <ReportDialog
+        kind="message"
+        id={reporting ?? ''}
+        author={author.username}
+        conversation={conversation}
+        open={reporting !== null}
+        onClose={() => setReporting(null)}
+      />
     </Box>
   )
 }

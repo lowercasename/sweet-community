@@ -2,7 +2,7 @@ import type { ReactNode } from 'react'
 import { QueryClientProvider, type QueryClient } from '@tanstack/react-query'
 import { render } from '@testing-library/react'
 import { makeQueryClient } from './data/client'
-import type { Comment, Group, Marker, Member, Message, Notification, Post, User } from './api'
+import type { Comment, Group, Marker, Member, Message, Notification, Post, Report, User } from './api'
 
 /**
  * Renders inside a new query cache, seeded first if `seed` is given. Returns the client so that tests can seed or
@@ -26,8 +26,10 @@ export const nameOf = (el: HTMLElement): string =>
     .map((n) => n.textContent)
     .join('')
 
-export const nobody = { edit: false, delete: false }
-export const mine = { edit: true, delete: true }
+export const nobody = { edit: false, delete: false, report: false }
+export const mine = { edit: true, delete: true, report: false }
+/** Another member's content, which the viewer can only report. */
+export const reportable = { edit: false, delete: false, report: true }
 
 /** The root group's fixed ID (perm.Root on the server). */
 export const ROOT = '00000000-0000-7000-8000-000000000000'
@@ -64,6 +66,7 @@ export const group = (id: string, role: Group['role'], extra: Partial<Group> = {
     manage_instance: id === ROOT ? role === 'owner' : undefined,
     manage_topics: id === ROOT ? role !== 'member' : undefined,
     manage_rules: id === ROOT ? role !== 'member' : undefined,
+    handle_reports: id === ROOT ? role !== 'member' : undefined,
   },
   ...extra,
 })
@@ -189,3 +192,19 @@ export class FakeEventSource {
     }
   }
 }
+
+/** A reported item with one report by mo, as the owner or a moderator receives it. */
+export const report = (kind: Report['kind'], id: string, extra: Partial<Report> = {}): Report => ({
+  kind,
+  id,
+  group_id: ROOT,
+  group_kind: 'root',
+  group_name: '',
+  post_id: kind === 'message' ? null : 'p1',
+  author: user('kit'),
+  body_html: `<p>${id} was reported</p>`,
+  deleted: false,
+  reports: [{ reporter: user('mo'), reason: 'Spam link', created_at: 1 }],
+  can: { open: true },
+  ...extra,
+})

@@ -1,7 +1,8 @@
 // @vitest-environment happy-dom
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, screen } from '@testing-library/react'
-import { mine, nobody, post, renderWithQuery, user } from '../test-utils'
+import type { Can } from '../api'
+import { mine, nobody, post, renderWithQuery, reportable, user } from '../test-utils'
 
 /** A post's menu shows exactly the actions its can flags allow. The component makes no permission decisions. */
 vi.mock('../api', () => ({
@@ -36,7 +37,7 @@ vi.mock('../api', () => ({
 
 afterEach(cleanup)
 
-async function render(flags: { edit: boolean; delete: boolean }) {
+async function render(flags: Can) {
   const { Post } = await import('./Post')
   renderWithQuery(
     <Post
@@ -76,13 +77,25 @@ describe('Post menu', () => {
     expect(screen.getAllByRole('menuitem').map((b) => b.textContent)).toEqual(['Edit', 'Delete'])
   })
   it('offers only Delete to a user who can delete but not edit', async () => {
-    await render({ edit: false, delete: true })
+    await render({ edit: false, delete: true, report: false })
     fireEvent.click(screen.getByLabelText('Post options'))
     expect(screen.getAllByRole('menuitem').map((b) => b.textContent)).toEqual(['Delete'])
   })
   it('shows no menu when nothing is allowed', async () => {
     await render(nobody)
     expect(screen.queryByLabelText('Post options')).toBeNull()
+  })
+  it("offers Report on another member's post, which opens the report dialog for the post", async () => {
+    await render(reportable)
+    fireEvent.click(screen.getByLabelText('Post options'))
+    expect(screen.getAllByRole('menuitem').map((b) => b.textContent)).toEqual(['Report'])
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Report' }))
+    expect(screen.getByRole('heading', { name: 'Report this post?', hidden: true })).toBeTruthy()
+  })
+  it('puts Report before Delete, so the item that removes something is last', async () => {
+    await render({ edit: false, delete: true, report: true })
+    fireEvent.click(screen.getByLabelText('Post options'))
+    expect(screen.getAllByRole('menuitem').map((b) => b.textContent)).toEqual(['Report', 'Delete'])
   })
 })
 
@@ -91,7 +104,7 @@ describe('Post menu', () => {
  * topic. The author changes a post's topic in the edit form.
  */
 describe('Post topic pill', () => {
-  async function drawFiled(flags: { edit: boolean; delete: boolean; set_topic?: boolean }) {
+  async function drawFiled(flags: Can) {
     const { Post } = await import('./Post')
     const onSetTopic = vi.fn(() => Promise.resolve())
     renderWithQuery(

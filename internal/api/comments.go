@@ -1,6 +1,7 @@
 package api
 
 import (
+	"context"
 	"database/sql"
 	"errors"
 	"net/http"
@@ -179,17 +180,27 @@ func (s *Server) editComment(w http.ResponseWriter, r *http.Request) {
 func (s *Server) deleteComment(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
 	now := db.Now()
-	s.logged(w, r, "comment_delete", now, func(qtx *store.Queries) (any, int, error) {
+	s.loggedMany(w, r, now, func(qtx *store.Queries) ([]events.Entry, any, int, error) {
 		owners, a, status, err := s.commentActor(r, qtx, id)
 		if err != nil {
-			return nil, status, err
+			return nil, nil, status, err
 		}
 		if !perm.DeleteComment(a, perm.Comment{AuthorID: owners.AuthorID, PostAuthorID: owners.PostAuthorID}) {
-			return nil, http.StatusForbidden, errors.New("Not your comment")
+			return nil, nil, http.StatusForbidden, errors.New("Not your comment")
 		}
-		if err := qtx.DeleteComment(r.Context(), store.DeleteCommentParams{DeletedAt: sql.NullInt64{Int64: now, Valid: true}, ID: id}); err != nil {
-			return nil, http.StatusInternalServerError, err
+		gone, err := removeComment(r.Context(), qtx, id, owners.PostID, owners.GroupID, now)
+		if err != nil {
+			return nil, nil, http.StatusInternalServerError, err
 		}
-		return map[string]string{"id": id, "post_id": owners.PostID, "group_id": owners.GroupID}, http.StatusOK, nil
+		return gone, gone[0].Payload, http.StatusOK, nil
 	})
+}
+
+// removeComment deletes a live comment and returns its comment_delete event. The delete handler and a report's
+// Delete action both use it.
+func removeComment(ctx context.Context, qtx *store.Queries, id, postID, groupID string, now int64) ([]events.Entry, error) {
+	if err := qtx.DeleteComment(ctx, store.DeleteCommentParams{DeletedAt: sql.NullInt64{Int64: now, Valid: true}, ID: id}); err != nil {
+		return nil, err
+	}
+	return []events.Entry{{Kind: "comment_delete", Payload: map[string]string{"id": id, "post_id": postID, "group_id": groupID}}}, nil
 }

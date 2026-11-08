@@ -26,4 +26,5 @@ export const keys = {
   mySettings: ['mySettings'] as const,
   version: ['version'] as const,
   rules: ['rules'] as const,
+  reports: ['reports'] as const,
 }

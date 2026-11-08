@@ -33,7 +33,9 @@ type Notification struct {
 	TopicID *string `json:"topic_id"`
 	// MessageID is the chat message a mention or reply is in, for scrolling to it.
 	MessageID *string `json:"message_id"`
-	CreatedAt int64   `json:"created_at"`
+	// ReportKind is the kind of item reported (post, comment or message), for a report notification.
+	ReportKind *string `json:"report_kind"`
+	CreatedAt  int64   `json:"created_at"`
 	// ReadAt is when the user opened the notification. It is null until then.
 	ReadAt *int64 `json:"read_at"`
 }
@@ -52,6 +54,9 @@ const (
 	NotifyMessage = "message"
 	// NotifyReply: a reply to the user's message in a room's chat (architecture.md, Chat).
 	NotifyReply = "reply"
+	// NotifyReport notifies the owner and the moderators that a member reported a post, comment or message
+	// (architecture.md, Admin tools). It names the report.
+	NotifyReport = "report"
 )
 
 // Marker records how far a user has read a stream, as the newest time they
@@ -164,11 +169,25 @@ func notifyIn(r *http.Request, qtx *store.Queries, kind, to, actor, groupID stri
 // notifyAbout is notifyIn with the chat message a mention or reply is in, so
 // opening the notification can scroll the chat to it.
 func notifyAbout(r *http.Request, qtx *store.Queries, kind, to, actor, groupID string, postID, topicID, messageID *string, now int64) (*events.Entry, error) {
-	if to == actor {
+	opt := func(v *string) sql.NullString {
+		if v == nil {
+			return sql.NullString{}
+		}
+		return sql.NullString{String: *v, Valid: true}
+	}
+	return insertNotification(r, qtx, store.CreateNotificationParams{
+		UserID: to, Kind: kind, ActorID: actor, GroupID: groupID, PostID: opt(postID), TopicID: opt(topicID), MessageID: opt(messageID), CreatedAt: now,
+	})
+}
+
+// insertNotification writes one notification and returns its event. It writes nothing when the recipient is the
+// actor, and nothing for a removed recipient.
+func insertNotification(r *http.Request, qtx *store.Queries, p store.CreateNotificationParams) (*events.Entry, error) {
+	if p.UserID == p.ActorID {
 		return nil, nil
 	}
 	// A removed user is notified of nothing, for example of a comment on a post they wrote before the removal.
-	if u, err := qtx.GetUser(r.Context(), to); errors.Is(err, sql.ErrNoRows) || (err == nil && u.RemovedAt.Valid) {
+	if u, err := qtx.GetUser(r.Context(), p.UserID); errors.Is(err, sql.ErrNoRows) || (err == nil && u.RemovedAt.Valid) {
 		return nil, nil
 	} else if err != nil {
 		return nil, err
@@ -177,21 +196,8 @@ func notifyAbout(r *http.Request, qtx *store.Queries, kind, to, actor, groupID s
 	if err != nil {
 		return nil, err
 	}
-	pid := sql.NullString{}
-	if postID != nil {
-		pid = sql.NullString{String: *postID, Valid: true}
-	}
-	tid := sql.NullString{}
-	if topicID != nil {
-		tid = sql.NullString{String: *topicID, Valid: true}
-	}
-	mid := sql.NullString{}
-	if messageID != nil {
-		mid = sql.NullString{String: *messageID, Valid: true}
-	}
-	if err := qtx.CreateNotification(r.Context(), store.CreateNotificationParams{
-		ID: id.String(), UserID: to, Kind: kind, ActorID: actor, GroupID: groupID, PostID: pid, TopicID: tid, MessageID: mid, CreatedAt: now,
-	}); err != nil {
+	p.ID = id.String()
+	if err := qtx.CreateNotification(r.Context(), p); err != nil {
 		return nil, err
 	}
 	row, err := qtx.GetNotification(r.Context(), id.String())

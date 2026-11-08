@@ -23,6 +23,7 @@ import { Body } from './Body'
 import { BodyEditor } from './BodyEditor'
 import { CommentThread } from './CommentThread'
 import { PersonName } from './PersonName'
+import { ReportDialog } from './ReportDialog'
 
 interface PostProps {
   post: PostData
@@ -65,6 +66,7 @@ export function Post({
   const [confirming, setConfirming] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const [deleteError, setDeleteError] = useState<string | null>(null)
+  const [reporting, setReporting] = useState(false)
 
   const save = async (bodyHtml: string) => {
     await onEdit(bodyHtml)
@@ -101,6 +103,7 @@ export function Post({
   // The server decides what this user can do and sends it as the post's can flags.
   const items: MenuItem[] = []
   if (post.can.edit) items.push({ label: 'Edit', icon: 'pencil', onSelect: startEditing })
+  if (post.can.report) items.push({ label: 'Report', icon: 'flag', onSelect: () => setReporting(true) })
   if (post.can.delete) items.push({ label: 'Delete', icon: 'trash', danger: true, onSelect: () => setConfirming(true) })
 
   const when = (
@@ -198,6 +201,13 @@ export function Post({
           This will also delete all the comments made on this post. This action cannot be undone.
         </Text>
       </ConfirmDialog>
+      <ReportDialog
+        kind="post"
+        id={post.id}
+        author={author.username}
+        open={reporting}
+        onClose={() => setReporting(false)}
+      />
     </Card>
   )
 }

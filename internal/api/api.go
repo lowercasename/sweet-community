@@ -41,6 +41,8 @@ type User struct {
 type Can struct {
 	Edit   bool `json:"edit"`
 	Delete bool `json:"delete"`
+	// Report is true for every member but the author (architecture.md, Admin tools).
+	Report bool `json:"report"`
 	// SetTopic is set only on a post (architecture.md, Topics). The author or the root group's staff may set its topic.
 	SetTopic bool `json:"set_topic,omitempty"`
 }
@@ -75,20 +77,24 @@ func forViewer(a perm.Actor, v any, st Settings) any {
 	case *Post:
 		p := *x
 		pp := perm.Post{AuthorID: p.Author.ID}
-		p.Can = Can{Edit: perm.EditPost(a, pp), Delete: perm.DeletePost(a, pp), SetTopic: p.GroupID == perm.Root && perm.SetTopic(a, pp)}
+		p.Can = Can{Edit: perm.EditPost(a, pp), Delete: perm.DeletePost(a, pp), Report: perm.Report(a, pp.AuthorID), SetTopic: p.GroupID == perm.Root && perm.SetTopic(a, pp)}
 		return &p
 	case *Comment:
 		c := *x
 		pc := perm.Comment{AuthorID: c.Author.ID, PostAuthorID: c.PostAuthorID}
-		c.Can = Can{Edit: perm.EditComment(a, pc), Delete: perm.DeleteComment(a, pc)}
+		c.Can = Can{Edit: perm.EditComment(a, pc), Delete: perm.DeleteComment(a, pc), Report: perm.Report(a, pc.AuthorID)}
 		return &c
 	case *Message:
 		m := *x
-		// A joined or added line cannot be edited or deleted by anyone.
+		// A joined or added line cannot be deleted or reported by anyone.
 		if m.Kind == MessageKind {
-			m.Can = Can{Delete: perm.DeleteMessage(a, perm.Message{AuthorID: m.Author.ID})}
+			m.Can = Can{Delete: perm.DeleteMessage(a, perm.Message{AuthorID: m.Author.ID}), Report: perm.Report(a, m.Author.ID)}
 		}
 		return &m
+	case *Report:
+		rp := *x
+		rp.Can = ReportCan{Open: !rp.Deleted && perm.OpenReported(a, perm.Group{Kind: rp.GroupKind})}
+		return &rp
 	}
 	return v
 }
@@ -106,6 +112,8 @@ func groupIDOf(v any) string {
 		return x.GroupID
 	case *Group:
 		return x.ID
+	case *Report:
+		return x.GroupID
 	}
 	return ""
 }
@@ -264,6 +272,9 @@ func (s *Server) Routes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/version", s.requireAuth(s.getVersion))
 	mux.HandleFunc("GET /api/rules", s.requireAuth(s.getRules))
 	mux.HandleFunc("PUT /api/rules", s.requireRoot(perm.ManageRules, s.setRules))
+	mux.HandleFunc("POST /api/reports", s.requireAuth(s.createReport))
+	mux.HandleFunc("GET /api/reports", s.requireRoot(perm.HandleReports, s.listReports))
+	mux.HandleFunc("POST /api/reports/{kind}/{id}/{action}", s.requireRoot(perm.HandleReports, s.closeReport))
 	mux.HandleFunc("PUT /api/settings", s.requireRoot(perm.ManageInstance, s.setSettings))
 	mux.HandleFunc("POST /api/images", s.requireAuth(s.uploadImage))
 	mux.HandleFunc("GET /img/{id}", s.requireAuth(s.serveImage))
@@ -607,41 +618,51 @@ func (s *Server) deletePost(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
 	me, _ := userFrom(r.Context())
 	now := db.Now()
-	s.logged(w, r, "post_delete", now, func(qtx *store.Queries) (any, int, error) {
+	s.loggedMany(w, r, now, func(qtx *store.Queries) ([]events.Entry, any, int, error) {
 		owners, err := qtx.GetPostOwners(r.Context(), id)
 		if errors.Is(err, sql.ErrNoRows) {
-			return nil, http.StatusNotFound, errors.New("No such post")
+			return nil, nil, http.StatusNotFound, errors.New("No such post")
 		}
 		if err != nil {
-			return nil, http.StatusInternalServerError, err
+			return nil, nil, http.StatusInternalServerError, err
 		}
 		a, err := actorIn(r.Context(), qtx, me, owners.GroupID)
 		if err != nil {
-			return nil, http.StatusInternalServerError, err
+			return nil, nil, http.StatusInternalServerError, err
 		}
 		if !perm.CanSee(a) {
-			return nil, http.StatusNotFound, errors.New("No such post")
+			return nil, nil, http.StatusNotFound, errors.New("No such post")
 		}
 		if !perm.DeletePost(a, perm.Post{AuthorID: owners.AuthorID}) {
-			return nil, http.StatusForbidden, errors.New("Not your post")
+			return nil, nil, http.StatusForbidden, errors.New("Not your post")
 		}
-		if err := qtx.DeletePost(r.Context(), store.DeletePostParams{DeletedAt: sql.NullInt64{Int64: now, Valid: true}, ID: id}); err != nil {
-			return nil, http.StatusInternalServerError, err
-		}
-		// The comments go with the post and get no delete event of their own, so their events leave the log here.
-		comments, err := qtx.ListCommentIDsOfPost(r.Context(), id)
+		gone, err := removePost(r.Context(), qtx, id, owners.GroupID, now)
 		if err != nil {
-			return nil, http.StatusInternalServerError, err
+			return nil, nil, http.StatusInternalServerError, err
 		}
-		keys := make([]string, len(comments))
-		for i, c := range comments {
-			keys[i] = "comment:" + c
-		}
-		if err := events.Forget(r.Context(), qtx, keys...); err != nil {
-			return nil, http.StatusInternalServerError, err
-		}
-		return map[string]string{"id": id, "group_id": owners.GroupID}, http.StatusOK, nil
+		return gone, gone[0].Payload, http.StatusOK, nil
 	})
+}
+
+// removePost deletes a live post and returns its post_delete event. The delete handler and a report's Delete action
+// both use it.
+func removePost(ctx context.Context, qtx *store.Queries, id, groupID string, now int64) ([]events.Entry, error) {
+	if err := qtx.DeletePost(ctx, store.DeletePostParams{DeletedAt: sql.NullInt64{Int64: now, Valid: true}, ID: id}); err != nil {
+		return nil, err
+	}
+	// The comments go with the post and get no delete event of their own, so their events leave the log here.
+	comments, err := qtx.ListCommentIDsOfPost(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	keys := make([]string, len(comments))
+	for i, c := range comments {
+		keys[i] = "comment:" + c
+	}
+	if err := events.Forget(ctx, qtx, keys...); err != nil {
+		return nil, err
+	}
+	return []events.Entry{{Kind: "post_delete", Payload: map[string]string{"id": id, "group_id": groupID}}}, nil
 }
 
 // getVersion is `GET /api/version`, for signed-in users only, so the release is not shown to anyone scanning for

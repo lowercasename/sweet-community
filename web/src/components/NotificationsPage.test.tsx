@@ -95,6 +95,20 @@ describe('NotificationsPage', () => {
     expect(onGo).toHaveBeenCalledWith('/r/knit?message=m7')
   })
 
+  it('shows "reported a comment" for a report and opens the Community page', async () => {
+    const { listNotifications, readNotification } = await import('../api')
+    vi.mocked(listNotifications).mockResolvedValue({
+      notifications: [notification('n50', 'report', mo, { group_id: ROOT, report_kind: 'comment' })],
+      next_before: null,
+    })
+    vi.mocked(readNotification).mockImplementation((id) =>
+      Promise.resolve(notification(id, 'report', mo, { group_id: ROOT, report_kind: 'comment', read_at: 51 })),
+    )
+    const onGo = await draw()
+    fireEvent.click(await screen.findByRole('button', { name: 'mo reported a comment, new' }))
+    expect(onGo).toHaveBeenCalledWith('/community')
+  })
+
   it('shows "messaged you" for a message notification and opens the conversation', async () => {
     const { listNotifications, readNotification } = await import('../api')
     vi.mocked(listNotifications).mockResolvedValue({

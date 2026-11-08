@@ -70,6 +70,17 @@ func TestRules(t *testing.T) {
 		{"owner files another's post", SetTopic(owner, kitsPost), true},
 		{"outsider files a post", SetTopic(outsider, Post{AuthorID: "out"}), false},
 
+		{"member reports another's post", Report(mo, kitsPost.AuthorID), true},
+		{"author reports own post", Report(kit, kitsPost.AuthorID), false},
+		{"moderator reports a post", Report(mod, kitsPost.AuthorID), true},
+		{"outsider reports a post", Report(outsider, kitsPost.AuthorID), false},
+		{"owner handles reports", HandleReports(owner), true},
+		{"moderator handles reports", HandleReports(mod), true},
+		{"member handles reports", HandleReports(kit), false},
+		{"member of a room opens a reported item", OpenReported(kit, club), true},
+		{"outsider opens a reported item", OpenReported(outsider, club), false},
+		{"member of a conversation opens a reported item", OpenReported(kit, Group{Kind: KindDM}), false},
+
 		{"owner hands over to a member", Transfer(owner, kit), true},
 		{"owner hands over to a moderator", Transfer(owner, mod), true},
 		{"owner hands over to self", Transfer(owner, owner), false},

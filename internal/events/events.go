@@ -72,6 +72,7 @@ func Key(kind string, raw []byte) string {
 		GroupID string `json:"group_id"`
 		UserID  string `json:"user_id"`
 		Stream  string `json:"stream"`
+		Kind    string `json:"kind"`
 		User    struct {
 			ID string `json:"id"`
 		} `json:"user"`
@@ -105,6 +106,12 @@ func Key(kind string, raw []byte) string {
 			return ""
 		}
 		return "marker:" + p.UserID + ":" + p.Stream
+	case "report", "report_delete":
+		// One key per reported item, so the log keeps the item's newest entry or its closing.
+		if p.Kind == "" || p.ID == "" {
+			return ""
+		}
+		return "report:" + p.Kind + ":" + p.ID
 	case "settings", "rules":
 		return kind
 	}

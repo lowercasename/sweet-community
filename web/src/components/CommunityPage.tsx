@@ -2,14 +2,15 @@ import type { Group } from '../api'
 import { useSettings } from '../data/hooks'
 import { Alert, Card, Heading, Measure, Pane, ScrollArea, Stack } from '../ui'
 import { CommunityForm } from './CommunityForm'
+import { ReportsCard } from './ReportsCard'
 import { RulesCard } from './RulesCard'
 import { TopicsCard } from './TopicsCard'
 
 /**
- * The page for the community's settings and topics. It is linked from the
- * nav, not from the owner's profile page (Raphael, 2026-11-06). The owner sees
- * both. A moderator sees only the topics, which moderators may manage too
- * (Raphael, 2026-11-08). The root group's flags decide which cards show.
+ * The page for the community's reports, settings, rules and topics. It is linked from the nav, not from the owner's
+ * profile page (Raphael, 2026-11-06). The reports come first, because they wait for someone to act on them. A
+ * moderator sees the reports, the rules and the topics, and not the community's settings (Raphael, 2026-11-08). The
+ * root group's flags decide which cards show.
  */
 export function CommunityPage({ root }: { root: Group }) {
   const { settings, error } = useSettings()
@@ -18,6 +19,7 @@ export function CommunityPage({ root }: { root: Group }) {
       <ScrollArea>
         <Measure>
           <Stack gap={3}>
+            {root.can.handle_reports && <ReportsCard />}
             {root.can.manage_instance && (
               <Card>
                 <Stack gap={2}>

@@ -15,6 +15,7 @@ vi.mock('../api', () => ({
   setMarker: vi.fn(),
   listMembers: vi.fn(() => Promise.resolve({ members: [] })),
   listUsers: vi.fn(() => Promise.resolve({ users: [] })),
+  listGroups: vi.fn(() => Promise.resolve({ groups: [] })),
 }))
 
 const mo = user('mo')

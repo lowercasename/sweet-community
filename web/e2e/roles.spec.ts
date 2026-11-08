@@ -12,8 +12,10 @@ test.describe('roles', () => {
     await writePost(mo.page, text)
 
     await open(kit.page)
-    // A member has no menu on another user's post.
-    await expect(article(kit.page, text).getByRole('button', { name: 'Post options' })).toHaveCount(0)
+    // A member's menu on another user's post holds only Report.
+    await article(kit.page, text).getByRole('button', { name: 'Post options' }).click()
+    await expect(kit.page.getByRole('menuitem')).toHaveText(['Report'])
+    await kit.page.keyboard.press('Escape')
 
     await open(o.page, '/people')
     const row = o.page.getByRole('listitem').filter({ hasText: kit.username })
@@ -26,7 +28,7 @@ test.describe('roles', () => {
     const action = await row.getByRole('button', { name: `Options for ${kit.username}` }).boundingBox()
     expect(face && action && action.y < face.y + face.height && action.y + action.height > face.y).toBeTruthy()
 
-    // Kit's open page receives the role change. The menu appears, with Delete and without Edit.
+    // Kit's open page receives the role change. The menu now has Delete, and still no Edit.
     await article(kit.page, text).getByRole('button', { name: 'Post options' }).click()
     await expect(kit.page.getByRole('menuitem', { name: 'Delete' })).toBeVisible()
     await expect(kit.page.getByRole('menuitem', { name: 'Edit' })).toHaveCount(0)

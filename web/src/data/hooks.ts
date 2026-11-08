@@ -7,6 +7,8 @@ import {
   getVersion,
   getRules,
   setRules,
+  listReports,
+  closeReport,
   getMySettings,
   setMySettings,
   clearNotifications,
@@ -61,6 +63,7 @@ import {
   type Member,
   type MySettings,
   type Notification,
+  type ReportKind,
   type Role,
   type Settings,
   type Topic,
@@ -556,5 +559,20 @@ export function useSetRules() {
   const qc = useQueryClient()
   return async (bodyHtml: string) => {
     qc.setQueryData(keys.rules, await setRules(bodyHtml))
+  }
+}
+
+/** The items with open reports, for the owner and moderators (architecture.md, Admin tools). Report events keep them current. */
+export function useReports() {
+  const q = useQuery({ queryKey: keys.reports, queryFn: listReports })
+  return { reports: q.data?.reports ?? [], loading: q.isPending, error: q.error }
+}
+
+/** Closes the reports of an item, by dismissing them or by deleting the item. The entry then leaves the list. */
+export function useCloseReport() {
+  const qc = useQueryClient()
+  return async (kind: ReportKind, id: string, action: 'dismiss' | 'delete') => {
+    await closeReport(kind, id, action)
+    applyEvent(qc, 'report_delete', { kind, id })
   }
 }

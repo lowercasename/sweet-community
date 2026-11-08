@@ -11,6 +11,8 @@ export interface User {
 export interface Can {
   edit: boolean
   delete: boolean
+  /** Whether I may report it to the owner and moderators. True for every member except the author. */
+  report: boolean
   /**
    * Posts only (architecture.md, Topics). Whether I may file the post under a topic. This is true for the post's
    * author and for the community's staff.
@@ -61,6 +63,8 @@ export interface GroupCan {
   manage_topics?: boolean
   /** Root group only. Whether the current user may write the rules. The owner and moderators may. */
   manage_rules?: boolean
+  /** Root group only. Whether the current user reads and closes reports. The owner and moderators do. */
+  handle_reports?: boolean
 }
 
 export type GroupMode = 'posts' | 'chat' | 'both'
@@ -210,7 +214,7 @@ export interface ReplyTo {
 export interface Notification {
   id: string
   user_id: string
-  kind: 'comment' | 'added' | 'mention' | 'joined' | 'topic_post' | 'message' | 'reply'
+  kind: 'comment' | 'added' | 'mention' | 'joined' | 'topic_post' | 'message' | 'reply' | 'report'
   actor: User
   group_id: string
   post_id: string | null
@@ -218,9 +222,41 @@ export interface Notification {
   topic_id?: string | null
   /** The chat message a mention or reply is in, for scrolling to it. */
   message_id?: string | null
+  /** The kind of item reported, for a report notification. */
+  report_kind?: ReportKind | null
   created_at: number
   /** When I opened the notification, or null if I have not opened it. */
   read_at: number | null
+}
+
+/** The kinds of item a member can report (architecture.md, Admin tools). */
+export type ReportKind = 'post' | 'comment' | 'message'
+
+/** One member's report of an item. */
+export interface ReportBy {
+  reporter: User
+  reason: string
+  created_at: number
+}
+
+/**
+ * One reported item with its open reports, for the owner and moderators (architecture.md, Admin tools). `body_html`
+ * is the copy kept when the item was first reported. `deleted` says the item has been deleted since. `can.open` says
+ * whether I can open the item where it is.
+ */
+export interface Report {
+  kind: ReportKind
+  id: string
+  group_id: string
+  group_kind: Group['kind']
+  group_name: string
+  /** The post, for a post or a comment. */
+  post_id: string | null
+  author: User
+  body_html: string
+  deleted: boolean
+  reports: ReportBy[]
+  can: { open: boolean }
 }
 
 export interface NotificationPage {
@@ -647,6 +683,23 @@ export function getRules(): Promise<Rules> {
 /** Writes the rules, for the owner and moderators. An empty body clears them. */
 export function setRules(bodyHtml: string): Promise<Rules> {
   return request<Rules>('/api/rules', json('PUT', { body_html: bodyHtml }))
+}
+
+/** Reports a post, comment or message to the owner and moderators. Reporting the same item again changes nothing. */
+export function createReport(kind: ReportKind, id: string, reason: string): Promise<void> {
+  return request<void>('/api/reports', json('POST', { kind, id, reason }))
+}
+
+/** The items with open reports, the newest report first. For the owner and moderators. */
+export function listReports(): Promise<{ reports: Report[] }> {
+  return request('/api/reports')
+}
+
+/** Closes every open report of an item. `delete` also deletes the item. */
+export function closeReport(kind: ReportKind, id: string, action: 'dismiss' | 'delete'): Promise<void> {
+  return request<void>(`/api/reports/${encodeURIComponent(kind)}/${encodeURIComponent(id)}/${action}`, {
+    method: 'POST',
+  })
 }
 
 /** Who created an invite link, and the rules the person agrees to by joining. */

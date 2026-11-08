@@ -104,16 +104,17 @@ func wireNotification(row store.GetNotificationRow) Notification {
 		pid = &p
 	}
 	return Notification{
-		ID:        row.ID,
-		UserID:    row.UserID,
-		Kind:      row.Kind,
-		Actor:     wireUser(row.ActorID, row.ActorUsername, row.ActorPictureID),
-		GroupID:   row.GroupID,
-		PostID:    pid,
-		TopicID:   nullStr(row.TopicID),
-		MessageID: nullStr(row.MessageID),
-		CreatedAt: row.CreatedAt,
-		ReadAt:    nullInt(row.ReadAt),
+		ID:         row.ID,
+		UserID:     row.UserID,
+		Kind:       row.Kind,
+		Actor:      wireUser(row.ActorID, row.ActorUsername, row.ActorPictureID),
+		GroupID:    row.GroupID,
+		PostID:     pid,
+		TopicID:    nullStr(row.TopicID),
+		MessageID:  nullStr(row.MessageID),
+		ReportKind: nullStr(row.ReportKind),
+		CreatedAt:  row.CreatedAt,
+		ReadAt:     nullInt(row.ReadAt),
 	}
 }
 
@@ -157,4 +158,61 @@ func lastAt(v any) *int64 {
 		return &n
 	}
 	return nil
+}
+
+// Report is one reported item with its open reports (architecture.md, Admin tools). Only the root group's owner and
+// moderators receive it. BodyHTML is the copy kept by the item's first open report. Deleted says the item has been
+// deleted since. Can.Open is personalised by forViewer.
+type Report struct {
+	Kind      string     `json:"kind"`
+	ID        string     `json:"id"`
+	GroupID   string     `json:"group_id"`
+	GroupKind string     `json:"group_kind"`
+	GroupName string     `json:"group_name"`
+	PostID    *string    `json:"post_id"`
+	Author    User       `json:"author"`
+	BodyHTML  string     `json:"body_html"`
+	Deleted   bool       `json:"deleted"`
+	Reports   []ReportBy `json:"reports"`
+	Can       ReportCan  `json:"can"`
+}
+
+// ReportBy is one member's report of an item.
+type ReportBy struct {
+	Reporter  User   `json:"reporter"`
+	Reason    string `json:"reason"`
+	CreatedAt int64  `json:"created_at"`
+}
+
+// ReportCan says whether the viewer can open the reported item where it is.
+type ReportCan struct {
+	Open bool `json:"open"`
+}
+
+// wireReports groups open report rows, which are oldest first, into one entry per item. The entries are ordered by
+// their newest report, newest first.
+func wireReports(rows []store.ListOpenReportsRow) []Report {
+	var out []Report
+	at := map[string]int{}
+	for _, row := range rows {
+		key := row.Kind + ":" + row.SubjectID
+		i, ok := at[key]
+		if !ok {
+			i = len(out)
+			at[key] = i
+			out = append(out, Report{
+				Kind: row.Kind, ID: row.SubjectID, GroupID: row.GroupID, GroupKind: row.GroupKind, GroupName: row.GroupName,
+				PostID: nullStr(row.PostID), Author: wireUser(row.AuthorID, row.AuthorUsername, row.AuthorPictureID),
+				BodyHTML: row.BodyHtml, Deleted: row.Deleted != 0,
+			})
+		}
+		out[i].Reports = append(out[i].Reports, ReportBy{
+			Reporter:  wireUser(row.ReporterID, row.ReporterUsername, row.ReporterPictureID),
+			Reason:    row.Reason,
+			CreatedAt: row.CreatedAt,
+		})
+	}
+	newest := func(r Report) int64 { return r.Reports[len(r.Reports)-1].CreatedAt }
+	sort.SliceStable(out, func(i, j int) bool { return newest(out[i]) > newest(out[j]) })
+	return out
 }

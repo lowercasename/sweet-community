@@ -12,12 +12,41 @@ import type {
   Post,
   PostPage,
   Profile,
+  Report,
   Rules,
   Settings,
   Topic,
   User,
 } from '../api'
 import { ROOT_ID, keys } from './keys'
+
+/**
+ * The kinds of event the stream listens for (architecture.md, Realtime): the whole resource, or its deletion. The
+ * browser drops an event whose kind is not listed, so every kind applyEvent handles must be here. A test checks this.
+ */
+export const EVENT_KINDS = [
+  'post',
+  'post_delete',
+  'comment',
+  'comment_delete',
+  'message',
+  'message_delete',
+  'user',
+  'group',
+  'group_delete',
+  'membership',
+  'membership_delete',
+  'settings',
+  'rules',
+  'notification',
+  'notification_delete',
+  'marker',
+  'profile',
+  'topic',
+  'topic_delete',
+  'report',
+  'report_delete',
+] as const
 
 /**
  * The cache's one write path. Every event from the stream, and every reply
@@ -92,7 +121,28 @@ export function applyEvent(qc: QueryClient, kind: string, data: unknown): void {
     case 'topic_delete':
       if (hasId(data)) deleteTopic(qc, data.id)
       break
+    case 'report':
+      if (isReport(data)) upsertReport(qc, data)
+      break
+    case 'report_delete':
+      if (isClosedReport(data)) dropReport(qc, data.kind, data.id)
+      break
   }
+}
+
+type Reports = { reports: Report[] }
+
+/** A report event comes from a new report, so its item moves to the top, where the newest report is. */
+function upsertReport(qc: QueryClient, r: Report) {
+  qc.setQueryData<Reports>(keys.reports, (old) =>
+    old ? { reports: [r, ...old.reports.filter((x) => x.kind !== r.kind || x.id !== r.id)] } : old,
+  )
+}
+
+function dropReport(qc: QueryClient, kind: string, id: string) {
+  qc.setQueryData<Reports>(keys.reports, (old) =>
+    old ? { reports: old.reports.filter((x) => x.kind !== kind || x.id !== id) } : old,
+  )
 }
 
 type Topics = { topics: Topic[] }
@@ -585,6 +635,13 @@ function isMembership(data: unknown): data is Membership {
     typeof m.role === 'string' &&
     isUser(m.user)
   )
+}
+function isClosedReport(data: unknown): data is { kind: string; id: string } {
+  return hasId(data) && typeof (data as { kind?: unknown }).kind === 'string'
+}
+function isReport(data: unknown): data is Report {
+  const r = data as Report
+  return hasId(data) && typeof r.kind === 'string' && Array.isArray(r.reports) && isUser(r.author)
 }
 function isNotification(data: unknown): data is Notification {
   const n = data as Notification

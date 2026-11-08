@@ -57,8 +57,8 @@ func removedName(id string) string { return "removed-" + id[len(id)-8:] }
 
 // removeUser removes a user from the instance (architecture.md, Admin
 // tools). Staff do this from People, or the user does it themselves from
-// Settings. The user's posts, comments and messages remain under a removed
-// name. Each room they own passes to the next most senior member, or is
+// Settings. The user's posts, comments and messages are deleted, and the open
+// reports of them are closed. Each room they own passes to the next most senior member, or is
 // deleted if they were the only member. Their conversation memberships are
 // hidden rather than deleted. Their sessions are deleted. The user event is
 // logged first, so every open page renames their posts, comments and
@@ -102,6 +102,11 @@ func (s *Server) removeUser(w http.ResponseWriter, r *http.Request) {
 			return nil, nil, http.StatusInternalServerError, err
 		}
 		entries = append(entries, erased...)
+		closed, err := closeReportsAbout(ctx, qtx, uid, me.ID, now)
+		if err != nil {
+			return nil, nil, http.StatusInternalServerError, err
+		}
+		entries = append(entries, closed...)
 		rows, err := qtx.ListUserMemberships(ctx, uid)
 		if err != nil {
 			return nil, nil, http.StatusInternalServerError, err
