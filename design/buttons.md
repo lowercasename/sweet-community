@@ -1,63 +1,59 @@
-# Buttons
+# Buttons and patterns
 
-Drawn at real size on the canvas https://claude.ai/artifact/YXR9jNVjYSQFY8abMpVfPi (variants and states, placement, phone width, surfaces before and after, labels and icons).
+Drawn at real size on the canvas https://claude.ai/artifact/YXR9jNVjYSQFY8abMpVfPi. It has six artboards: variants and states, patterns, phone width, surfaces before and after, labels and icons, and colour schemes.
 
-A design for every button in Sweet, written 8 November 2026 from an inventory of all of them: about 130 uses of `Button`, plus the nav items, tab bar, rail, list rows, menu triggers, pills and dialog actions. The inventory found thirty inconsistencies. They are listed at the end with the rule that resolves each one. Nothing in this document is built yet. Once agreed, the rules go into `architecture.md` and the changes are made one surface per commit.
+Written 8 November 2026 from an inventory of every button in the app (about 130 uses of `Button`, plus nav items, the tab bar, the rail, list rows, menu triggers, pills and dialog actions). Revised the same day after Raphael's review. Nothing here is built yet. Once agreed, the rules go into `architecture.md` and the changes are made one surface per commit.
 
 ## The problem
 
-There are three variants, but no rule says what each one is for, so each surface chose differently.
+There are three variants, but no rule says what each one is for, so each surface chose differently. Save is primary in the post editor and in room settings, and secondary on the account and topics cards. Message is a ghost button in the People list and secondary in the person card. Destructive actions are styled four ways. Every primary submit button is disabled until its form is valid, and a disabled primary is grey, so the main action on most screens first appears as a grey block. In room settings, the grey Save sits to the left of a ghost Delete room, which makes Delete room look like the active control. Twenty busy labels are written by hand. Icons have several meanings each.
 
-- Save is primary in the post editor and in room settings, and secondary on the account card and the topics card.
-- Message is a ghost button in the People list, secondary in the person card, and secondary on a profile.
-- Destructive actions are styled four ways: Delete room is a ghost with a bin icon, Remove my account is secondary with a cross icon, Leave room is secondary with a door icon, Revoke is a ghost with no icon.
-- Every primary submit button is disabled until the form is valid, and a disabled primary is grey. So the main action on most screens first appears as a grey block. In room settings, the grey Save sits to the left of a ghost Delete room, which makes Delete room look like the active control.
-- Twenty busy-state labels are written by hand ("Saving…", "Sending…", "Opening…"). Three dialogs have none.
-- Icons have several meanings each. `people` is used for the People page, a room's members, View profile, and the way out of an empty state.
+The same lack of rules applies to layout. Destructive actions sit in form footers, inside lists, or under a paragraph next to a harmless action. A user cannot learn where to look.
 
-## The system
-
-Four variants. Each variant answers one question: what does pressing this button do?
+## Variants
 
 | Variant | Use | Rest | Hover | Pressed (toggles only) | Disabled |
 |---|---|---|---|---|---|
-| **primary** | The main action of the surface. At most one visible at a time. | Pink fill, white text, medium weight | Red (sweet) fill | Not used as a toggle | Pink fill at 45% opacity, white text. Still recognisable as the main action. Never grey. |
-| **secondary** | An action that changes something or starts a flow, but is not the surface's main action. | 1px border in the line colour, ink text, card background | Pink border, red text | Not used as a toggle | Grey (mute) text, border unchanged |
-| **ghost** | A quiet action next to content, a toggle, a menu trigger, or Cancel. | No border, grey text | Field background, ink text | Blush background, red text. A text toggle shows its state at rest (Subscribed) and its action on hover (Unsubscribe). | Line-coloured text |
-| **danger** | An action that removes something and cannot simply be undone: a post, a room, a member, an account, all sessions. Always has an icon. Always confirmed when the loss is real. | Ghost shape, red text and icon | Blush background and a blush-line border. Blush alone is almost white, so the border makes the hover visible. | Not used as a toggle | Line-coloured text |
+| **primary** | The main action of a surface. At most one visible at a time. | Primary fill, white text, medium weight | Darker fill | Not used as a toggle | Primary fill at 45% opacity, white text. Never grey. |
+| **secondary** | Any other action that changes something or starts a flow. | 1px border in the line colour, ink text, card background | Pink border, red text | Not used as a toggle | Grey text, border unchanged |
+| **ghost** | A quiet action, a toggle, a menu trigger, or Cancel. | No border, grey text | Field background, ink text | Blush background, red text. A text toggle shows its state at rest (Subscribed) and its action on hover (Unsubscribe). | Line-coloured text |
+| **danger** | Removes something that cannot simply be undone: a post, a room, a member, an account, every session. | Like secondary, with a blush-line border and red text and icon, on a card background. Always has an icon. | Red border, blush background | Not used as a toggle | Line-coloured text and border |
 
-One height, 34px. Text buttons and medium pills are already 34px: a 24px line, 4px padding above and below, and a 1px border. Icon-only buttons are 32px today, because they use 6px padding around an 18px icon. They change to 7px padding, so every button and pill on a row is 34px. Icon sizes: 18px in a button, 20px in the nav, 22px in the tab bar. These three are documented so no fourth size is added.
+A confirm dialog's confirm button is **danger as a filled button**: red fill, white text, the same words as the control that opened the dialog. Cancel is a ghost.
 
-Busy state is a `busy` prop, not a label change. `busy` disables the button and shows a small spinner in place of the icon, or before the text if there is no icon. The label does not change: "Save" stays "Save" while saving. This removes nineteen hand-written "…" labels and fixes the three dialogs without one.
+Blush, used for the pressed state and the danger hover, changes from `#fffafc` to a visible tint (`#fde8e8` in today's colours). Today's blush has a contrast of 1.03:1 against white and cannot be seen.
 
-The confirm button in a confirm dialog is **danger as a filled button**: red (sweet) fill, white text, the same verb as the control that opened the dialog (Delete, Remove, Leave, Revoke, Make owner). Cancel is a ghost. Today every confirm button is pink primary, so confirming a deletion looks the same as posting.
+**Size.** Every button and medium pill is 34px tall. Button text changes from 16px to 15px, the same size as pill text, with a 22px line and 5px padding above and below. Icon-only buttons change from 32px to 34px (7px padding around an 18px icon). Icons are 18px in a button, 20px in the nav and 22px in the tab bar. Raphael accepted 34px as the touch target on 8 November.
 
-Navigation is a link, not a button. A control that only moves to another page is a `Link` in text, or a ghost button with an arrow when it stands alone. Exception: an empty state whose only purpose is to send the user somewhere else may use a secondary button, because a single link looks lost.
+**Busy** is a `busy` prop, not a label change. It disables the button and shows a spinner in place of the icon, or before the text. The label does not change.
 
-### Placement
+**Navigation** is a link, not a button, except in an empty state, where a secondary button named after the destination sends the user on.
 
-A row of actions reads left to right from least to most consequential. The primary is always at the right end.
+## Patterns
 
-```
-[danger]                                  [ghost Cancel] [primary Save]
-```
+Every surface is built from eight patterns, so the same kind of thing is always in the same place.
 
-- A form's footer is `Row justify="end"` with the primary last. Not left-aligned. (New room, New message, the invite card and room settings are left-aligned today.)
-- A destructive action goes at the far left of the same row, never next to the primary. In room settings: Delete room at the left, Save at the right.
-- A card with only secondary buttons (Sign out, Sign out everywhere) orders them by scope: this device first, then everywhere.
-- A list row's actions are at its right: the one common action in the open (Message), the rest in the three-dot menu. The menu is always visible on a list row, for touch devices, and appears on hover on a content block (post, comment, message), as now.
-- A dialog: Cancel, then the confirm button, right-aligned, 12px gap.
+One rule for every row of buttons: left to right, from the least to the most consequential action. A destructive action never shares a row with a primary. It is an action row in the last card of the page, and it opens a confirm dialog.
 
-Gaps: 8px between buttons that belong together (Cancel and Save, Copy and Revoke), 16px between groups. There are four different gaps today.
+1. **Form.** Fields, then a footer at the right: Cancel when the form can be abandoned, then the primary. Nothing else goes in the footer. Used for room settings, community settings, email and password, new room, new message, topics, and every sign-in page.
+2. **Action rows.** Each row is one thing the user can do or turn on: a title and one sentence on the left, one button on the right. Toggles and actions use the same row. On a phone the button drops below the text and stays at the right. Used for notifications and for pattern 3.
+3. **Ending things.** Destructive actions are action rows in the last card of the page, ordered from the least to the most consequential, top to bottom. The row says what will be lost. A danger button opens a confirm dialog. Used for a room's Leave room and Delete room, and on Settings for Sign out, Sign out everywhere and Remove my account.
+4. **List.** The control that adds to the list sits above the rows. Each row has its subject on the left, then the one common action in the open and the rest in a three-dot menu at the right. A menu item that removes something confirms. The menu is always visible on a list row. Used for People, room members, topics and invite links.
+5. **Confirm dialog.** A heading that asks the question, one sentence on the consequence, then Cancel and the confirm button at the right.
+6. **Content and editor.** A post, comment or message keeps its actions in a menu at its top right, shown on hover with a pointer and always on touch screens. An editor has formatting on the left and Cancel and the submit button on the right.
+7. **Controls under an object.** Buttons that act on one object sit in a row beside or under it, least to most consequential. Facts about the object go at the right end of the row. Used for the profile picture, the room picture and invite links.
+8. **Empty state.** One sentence on why the place is empty, then one secondary button named after the place that fills it.
 
-### Labels
+Gaps: 8px between buttons in a row, 16px between groups.
 
-A button label is a verb, plus an object when the verb alone would be ambiguous on that page. One verb per kind of action:
+## Labels
+
+A button label is a verb, plus an object when the verb alone would be unclear on that page. Sentence case, no full stop, no ellipsis.
 
 | Action | Verb | Today |
 |---|---|---|
 | Making a new thing | **Create** room, invite link, topic | Create, Add, Start |
-| Putting an existing thing in | **Add** someone, images | Add |
+| Putting an existing thing in | **Add to room**, **Add images** | Add |
 | Beginning a conversation | **Message** | Start, Message |
 | Keeping an edit | **Save** | Save, Set the password |
 | Publishing | **Post**, **Send**, **Reply** | Same |
@@ -68,79 +64,49 @@ A button label is a verb, plus an object when the verb alone would be ambiguous 
 | Copying | **Copy**, then **Copied** for two seconds | Same |
 | Continuing | **Next**, or the destination's name | Same |
 
-Sentence case. No full stop. No ellipsis in a label. A toggle's label at rest names the state when on (Subscribed, Weekly digest on, Notifying this device) and the action when off (Subscribe, Send me a weekly digest, Notify this device). On hover, the on state shows its action (Unsubscribe, Turn weekly digest off, Stop notifying this device, which is Raphael's wording from 8 November).
+Toggles: Subscribe, Subscribed, Unsubscribe on hover. Send me a weekly digest, Weekly digest on, Turn weekly digest off on hover. Notify this device, Notifying this device, Stop notifying this device on hover (Raphael's wording, 8 November).
 
-### Icons
+## Icons
 
-A button has an icon only in three cases: the icon is the whole button (toolbar, menu trigger, Back), the icon distinguishes two neighbouring buttons (Sign out with a door, Sign out everywhere with devices), or the button is a danger. A primary button never has an icon. One icon per meaning:
+A button has an icon only when the icon is the whole button, when it tells two neighbouring buttons apart, or when the button is a danger. A primary never has one. One meaning per icon:
 
 | Icon | Meaning | Not used for |
 |---|---|---|
 | `trash` | Delete content: post, comment, message, room, topic | People |
-| `remove` | Remove: a member, a picture, an attached image, my account | Content |
+| `remove` | Remove a member, a picture, an attached image, my account, an invite link | Content |
 | `logout` | Sign out, Leave room | |
-| `devices` | All devices | |
+| `devices` | Every device | |
 | `people` | The People page and a room's members | View profile, empty states |
 | `user` (new) | One person: View profile | |
 | `chat` | Message someone | |
 | `pencil` | Edit | |
-| `plus` | Create, in a section's title row | |
+| `plus` | Create, in a nav section's title row | |
 | `back` | Back, in a bar | |
 | `more` | A menu | |
 
-## Every button, after the change
+## Surfaces that change
 
-Grouped by surface. Only buttons that change are listed. The rest already follow the rules.
+- **A room's members and settings page.** Room settings is a form with Save only, at the right. Members is a list with Add to room above it. A last card holds Leave room and Delete room as danger action rows. Delete room shows only to the owner.
+- **Settings.** The last card, Sign out and leave, holds three action rows: This device (Sign out, secondary), Every device (Sign out everywhere, danger, confirmed), Leave this community (Remove my account, danger, confirmed). The profile picture uses Choose a picture and Remove picture (danger).
+- **People.** Create invite link is primary. Each invite row is Copy (secondary) and Revoke (danger, not confirmed, because a new link is one click away), with the expiry at the right. A person row has Message in the open and the rest in the menu. On a phone, Message drops its label and keeps its icon.
+- **Sign-in pages.** Submit buttons are right-aligned primaries that stay pink when disabled. Check your email shows Use a different address, then Send a new link, then a link back to sign in.
+- **Every confirm dialog** uses the filled danger button with the opening control's words, and `busy`.
+- **Nav, tab bar, rail, list rows, suggestion list and menu items** use the ghost tokens for hover and current, instead of repeating them.
 
-**Auth pages.** Submit buttons stay primary and right-aligned, but a disabled primary stays pink instead of grey. "Set the password" becomes "Save". On the check-your-email screen, "Send it again" becomes "Send a new link" (secondary), "Use a different address" stays ghost, and "Back to sign in" becomes a link under the card, matching the other auth pages. On the Welcome page, "Create invite link" becomes primary once the community is named, matching the People page.
+## Colour
 
-**Sidebar, tab bar, rail.** No visual change. NavItem, TabBar, Rail and ListRow currently repeat the ghost hover and current colours in their own classes. They change to use the ghost tokens, so a change to ghost applies to them too. The nav's New room and New message stay icon-only ghosts.
+Today five of the six key colour pairs fail the contrast guidelines: grey text on white (4.29:1) and on the grey field (3.94:1), white on the pink primary button (3.30:1), links (3.57:1) and input borders (1.30:1, against 3:1 needed). The canvas shows three site-wide schemes that keep the same feel and pass every pair:
 
-**Bars.** Back stays an icon-only ghost. "Members and settings" stays a ghost with the `people` icon. The Posts and Chat segments on the phone stay pressed ghosts.
+- **A. Closest to today.** The same hues. The primary button uses Sweet red instead of pink. Grey text and links are darker, inputs get a visible border, blush is a visible tint. Pink stays for focus rings and hover borders.
+- **B. Warm.** Everything in A, with the greys warmed towards Sweet's red-tinged ink, and more margin on every pair.
+- **C. Pink kept.** The primary button stays a lighter red than the text, deepened until white text on it passes (4.59:1). Red text is one shade darker so the two stay distinct.
 
-**Feed header.** The topic pill changes to 32px. Subscribe stays a ghost toggle. It is the model for the other toggles.
-
-**Editors.** The toolbar stays icon-only ghosts with pressed states. Cancel is a ghost, then Post, Send, Reply or Save as primary, 8px gap, right-aligned. Busy state uses the `busy` prop. The topic pill in the edit form stays after the toolbar.
-
-**Post, comment, message.** The menu trigger is unchanged. Delete in a menu becomes a danger item (red text and bin icon). Edit stays plain. "Show comments" stays an icon-only ghost with a count.
-
-**Person card and profile.** View profile becomes a ghost with the `user` icon. Message becomes a secondary with the `chat` icon, as the card's one action. On a profile: Edit bio is secondary with `pencil`, Settings is a ghost with `settings` (navigation), Message is secondary with `chat`. In the People list, Message stays a ghost with `chat`, because every row has one. On a phone it drops its label and keeps its icon, as Members and settings does in the bar, so a long username has room.
-
-**Settings.** Choose a picture is secondary with `image`. "Back to the donut" becomes "Remove picture", a danger. Account: both submit buttons become primary (each form is its own surface), right-aligned, pink when disabled. Notifications: the two toggles keep the Subscribe wording pattern, with "Turn off" and "Stop" as the hover text. Sign out: "Sign out" is secondary with `logout`. "Sign out everywhere" is a danger with `devices` and is confirmed, because it ends sessions the user cannot see. "Remove my account" is a danger with `remove` and is confirmed, as now.
-
-**Community.** Save is primary, as now. Topics: "Add topic" becomes "Create topic", primary within its form, right-aligned. The edit form's Save is primary and Cancel is a ghost. Delete in the menu is a danger item.
-
-**People.** "Create invite link" is primary, as now, with `busy`. Copy is secondary. Revoke is a danger with `remove` and is not confirmed, because a new link is one click away. The row menu: Make moderator and Make member are plain items, Remove is a danger item and is confirmed, as now.
-
-**Room settings.** The row becomes `[Delete room, danger, trash] … [Save, primary]`, with Save at the right and pink when nothing has changed. Choose a picture is secondary. Remove picture is a danger.
-
-**Members.** "Add" becomes "Add to room", secondary. Remove in the row menu becomes a confirmed danger item, matching the People page. "Switch ownership" becomes "Make owner", matching the menu item. "Leave room" is a danger with `logout` at the bottom of the card and is confirmed, as now. All three dialogs get `busy`.
-
-**Other pages.** New room and New message: submit buttons right-aligned, and "Start" becomes "Message". Notifications: Clear stays a ghost with `trash`, because it only removes already-read items. Empty states keep a secondary button named after the destination, without an icon. Load more and Load earlier stay secondary.
-
-## The thirty inconsistencies, resolved
-
-Numbers refer to the inventory.
-
-- 1 to 5, same action with different variants: a form's submit is primary and there is one per form. Message is secondary where it is the card's main action and ghost in a list row. Navigation is a link or a ghost.
-- 6 to 8, destructive actions: the danger variant, the filled confirm button, the verb repeated in the dialog, `busy` on every dialog.
-- 9, grey primaries: a disabled primary stays pink.
-- 10 to 12, toggles: pressed is a ghost-only state by design. Pressed and current share one look, because both mean "this is selected". The three text toggles use one wording pattern.
-- 13 and 14, pills next to buttons: medium pills and text buttons are both 34px already. Icon-only buttons change from 32px to 34px. Hover rules are written down for each primitive.
-- 15 to 19, labels: the verb table and the `busy` prop.
-- 20 to 22, icons: the icon table, `user` added, `people` narrowed to People and members.
-- 23 to 26, placement: the row rule, the gap rule, menus always visible on rows and shown on hover on content.
-- 27 to 30, duplicate implementations: NavItem, TabBar, Rail, ListRow, SuggestionList and Menu items use `buttonClass('ghost')` for hover and current states. FilePicker takes its variant from its caller, as now. HoverCard's trigger (a person's name, red, underlined on hover) is documented as the one text control that is not a Link.
-
-## Open points
-
-- White text on pink `#ed5e5e` has a contrast ratio of 3.3:1, and ghost text `#7a7a7a` on white has 4.3:1. Both are below the 4.5:1 guideline for 16px text. White on Sweet red `#ce1717` is 5.6:1. Changing either is a change to Sweet's colours, so it is listed here for a decision, not proposed.
-- Buttons are 34px tall. That is below the usual 44px touch-target guideline for phones. Raising it would make every row taller, so it is listed here for a decision.
-- A pressed ghost button uses a blush background, which is almost white. The pressed state is visible through the red text and the changed icon or label, not through the background.
+Raphael chooses. The chosen scheme replaces the tokens in `web/src/global.css`.
 
 ## Order of work
 
-1. `Button`: add `danger`, add `busy`, restyle the disabled primary, export the tokens the nav primitives need. Vitest for `busy` and `danger`. A Playwright page that renders every variant in every state at both widths and saves screenshots to `test-results`, reviewed before anything else changes.
-2. Icon-only buttons to 34px. Nav primitives onto the ghost tokens. Screenshots of the sidebar, tab bar, rail and feed header.
-3. One commit per surface in the order above, each checked at both widths.
-4. Record the rules in `architecture.md` under a Buttons heading, and delete this file.
+1. Colours: the chosen scheme in `global.css`, then screenshots of every page at both widths.
+2. `Button`: add `danger` and `busy`, 15px text, disabled primary, icon-only to 34px. Vitest for `busy` and `danger`. A Playwright page that renders every variant in every state at both widths, reviewed before anything else changes.
+3. Nav primitives onto the ghost tokens.
+4. One commit per surface, applying the patterns, each checked at both widths.
+5. Record the rules in `architecture.md` under a Buttons and patterns heading, and delete this file.
