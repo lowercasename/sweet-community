@@ -95,6 +95,9 @@ func Migrate(ctx context.Context, db *sql.DB, migrations fs.FS) error {
 		return err
 	}
 	sort.Strings(names)
+	if err := squashed(ctx, d, names); err != nil {
+		return err
+	}
 	var applied int
 	if err := d.QueryRowContext(ctx, `SELECT COUNT(*) FROM schema_migrations`).Scan(&applied); err != nil {
 		return err
@@ -145,6 +148,61 @@ func Migrate(ctx context.Context, db *sql.DB, migrations fs.FS) error {
 		}
 	}
 	return nil
+}
+
+// Migrations 001 to 028 were squashed into one file before v1.0.0
+// (architecture.md, Data model notes). lastSquashed is the last of them.
+const (
+	lastSquashed = "028_signin.sql"
+	baseline     = "001_v1.sql"
+)
+
+// squashed records a database that ran every migration up to lastSquashed as
+// having run the baseline instead, because it already has the baseline's
+// schema. A database that recorded a migration this binary does not have is
+// refused. That is a database from before 028, which the baseline must not
+// run over, or a database that a newer release migrated.
+func squashed(ctx context.Context, d *sql.Conn, names []string) error {
+	known := map[string]bool{}
+	for _, n := range names {
+		known[n] = true
+	}
+	if !known[baseline] {
+		return nil
+	}
+	var old int
+	if err := d.QueryRowContext(ctx, `SELECT COUNT(*) FROM schema_migrations WHERE name = ?`, lastSquashed).Scan(&old); err != nil {
+		return err
+	}
+	if old > 0 {
+		tx, err := d.BeginTx(ctx, nil)
+		if err != nil {
+			return err
+		}
+		defer tx.Rollback()
+		if _, err := tx.ExecContext(ctx, `DELETE FROM schema_migrations`); err != nil {
+			return err
+		}
+		if _, err := tx.ExecContext(ctx, `INSERT INTO schema_migrations (name, applied_at) VALUES (?, ?)`, baseline, time.Now().UnixMilli()); err != nil {
+			return err
+		}
+		return tx.Commit()
+	}
+	rows, err := d.QueryContext(ctx, `SELECT name FROM schema_migrations`)
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var n string
+		if err := rows.Scan(&n); err != nil {
+			return err
+		}
+		if !known[n] {
+			return fmt.Errorf("the database was migrated by %s, which this release does not have. A database from before v1 needs the last release before v1.0.0 first, and one from a newer release needs that release", n)
+		}
+	}
+	return rows.Err()
 }
 
 // backup writes a single-file copy of the open database next to it, at its
