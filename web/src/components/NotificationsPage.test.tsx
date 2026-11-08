@@ -79,6 +79,21 @@ describe('NotificationsPage', () => {
     expect(readNotification).toHaveBeenCalledTimes(1)
   })
 
+  it('a message in a conversation reads "messaged you" and opens the conversation', async () => {
+    const { listNotifications, readNotification } = await import('../api')
+    vi.mocked(listNotifications).mockResolvedValue({
+      notifications: [notification('n30', 'message', mo, { group_id: 'talk' })],
+      next_before: null,
+    })
+    vi.mocked(readNotification).mockImplementation((id) =>
+      Promise.resolve(notification(id, 'message', mo, { group_id: 'talk', read_at: 31 })),
+    )
+    const onGo = await draw()
+    fireEvent.click(await screen.findByRole('button', { name: 'mo messaged you, new' }))
+    expect(onGo).toHaveBeenCalledWith('/r/talk')
+    await screen.findByRole('button', { name: 'mo messaged you' })
+  })
+
   it('clears the opened ones for good; the unopened stay', async () => {
     const { clearNotifications } = await import('../api')
     await draw()

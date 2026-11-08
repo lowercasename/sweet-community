@@ -15,6 +15,7 @@ ON CONFLICT (user_id, key) DO UPDATE SET value = excluded.value;
 -- handler decides the rest. since is where their feed reading stands, or
 -- the last digest if that is later, so a week's counts are never repeated.
 SELECT u.id, u.username, CAST(u.email AS TEXT) AS email,
+       CAST(COALESCE(u.digest_sent_at, 0) AS INTEGER) AS sent_at,
        CAST(MAX(COALESCE((SELECT r.read_at FROM read_markers r WHERE r.user_id = u.id AND r.stream = 'feed:' || m.group_id), m.joined_at), COALESCE(u.digest_sent_at, 0)) AS INTEGER) AS since
 FROM users u
 JOIN memberships m ON m.user_id = u.id AND m.group_id = sqlc.arg(root)
@@ -42,6 +43,16 @@ WHERE p.author_id = sqlc.arg(user_id) AND c.author_id != sqlc.arg(user_id) AND c
 SELECT u.username FROM memberships m JOIN users u ON u.id = m.user_id
 WHERE m.group_id = sqlc.arg(root) AND m.joined_at > sqlc.arg(since) AND u.removed_at IS NULL AND u.id != sqlc.arg(user_id)
 ORDER BY m.joined_at;
+
+-- name: CountConversationsWithNewMessages :one
+-- The person's conversations with others' live messages newer than where
+-- they have read to (or their joining) and than the last digest.
+SELECT COUNT(*) FROM memberships m
+JOIN groups g ON g.id = m.group_id AND g.kind = 'dm' AND g.deleted_at IS NULL
+LEFT JOIN read_markers r ON r.user_id = m.user_id AND r.stream = 'chat:' || m.group_id
+WHERE m.user_id = sqlc.arg(user_id) AND m.hidden_at IS NULL
+  AND EXISTS (SELECT 1 FROM messages x WHERE x.group_id = m.group_id AND x.deleted_at IS NULL AND x.author_id != m.user_id
+              AND x.created_at > MAX(COALESCE(r.read_at, m.joined_at), sqlc.arg(since)));
 
 -- name: SetDigestSentAt :exec
 UPDATE users SET digest_sent_at = sqlc.arg(sent_at) WHERE id = sqlc.arg(id);

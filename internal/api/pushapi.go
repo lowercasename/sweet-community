@@ -64,23 +64,26 @@ func (s *Server) unsubscribePush(w http.ResponseWriter, r *http.Request) {
 }
 
 // pushWords is what a device shows for a notification, or ok false for the
-// kinds that do not push (architecture.md: mentions and replies to your posts).
-func pushWords(n Notification) (body, path string, ok bool) {
+// kinds that do not push (architecture.md: mentions, replies to your posts,
+// and a message in a conversation, the last under the conversation's tag).
+func pushWords(n Notification) (body, path, tag string, ok bool) {
 	switch n.Kind {
 	case NotifyComment:
 		body = n.Actor.Username + " commented on your post"
 	case NotifyMention:
 		body = n.Actor.Username + " mentioned you"
+	case NotifyMessage:
+		return n.Actor.Username + " messaged you", "/r/" + n.GroupID, streamChatPrefix + n.GroupID, true
 	default:
-		return "", "", false
+		return "", "", "", false
 	}
 	if n.PostID != nil {
-		return body, "/p/" + *n.PostID, true
+		return body, "/p/" + *n.PostID, "", true
 	}
 	if n.GroupID == perm.Root {
-		return body, "/", true
+		return body, "/", "", true
 	}
-	return body, "/r/" + n.GroupID, true
+	return body, "/r/" + n.GroupID, "", true
 }
 
 // pushAfterCommit sends a push for each notification among the events just
@@ -96,10 +99,11 @@ func (s *Server) pushAfterCommit(payloads []json.RawMessage, community string) {
 	}
 	for _, raw := range payloads {
 		var n Notification
-		if json.Unmarshal(raw, &n) != nil {
+		if json.Unmarshal(raw, &n) != nil || n.ReadAt != nil {
+			// A row going out read (a conversation read to its marker) is not news.
 			continue
 		}
-		body, path, ok := pushWords(n)
+		body, path, tag, ok := pushWords(n)
 		if !ok {
 			continue
 		}
@@ -111,6 +115,6 @@ func (s *Server) pushAfterCommit(payloads []json.RawMessage, community string) {
 			if err := s.Push.Tell(context.Background(), uid, p); err != nil {
 				log.Printf("push: %v", err)
 			}
-		}(n.UserID, push.Payload{Title: title, Body: body, URL: s.BaseURL + path})
+		}(n.UserID, push.Payload{Title: title, Body: body, URL: s.BaseURL + path, Tag: tag})
 	}
 }

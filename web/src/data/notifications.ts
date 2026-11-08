@@ -55,10 +55,12 @@ export function describe(n: Notification, groups: Group[], topics: Topic[] = [])
     }
     case 'joined':
       return 'joined the community'
+    case 'message':
+      return 'messaged you'
   }
 }
 
-/** Where a notification leads: anything about a post to the post's page, an arrival to the person, else to the room. */
+/** Where a notification leads: anything about a post to the post's page, an arrival to the person, else to the room or conversation. */
 export function targetOf(n: Notification, rootId?: string): string {
   if (n.post_id) return postPath(n.post_id)
   if (n.kind === 'joined') return profilePath(n.actor.username)

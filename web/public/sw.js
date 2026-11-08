@@ -6,18 +6,24 @@ self.addEventListener('install', () => self.skipWaiting())
 self.addEventListener('activate', (event) => event.waitUntil(self.clients.claim()))
 
 self.addEventListener('push', (event) => {
-  let data = { title: 'Sweet', body: '', url: '/' }
+  let data = { title: 'Sweet', body: '', url: '/', tag: undefined }
   try {
     data = { ...data, ...event.data.json() }
   } catch {
     // A push with no readable body still shows the title.
   }
   event.waitUntil(
-    self.registration.showNotification(data.title, {
-      body: data.body,
-      icon: '/icon-192.png',
-      badge: '/icon-192.png',
-      data: { url: data.url },
+    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((windows) => {
+      // Already looking at the thing, in a focused window: nothing to show.
+      const path = new URL(data.url, self.location.origin).pathname
+      if (windows.some((w) => w.focused && new URL(w.url).pathname === path)) return
+      return self.registration.showNotification(data.title, {
+        body: data.body,
+        icon: '/icon-192.png',
+        badge: '/icon-192.png',
+        tag: data.tag,
+        data: { url: data.url },
+      })
     }),
   )
 })

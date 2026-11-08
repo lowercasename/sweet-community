@@ -75,6 +75,44 @@ test.describe('notifications', () => {
     await boss.context.close()
   })
 
+  test('a message in a conversation lights the bell, and reading the conversation reads it, by either door', async ({
+    browser,
+  }, testInfo) => {
+    const kit = await member(browser, testInfo, 'kit')
+    const mo = await member(browser, testInfo, 'mo')
+    await open(kit.page, '/people')
+    const nav = kit.page.getByRole('navigation', { name: 'Main' })
+    const me = (await (await kit.context.request.get('/api/me')).json()) as { id: string }
+    const dm = await mo.context.request.post('/api/groups', { data: { kind: 'dm', members: [me.id] } })
+    const gid = ((await dm.json()) as { id: string }).id
+    await mo.context.request.post(`/api/groups/${gid}/messages`, { data: { body_html: '<p>hello kit</p>' } })
+
+    // Live: the bell lights, and the conversation carries its own dot under Messages.
+    await expect(nav.getByRole('button', { name: 'Notifications, unread' })).toBeVisible()
+    await expect(nav.getByRole('button', { name: `${mo.username}, unread` })).toBeVisible()
+    // Reading the conversation reads the notification: the dot goes, and the row sits under Earlier.
+    await nav.getByRole('button', { name: `${mo.username}, unread` }).click()
+    await expect(kit.page.getByText('hello kit')).toBeVisible()
+    await expect(nav.getByRole('button', { name: 'Notifications', exact: true })).toBeVisible()
+    await nav.getByRole('button', { name: 'Notifications', exact: true }).click()
+    await expect(kit.page.getByRole('heading', { name: 'Earlier' })).toBeVisible()
+    await expect(kit.page.getByRole('button', { name: `${mo.username} messaged you` })).toBeVisible()
+    await expect(kit.page.getByRole('heading', { name: 'New' })).toHaveCount(0)
+
+    // The other door: a new message is a new row, and opening it from the bell opens the conversation and reads it.
+    await mo.context.request.post(`/api/groups/${gid}/messages`, { data: { body_html: '<p>still there?</p>' } })
+    const row = kit.page.getByRole('button', { name: `${mo.username} messaged you, new` })
+    await expect(row).toBeVisible()
+    await expect(nav.getByRole('button', { name: 'Notifications, unread' })).toBeVisible()
+    await row.click()
+    await expect(kit.page).toHaveURL(new RegExp(`/r/${gid}$`))
+    await expect(kit.page.getByText('still there?')).toBeVisible()
+    await expect(nav.getByRole('button', { name: 'Notifications', exact: true })).toBeVisible()
+    await expect(nav.getByRole('button', { name: mo.username, exact: true })).toBeVisible()
+    await kit.context.close()
+    await mo.context.close()
+  })
+
   test('@phone the tab bar bell carries the dot and opens the page', async ({ browser }, testInfo) => {
     const kit = await member(browser, testInfo, 'kit')
     const mo = await member(browser, testInfo, 'mo')

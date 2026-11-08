@@ -23,6 +23,19 @@ WHERE n.user_id = sqlc.arg(user_id) AND n.created_at < sqlc.arg(before)
 ORDER BY n.created_at DESC, n.id DESC
 LIMIT sqlc.arg(page_size);
 
+-- name: CountUnreadNotificationsInGroup :one
+-- Whether one of a kind about a group is still unopened: a conversation's
+-- message notification is written once until it is read.
+SELECT COUNT(*) FROM notifications
+WHERE user_id = sqlc.arg(user_id) AND kind = sqlc.arg(kind) AND group_id = sqlc.arg(group_id) AND read_at IS NULL;
+
+-- name: ListUnreadNotificationsInGroupUpTo :many
+-- The unopened ones of a kind about a group up to a time: what reading the
+-- group's chat to that time reads.
+SELECT id FROM notifications
+WHERE user_id = sqlc.arg(user_id) AND kind = sqlc.arg(kind) AND group_id = sqlc.arg(group_id) AND read_at IS NULL AND created_at <= sqlc.arg(before)
+ORDER BY created_at;
+
 -- name: DeleteReadNotifications :exec
 -- The ones I have opened, up to a time; an unread one is never cleared.
 DELETE FROM notifications WHERE user_id = sqlc.arg(user_id) AND read_at IS NOT NULL AND created_at <= sqlc.arg(before);
@@ -51,6 +64,13 @@ SELECT m.user_id, CAST('feed:' || m.group_id AS TEXT) AS stream, CAST(COALESCE(r
           AND x.created_at > COALESCE(r.read_at, m.joined_at)) AS unread
 FROM memberships m LEFT JOIN read_markers r ON r.user_id = m.user_id AND r.stream = 'feed:' || m.group_id
 WHERE m.user_id = sqlc.arg(user_id) AND m.group_id = sqlc.arg(group_id) AND m.hidden_at IS NULL;
+
+-- name: GetNotificationsMarker :one
+-- The notifications row alone, as ListMarkers lists it: for when a write elsewhere has read some.
+SELECT u.id AS user_id, CAST('notifications' AS TEXT) AS stream, CAST(0 AS INTEGER) AS read_at,
+       (SELECT COUNT(*) FROM notifications n WHERE n.user_id = u.id AND n.read_at IS NULL) AS unread
+FROM users u
+WHERE u.id = sqlc.arg(user_id);
 
 -- name: ListMarkers :many
 -- The notifications row has no marker time: its unread is the rows not yet opened.

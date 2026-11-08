@@ -120,6 +120,17 @@ func TestDigestGoesToTheAwayWithSomethingToTell(t *testing.T) {
 	}
 	f.person("sam", 2*day, 2*day, true)
 	_ = jo
+	// Two conversations with words kit has not read, and one kit has: two count. A room's chat does not.
+	talk := f.conversation(mo, kit)
+	f.message(talk, mo, 4*day)
+	f.message(talk, mo, 3*day)
+	f.message(f.conversation(ade, kit), ade, 2*day)
+	seen := f.conversation(jo, kit)
+	f.message(seen, jo, 6*day)
+	if err := f.q.SetMarker(f.ctx, store.SetMarkerParams{UserID: kit, Stream: "chat:" + seen, ReadAt: f.ms(-5 * day)}); err != nil {
+		t.Fatal(err)
+	}
+	f.message(perm.Root, mo, 2*day)
 
 	out := &memo{}
 	n, err := Run(f.ctx, f.d, out, "https://sweet.test", f.now)
@@ -138,6 +149,7 @@ func TestDigestGoesToTheAwayWithSomethingToTell(t *testing.T) {
 		"2 new posts: 1 in Practice, 1 without a topic.",
 		"1 reply to your posts.",
 		"sam joined.",
+		"2 conversations with new messages.",
 		"Open Thursday Group:\nhttps://sweet.test",
 		"turn it off in Settings",
 	} {
@@ -200,5 +212,28 @@ func TestWordsForNumbersAndNames(t *testing.T) {
 		if got := joinNames(c.in); got != c.want {
 			t.Errorf("joinNames(%v) = %q", c.in, got)
 		}
+	}
+}
+
+// conversation is the two people's conversation, as the API makes it.
+func (f *fixture) conversation(a, b string) string {
+	f.t.Helper()
+	id := uuid.NewString()
+	at := f.ms(-20 * 24 * time.Hour)
+	if err := f.q.CreateGroup(f.ctx, store.CreateGroupParams{ID: id, Kind: perm.KindDM, Name: "", Mode: perm.ModeChat, CreatedAt: at, PeopleKey: sql.NullString{String: a + ":" + b, Valid: true}}); err != nil {
+		f.t.Fatal(err)
+	}
+	for _, uid := range []string{a, b} {
+		if err := f.q.CreateMembership(f.ctx, store.CreateMembershipParams{GroupID: id, UserID: uid, Role: perm.Member, JoinedAt: at}); err != nil {
+			f.t.Fatal(err)
+		}
+	}
+	return id
+}
+
+func (f *fixture) message(group, author string, ago time.Duration) {
+	f.t.Helper()
+	if err := f.q.CreateMessage(f.ctx, store.CreateMessageParams{ID: uuid.NewString(), GroupID: group, AuthorID: author, BodyHtml: "<p>m</p>", BodyText: "m", CreatedAt: f.ms(-ago)}); err != nil {
+		f.t.Fatal(err)
 	}
 }

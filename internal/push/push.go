@@ -33,6 +33,9 @@ type Payload struct {
 	Title string `json:"title"`
 	Body  string `json:"body"`
 	URL   string `json:"url"`
+	// Tag groups pushes on a device: a new one under the same tag replaces
+	// the one showing, so a conversation is one notification, not a stack.
+	Tag string `json:"tag,omitempty"`
 }
 
 // Sender delivers one payload to one device. gone is true when the push

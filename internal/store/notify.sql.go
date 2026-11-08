@@ -10,6 +10,29 @@ import (
 	"database/sql"
 )
 
+const countConversationsWithNewMessages = `-- name: CountConversationsWithNewMessages :one
+SELECT COUNT(*) FROM memberships m
+JOIN groups g ON g.id = m.group_id AND g.kind = 'dm' AND g.deleted_at IS NULL
+LEFT JOIN read_markers r ON r.user_id = m.user_id AND r.stream = 'chat:' || m.group_id
+WHERE m.user_id = ?1 AND m.hidden_at IS NULL
+  AND EXISTS (SELECT 1 FROM messages x WHERE x.group_id = m.group_id AND x.deleted_at IS NULL AND x.author_id != m.user_id
+              AND x.created_at > MAX(COALESCE(r.read_at, m.joined_at), ?2))
+`
+
+type CountConversationsWithNewMessagesParams struct {
+	UserID string
+	Since  interface{}
+}
+
+// The person's conversations with others' live messages newer than where
+// they have read to (or their joining) and than the last digest.
+func (q *Queries) CountConversationsWithNewMessages(ctx context.Context, arg CountConversationsWithNewMessagesParams) (int64, error) {
+	row := q.db.QueryRowContext(ctx, countConversationsWithNewMessages, arg.UserID, arg.Since)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
 const countPostsSinceByTopic = `-- name: CountPostsSinceByTopic :many
 SELECT p.topic_id, COUNT(*) AS n
 FROM posts p
@@ -143,6 +166,7 @@ func (q *Queries) GetUserSetting(ctx context.Context, arg GetUserSettingParams) 
 
 const listDigestCandidates = `-- name: ListDigestCandidates :many
 SELECT u.id, u.username, CAST(u.email AS TEXT) AS email,
+       CAST(COALESCE(u.digest_sent_at, 0) AS INTEGER) AS sent_at,
        CAST(MAX(COALESCE((SELECT r.read_at FROM read_markers r WHERE r.user_id = u.id AND r.stream = 'feed:' || m.group_id), m.joined_at), COALESCE(u.digest_sent_at, 0)) AS INTEGER) AS since
 FROM users u
 JOIN memberships m ON m.user_id = u.id AND m.group_id = ?1
@@ -164,6 +188,7 @@ type ListDigestCandidatesRow struct {
 	ID       string
 	Username string
 	Email    string
+	SentAt   int64
 	Since    int64
 }
 
@@ -184,6 +209,7 @@ func (q *Queries) ListDigestCandidates(ctx context.Context, arg ListDigestCandid
 			&i.ID,
 			&i.Username,
 			&i.Email,
+			&i.SentAt,
 			&i.Since,
 		); err != nil {
 			return nil, err

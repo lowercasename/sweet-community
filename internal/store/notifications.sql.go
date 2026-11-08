@@ -10,6 +10,26 @@ import (
 	"database/sql"
 )
 
+const countUnreadNotificationsInGroup = `-- name: CountUnreadNotificationsInGroup :one
+SELECT COUNT(*) FROM notifications
+WHERE user_id = ?1 AND kind = ?2 AND group_id = ?3 AND read_at IS NULL
+`
+
+type CountUnreadNotificationsInGroupParams struct {
+	UserID  string
+	Kind    string
+	GroupID string
+}
+
+// Whether one of a kind about a group is still unopened: a conversation's
+// message notification is written once until it is read.
+func (q *Queries) CountUnreadNotificationsInGroup(ctx context.Context, arg CountUnreadNotificationsInGroupParams) (int64, error) {
+	row := q.db.QueryRowContext(ctx, countUnreadNotificationsInGroup, arg.UserID, arg.Kind, arg.GroupID)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
 const createNotification = `-- name: CreateNotification :exec
 
 INSERT INTO notifications (id, user_id, kind, actor_id, group_id, post_id, topic_id, created_at)
@@ -168,6 +188,33 @@ func (q *Queries) GetNotification(ctx context.Context, id string) (GetNotificati
 	return i, err
 }
 
+const getNotificationsMarker = `-- name: GetNotificationsMarker :one
+SELECT u.id AS user_id, CAST('notifications' AS TEXT) AS stream, CAST(0 AS INTEGER) AS read_at,
+       (SELECT COUNT(*) FROM notifications n WHERE n.user_id = u.id AND n.read_at IS NULL) AS unread
+FROM users u
+WHERE u.id = ?1
+`
+
+type GetNotificationsMarkerRow struct {
+	UserID string
+	Stream string
+	ReadAt int64
+	Unread int64
+}
+
+// The notifications row alone, as ListMarkers lists it: for when a write elsewhere has read some.
+func (q *Queries) GetNotificationsMarker(ctx context.Context, userID string) (GetNotificationsMarkerRow, error) {
+	row := q.db.QueryRowContext(ctx, getNotificationsMarker, userID)
+	var i GetNotificationsMarkerRow
+	err := row.Scan(
+		&i.UserID,
+		&i.Stream,
+		&i.ReadAt,
+		&i.Unread,
+	)
+	return i, err
+}
+
 const listMarkers = `-- name: ListMarkers :many
 SELECT u.id AS user_id, CAST('notifications' AS TEXT) AS stream, CAST(0 AS INTEGER) AS read_at,
        (SELECT COUNT(*) FROM notifications n WHERE n.user_id = u.id AND n.read_at IS NULL) AS unread
@@ -279,6 +326,49 @@ func (q *Queries) ListNotifications(ctx context.Context, arg ListNotificationsPa
 			return nil, err
 		}
 		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listUnreadNotificationsInGroupUpTo = `-- name: ListUnreadNotificationsInGroupUpTo :many
+SELECT id FROM notifications
+WHERE user_id = ?1 AND kind = ?2 AND group_id = ?3 AND read_at IS NULL AND created_at <= ?4
+ORDER BY created_at
+`
+
+type ListUnreadNotificationsInGroupUpToParams struct {
+	UserID  string
+	Kind    string
+	GroupID string
+	Before  int64
+}
+
+// The unopened ones of a kind about a group up to a time: what reading the
+// group's chat to that time reads.
+func (q *Queries) ListUnreadNotificationsInGroupUpTo(ctx context.Context, arg ListUnreadNotificationsInGroupUpToParams) ([]string, error) {
+	rows, err := q.db.QueryContext(ctx, listUnreadNotificationsInGroupUpTo,
+		arg.UserID,
+		arg.Kind,
+		arg.GroupID,
+		arg.Before,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []string{}
+	for rows.Next() {
+		var id string
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		items = append(items, id)
 	}
 	if err := rows.Close(); err != nil {
 		return nil, err

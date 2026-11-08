@@ -42,6 +42,10 @@ const (
 	NotifyJoined = "joined"
 	// NotifyTopicPost tells a topic's followers of a post in it (architecture.md, Topics).
 	NotifyTopicPost = "topic_post"
+	// NotifyMessage tells the other person of a message in a conversation: one
+	// unopened row per conversation, read by reading the conversation
+	// (architecture.md, Notifications, 2026-11-08). A room's chat is unread only.
+	NotifyMessage = "message"
 )
 
 // Marker is how far along a stream a person has read: the newest time they
@@ -67,6 +71,59 @@ const (
 // its event. Nobody is told about their own doing: to == actor is no row.
 func notify(r *http.Request, qtx *store.Queries, kind, to, actor, groupID string, postID *string, now int64) (*events.Entry, error) {
 	return notifyIn(r, qtx, kind, to, actor, groupID, postID, nil, now)
+}
+
+// notifyMessage is the message notification for each other person in a
+// conversation who has none unopened for it yet. Nothing for a room, and
+// nothing for someone who has hidden the conversation.
+func notifyMessage(r *http.Request, qtx *store.Queries, g Group, author string, now int64) ([]events.Entry, error) {
+	if g.Kind != perm.KindDM {
+		return nil, nil
+	}
+	members, err := qtx.ListMembers(r.Context(), g.ID)
+	if err != nil {
+		return nil, err
+	}
+	var told []events.Entry
+	for _, m := range members {
+		if m.ID == author || m.HiddenAt.Valid {
+			continue
+		}
+		n, err := qtx.CountUnreadNotificationsInGroup(r.Context(), store.CountUnreadNotificationsInGroupParams{UserID: m.ID, Kind: NotifyMessage, GroupID: g.ID})
+		if err != nil {
+			return nil, err
+		}
+		if n > 0 {
+			continue
+		}
+		e, err := notify(r, qtx, NotifyMessage, m.ID, author, g.ID, nil, now)
+		if err != nil {
+			return nil, err
+		}
+		told = append(told, *e)
+	}
+	return told, nil
+}
+
+// readMessageNotifications reads my message notifications for a conversation
+// up to where I have read its chat, and returns each, read, as an event.
+func readMessageNotifications(r *http.Request, qtx *store.Queries, me, groupID string, upTo, now int64) ([]events.Entry, error) {
+	ids, err := qtx.ListUnreadNotificationsInGroupUpTo(r.Context(), store.ListUnreadNotificationsInGroupUpToParams{UserID: me, Kind: NotifyMessage, GroupID: groupID, Before: upTo})
+	if err != nil {
+		return nil, err
+	}
+	var read []events.Entry
+	for _, id := range ids {
+		if err := qtx.ReadNotification(r.Context(), store.ReadNotificationParams{ReadAt: sql.NullInt64{Int64: now, Valid: true}, ID: id, UserID: me}); err != nil {
+			return nil, err
+		}
+		row, err := qtx.GetNotification(r.Context(), id)
+		if err != nil {
+			return nil, err
+		}
+		read = append(read, events.Entry{Kind: "notification", Payload: wireNotification(row)})
+	}
+	return read, nil
 }
 
 // notifyIn is notify with the topic a topic_post is about.
@@ -198,19 +255,27 @@ func (s *Server) setMarker(w http.ResponseWriter, r *http.Request) {
 	if in.ReadAt > now {
 		in.ReadAt = now
 	}
-	s.logged(w, r, "marker", now, func(qtx *store.Queries) (any, int, error) {
+	// The marker, and for a chat the message notifications it reads (architecture.md,
+	// Notifications: reading the conversation reads them), in one transaction.
+	s.loggedMany(w, r, now, func(qtx *store.Queries) ([]events.Entry, any, int, error) {
 		// The row re-read after the write, as its stream's query lists it.
 		var reread func() (store.ListMarkersRow, error)
+		var read []events.Entry
 		switch {
 		case strings.HasPrefix(stream, streamChatPrefix), strings.HasPrefix(stream, streamFeedPrefix):
 			chat := strings.HasPrefix(stream, streamChatPrefix)
 			gid := strings.TrimPrefix(strings.TrimPrefix(stream, streamChatPrefix), streamFeedPrefix)
 			a, err := actorIn(r.Context(), qtx, me, gid)
 			if err != nil {
-				return nil, http.StatusInternalServerError, err
+				return nil, nil, http.StatusInternalServerError, err
 			}
 			if !perm.CanSee(a) {
-				return nil, http.StatusNotFound, errors.New("No such room")
+				return nil, nil, http.StatusNotFound, errors.New("No such room")
+			}
+			if chat {
+				if read, err = readMessageNotifications(r, qtx, me.ID, gid, in.ReadAt, now); err != nil {
+					return nil, nil, http.StatusInternalServerError, err
+				}
 			}
 			reread = func() (store.ListMarkersRow, error) {
 				if chat {
@@ -221,16 +286,26 @@ func (s *Server) setMarker(w http.ResponseWriter, r *http.Request) {
 				return store.ListMarkersRow(row), err
 			}
 		default:
-			return nil, http.StatusBadRequest, errors.New("No such stream")
+			return nil, nil, http.StatusBadRequest, errors.New("No such stream")
 		}
 		if err := qtx.SetMarker(r.Context(), store.SetMarkerParams{UserID: me.ID, Stream: stream, ReadAt: in.ReadAt}); err != nil {
-			return nil, http.StatusInternalServerError, err
+			return nil, nil, http.StatusInternalServerError, err
 		}
 		row, err := reread()
 		if err != nil {
-			return nil, http.StatusInternalServerError, err
+			return nil, nil, http.StatusInternalServerError, err
 		}
 		m := wireMarker(row)
-		return &m, http.StatusOK, nil
+		entries := append([]events.Entry{{Kind: "marker", Payload: &m}}, read...)
+		if len(read) > 0 {
+			// The bell's count, after the rows it counts, so a device that never loaded the list agrees.
+			bell, err := qtx.GetNotificationsMarker(r.Context(), me.ID)
+			if err != nil {
+				return nil, nil, http.StatusInternalServerError, err
+			}
+			b := wireMarker(store.ListMarkersRow(bell))
+			entries = append(entries, events.Entry{Kind: "marker", Payload: &b})
+		}
+		return entries, &m, http.StatusOK, nil
 	})
 }

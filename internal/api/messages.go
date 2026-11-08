@@ -70,7 +70,8 @@ func (s *Server) createMessage(w http.ResponseWriter, r *http.Request) {
 	}
 	author, _ := userFrom(r.Context())
 	now := db.Now()
-	// The message, and a notification to each person it mentions, in one transaction.
+	// The message, a notification to each person it mentions, and in a conversation
+	// one to the other person, in one transaction.
 	s.loggedMany(w, r, now, func(qtx *store.Queries) ([]events.Entry, any, int, error) {
 		if err := qtx.CreateMessage(r.Context(), store.CreateMessageParams{ID: id.String(), GroupID: g.ID, AuthorID: author.ID, BodyHtml: clean, BodyText: sanitize.Text(clean), CreatedAt: now}); err != nil {
 			return nil, nil, http.StatusInternalServerError, err
@@ -84,7 +85,11 @@ func (s *Server) createMessage(w http.ResponseWriter, r *http.Request) {
 		if err != nil {
 			return nil, nil, http.StatusInternalServerError, err
 		}
-		return append([]events.Entry{{Kind: "message", Payload: &m}}, told...), &m, http.StatusCreated, nil
+		messaged, err := notifyMessage(r, qtx, g, author.ID, now)
+		if err != nil {
+			return nil, nil, http.StatusInternalServerError, err
+		}
+		return append(append([]events.Entry{{Kind: "message", Payload: &m}}, told...), messaged...), &m, http.StatusCreated, nil
 	})
 }
 

@@ -177,7 +177,7 @@ export interface Message {
 export interface Notification {
   id: string
   user_id: string
-  kind: 'comment' | 'added' | 'mention' | 'joined' | 'topic_post'
+  kind: 'comment' | 'added' | 'mention' | 'joined' | 'topic_post' | 'message'
   actor: User
   group_id: string
   post_id: string | null

@@ -113,6 +113,10 @@ func compose(ctx context.Context, q *store.Queries, p store.ListDigestCandidates
 	if err != nil {
 		return c, false, err
 	}
+	talks, err := q.CountConversationsWithNewMessages(ctx, store.CountConversationsWithNewMessagesParams{UserID: p.ID, Since: p.SentAt})
+	if err != nil {
+		return c, false, err
+	}
 	var lines []string
 	if line := postsLine(posts, topicNames); line != "" {
 		lines = append(lines, line)
@@ -122,6 +126,9 @@ func compose(ctx context.Context, q *store.Queries, p store.ListDigestCandidates
 	}
 	if len(joined) > 0 {
 		lines = append(lines, joinNames(joined)+" joined.")
+	}
+	if talks > 0 {
+		lines = append(lines, plural(talks, "conversation", "conversations")+" with new messages.")
 	}
 	if len(lines) == 0 {
 		return c, false, nil

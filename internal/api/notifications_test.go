@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"sweet/internal/db"
 	"sweet/internal/perm"
 	"sweet/internal/push"
 )
@@ -307,7 +308,7 @@ func TestMySettings(t *testing.T) {
 // A sender that remembers, and can be told a device is gone.
 type fakePush struct {
 	mu   sync.Mutex
-	sent []string // "endpoint body url"
+	sent []string // "endpoint title body url [tag]"
 	gone map[string]bool
 }
 
@@ -319,7 +320,7 @@ func (f *fakePush) Send(_ context.Context, sub push.Subscription, data []byte) (
 	}
 	var p push.Payload
 	_ = json.Unmarshal(data, &p)
-	f.sent = append(f.sent, sub.Endpoint+" "+p.Title+" "+p.Body+" "+p.URL)
+	f.sent = append(f.sent, strings.TrimSpace(sub.Endpoint+" "+p.Title+" "+p.Body+" "+p.URL+" "+p.Tag))
 	return false, nil
 }
 
@@ -407,4 +408,158 @@ func TestPushForMentionsAndReplies(t *testing.T) {
 // mentionOf is a stored mention of a person, as the editor writes it.
 func mentionOf(id, name string) string {
 	return fmt.Sprintf(`<span data-type="mention" data-mention-id="%s">@%s</span>`, id, name)
+}
+
+// waitPushes is the fake's record once it holds n pushes, or a failure after a while.
+func waitPushes(t *testing.T, fake *fakePush, n int) []string {
+	t.Helper()
+	deadline := time.Now().Add(3 * time.Second)
+	for time.Now().Before(deadline) {
+		if got := fake.all(); len(got) >= n {
+			return got
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
+	t.Fatalf("waited for %d pushes, got %v", n, fake.all())
+	return nil
+}
+
+// A message in a conversation is a notification (architecture.md,
+// Notifications, 2026-11-08): one unopened row per conversation, read by
+// reading the conversation, through either door. A room's chat is unread,
+// never a notification.
+func TestMessageNotifications(t *testing.T) {
+	ts, owner := newTestServer(t)
+	kit, kitID := registerMember(t, ts, owner, "kit")
+	mo, moID := registerMember(t, ts, owner, "mo")
+	dm := mo.mustStatus(201, "POST", "/api/groups", map[string]any{"kind": "dm", "members": []string{kitID}})
+	gid := dm["id"].(string)
+	list := func(c *client) []map[string]any {
+		t.Helper()
+		var out []map[string]any
+		for _, x := range c.mustStatus(200, "GET", "/api/notifications", nil)["notifications"].([]any) {
+			out = append(out, x.(map[string]any))
+		}
+		return out
+	}
+	unreadBell := func(c *client) float64 {
+		t.Helper()
+		for _, x := range c.mustStatus(200, "GET", "/api/markers", nil)["markers"].([]any) {
+			if m := x.(map[string]any); m["stream"] == "notifications" {
+				return m["unread"].(float64)
+			}
+		}
+		t.Fatal("no notifications marker")
+		return 0
+	}
+
+	// One message: one row for kit, unopened, from mo, about the conversation and no post. Mo has none.
+	mo.mustStatus(201, "POST", "/api/groups/"+gid+"/messages", map[string]string{"body_html": "<p>one</p>"})
+	ns := list(kit)
+	if len(ns) != 1 || ns[0]["kind"] != "message" || ns[0]["actor"].(map[string]any)["id"] != moID || ns[0]["group_id"] != gid || ns[0]["post_id"] != nil || ns[0]["read_at"] != nil {
+		t.Fatalf("kit's notifications after a message: %v", ns)
+	}
+	if len(list(mo)) != 0 {
+		t.Fatalf("mo told of mo's own message: %v", list(mo))
+	}
+	// A second message while the first is unopened writes no second row: the bell says one thing per conversation.
+	second := mo.mustStatus(201, "POST", "/api/groups/"+gid+"/messages", map[string]string{"body_html": "<p>two</p>"})
+	if ns = list(kit); len(ns) != 1 || unreadBell(kit) != 1 {
+		t.Fatalf("a second row for the same conversation: %v (bell %v)", ns, unreadBell(kit))
+	}
+	// Reading the conversation reads the row: the marker's PUT answers with the marker, and the row,
+	// read, goes out as a notification event so every device's bell agrees.
+	readAt := int64(second["created_at"].(float64))
+	kit.mustStatus(200, "PUT", "/api/markers/chat:"+gid, map[string]any{"read_at": readAt})
+	if ns = list(kit); len(ns) != 1 || ns[0]["read_at"] == nil || unreadBell(kit) != 0 {
+		t.Fatalf("after reading the conversation: %v (bell %v)", ns, unreadBell(kit))
+	}
+	// The bell's own count goes with it, after the row, so a device that never loaded the list agrees too.
+	var told, counted bool
+	for _, e := range kit.readEvents(80) {
+		p, _ := e["payload"].(map[string]any)
+		switch {
+		case e["kind"] == "notification" && p["id"] == ns[0]["id"] && p["read_at"] != nil:
+			told = true
+		case e["kind"] == "marker" && p["stream"] == "notifications":
+			if !told || p["unread"] != float64(0) {
+				t.Fatalf("notifications marker before the row, or wrong: %v (row seen %v)", p, told)
+			}
+			counted = true
+		}
+	}
+	if !told || !counted {
+		t.Fatalf("the read row and the bell's count did not both go out (row %v, count %v)", told, counted)
+	}
+	// The next message is a new row, and kit's reply is one for mo.
+	time.Sleep(2 * time.Millisecond)
+	mo.mustStatus(201, "POST", "/api/groups/"+gid+"/messages", map[string]string{"body_html": "<p>three</p>"})
+	if ns = list(kit); len(ns) != 2 || ns[0]["read_at"] != nil || ns[1]["read_at"] == nil {
+		t.Fatalf("after a message once read: %v", ns)
+	}
+	kit.mustStatus(201, "POST", "/api/groups/"+gid+"/messages", map[string]string{"body_html": "<p>back</p>"})
+	if ms := list(mo); len(ms) != 1 || ms[0]["kind"] != "message" || ms[0]["actor"].(map[string]any)["id"] != kitID {
+		t.Fatalf("mo's notifications after kit's reply: %v", ms)
+	}
+	// Opening the row from the bell reads it too, and the conversation's marker afterwards finds nothing left to read.
+	mo.mustStatus(200, "PUT", "/api/notifications/"+list(mo)[0]["id"].(string)+"/read", nil)
+	mo.mustStatus(200, "PUT", "/api/markers/chat:"+gid, map[string]any{"read_at": db.Now()})
+	if ms := list(mo); len(ms) != 1 || ms[0]["read_at"] == nil || unreadBell(mo) != 0 {
+		t.Fatalf("after the bell door: %v", ms)
+	}
+	// A room's chat is unread, never a notification: kit hears of being added, and nothing of the message.
+	room := owner.mustStatus(201, "POST", "/api/groups", map[string]any{"kind": "group", "name": "Knitting", "mode": "both"})
+	rid := room["id"].(string)
+	owner.mustStatus(201, "POST", "/api/groups/"+rid+"/members", map[string]string{"user_id": kitID})
+	owner.mustStatus(201, "POST", "/api/groups/"+rid+"/messages", map[string]string{"body_html": "<p>wool</p>"})
+	for _, n := range list(kit) {
+		if n["kind"] == "message" && n["group_id"] == rid {
+			t.Fatalf("a room's message became a notification: %v", n)
+		}
+	}
+	if ns = list(kit); len(ns) != 3 || ns[0]["kind"] != "added" {
+		t.Fatalf("kit's notifications after the room: %v", ns)
+	}
+}
+
+// A message in a conversation pushes, once per unopened row, under the
+// conversation's own tag so a device shows one notification per person.
+func TestPushForMessages(t *testing.T) {
+	ts, owner, srv := newTestServerWith(t)
+	fake := &fakePush{gone: map[string]bool{}}
+	srv.Push = &push.Pusher{DB: srv.DB, Send: fake}
+	srv.PushKey = "test-public-key"
+	kit, kitID := registerMember(t, ts, owner, "kit")
+	mo, _ := registerMember(t, ts, owner, "mo")
+	owner.mustStatus(200, "PUT", "/api/settings", map[string]string{"group_creation": "anyone", "name": "Thursday Group", "description": ""})
+	kit.mustStatus(201, "POST", "/api/push/subscriptions", map[string]any{"endpoint": "https://push.test/kit-phone", "keys": map[string]string{"p256dh": "p", "auth": "a"}})
+	dm := mo.mustStatus(201, "POST", "/api/groups", map[string]any{"kind": "dm", "members": []string{kitID}})
+	gid := dm["id"].(string)
+
+	mo.mustStatus(201, "POST", "/api/groups/"+gid+"/messages", map[string]string{"body_html": "<p>hello</p>"})
+	got := waitPushes(t, fake, 1)
+	if want := "https://push.test/kit-phone Thursday Group mo messaged you http://sweet.test/r/" + gid + " chat:" + gid; got[0] != want {
+		t.Fatalf("push:\n got %q\nwant %q", got[0], want)
+	}
+	// A second message while the first is unopened: no second push, since there is no second row.
+	mo.mustStatus(201, "POST", "/api/groups/"+gid+"/messages", map[string]string{"body_html": "<p>still there?</p>"})
+	time.Sleep(150 * time.Millisecond)
+	if len(fake.all()) != 1 {
+		t.Fatalf("pushed again for an unopened conversation: %v", fake.all())
+	}
+	// Once kit has read the conversation, the next message pushes again.
+	kit.mustStatus(200, "PUT", "/api/markers/chat:"+gid, map[string]any{"read_at": db.Now()})
+	time.Sleep(2 * time.Millisecond)
+	mo.mustStatus(201, "POST", "/api/groups/"+gid+"/messages", map[string]string{"body_html": "<p>yes</p>"})
+	if got = waitPushes(t, fake, 2); !strings.HasSuffix(got[1], " chat:"+gid) {
+		t.Fatalf("second push: %q", got[1])
+	}
+	// A room's chat never pushes.
+	room := owner.mustStatus(201, "POST", "/api/groups", map[string]any{"kind": "group", "name": "Knitting", "mode": "both"})
+	owner.mustStatus(201, "POST", "/api/groups/"+room["id"].(string)+"/members", map[string]string{"user_id": kitID})
+	owner.mustStatus(201, "POST", "/api/groups/"+room["id"].(string)+"/messages", map[string]string{"body_html": "<p>wool</p>"})
+	time.Sleep(150 * time.Millisecond)
+	if len(fake.all()) != 2 {
+		t.Fatalf("pushed for a room's message: %v", fake.all())
+	}
 }
