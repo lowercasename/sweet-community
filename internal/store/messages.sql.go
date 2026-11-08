@@ -52,6 +52,22 @@ func (q *Queries) DeleteMessage(ctx context.Context, arg DeleteMessageParams) er
 	return err
 }
 
+const eraseAuthorMessages = `-- name: EraseAuthorMessages :exec
+UPDATE messages SET deleted_at = COALESCE(deleted_at, ?1), body_html = '', body_text = ''
+WHERE author_id = ?2
+`
+
+type EraseAuthorMessagesParams struct {
+	DeletedAt sql.NullInt64
+	AuthorID  string
+}
+
+// Deletes every message of a removed user and clears its text.
+func (q *Queries) EraseAuthorMessages(ctx context.Context, arg EraseAuthorMessagesParams) error {
+	_, err := q.db.ExecContext(ctx, eraseAuthorMessages, arg.DeletedAt, arg.AuthorID)
+	return err
+}
+
 const getMessage = `-- name: GetMessage :one
 SELECT m.id, m.group_id, m.body_html, m.body_text, m.created_at,
        u.id AS author_id, u.username AS author_username, u.picture_id AS author_picture_id,
@@ -117,6 +133,39 @@ func (q *Queries) GetMessageOwners(ctx context.Context, id string) (GetMessageOw
 	var i GetMessageOwnersRow
 	err := row.Scan(&i.AuthorID, &i.GroupID)
 	return i, err
+}
+
+const listLiveMessagesByAuthor = `-- name: ListLiveMessagesByAuthor :many
+SELECT id, group_id FROM messages WHERE author_id = ?1 AND deleted_at IS NULL
+`
+
+type ListLiveMessagesByAuthorRow struct {
+	ID      string
+	GroupID string
+}
+
+// A user's messages that are not deleted, with their groups, for the delete events when the user is removed.
+func (q *Queries) ListLiveMessagesByAuthor(ctx context.Context, authorID string) ([]ListLiveMessagesByAuthorRow, error) {
+	rows, err := q.db.QueryContext(ctx, listLiveMessagesByAuthor, authorID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListLiveMessagesByAuthorRow{}
+	for rows.Next() {
+		var i ListLiveMessagesByAuthorRow
+		if err := rows.Scan(&i.ID, &i.GroupID); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const listMessages = `-- name: ListMessages :many

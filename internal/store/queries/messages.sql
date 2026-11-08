@@ -39,3 +39,12 @@ UPDATE messages SET deleted_at = sqlc.arg(deleted_at) WHERE id = sqlc.arg(id) AN
 -- The live messages that reply to a message. Deleting the message logs them again, so the log no longer holds the
 -- deleted message's text in their quotes.
 SELECT id FROM messages WHERE reply_to = sqlc.arg(reply_to) AND deleted_at IS NULL;
+
+-- name: ListLiveMessagesByAuthor :many
+-- A user's messages that are not deleted, with their groups, for the delete events when the user is removed.
+SELECT id, group_id FROM messages WHERE author_id = sqlc.arg(author_id) AND deleted_at IS NULL;
+
+-- name: EraseAuthorMessages :exec
+-- Deletes every message of a removed user and clears its text.
+UPDATE messages SET deleted_at = COALESCE(deleted_at, sqlc.arg(deleted_at)), body_html = '', body_text = ''
+WHERE author_id = sqlc.arg(author_id);

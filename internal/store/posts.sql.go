@@ -74,6 +74,23 @@ func (q *Queries) EditPost(ctx context.Context, arg EditPostParams) error {
 	return err
 }
 
+const eraseAuthorPosts = `-- name: EraseAuthorPosts :exec
+UPDATE posts SET deleted_at = COALESCE(deleted_at, ?1), body_html = '', body_text = ''
+WHERE author_id = ?2
+`
+
+type EraseAuthorPostsParams struct {
+	DeletedAt sql.NullInt64
+	AuthorID  string
+}
+
+// Deletes every post of a removed user and clears its text, including posts deleted before (architecture.md, Admin
+// tools).
+func (q *Queries) EraseAuthorPosts(ctx context.Context, arg EraseAuthorPostsParams) error {
+	_, err := q.db.ExecContext(ctx, eraseAuthorPosts, arg.DeletedAt, arg.AuthorID)
+	return err
+}
+
 const getPost = `-- name: GetPost :one
 SELECT p.id, p.group_id, p.topic_id, p.body_html, p.body_text, p.created_at, p.edited_at,
        u.id AS author_id, u.username AS author_username, u.picture_id AS author_picture_id,
@@ -130,6 +147,39 @@ func (q *Queries) GetPostOwners(ctx context.Context, id string) (GetPostOwnersRo
 	var i GetPostOwnersRow
 	err := row.Scan(&i.AuthorID, &i.GroupID)
 	return i, err
+}
+
+const listLivePostsByAuthor = `-- name: ListLivePostsByAuthor :many
+SELECT id, group_id FROM posts WHERE author_id = ?1 AND deleted_at IS NULL
+`
+
+type ListLivePostsByAuthorRow struct {
+	ID      string
+	GroupID string
+}
+
+// A user's posts that are not deleted, with their groups, for the delete events when the user is removed.
+func (q *Queries) ListLivePostsByAuthor(ctx context.Context, authorID string) ([]ListLivePostsByAuthorRow, error) {
+	rows, err := q.db.QueryContext(ctx, listLivePostsByAuthor, authorID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListLivePostsByAuthorRow{}
+	for rows.Next() {
+		var i ListLivePostsByAuthorRow
+		if err := rows.Scan(&i.ID, &i.GroupID); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const listPosts = `-- name: ListPosts :many

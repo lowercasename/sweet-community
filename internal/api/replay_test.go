@@ -24,7 +24,7 @@ func TestReplayHoldsNoDeletedOrEarlierContent(t *testing.T) {
 	kit.mustStatus(200, "DELETE", "/api/posts/"+gone["id"].(string), nil)
 
 	said := kit.mustStatus(201, "POST", rootPath+"/messages", map[string]string{"body_html": "<p>deleted message secret</p>"})
-	mo.mustStatus(201, "POST", rootPath+"/messages", map[string]any{"body_html": "<p>a reply</p>", "reply_to": said["id"]})
+	owner.mustStatus(201, "POST", rootPath+"/messages", map[string]any{"body_html": "<p>a reply</p>", "reply_to": said["id"]})
 	kit.mustStatus(200, "DELETE", "/api/messages/"+said["id"].(string), nil)
 
 	mo.mustStatus(200, "PUT", "/api/me/bio", map[string]string{"body_html": "<p>removed bio secret</p>"})

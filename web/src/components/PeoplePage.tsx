@@ -211,8 +211,7 @@ export function PeoplePage({ me, root, onOpenGroup }: PeoplePageProps) {
         onClose={() => setRemoving(null)}
       >
         <Text variant="secondary">
-          Their posts, comments and messages stay, under a removed name. They cannot sign in again. This action cannot
-          be undone.
+          Their posts, comments and messages are deleted. They cannot sign in again. This action cannot be undone.
         </Text>
       </ConfirmDialog>
     </Pane>

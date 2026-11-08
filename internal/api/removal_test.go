@@ -36,6 +36,10 @@ func TestRemoveFromInstance(t *testing.T) {
 	pair := kit.mustStatus(201, "POST", "/api/groups", map[string]any{"kind": "dm", "members": []string{moID}})
 	pid := pair["id"].(string)
 	post := kit.mustStatus(201, "POST", rootPath+"/posts", map[string]string{"body_html": "<p>mine</p>"})
+	others := owner.mustStatus(201, "POST", rootPath+"/posts", map[string]string{"body_html": "<p>the owner's</p>"})
+	kit.mustStatus(201, "POST", "/api/posts/"+others["id"].(string)+"/comments", map[string]string{"body_html": "<p>kit's comment</p>"})
+	jo.mustStatus(201, "POST", "/api/posts/"+post["id"].(string)+"/comments", map[string]string{"body_html": "<p>jo's comment on kit's post</p>"})
+	said := kit.mustStatus(201, "POST", rootPath+"/messages", map[string]string{"body_html": "<p>kit's message</p>"})
 
 	// A member can remove nobody. A moderator can remove members but not another moderator. Nobody can remove the owner,
 	// and the owner cannot remove themselves.
@@ -78,19 +82,27 @@ func TestRemoveFromInstance(t *testing.T) {
 			t.Fatal("removed, still on People")
 		}
 	}
-	// Their content stays, under a removed name with no picture.
 	removed := removedName(kitID)
-	found := false
+	// Their posts, comments and messages are deleted, and comments by others on their posts go with the posts
+	// (Raphael, 2026-11-08). The text is cleared, so it is not kept in the database either.
 	for _, p := range owner.mustStatus(200, "GET", rootPath+"/posts?limit=50", nil)["posts"].([]any) {
-		if pm := p.(map[string]any); pm["id"] == post["id"] {
-			found = true
-			if au := pm["author"].(map[string]any); au["id"] != kitID || au["username"] != removed || au["picture"] != nil {
-				t.Fatalf("the removed person's post is by %v", au)
-			}
+		if p.(map[string]any)["id"] == post["id"] {
+			t.Fatal("the removed person's post is still in the feed")
 		}
 	}
-	if !found {
-		t.Fatal("the removed person's post is gone")
+	if cs := owner.mustStatus(200, "GET", "/api/posts/"+others["id"].(string)+"/comments", nil)["comments"].([]any); len(cs) != 0 {
+		t.Fatalf("the removed person's comment is still there: %v", cs)
+	}
+	for _, m := range owner.mustStatus(200, "GET", rootPath+"/messages", nil)["messages"].([]any) {
+		if m.(map[string]any)["id"] == said["id"] {
+			t.Fatal("the removed person's message is still in the chat")
+		}
+	}
+	var kept int
+	if err := srv.DB.QueryRow(`SELECT (SELECT count(*) FROM posts WHERE author_id = ?1 AND (body_text != '' OR deleted_at IS NULL))
+		+ (SELECT count(*) FROM comments WHERE author_id = ?1 AND (body_text != '' OR deleted_at IS NULL))
+		+ (SELECT count(*) FROM messages WHERE author_id = ?1 AND (body_text != '' OR deleted_at IS NULL))`, kitID).Scan(&kept); err != nil || kept != 0 {
+		t.Fatalf("the removed person's content kept in the database: %d %v", kept, err)
 	}
 	// Ownership of the club passed to mo, its moderator, instead of jo. The room kit was alone in was deleted. The
 	// conversation stays for mo, with kit under the removed name.
@@ -183,8 +195,8 @@ func TestRemovedUserCannotComeBackAndIsNotNotified(t *testing.T) {
 	if status, _ := newClient(t, ts).do("GET", "/api/me", nil, "Authorization", "Bearer "+token); status != 401 {
 		t.Fatalf("a removed account's session: %d", status)
 	}
-	// A comment on the removed user's post creates no notification for them.
-	kit.mustStatus(201, "POST", "/api/posts/"+post["id"].(string)+"/comments", map[string]string{"body_html": "<p>nice</p>"})
+	// The removed user's post is gone, so nobody can comment on it, and they have no notifications.
+	kit.mustStatus(404, "POST", "/api/posts/"+post["id"].(string)+"/comments", map[string]string{"body_html": "<p>nice</p>"})
 	var n int
 	if err := srv.DB.QueryRow("SELECT count(*) FROM notifications WHERE user_id = ?", moID).Scan(&n); err != nil || n != 0 {
 		t.Fatalf("notifications for a removed user: %d %v", n, err)

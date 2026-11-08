@@ -33,3 +33,14 @@ UPDATE comments SET deleted_at = sqlc.arg(deleted_at) WHERE id = sqlc.arg(id) AN
 -- name: ListCommentIDsOfPost :many
 -- The ids of a post's comments, deleted or not. Deleting the post removes their events from the log.
 SELECT id FROM comments WHERE post_id = sqlc.arg(post_id);
+
+-- name: ListLiveCommentsByAuthor :many
+-- A user's comments that are not deleted and are on posts that are not deleted, for the delete events when the user
+-- is removed.
+SELECT c.id, c.post_id, p.group_id FROM comments c JOIN posts p ON p.id = c.post_id
+WHERE c.author_id = sqlc.arg(author_id) AND c.deleted_at IS NULL AND p.deleted_at IS NULL;
+
+-- name: EraseAuthorComments :exec
+-- Deletes every comment of a removed user and clears its text.
+UPDATE comments SET deleted_at = COALESCE(deleted_at, sqlc.arg(deleted_at)), body_html = '', body_text = ''
+WHERE author_id = sqlc.arg(author_id);

@@ -1,6 +1,7 @@
 package api
 
 import (
+	"context"
 	"database/sql"
 	"errors"
 	"net/http"
@@ -161,19 +162,29 @@ func (s *Server) deleteMessage(w http.ResponseWriter, r *http.Request) {
 			return nil, nil, http.StatusInternalServerError, err
 		}
 		gone := map[string]string{"id": id, "group_id": owners.GroupID}
-		entries := []events.Entry{{Kind: "message_delete", Payload: gone}}
-		replies, err := qtx.ListReplyIDs(r.Context(), sql.NullString{String: id, Valid: true})
+		replies, err := replyEvents(r.Context(), qtx, id)
 		if err != nil {
 			return nil, nil, http.StatusInternalServerError, err
 		}
-		for _, rid := range replies {
-			row, err := qtx.GetMessage(r.Context(), rid)
-			if err != nil {
-				return nil, nil, http.StatusInternalServerError, err
-			}
-			m := wireMessage(row)
-			entries = append(entries, events.Entry{Kind: "message", Payload: &m})
-		}
-		return entries, gone, http.StatusOK, nil
+		return append([]events.Entry{{Kind: "message_delete", Payload: gone}}, replies...), gone, http.StatusOK, nil
 	})
+}
+
+// replyEvents logs the live replies to a deleted message again, so their quotes say the original is deleted and the
+// log no longer holds its text.
+func replyEvents(ctx context.Context, qtx *store.Queries, messageID string) ([]events.Entry, error) {
+	replies, err := qtx.ListReplyIDs(ctx, sql.NullString{String: messageID, Valid: true})
+	if err != nil {
+		return nil, err
+	}
+	var out []events.Entry
+	for _, rid := range replies {
+		row, err := qtx.GetMessage(ctx, rid)
+		if err != nil {
+			return nil, err
+		}
+		m := wireMessage(row)
+		out = append(out, events.Entry{Kind: "message", Payload: &m})
+	}
+	return out, nil
 }

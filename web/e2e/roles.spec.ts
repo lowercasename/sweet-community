@@ -82,12 +82,11 @@ test.describe('roles', () => {
     await kit.page.reload()
     await expect(kit.page.getByRole('button', { name: 'Send a sign-in email' })).toBeVisible()
     await expect(kit.page.getByRole('navigation', { name: 'Main' })).toHaveCount(0)
-    // Kit's post stays in the feed under a removed- name. This holds on a page that was already open and after a
-    // fresh load.
-    await expect(article(mo.page, text)).toContainText(/removed-/)
+    // Kit's post is deleted with the account (Raphael, 2026-11-08). It leaves a page that was already open, and it is
+    // not there after a fresh load.
+    await expect(article(mo.page, text)).toHaveCount(0)
     await open(o.page)
-    await expect(article(o.page, text)).toContainText(/removed-/)
-    await expect(article(o.page, text)).not.toContainText(kit.username)
+    await expect(o.page.getByText(text)).toHaveCount(0)
     // Ownership of the room passed to mo.
     await mo.page.getByRole('navigation', { name: 'Main' }).getByRole('button', { name }).click()
     await mo.page.getByRole('button', { name: 'Members and settings' }).click()

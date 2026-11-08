@@ -173,7 +173,7 @@ export function SettingsPage({ me, root, onSignOut }: SettingsPageProps) {
                   >
                     {root.role === 'owner'
                       ? 'You run this community. Hand it over to someone else before you leave.'
-                      : 'Your account is removed for good. Your posts, comments and messages stay, under a removed name. Rooms you own are handed to another member.'}
+                      : 'Your account is removed for good, and your posts, comments and messages are deleted. Rooms you own are handed to another member.'}
                   </ActionRow>
                 </ActionRows>
               </Stack>

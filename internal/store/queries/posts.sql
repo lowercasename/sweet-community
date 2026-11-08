@@ -47,3 +47,13 @@ WHERE p.author_id = sqlc.arg(author_id) AND p.deleted_at IS NULL AND p.created_a
 ORDER BY p.created_at DESC, p.id DESC
 LIMIT sqlc.arg(page_size);
 
+
+-- name: ListLivePostsByAuthor :many
+-- A user's posts that are not deleted, with their groups, for the delete events when the user is removed.
+SELECT id, group_id FROM posts WHERE author_id = sqlc.arg(author_id) AND deleted_at IS NULL;
+
+-- name: EraseAuthorPosts :exec
+-- Deletes every post of a removed user and clears its text, including posts deleted before (architecture.md, Admin
+-- tools).
+UPDATE posts SET deleted_at = COALESCE(deleted_at, sqlc.arg(deleted_at)), body_html = '', body_text = ''
+WHERE author_id = sqlc.arg(author_id);

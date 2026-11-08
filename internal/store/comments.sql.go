@@ -72,6 +72,22 @@ func (q *Queries) EditComment(ctx context.Context, arg EditCommentParams) error 
 	return err
 }
 
+const eraseAuthorComments = `-- name: EraseAuthorComments :exec
+UPDATE comments SET deleted_at = COALESCE(deleted_at, ?1), body_html = '', body_text = ''
+WHERE author_id = ?2
+`
+
+type EraseAuthorCommentsParams struct {
+	DeletedAt sql.NullInt64
+	AuthorID  string
+}
+
+// Deletes every comment of a removed user and clears its text.
+func (q *Queries) EraseAuthorComments(ctx context.Context, arg EraseAuthorCommentsParams) error {
+	_, err := q.db.ExecContext(ctx, eraseAuthorComments, arg.DeletedAt, arg.AuthorID)
+	return err
+}
+
 const getComment = `-- name: GetComment :one
 SELECT c.id, c.post_id, c.body_html, c.body_text, c.created_at, c.edited_at, p.author_id AS post_author_id, p.group_id,
        u.id AS author_id, u.username AS author_username, u.picture_id AS author_picture_id
@@ -212,6 +228,42 @@ func (q *Queries) ListComments(ctx context.Context, postID string) ([]ListCommen
 			&i.AuthorUsername,
 			&i.AuthorPictureID,
 		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listLiveCommentsByAuthor = `-- name: ListLiveCommentsByAuthor :many
+SELECT c.id, c.post_id, p.group_id FROM comments c JOIN posts p ON p.id = c.post_id
+WHERE c.author_id = ?1 AND c.deleted_at IS NULL AND p.deleted_at IS NULL
+`
+
+type ListLiveCommentsByAuthorRow struct {
+	ID      string
+	PostID  string
+	GroupID string
+}
+
+// A user's comments that are not deleted and are on posts that are not deleted, for the delete events when the user
+// is removed.
+func (q *Queries) ListLiveCommentsByAuthor(ctx context.Context, authorID string) ([]ListLiveCommentsByAuthorRow, error) {
+	rows, err := q.db.QueryContext(ctx, listLiveCommentsByAuthor, authorID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListLiveCommentsByAuthorRow{}
+	for rows.Next() {
+		var i ListLiveCommentsByAuthorRow
+		if err := rows.Scan(&i.ID, &i.PostID, &i.GroupID); err != nil {
 			return nil, err
 		}
 		items = append(items, i)
