@@ -67,16 +67,16 @@ export function CheckEmail({ login, joinedWith, onSignedIn, backLabel, onBack }:
       <Heading level={2}>Check your email</Heading>
       {address ? (
         <Text>
-          An email with a link and a code is on its way to{' '}
+          An email is on its way to{' '}
           <Text as="span" weight="bold">
             {address}
           </Text>
-          . Open the link, or type the code here, to finish joining. Both work for 15 minutes.
+          . Open the link or type the code here to finish joining.
         </Text>
       ) : (
         <Text>
-          If an account matches, an email with a link and a code is on its way to its address. Open the link, or type
-          the code here. Both work for 15 minutes.
+          If that account exists, an email with a link and a code is on its way to you. Open the link or type the code
+          here to sign in.
         </Text>
       )}
       {changing ? (
@@ -116,7 +116,7 @@ export function CheckEmail({ login, joinedWith, onSignedIn, backLabel, onBack }:
               required
             />
           </Field>
-          {sentAgain && <Alert>Sent again. Check your spam folder if it does not arrive.</Alert>}
+          {sentAgain && <Alert>Sent again. Check your spam folder if it doesn't arrive.</Alert>}
           {error && <Alert tone="error">{error}</Alert>}
           <Row justify="end">
             <Button type="submit" disabled={digits.length !== 6} busy={busy}>

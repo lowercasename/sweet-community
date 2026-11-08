@@ -74,7 +74,7 @@ export function Join({ code, community, onSignedIn }: JoinProps) {
           <Field label="Username" hint="Letters, digits and underscores.">
             <Input name="username" value={username} onChange={setUsername} autoComplete="username" autoFocus required />
           </Field>
-          <Field label="Email address" hint="You sign in with a link and a code sent to this address.">
+          <Field label="Email address" hint="You will sign in with a link and a code sent here.">
             <Input type="email" name="email" value={email} onChange={setEmail} autoComplete="email" required />
           </Field>
           {error && <Alert tone="error">{error}</Alert>}

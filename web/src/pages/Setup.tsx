@@ -46,10 +46,7 @@ export function Setup({ token, onSetUp }: SetupProps) {
         <Field label="Email address">
           <Input type="email" name="email" value={email} onChange={setEmail} autoComplete="email" required />
         </Field>
-        <Field
-          label="Password"
-          hint="Optional, at least 8 characters. Without one, you sign in with a link and a code sent to your email address."
-        >
+        <Field label="Password" hint="Optional, at least 8 characters. Without one, you sign in by email.">
           <Input type="password" name="password" value={password} onChange={setPassword} autoComplete="new-password" />
         </Field>
         {error && <Alert tone="error">{error}</Alert>}

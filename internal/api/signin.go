@@ -112,7 +112,7 @@ func (s *Server) sendSignin(ctx context.Context, q *store.Queries, userID, email
 	c := mail.Content{
 		Community: community,
 		Heading:   "Sign in to " + community,
-		Lines:     []string{"Open the link, or type the code on the sign-in page, to sign in to " + community + "."},
+		Lines:     []string{"Open the link or type the code on the sign-in page to sign in to " + community + "."},
 		Code:      code,
 		Action:    &mail.Action{Label: "Finish signing in", URL: s.BaseURL + "/signin/" + token},
 		Note:      "The link and the code work once, for 15 minutes. If you did not ask to sign in, ignore this email.",
@@ -120,7 +120,7 @@ func (s *Server) sendSignin(ctx context.Context, q *store.Queries, userID, email
 	subject := "Sign in to " + community
 	if joining {
 		c.Heading = "Finish joining " + community
-		c.Lines = []string{"Open the link, or type the code on the page you joined from, to finish joining " + community + "."}
+		c.Lines = []string{"Open the link or type the code where you joined to finish joining " + community + "."}
 		c.Action.Label = "Finish joining"
 		subject = "Finish joining " + community
 	}

@@ -33,7 +33,7 @@ describe('AccountCard', () => {
     const { setPassword } = await import('../api')
     const { AccountCard } = await import('./AccountCard')
     renderWithQuery(<AccountCard />, (qc) => qc.setQueryData(keys.account, account()))
-    expect(screen.getByText(/You sign in with a link and a code/)).toBeTruthy()
+    expect(screen.getByText(/You sign in by email/)).toBeTruthy()
     expect(screen.queryByRole('button', { name: 'Remove password' })).toBeNull()
     fireEvent.change(screen.getByLabelText('Password'), { target: { value: 'longenough' } })
     fireEvent.click(screen.getByRole('button', { name: 'Set password' }))

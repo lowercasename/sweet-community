@@ -67,7 +67,7 @@ export function Login({ community, onSignedIn }: LoginProps) {
           <Form onSubmit={() => void (withPassword ? signInWithPassword() : sendEmail())}>
             <Field
               label="Username or email address"
-              hint={withPassword ? undefined : 'A link and a code to sign in will be sent to your email address.'}
+              hint={withPassword ? undefined : 'You will get an email with a link and a code to sign in.'}
             >
               <Input name="username" value={who} onChange={setWho} autoComplete="username" autoFocus required />
             </Field>

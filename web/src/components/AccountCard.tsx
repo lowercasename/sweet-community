@@ -91,8 +91,8 @@ export function AccountCard() {
           {account && (
             <Text variant="secondary">
               {hasPassword
-                ? 'You can sign in with your password or with a sign-in email.'
-                : 'You sign in with a link and a code sent to your email address. A password is optional.'}
+                ? 'You can sign in with your password or by email.'
+                : 'You sign in by email, with a link and a code. A password is optional.'}
             </Text>
           )}
           <Form
@@ -143,13 +143,14 @@ export function AccountCard() {
         onConfirm={() =>
           void changePassword(
             removePassword,
-            'Password removed. You sign in with a sign-in email. Every other device has been signed out.',
+            'Password removed. You now sign in by email. Every other device has been signed out.',
           )
         }
         onClose={() => setRemoving(false)}
       >
         <Text variant="secondary">
-          You will sign in with a link and a code sent to {account?.email}. Every other device will be signed out.
+          You will sign in by email, with a link and a code sent to {account?.email}. Every other device will be signed
+          out.
         </Text>
       </ConfirmDialog>
     </Card>

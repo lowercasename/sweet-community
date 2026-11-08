@@ -168,11 +168,11 @@ test.describe('signing in and joining', () => {
     await expect(m.page.getByText(/A link has been sent/)).toHaveCount(0)
 
     // The account has no password. Setting one asks for nothing else.
-    await expect(m.page.getByText(/You sign in with a link and a code/)).toBeVisible()
+    await expect(m.page.getByText(/You sign in by email/)).toBeVisible()
     await m.page.getByLabel('Password', { exact: true }).fill('anotherlongone')
     await m.page.getByRole('button', { name: 'Set password' }).click()
     await expect(m.page.getByText(/Password set/)).toBeVisible()
-    await expect(m.page.getByText('You can sign in with your password or with a sign-in email.')).toBeVisible()
+    await expect(m.page.getByText('You can sign in with your password or by email.')).toBeVisible()
     await m.page.getByRole('button', { name: 'Remove password' }).click()
     await m.page.getByRole('dialog').getByRole('button', { name: 'Remove password' }).click()
     await expect(m.page.getByText(/Password removed/)).toBeVisible()
