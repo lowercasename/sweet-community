@@ -132,7 +132,7 @@ export function Sidebar({ me, groups, location, expanded, onGo, onToggle }: Side
         current={at(location, '/people')}
         onClick={() => onGo('/people')}
       />
-      {root?.can.manage_instance && (
+      {(root?.can.manage_instance || root?.can.manage_topics) && (
         <NavItem
           icon="settings"
           label="Community"

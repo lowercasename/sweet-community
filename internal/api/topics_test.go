@@ -228,3 +228,22 @@ func TestFollowingATopicTellsYouOfPostsInIt(t *testing.T) {
 	}
 	kit.mustStatus(404, "PUT", "/api/topics/nonsense/follow", nil)
 }
+
+// The root group carries manage_topics for its owner and moderators
+// (architecture.md, Topics). The Community page and the feed's topic controls
+// read it, so a moderator can reach the Topics card. Only the owner has
+// manage_instance, for the community's own settings.
+func TestStaffCarryManageTopics(t *testing.T) {
+	ts, owner := newTestServer(t)
+	kit, kitID := registerMember(t, ts, owner, "kit")
+	if r := myGroups(owner)[rootPath[len("/api/groups/"):]]; !groupCan(r, "manage_topics") || !groupCan(r, "manage_instance") {
+		t.Fatalf("the owner's root flags: %v", r["can"])
+	}
+	if r := myGroups(kit)[rootPath[len("/api/groups/"):]]; groupCan(r, "manage_topics") {
+		t.Fatalf("a member manages topics: %v", r["can"])
+	}
+	owner.mustStatus(200, "PUT", rootPath+"/members/"+kitID, map[string]string{"role": "moderator"})
+	if r := myGroups(kit)[rootPath[len("/api/groups/"):]]; !groupCan(r, "manage_topics") || groupCan(r, "manage_instance") {
+		t.Fatalf("a moderator's root flags: %v", r["can"])
+	}
+}

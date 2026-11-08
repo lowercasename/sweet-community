@@ -57,6 +57,8 @@ export interface GroupCan {
   create_groups?: boolean
   /** Root group only. Whether the current user may edit the instance's settings. */
   manage_instance?: boolean
+  /** Root group only. Whether the current user may manage the topics. The owner and moderators may. */
+  manage_topics?: boolean
 }
 
 export type GroupMode = 'posts' | 'chat' | 'both'

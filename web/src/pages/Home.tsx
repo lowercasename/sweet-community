@@ -222,7 +222,12 @@ export function Home({ me, onSignOut }: HomeProps) {
           </Route>
           <Route path="/settings">{root && <SettingsPage me={me} root={root} onSignOut={onSignOut} />}</Route>
           <Route path={COMMUNITY}>
-            {root && (root.can.manage_instance ? <CommunityPage /> : <Redirect to="/" replace />)}
+            {root &&
+              (root.can.manage_instance || root.can.manage_topics ? (
+                <CommunityPage root={root} />
+              ) : (
+                <Redirect to="/" replace />
+              ))}
           </Route>
           <Route path={SEARCH}>
             <SearchPage key={searched} query={searched} groups={groups} onGo={navigate} />

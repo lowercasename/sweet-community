@@ -1,9 +1,12 @@
 // @vitest-environment happy-dom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, screen } from '@testing-library/react'
-import { renderWithQuery } from '../test-utils'
+import { ROOT, group, renderWithQuery } from '../test-utils'
 
-/** The owner's page for the community settings: the name, the description and who may create groups. */
+/**
+ * The Community page: the community's settings for the owner, and the topics for the owner and moderators
+ * (architecture.md, Admin tools and Topics).
+ */
 vi.mock('../api', () => ({
   listTopics: vi.fn(() => Promise.resolve({ topics: [] })),
   getSettings: vi.fn(() =>
@@ -21,7 +24,7 @@ describe('CommunityPage', () => {
   it('shows the current settings and saves them in one request', async () => {
     const { setSettings } = await import('../api')
     const { CommunityPage } = await import('./CommunityPage')
-    renderWithQuery(<CommunityPage />)
+    renderWithQuery(<CommunityPage root={group(ROOT, 'owner')} />)
     const name = (await screen.findByLabelText('Community name')) as HTMLInputElement
     expect(name.value).toBe('Knitting Circle')
     expect((screen.getByLabelText('Short community description') as HTMLTextAreaElement).value).toBe('Wool.')
@@ -35,9 +38,17 @@ describe('CommunityPage', () => {
   it('does not save without a name', async () => {
     const { setSettings } = await import('../api')
     const { CommunityPage } = await import('./CommunityPage')
-    renderWithQuery(<CommunityPage />)
+    renderWithQuery(<CommunityPage root={group(ROOT, 'owner')} />)
     fireEvent.change(await screen.findByLabelText('Community name'), { target: { value: '  ' } })
     expect((screen.getByRole('button', { name: 'Save' }) as HTMLButtonElement).disabled).toBe(true)
     expect(setSettings).not.toHaveBeenCalled()
+  })
+
+  it('a moderator sees the topics and not the community settings', async () => {
+    const { CommunityPage } = await import('./CommunityPage')
+    renderWithQuery(<CommunityPage root={group(ROOT, 'moderator')} />)
+    await screen.findByRole('heading', { name: 'Topics' })
+    expect(screen.queryByRole('heading', { name: 'About this community' })).toBeNull()
+    expect(screen.queryByLabelText('Community name')).toBeNull()
   })
 })

@@ -35,6 +35,10 @@ test.describe('roles', () => {
     await open(kit.page, '/people')
     await expect(kit.page.getByRole('button', { name: 'Create invite link' })).toBeVisible()
     await expect(kit.page.getByRole('button', { name: /Make / })).toHaveCount(0)
+    // A moderator may manage topics, so the Community page is in their nav, with the Topics card only.
+    await kit.page.getByRole('navigation', { name: 'Main' }).getByRole('button', { name: 'Community' }).click()
+    await expect(kit.page.getByRole('heading', { name: 'Topics' })).toBeVisible()
+    await expect(kit.page.getByRole('heading', { name: 'About this community' })).toHaveCount(0)
 
     await open(kit.page)
     await pick(kit.page, article(kit.page, text), 'Post options', 'Delete')

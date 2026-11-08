@@ -1,12 +1,12 @@
 import { useEffect, useState } from 'react'
 import { useLocation } from 'wouter'
-import { useMarkRead, useMarkers, usePostActions, usePosts, useTopicActions, useTopics } from '../data/hooks'
+import { useGroups, useMarkRead, useMarkers, usePostActions, usePosts, useTopicActions, useTopics } from '../data/hooks'
 import { ROOT_ID } from '../data/keys'
 import { feedStream, markerOf } from '../data/notifications'
 import { usePageVisible } from '../hooks/usePageVisible'
 import { useStreamStatus } from '../hooks/StreamContext'
-import { topicPath } from '../routes'
-import { Alert, Button, Card, Measure, Pane, PillCaption, Row, ScrollArea, Stack, Text } from '../ui'
+import { COMMUNITY, topicPath } from '../routes'
+import { Alert, Button, Card, Measure, Pane, Pill, PillCaption, Row, ScrollArea, Stack, Text } from '../ui'
 import { postExtensions } from '../editor/extensions'
 import { BodyEditor } from './BodyEditor'
 import { ConnectionStatus } from './ConnectionStatus'
@@ -35,6 +35,10 @@ export function PostsPane({ groupId, side = 'full', watching, topicId = null }: 
   // Only the community's feed has topics. A new post gets the topic the feed is filtered to.
   const { topics } = useTopics()
   const topical = groupId === ROOT_ID && topics.length > 0
+  // The owner and moderators manage topics. With none yet, the feed offers them Add topics, so the setting is found
+  // where topics are used (Raphael, 2026-11-08). Members see nothing until a topic exists.
+  const { groups } = useGroups()
+  const staff = groupId === ROOT_ID && groups.find((g) => g.id === ROOT_ID)?.can.manage_topics === true
   const topic = topical ? topics.find((t) => t.id === topicId) : undefined
   const topicActions = useTopicActions()
   const [, navigate] = useLocation()
@@ -74,33 +78,47 @@ export function PostsPane({ groupId, side = 'full', watching, topicId = null }: 
           <Stack gap={3}>
             <Card
               head={
-                topical && (
+                !topical && staff ? (
                   <Stack gap={2}>
-                    <Row justify="between" align="center" wrap="never">
-                      <TopicMenu
-                        topics={topics}
-                        value={topic?.id ?? null}
-                        onChange={(id) => navigate(id ? topicPath(id) : '/')}
-                        noneLabel="Everything"
-                        label="Showing"
-                      />
-                      {topic && (
-                        <Button
-                          variant="ghost"
-                          icon={topic.following ? (overBell ? 'bell-off' : 'bell-ring') : 'bell'}
-                          pressed={topic.following}
-                          disabled={following || offline}
-                          onClick={() => void follow()}
-                          onHoverChange={setOverBell}
-
-                          labels={['Subscribe', 'Subscribed', 'Unsubscribe']}
-                        >
-                          {topic.following ? (overBell ? 'Unsubscribe' : 'Subscribed') : 'Subscribe'}
-                        </Button>
-                      )}
+                    <Row>
+                      <Pill href={COMMUNITY} tone="quiet" size="md">
+                        Add topics
+                      </Pill>
                     </Row>
-                    {topic?.description && <PillCaption>{topic.description}</PillCaption>}
+                    <PillCaption>
+                      Topics sort posts by subject, like Events or Questions. Members see them once you add one.
+                    </PillCaption>
                   </Stack>
+                ) : (
+                  topical && (
+                    <Stack gap={2}>
+                      <Row justify="between" align="center" wrap="never">
+                        <TopicMenu
+                          topics={topics}
+                          value={topic?.id ?? null}
+                          onChange={(id) => navigate(id ? topicPath(id) : '/')}
+                          noneLabel="Everything"
+                          label="Showing"
+                          onEdit={staff ? () => navigate(COMMUNITY) : undefined}
+                        />
+                        {topic && (
+                          <Button
+                            variant="ghost"
+                            icon={topic.following ? (overBell ? 'bell-off' : 'bell-ring') : 'bell'}
+                            pressed={topic.following}
+                            disabled={following || offline}
+                            onClick={() => void follow()}
+                            onHoverChange={setOverBell}
+
+                            labels={['Subscribe', 'Subscribed', 'Unsubscribe']}
+                          >
+                            {topic.following ? (overBell ? 'Unsubscribe' : 'Subscribed') : 'Subscribe'}
+                          </Button>
+                        )}
+                      </Row>
+                      {topic?.description && <PillCaption>{topic.description}</PillCaption>}
+                    </Stack>
+                  )
                 )
               }
             >

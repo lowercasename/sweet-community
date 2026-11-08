@@ -27,6 +27,11 @@ test.describe('topics', () => {
     // feed header first, then post.
     await open(o.page)
     await expect(o.page.getByRole('button', { name: 'Showing' })).toContainText('Everything')
+    // For the owner and moderators, the menu ends with Edit topics, which opens the Topics card.
+    await o.page.getByRole('button', { name: 'Showing' }).click()
+    await o.page.getByRole('menuitem', { name: 'Edit topics' }).click()
+    await expect(o.page).toHaveURL(/\/community$/)
+    await open(o.page)
     const composer = o.page.locator('form').filter({ has: postEditor(o.page) })
     await expect(composer.getByRole('button', { name: 'Topic' })).toHaveCount(0)
     await o.page.getByRole('button', { name: 'Showing' }).click()

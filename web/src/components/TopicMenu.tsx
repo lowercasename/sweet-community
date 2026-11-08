@@ -18,6 +18,8 @@ interface TopicMenuProps {
   /** The pill size. `md`, the default, is a control among controls. `sm` is a label among content. */
   size?: PillSize
   disabled?: boolean
+  /** Given to the owner and moderators in the feed's menu. The menu then ends with Edit topics. */
+  onEdit?: () => void
 }
 
 /**
@@ -34,6 +36,7 @@ export function TopicMenu({
   label,
   size = 'md',
   disabled,
+  onEdit,
 }: TopicMenuProps) {
   const chosen = topics.find((t) => t.id === value)
   const items: MenuItem[] = [
@@ -44,6 +47,7 @@ export function TopicMenu({
       checked: t.id === value,
       onSelect: () => onChange(t.id),
     })),
+    ...(onEdit ? [{ label: 'Edit topics', icon: 'settings' as const, onSelect: onEdit }] : []),
   ]
   return (
     <Menu label={label} items={items} trigger="pill" quiet={!chosen} size={size} disabled={disabled}>

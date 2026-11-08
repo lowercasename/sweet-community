@@ -66,7 +66,7 @@ export function MenuPage({ me, groups, onGo, onLogout }: MenuPageProps) {
           <ConversationsSection groups={groups} me={me} places={places} expanded onGo={onGo} />
           <Hairline />
           <NavItem icon="people" label="People" expanded onClick={() => onGo('/people')} />
-          {root?.can.manage_instance && (
+          {(root?.can.manage_instance || root?.can.manage_topics) && (
             <NavItem icon="settings" label="Community" expanded onClick={() => onGo(COMMUNITY)} />
           )}
           <Hairline />
