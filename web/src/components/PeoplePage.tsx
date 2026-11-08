@@ -148,7 +148,7 @@ export function PeoplePage({ me, root, onOpenGroup }: PeoplePageProps) {
               <Card>
                 <Stack gap={2}>
                   <Heading level={2}>Invite someone</Heading>
-                  <Text variant="secondary">
+                  <Text variant="small">
                     Invite links are active for seven days and can be used multiple times. Create a new one whenever you
                     need to.
                   </Text>

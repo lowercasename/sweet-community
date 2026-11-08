@@ -59,6 +59,8 @@ export interface GroupCan {
   manage_instance?: boolean
   /** Root group only. Whether the current user may manage the topics. The owner and moderators may. */
   manage_topics?: boolean
+  /** Root group only. Whether the current user may write the rules. The owner and moderators may. */
+  manage_rules?: boolean
 }
 
 export type GroupMode = 'posts' | 'chat' | 'both'
@@ -633,7 +635,22 @@ export async function logoutEverywhere(): Promise<void> {
   await fetch('/api/logout-all', { method: 'POST' })
 }
 
-export function getInvite(code: string): Promise<{ invited_by: string }> {
+/** The community's rules (architecture.md, Admin tools). An empty body means there are none. */
+export interface Rules {
+  body_html: string
+}
+
+export function getRules(): Promise<Rules> {
+  return request('/api/rules')
+}
+
+/** Writes the rules, for the owner and moderators. An empty body clears them. */
+export function setRules(bodyHtml: string): Promise<Rules> {
+  return request<Rules>('/api/rules', json('PUT', { body_html: bodyHtml }))
+}
+
+/** Who created an invite link, and the rules the person agrees to by joining. */
+export function getInvite(code: string): Promise<{ invited_by: string; rules_html: string }> {
   return request(`/api/invites/${encodeURIComponent(code)}`)
 }
 

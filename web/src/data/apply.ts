@@ -12,6 +12,7 @@ import type {
   Post,
   PostPage,
   Profile,
+  Rules,
   Settings,
   Topic,
   User,
@@ -72,6 +73,11 @@ export function applyEvent(qc: QueryClient, kind: string, data: unknown): void {
       break
     case 'profile':
       if (isProfile(data)) qc.setQueryData<Profile>(keys.profile(data.username), data)
+      break
+    case 'rules':
+      if (typeof data === 'object' && data !== null && typeof (data as Rules).body_html === 'string') {
+        qc.setQueryData<Rules>(keys.rules, data as Rules)
+      }
       break
     case 'settings':
       if (isSettings(data)) {

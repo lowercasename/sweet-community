@@ -89,7 +89,13 @@ func (s *Server) getInvite(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusInternalServerError, err.Error())
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"invited_by": by})
+	// The join page shows the rules, which a person agrees to by joining (architecture.md, Admin tools).
+	rules, err := rulesOf(r.Context(), s.q())
+	if err != nil {
+		writeErr(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"invited_by": by, "rules_html": rules.BodyHTML})
 }
 
 // register (public) creates an account with no password from a valid invite, and sends the first sign-in email.

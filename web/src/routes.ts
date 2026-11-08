@@ -24,6 +24,9 @@ export const NOTIFICATIONS = '/notifications'
 /** The owner's settings page for the community (architecture.md, Admin tools). Name, description, and who may create rooms. */
 export const COMMUNITY = '/community'
 
+/** The community's rules (architecture.md, Admin tools). */
+export const RULES = '/rules'
+
 /** The community's feed filtered to one topic (architecture.md, Topics). */
 export const topicPath = (id: string) => `/?topic=${encodeURIComponent(id)}`
 

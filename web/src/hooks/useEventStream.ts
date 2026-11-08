@@ -18,6 +18,7 @@ const EVENT_KINDS = [
   'membership',
   'membership_delete',
   'settings',
+  'rules',
   'notification',
   'notification_delete',
   'marker',

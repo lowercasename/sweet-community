@@ -1,4 +1,5 @@
 // @vitest-environment happy-dom
+import { paragraph, renderWithQuery } from '../test-utils'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 
@@ -8,7 +9,7 @@ import { cleanup, fireEvent, render, screen } from '@testing-library/react'
  */
 vi.mock('../api', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../api')>()),
-  getInvite: vi.fn(() => Promise.resolve({ invited_by: 'raphael' })),
+  getInvite: vi.fn(() => Promise.resolve({ invited_by: 'raphael', rules_html: '' })),
   register: vi.fn(() => Promise.resolve({ email: 'kit@example.test' })),
   changeJoiningAddress: vi.fn(() => Promise.resolve()),
   signinWithCode: vi.fn(),
@@ -59,5 +60,14 @@ describe('Join', () => {
     fireEvent.change(screen.getByLabelText('Code'), { target: { value: '123456' } })
     fireEvent.click(screen.getByRole('button', { name: 'Finish joining' }))
     await vi.waitFor(() => expect(onSignedIn).toHaveBeenCalled())
+  })
+
+  it('shows the rules, and joining agrees to them', async () => {
+    const { getInvite } = await import('../api')
+    vi.mocked(getInvite).mockResolvedValue({ invited_by: 'raphael', rules_html: paragraph('Be kind.') })
+    const { Join } = await import('./Join')
+    renderWithQuery(<Join code="abc" community={community} onSignedIn={() => {}} />)
+    await screen.findByText('Be kind.')
+    expect(screen.getByRole('button', { name: 'Agree and join' })).toBeTruthy()
   })
 })

@@ -34,6 +34,7 @@ vi.mock('../api', async (importOriginal) => ({
   listInvites: vi.fn(() => Promise.resolve({ invites: [] })),
   getSettings: vi.fn(() => Promise.resolve({ group_creation: 'anyone' })),
   getVersion: vi.fn(() => Promise.resolve({ release: 'dev', build: 'abcdef123456' })),
+  getRules: vi.fn(() => Promise.resolve({ body_html: '' })),
   getAccount: vi.fn(() => Promise.resolve({ email: null, email_verified: false, pending_email: null })),
   getMySettings: vi.fn(() => Promise.resolve({ digest: 'weekly' })),
   setMySettings: vi.fn(),

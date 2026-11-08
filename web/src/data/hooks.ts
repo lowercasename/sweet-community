@@ -5,6 +5,8 @@ import {
   changeEmail,
   getAccount,
   getVersion,
+  getRules,
+  setRules,
   getMySettings,
   setMySettings,
   clearNotifications,
@@ -542,4 +544,17 @@ export function useChangeEmail() {
  */
 export function useRelease(): string | undefined {
   return useQuery({ queryKey: keys.version, queryFn: getVersion, staleTime: Infinity }).data?.release
+}
+
+/** The community's rules (architecture.md, Admin tools). A rules event keeps them current. */
+export function useRules(): string | undefined {
+  return useQuery({ queryKey: keys.rules, queryFn: getRules }).data?.body_html
+}
+
+/** Writes the rules. The reply is the rules as stored. */
+export function useSetRules() {
+  const qc = useQueryClient()
+  return async (bodyHtml: string) => {
+    qc.setQueryData(keys.rules, await setRules(bodyHtml))
+  }
 }

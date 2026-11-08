@@ -102,6 +102,9 @@ func ManageInstance(root Actor) bool { return root.Role == Owner }
 // of topics (architecture.md, Topics).
 func ManageTopics(root Actor) bool { return root.staff() }
 
+// ManageRules allows the root group's owner and moderators to write the community's rules (Raphael, 2026-11-08).
+func ManageRules(root Actor) bool { return root.staff() }
+
 // SetTopic allows the author to set the topic of their own post, and the root
 // group's staff to set the topic of any post. It is the only change staff may
 // make to another user's post (Raphael, 2026-11-07: setting a topic is

@@ -9,6 +9,7 @@ import { ROOT, group, renderWithQuery } from '../test-utils'
  */
 vi.mock('../api', () => ({
   listTopics: vi.fn(() => Promise.resolve({ topics: [] })),
+  getRules: vi.fn(() => Promise.resolve({ body_html: '' })),
   getSettings: vi.fn(() =>
     Promise.resolve({ group_creation: 'anyone', name: 'Knitting Circle', description: 'Wool.', owner_set: true }),
   ),

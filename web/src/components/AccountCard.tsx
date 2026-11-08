@@ -89,7 +89,7 @@ export function AccountCard() {
         <Stack gap={2}>
           <Heading level={2}>Password</Heading>
           {account && (
-            <Text variant="secondary">
+            <Text variant="small">
               {hasPassword
                 ? 'You can sign in with your password or by email.'
                 : 'You sign in by email, with a link and a code. A password is optional.'}

@@ -105,8 +105,8 @@ func Key(kind string, raw []byte) string {
 			return ""
 		}
 		return "marker:" + p.UserID + ":" + p.Stream
-	case "settings":
-		return "settings"
+	case "settings", "rules":
+		return kind
 	}
 	return ""
 }

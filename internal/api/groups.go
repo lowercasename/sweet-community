@@ -62,6 +62,8 @@ type GroupCan struct {
 	ManageInstance bool `json:"manage_instance,omitempty"`
 	// ManageTopics is meaningful on the root group only. The owner and moderators may manage the topics.
 	ManageTopics bool `json:"manage_topics,omitempty"`
+	// ManageRules is meaningful on the root group only. The owner and moderators may write the rules.
+	ManageRules bool `json:"manage_rules,omitempty"`
 }
 
 // Settings is the wire shape of the instance's settings (architecture.md,
@@ -150,6 +152,7 @@ func groupFor(a perm.Actor, g Group, st Settings) Group {
 		g.Can.CreateGroups = perm.CreateGroup(a, st.GroupCreation)
 		g.Can.ManageInstance = perm.ManageInstance(a)
 		g.Can.ManageTopics = perm.ManageTopics(a)
+		g.Can.ManageRules = perm.ManageRules(a)
 	}
 	return g
 }

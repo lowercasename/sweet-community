@@ -262,6 +262,8 @@ func (s *Server) Routes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/settings", s.getSettings) // public, because the sign-in page shows the community's name
 	mux.HandleFunc("POST /api/setup", s.setup)
 	mux.HandleFunc("GET /api/version", s.requireAuth(s.getVersion))
+	mux.HandleFunc("GET /api/rules", s.requireAuth(s.getRules))
+	mux.HandleFunc("PUT /api/rules", s.requireRoot(perm.ManageRules, s.setRules))
 	mux.HandleFunc("PUT /api/settings", s.requireRoot(perm.ManageInstance, s.setSettings))
 	mux.HandleFunc("POST /api/images", s.requireAuth(s.uploadImage))
 	mux.HandleFunc("GET /img/{id}", s.requireAuth(s.serveImage))

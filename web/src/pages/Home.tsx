@@ -5,6 +5,7 @@ import {
   useAuthor,
   useGroupActions,
   useGroups,
+  useRules,
   usePost,
   useTopics,
   useUnreadNotifications,
@@ -20,6 +21,7 @@ import {
   NEW_CONVERSATION,
   NEW_ROOM,
   NOTIFICATIONS,
+  RULES,
   SEARCH,
   groupPath,
   membersPath,
@@ -38,6 +40,7 @@ import { PageBar } from '../components/PageBar'
 import { PeoplePage } from '../components/PeoplePage'
 import { PostPage } from '../components/PostPage'
 import { ProfilePage } from '../components/ProfilePage'
+import { RulesPage } from '../components/RulesPage'
 import { SearchPage } from '../components/SearchPage'
 import { SettingsPage } from '../components/SettingsPage'
 import { Sidebar } from '../components/Sidebar'
@@ -53,6 +56,7 @@ const PAGE_TITLES: Record<string, string> = {
   '/people': 'People',
   '/settings': 'Settings',
   [COMMUNITY]: 'Community',
+  [RULES]: 'Rules',
 }
 
 interface HomeProps {
@@ -89,6 +93,7 @@ export function Home({ me, onSignOut }: HomeProps) {
   const focusMessage = search.get('message')
   const { topics, loading: topicsLoading } = useTopics()
   const { settings } = useSettings()
+  const rules = useRules()
   // A post's page sits over the room the post is in, once the post is known.
   const { post: openPost } = usePost(postParams?.id ?? '', atPost)
 
@@ -142,12 +147,14 @@ export function Home({ me, onSignOut }: HomeProps) {
             : { title: 'Post' }
           : atProfile
             ? { title: decodeURIComponent(profileParams.name) }
-            : location === '/settings'
-              ? {
-                  title: 'Settings',
-                  back: { label: `Back to ${me.username}`, onClick: () => navigate(profilePath(me.username)) },
-                }
-              : { title: PAGE_TITLES[location] ?? 'Home' }
+            : location === RULES
+              ? { title: 'Rules', back: { label: 'Back to Home', onClick: () => navigate('/') } }
+              : location === '/settings'
+                ? {
+                    title: 'Settings',
+                    back: { label: `Back to ${me.username}`, onClick: () => navigate(profilePath(me.username)) },
+                  }
+                : { title: PAGE_TITLES[location] ?? 'Home' }
 
   // A group the URL names that is not mine (or is gone) does not exist to me. A topic that is gone is everything.
   if (!loading && named && !groups.some((g) => g.id === named)) return <Redirect to="/" replace />
@@ -196,6 +203,12 @@ export function Home({ me, onSignOut }: HomeProps) {
                 onChange={setLayout}
               />
             )}
+            {/* The community's rules, when it has some (architecture.md, Admin tools). */}
+            {atRoot && rules && (
+              <Button variant="ghost" icon="rules" label="Rules" onClick={() => navigate(RULES)}>
+                {narrow ? undefined : 'Rules'}
+              </Button>
+            )}
             {viewing && current && current.kind === 'group' && (
               <Button
                 variant="ghost"
@@ -228,6 +241,9 @@ export function Home({ me, onSignOut }: HomeProps) {
               ) : (
                 <Redirect to="/" replace />
               ))}
+          </Route>
+          <Route path={RULES}>
+            <RulesPage />
           </Route>
           <Route path={SEARCH}>
             <SearchPage key={searched} query={searched} groups={groups} onGo={navigate} />

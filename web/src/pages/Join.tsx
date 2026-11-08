@@ -2,7 +2,8 @@ import { useEffect, useState } from 'react'
 import { getInvite, register, type Settings, type User } from '../api'
 import { AuthFrame } from '../components/AuthFrame'
 import { CheckEmail } from '../components/CheckEmail'
-import { Alert, Button, Field, Form, Input, Row, Text } from '../ui'
+import { Body } from '../components/Body'
+import { Alert, Button, Field, Form, Inset, Input, Row, Stack, Text } from '../ui'
 
 interface JoinProps {
   code: string
@@ -19,6 +20,7 @@ interface JoinProps {
  */
 export function Join({ code, community, onSignedIn }: JoinProps) {
   const [invitedBy, setInvitedBy] = useState<string | null>(null)
+  const [rules, setRules] = useState('')
   const [invalid, setInvalid] = useState<string | null>(null)
   const [username, setUsername] = useState('')
   const [email, setEmail] = useState('')
@@ -30,7 +32,10 @@ export function Join({ code, community, onSignedIn }: JoinProps) {
     let cancelled = false
     getInvite(code)
       .then((r) => {
-        if (!cancelled) setInvitedBy(r.invited_by)
+        if (!cancelled) {
+          setInvitedBy(r.invited_by)
+          setRules(r.rules_html)
+        }
       })
       .catch((e: unknown) => {
         if (!cancelled) setInvalid(e instanceof Error ? e.message : 'This invite link does not work')
@@ -77,10 +82,20 @@ export function Join({ code, community, onSignedIn }: JoinProps) {
           <Field label="Email address" hint="You will sign in with a link and a code sent here.">
             <Input type="email" name="email" value={email} onChange={setEmail} autoComplete="email" required />
           </Field>
+          {rules && (
+            <Stack gap={1}>
+              <Text variant="small" weight="bold">
+                The rules of {name}
+              </Text>
+              <Inset>
+                <Body html={rules} />
+              </Inset>
+            </Stack>
+          )}
           {error && <Alert tone="error">{error}</Alert>}
           <Row justify="end" align="center">
             <Button type="submit" disabled={!invitedBy || !username || !email} busy={busy}>
-              Join {name}
+              {rules ? 'Agree and join' : `Join ${name}`}
             </Button>
           </Row>
         </Form>

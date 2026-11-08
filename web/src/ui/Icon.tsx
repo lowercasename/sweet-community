@@ -25,6 +25,8 @@ import {
   Pencil,
   Plus,
   Reply,
+  ScrollText,
+  Flag,
   Search,
   Settings,
   TabletSmartphone,
@@ -69,6 +71,8 @@ export type IconName =
   | 'user'
   | 'spinner'
   | 'reply'
+  | 'rules'
+  | 'flag'
 
 const ICONS: Record<IconName, LucideIcon> = {
   bold: Bold,
@@ -104,6 +108,8 @@ const ICONS: Record<IconName, LucideIcon> = {
   user: User,
   spinner: LoaderCircle,
   reply: Reply,
+  rules: ScrollText,
+  flag: Flag,
 }
 
 interface IconProps {

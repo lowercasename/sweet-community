@@ -25,4 +25,5 @@ export const keys = {
   account: ['account'] as const,
   mySettings: ['mySettings'] as const,
   version: ['version'] as const,
+  rules: ['rules'] as const,
 }

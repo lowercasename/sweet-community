@@ -2,6 +2,7 @@ import type { Group } from '../api'
 import { useSettings } from '../data/hooks'
 import { Alert, Card, Heading, Measure, Pane, ScrollArea, Stack } from '../ui'
 import { CommunityForm } from './CommunityForm'
+import { RulesCard } from './RulesCard'
 import { TopicsCard } from './TopicsCard'
 
 /**
@@ -26,6 +27,7 @@ export function CommunityPage({ root }: { root: Group }) {
                 </Stack>
               </Card>
             )}
+            {root.can.manage_rules && <RulesCard />}
             {root.can.manage_topics && <TopicsCard />}
           </Stack>
         </Measure>
