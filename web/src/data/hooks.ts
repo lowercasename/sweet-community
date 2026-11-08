@@ -4,6 +4,7 @@ import {
   addMember,
   changeEmail,
   getAccount,
+  getVersion,
   getMySettings,
   setMySettings,
   clearNotifications,
@@ -533,4 +534,12 @@ export function useChangeEmail() {
   return async (email: string) => {
     qc.setQueryData(keys.account, await changeEmail(email))
   }
+}
+
+/**
+ * The release the server was built from, shown in the nav (architecture.md, Updates). It does not change while the
+ * page is open, because a new build makes open tabs reload.
+ */
+export function useRelease(): string | undefined {
+  return useQuery({ queryKey: keys.version, queryFn: getVersion, staleTime: Infinity }).data?.release
 }

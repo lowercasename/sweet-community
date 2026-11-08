@@ -16,6 +16,7 @@ vi.mock('../api', () => ({
     Promise.resolve({ markers: [{ user_id: 'raphael', stream: 'chat:knit', read_at: 0, unread: 2 }] }),
   ),
   getSettings: vi.fn(() => Promise.resolve({ group_creation: 'anyone', name: '', description: '', owner_set: true })),
+  getVersion: vi.fn(() => Promise.resolve({ release: 'v1.2.3', build: 'abcdef123456' })),
 }))
 
 const raphael = user('raphael')
@@ -24,6 +25,12 @@ const kit = user('kit')
 afterEach(cleanup)
 
 describe('MenuPage', () => {
+  it('names the release at the bottom (architecture.md, Updates)', async () => {
+    const { MenuPage } = await import('./MenuPage')
+    renderWithQuery(<MenuPage me={raphael} groups={[group(ROOT, 'owner')]} onGo={() => {}} onLogout={() => {}} />)
+    await screen.findByText('Sweet v1.2.3')
+  })
+
   it('lists the user, Home, the Rooms section, the Messages section, People and Sign out, in that order', async () => {
     const { MenuPage } = await import('./MenuPage')
     const onGo = vi.fn()

@@ -20,6 +20,7 @@ vi.mock('../api', () => ({
   getSettings: vi.fn(() =>
     Promise.resolve({ group_creation: 'anyone', name: 'Knitting Circle', description: '', owner_set: true }),
   ),
+  getVersion: vi.fn(() => Promise.resolve({ release: 'v1.2.3', build: 'abcdef123456' })),
 }))
 
 const raphael = user('raphael')
@@ -50,6 +51,15 @@ const groupsSection = () => screen.getByRole('group', { name: 'Rooms' })
 const messages = () => screen.getByRole('group', { name: 'Messages' })
 
 describe('Sidebar', () => {
+  it('names the release under Collapse when expanded, and not when collapsed (architecture.md, Updates)', async () => {
+    await draw([root(true)])
+    await screen.findByText('Sweet v1.2.3')
+    cleanup()
+    await draw([root(true)], '/', false)
+    await screen.findByRole('button', { name: 'Expand' })
+    expect(screen.queryByText('Sweet v1.2.3')).toBeNull()
+  })
+
   it('shows the groups block, the tools block and the community block, with a rule between each block', async () => {
     const onGo = await draw([root(true), knitting, withKit])
     // When expanded, the section's control is in its title row, so it comes before the groups.

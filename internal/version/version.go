@@ -30,3 +30,19 @@ var Of = sync.OnceValue(func() string {
 	}
 	return hex.EncodeToString(h.Sum(nil))[:12]
 })
+
+// release is set at build time to the git tag the binary was built from, as
+// `go build -ldflags "-X sweet/internal/version.release=v1.2.3"`. A build after
+// a tag is named by `git describe`, such as v1.2.3-4-gab1c234.
+var release string
+
+// Release is the release the binary was built from (architecture.md,
+// Updates), shown in the nav as "Sweet v1.2.3". A binary built without the
+// setting, such as go run during development, reports "dev". Of, not
+// Release, decides when an open tab reloads.
+func Release() string {
+	if release == "" {
+		return "dev"
+	}
+	return release
+}

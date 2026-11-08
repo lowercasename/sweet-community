@@ -13,6 +13,9 @@ RUN pnpm build
 
 FROM --platform=$BUILDPLATFORM golang:1.26-alpine AS build
 ARG TARGETOS TARGETARCH
+# The release the nav names, such as v1.2.3 (architecture.md, Updates). CI passes it from git describe. A build without
+# it reports dev.
+ARG VERSION=
 WORKDIR /src
 COPY go.mod go.sum ./
 RUN go mod download
@@ -20,7 +23,7 @@ COPY . ./
 COPY --from=web /src/internal/web/dist ./internal/web/dist
 # go:embed cannot reach ../../migrations (see the Makefile).
 RUN rm -rf cmd/sweet/migrations && cp -R migrations cmd/sweet/migrations \
- && CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH go build -trimpath -ldflags '-s -w' -o /sweet ./cmd/sweet
+ && CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH go build -trimpath -ldflags "-s -w -X sweet/internal/version.release=${VERSION}" -o /sweet ./cmd/sweet
 
 FROM alpine:3.21
 RUN apk add --no-cache ca-certificates tzdata \

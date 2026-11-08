@@ -26,6 +26,8 @@ test.describe('nav', () => {
     )
     const title = nav(kit).getByRole('group', { name: 'Rooms' }).getByText('Rooms', { exact: true })
     await expect(title).toHaveCSS('color', 'rgb(105, 105, 105)')
+    // The release is named at the foot of the expanded nav (architecture.md, Updates). The test binary has none.
+    await expect(nav(kit).getByText('Sweet dev')).toBeVisible()
     await kit.context.close()
   })
 

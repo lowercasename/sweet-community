@@ -139,3 +139,15 @@ func TestSetupWithoutAPassword(t *testing.T) {
 	}
 	newClient(t, ts).mustStatus(401, "POST", "/api/login", map[string]string{"username": "raphael", "password": "anything at all"})
 }
+
+// GET /api/version names the release the binary was built from and the
+// build's own identifier, which open tabs use to reload. Only a signed-in user
+// can read it, so the release is not shown to anyone scanning for old versions.
+func TestVersionIsForSignedInUsers(t *testing.T) {
+	ts, owner := newTestServer(t)
+	newClient(t, ts).mustStatus(401, "GET", "/api/version", nil)
+	v := owner.mustStatus(200, "GET", "/api/version", nil)
+	if v["release"] != "dev" || len(v["build"].(string)) != 12 {
+		t.Fatalf("version: %v", v)
+	}
+}

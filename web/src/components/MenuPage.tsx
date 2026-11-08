@@ -1,9 +1,9 @@
 import type { Group, User } from '../api'
 import { roomsOf } from '../data/groups'
-import { useAuthor, useUnreadPlaces } from '../data/hooks'
+import { useAuthor, useRelease, useUnreadPlaces } from '../data/hooks'
 import { anyUnread } from '../data/notifications'
 import { NEW_ROOM, groupPath, profilePath, COMMUNITY } from '../routes'
-import { Avatar, Card, Hairline, NavItem, NavSection, Pane, Stack, Tile } from '../ui'
+import { Avatar, Card, Hairline, NavItem, NavNote, NavSection, Pane, Stack, Tile } from '../ui'
 import { ConversationsSection } from './ConversationsSection'
 
 interface MenuPageProps {
@@ -21,6 +21,7 @@ interface MenuPageProps {
  * view that needs a title (Raphael, 2026-11-06).
  */
 export function MenuPage({ me, groups, onGo, onLogout }: MenuPageProps) {
+  const release = useRelease()
   const live = useAuthor(me)
   const places = useUnreadPlaces()
   const root = groups.find((g) => g.kind === 'root')
@@ -71,6 +72,7 @@ export function MenuPage({ me, groups, onGo, onLogout }: MenuPageProps) {
           )}
           <Hairline />
           <NavItem icon="logout" label="Sign out" expanded onClick={onLogout} />
+          {release && <NavNote>{`Sweet ${release}`}</NavNote>}
         </Stack>
       </Card>
     </Pane>

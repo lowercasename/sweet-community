@@ -24,6 +24,7 @@ import (
 	"sweet/internal/push"
 	"sweet/internal/sanitize"
 	"sweet/internal/store"
+	"sweet/internal/version"
 )
 
 type User struct {
@@ -257,6 +258,7 @@ func (s *Server) Routes(mux *http.ServeMux) {
 	mux.HandleFunc("PUT /api/markers/{stream}", s.requireAuth(s.setMarker))
 	mux.HandleFunc("GET /api/settings", s.getSettings) // public, because the sign-in page shows the community's name
 	mux.HandleFunc("POST /api/setup", s.setup)
+	mux.HandleFunc("GET /api/version", s.requireAuth(s.getVersion))
 	mux.HandleFunc("PUT /api/settings", s.requireRoot(perm.ManageInstance, s.setSettings))
 	mux.HandleFunc("POST /api/images", s.requireAuth(s.uploadImage))
 	mux.HandleFunc("GET /img/{id}", s.requireAuth(s.serveImage))
@@ -635,4 +637,11 @@ func (s *Server) deletePost(w http.ResponseWriter, r *http.Request) {
 		}
 		return map[string]string{"id": id, "group_id": owners.GroupID}, http.StatusOK, nil
 	})
+}
+
+// getVersion is `GET /api/version`, for signed-in users only, so the release is not shown to anyone scanning for
+// old versions. It names the release the binary was built from, which the nav
+// shows, and the build's own identifier, which open tabs use to reload (architecture.md, Updates).
+func (s *Server) getVersion(w http.ResponseWriter, r *http.Request) {
+	writeJSON(w, http.StatusOK, map[string]string{"release": version.Release(), "build": version.Of()})
 }

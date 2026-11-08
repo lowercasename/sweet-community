@@ -14,3 +14,12 @@ func TestOfNamesTheBinary(t *testing.T) {
 		t.Fatal("the version changed between two calls")
 	}
 }
+
+// The release is the git tag the binary was built from, set at build time
+// (architecture.md, Updates). A binary built without one, such as go run
+// during development, reports "dev".
+func TestReleaseIsDevWithoutABuildSetting(t *testing.T) {
+	if got := Release(); got != "dev" {
+		t.Fatalf("release without a build setting: %q", got)
+	}
+}

@@ -1,15 +1,19 @@
-.PHONY: build run dev-backend frontend test clean
+.PHONY: build run dev-backend frontend test clean release
 
 # go:embed cannot reference a parent directory, so migrations/ is the source
 # of truth and is copied beside main.go at build time.
 cmd/sweet/migrations: migrations/*.sql
 	rm -rf cmd/sweet/migrations && cp -R migrations cmd/sweet/migrations
 
+# The release the nav names (architecture.md, Updates): the newest tag, or the commit after it.
+RELEASE := $(shell git describe --tags --always --dirty 2>/dev/null)
+LDFLAGS := -X sweet/internal/version.release=$(RELEASE)
+
 frontend:
 	cd web && pnpm install --frozen-lockfile && pnpm build
 
 build: cmd/sweet/migrations frontend
-	mkdir -p bin && go build -o bin/sweet ./cmd/sweet
+	mkdir -p bin && go build -ldflags "$(LDFLAGS)" -o bin/sweet ./cmd/sweet
 
 # Backend only, serving whatever is in internal/web/dist (placeholder until
 # the frontend is built). Pair with `cd web && pnpm dev` for live reload.
@@ -18,7 +22,7 @@ build: cmd/sweet/migrations frontend
 export
 
 dev-backend: cmd/sweet/migrations
-	go run ./cmd/sweet -db data/sweet.db -owner raphael -base-url http://localhost:5173
+	go run -ldflags "$(LDFLAGS)" ./cmd/sweet -db data/sweet.db -owner raphael -base-url http://localhost:5173
 
 run: build
 	./bin/sweet -db data/sweet.db -owner raphael
@@ -31,6 +35,10 @@ test: cmd/sweet/migrations
 
 clean:
 	rm -rf bin cmd/sweet/migrations internal/web/dist/assets
+
+# Releases main as the next version: make release KIND=patch, minor or major, or KIND=v1.0.0 for a version by name.
+release:
+	sh scripts/release.sh $(KIND)
 
 # Playwright tests in a real browser, against the built binary and the Vite dev server.
 e2e:

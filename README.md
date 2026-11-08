@@ -81,12 +81,12 @@ docker compose pull
 docker compose up -d
 ```
 
-`git pull` updates the compose files, and `docker compose pull` downloads the new image. Before a migration changes the database schema, Sweet copies the database to `sweet.db.before-upgrade` in the same volume. Open browser tabs reload automatically when the new version starts.
+`git pull` updates the compose files, and `docker compose pull` downloads the new image. To run a particular release instead of the latest image, set `SWEET_IMAGE=ghcr.io/lowercasename/sweet-community:<version>` in `.env`, such as `1.0.0`. Then an upgrade is a change of that line. A release is made from main with `make release KIND=patch`, `minor` or `major`, which updates `CHANGELOG.md`, tags and pushes, and CI publishes the image for the tag. Before a migration changes the database schema, Sweet copies the database to `sweet.db.before-upgrade` in the same volume. Open browser tabs reload automatically when the new version starts.
 
 ### Restoring
 
 - **The server is gone.** On a new one, install as above with the same `.env`. Sweet finds no database, fetches the latest from the bucket and starts. The images are already there.
-- **An upgrade went wrong.** `docker compose down`. Find the commit you were on in `git log` and put `SWEET_IMAGE=ghcr.io/lowercasename/sweet-community:sha-<its first seven characters>` in `.env`. Then `docker compose run --rm sweet sh -c 'cp /data/sweet.db.before-upgrade /data/sweet.db'` and `docker compose up -d`. Remove the `SWEET_IMAGE` line when the next release is good.
+- **An upgrade went wrong.** `docker compose down`. Put the release you were on in `.env`, for example `SWEET_IMAGE=ghcr.io/lowercasename/sweet-community:1.0.0`. The nav shows the release under Collapse, and `CHANGELOG.md` lists them all. Then `docker compose run --rm sweet sh -c 'cp /data/sweet.db.before-upgrade /data/sweet.db'` and `docker compose up -d`.
 - **Something was deleted and you want the database as it was at a moment.** Stop Sweet, restore the database as of that moment (UTC), start it:
 
   ```

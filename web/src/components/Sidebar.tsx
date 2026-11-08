@@ -1,9 +1,9 @@
 import type { Group, User } from '../api'
 import { roomsOf } from '../data/groups'
-import { useAuthor, useSettings, useUnreadPlaces, useUnreadNotifications } from '../data/hooks'
+import { useAuthor, useRelease, useSettings, useUnreadPlaces, useUnreadNotifications } from '../data/hooks'
 import { anyUnread } from '../data/notifications'
 import { COMMUNITY, NEW_ROOM, NOTIFICATIONS, SEARCH, groupPath, profilePath } from '../routes'
-import { Avatar, Hairline, NavBar, NavItem, NavSection, Tile, Wordmark } from '../ui'
+import { Avatar, Hairline, NavBar, NavItem, NavNote, NavSection, Tile, Wordmark } from '../ui'
 import { ConversationsSection } from './ConversationsSection'
 
 interface SidebarProps {
@@ -41,6 +41,7 @@ export function Sidebar({ me, groups, location, expanded, onGo, onToggle }: Side
   const mine = roomsOf(groups)
   const canCreate = root?.can.create_groups === true
   const { settings } = useSettings()
+  const release = useRelease()
   return (
     <NavBar
       expanded={expanded}
@@ -60,6 +61,8 @@ export function Sidebar({ me, groups, location, expanded, onGo, onToggle }: Side
             expanded={expanded}
             onClick={onToggle}
           />
+          {/* The release, for telling which version a person is on. The collapsed column has no room for it. */}
+          {expanded && release && <NavNote>{`Sweet ${release}`}</NavNote>}
         </>
       }
     >
