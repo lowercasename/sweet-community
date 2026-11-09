@@ -15,8 +15,7 @@ import (
 	"sweet/internal/store"
 )
 
-// Notification records one action that affects one user (architecture.md,
-// Notifications), such as a comment on their post or being added to a room.
+// Notification records one action that affects one user, such as a comment on their post or being added to a room.
 // The handler that writes the action writes the notification in the same
 // transaction, and the notification is sent to that user only. A
 // notification is marked read (read_at) when the user opens it, one at a
@@ -45,17 +44,17 @@ const (
 	NotifyAdded   = "added"
 	// NotifyJoined notifies the owner and the moderators that a user joined through an invite link.
 	NotifyJoined = "joined"
-	// NotifyTopicPost notifies a topic's followers of a post in it (architecture.md, Topics).
+	// NotifyTopicPost notifies a topic's followers of a post in it.
 	NotifyTopicPost = "topic_post"
 	// NotifyMessage is a message in a conversation (DM). There is at most one
 	// unread row per conversation. It is marked read when the conversation's
-	// chat marker moves past it (architecture.md, Notifications, 2026-11-08).
+	// chat marker moves past it.
 	// Room chat does not produce notifications.
 	NotifyMessage = "message"
-	// NotifyReply: a reply to the user's message in a room's chat (architecture.md, Chat).
+	// NotifyReply: a reply to the user's message in a room's chat.
 	NotifyReply = "reply"
-	// NotifyReport notifies the owner and the moderators that a member reported a post, comment or message
-	// (architecture.md, Admin tools). It names the report.
+	// NotifyReport notifies the owner and the moderators that a member reported a post, comment or message.
+	// It names the report.
 	NotifyReport = "report"
 )
 
@@ -230,7 +229,7 @@ func (s *Server) listNotifications(w http.ResponseWriter, r *http.Request) {
 }
 
 // readNotification marks one of the user's notifications read when they open
-// it (architecture.md, Notifications). The response and the event are the
+// it. The response and the event are the
 // updated row.
 func (s *Server) readNotification(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
@@ -261,8 +260,8 @@ type Cleared struct {
 	Before int64  `json:"before"`
 }
 
-// clearNotifications permanently deletes the user's read notifications
-// (architecture.md, Notifications). One event describes the deleted set, the
+// clearNotifications permanently deletes the user's read notifications.
+// One event describes the deleted set, the
 // read notifications up to now, rather than one event per row.
 func (s *Server) clearNotifications(w http.ResponseWriter, r *http.Request) {
 	me, _ := userFrom(r.Context())
@@ -310,7 +309,7 @@ func (s *Server) setMarker(w http.ResponseWriter, r *http.Request) {
 		in.ReadAt = now
 	}
 	// The marker and, for a chat stream, the message notifications that the
-	// new marker position marks as read (architecture.md, Notifications) are
+	// new marker position marks as read are
 	// written in one transaction.
 	s.loggedMany(w, r, now, func(qtx *store.Queries) ([]events.Entry, any, int, error) {
 		// reread returns the marker row after the write, as the stream's

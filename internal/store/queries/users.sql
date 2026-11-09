@@ -8,7 +8,7 @@ SELECT id, password_hash FROM users WHERE username = ?;
 SELECT id, username, picture_id, removed_at FROM users WHERE id = ?;
 
 -- name: RemoveUser :exec
--- Anonymises a user (architecture.md, Admin tools). The username becomes
+-- Anonymises a user. The username becomes
 -- removed-<id prefix>, and the password, picture and bio are cleared. The row
 -- and the id stay so that the user's content keeps its author.
 UPDATE users SET username = sqlc.arg(username), password_hash = NULL, picture_id = NULL, bio_html = '', bio_text = '', removed_at = sqlc.arg(removed_at)

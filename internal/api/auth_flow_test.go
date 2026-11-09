@@ -11,7 +11,7 @@ import (
 	"sweet/internal/db"
 )
 
-// These tests cover the account flows (architecture.md, Accounts). A password
+// These tests cover the account flows. A password
 // is optional. A user signs in with an email that holds a link and a
 // six-digit code. The code works only in the browser that asked for it. The
 // link opens a page whose button uses it, in any browser. Joining sends the

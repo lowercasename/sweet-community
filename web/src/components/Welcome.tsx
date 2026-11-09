@@ -27,7 +27,7 @@ interface WelcomeProps {
 }
 
 /**
- * The welcome dialog and the tour (architecture.md, New-instance lifecycle). The dialog opens the first time a user
+ * The welcome dialog and the tour. The dialog opens the first time a user
  * sees Home, and again when they ask for it on Settings. It shows the welcome message under the owner's name and
  * offers the tour. Closing it either way records that the user has been welcomed.
  */

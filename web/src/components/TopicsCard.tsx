@@ -23,7 +23,7 @@ import {
 const ABOUT =
   'A topic is a label a post on the Home feed can carry. People can read one topic at a time, and can subscribe to notifications for a specific topic. Topics are always optional.'
 
-/** The community's topics, for its staff (architecture.md, Topics): the list with its counts, add, rename, delete. */
+/** The community's topics, for its staff: the list with its counts, add, rename, delete. */
 export function TopicsCard() {
   const { topics, error } = useTopics()
   const actions = useTopicActions()

@@ -12,8 +12,7 @@ import (
 	"sweet/internal/store"
 )
 
-// Profile is a user as their profile page shows them (architecture.md,
-// Accounts). It holds the user, their role on the instance, when they
+// Profile is a user as their profile page shows them. It holds the user, their role on the instance, when they
 // joined, and their bio. The bio is a body like any other and is sanitised by
 // the same policy. Every user on the instance may see every profile. Only
 // the profile's user may edit the bio.

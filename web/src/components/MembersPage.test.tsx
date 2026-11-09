@@ -69,7 +69,7 @@ describe('MembersPage', () => {
     await screen.findByText('jo')
     fireEvent.click(within(rowOf('mo')).getByRole('button', { name: 'Options for mo' }))
     fireEvent.click(screen.getByRole('menuitem', { name: 'Remove' }))
-    // Removing a member confirms first (architecture.md, Interface, pattern 4).
+    // Removing a member confirms first.
     expect(removeMember).not.toHaveBeenCalled()
     fireEvent.click(within(screen.getByRole('dialog', { hidden: true })).getByRole('button', { name: 'Remove' }))
     expect(removeMember).toHaveBeenCalledWith('club', 'mo')

@@ -149,7 +149,7 @@ type GetGroupRow struct {
 	LastMessageAt interface{}
 }
 
-// Groups and memberships (architecture.md, Groups). Roles are stored on
+// Groups and memberships. Roles are stored on
 // memberships, not on users. perm decides who can do what. The queries do
 // not check permissions.
 func (q *Queries) GetGroup(ctx context.Context, id string) (GetGroupRow, error) {
@@ -427,7 +427,7 @@ type NextOwnerParams struct {
 	UserID  string
 }
 
-// Succession by seniority (architecture.md, Groups). The next owner is the
+// Succession by seniority. The next owner is the
 // longest-serving moderator, or else the longest-serving member.
 func (q *Queries) NextOwner(ctx context.Context, arg NextOwnerParams) (string, error) {
 	row := q.db.QueryRowContext(ctx, nextOwner, arg.GroupID, arg.UserID)

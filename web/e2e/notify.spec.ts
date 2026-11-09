@@ -1,7 +1,7 @@
 import { expect, member, open, test } from './helpers'
 
 /**
- * Notifications that reach a user outside the app (architecture.md, Notifications).
+ * Notifications that reach a user outside the app.
  * The weekly digest is on until the user turns it off on Settings. The device
  * toggle is offered when the browser can show notifications.
  */

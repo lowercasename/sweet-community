@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, screen } from '@testing-library/react'
 import { ROOT, marker, post, renderWithQuery, user } from '../test-utils'
 
-/** A visible feed is marked read, as with a group's chat (architecture.md, Notifications). */
+/** A visible feed is marked read, as with a group's chat. */
 vi.mock('../api', () => ({
   getPosts: vi.fn(),
   listMarkers: vi.fn(),
@@ -72,7 +72,7 @@ describe('PostsPane read marker', () => {
 })
 
 /**
- * Filtering the feed to one topic (architecture.md, Topics). The feed shows
+ * Filtering the feed to one topic. The feed shows
  * only that topic, its header shows the topic's name, and Subscribe follows
  * the topic.
  */

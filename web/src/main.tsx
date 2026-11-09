@@ -19,7 +19,7 @@ const queryClient = makeQueryClient()
 // The browser's offer to install Sweet arrives soon after load, so it is caught before anything renders.
 listenForInstall()
 
-// The service worker is only for web push (architecture.md, Notifications). It caches nothing.
+// The service worker is only for web push. It caches nothing.
 if ('serviceWorker' in navigator) {
   navigator.serviceWorker.register('/sw.js').catch(() => {
     // Without the service worker there is no push. Everything else still works.

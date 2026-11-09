@@ -16,14 +16,14 @@ export interface Can {
   /** Whether I may delete it only because of my role in its group. Such a Delete is marked with the shield. */
   delete_by_role?: boolean
   /**
-   * Posts only (architecture.md, Topics). Whether I may file the post under a topic. This is true for the post's
+   * Posts only. Whether I may file the post under a topic. This is true for the post's
    * author and for the community's staff.
    */
   set_topic?: boolean
 }
 
 /**
- * A topic (architecture.md, Topics). A topic is a label on a post in the
+ * A topic. A topic is a label on a post in the
  * community's feed. A post has at most one topic. The staff manage the list of
  * topics. `following` is the current user's follow state.
  */
@@ -73,9 +73,9 @@ export interface GroupCan {
 
 export type GroupMode = 'posts' | 'chat' | 'both'
 
-/** The instance's settings (architecture.md, Feature flags). */
+/** The instance's settings. */
 /**
- * The instance's settings (architecture.md, Admin tools). The owner sets these
+ * The instance's settings. The owner sets these
  * for the community. Anyone can read them, signed in or not, because the
  * sign-in and join pages show the community's name. `owner_set` is state, not
  * a setting. It is false until the setup link has been used. The name is
@@ -88,7 +88,7 @@ export interface Settings {
   owner_set: boolean
 }
 
-/** A group as its viewer sees it (architecture.md, Groups). The group of kind root represents the instance. */
+/** A group as its viewer sees it. The group of kind root represents the instance. */
 export interface Group {
   id: string
   kind: 'root' | 'group' | 'dm'
@@ -112,7 +112,7 @@ export interface Group {
   hidden_at?: number | null
 }
 
-/** A user as their page shows them (architecture.md, Accounts): role, join time, and a bio that only they can edit. */
+/** A user as their page shows them: role, join time, and a bio that only they can edit. */
 export interface Profile extends User {
   role: Role
   joined_at: number
@@ -157,7 +157,7 @@ export interface Post {
   id: string
   group_id: string
   /**
-   * The topic the post is filed under, or null (architecture.md, Topics). The client looks up the topic's name in the
+   * The topic the post is filed under, or null. The client looks up the topic's name in the
    * topics cache at render time.
    */
   topic_id: string | null
@@ -192,7 +192,7 @@ export interface Message {
   body_html: string
   body_text: string
   created_at: number
-  /** The message this one replies to, or null (architecture.md, Chat). */
+  /** The message this one replies to, or null. */
   reply_to: ReplyTo | null
   /** A message, or a joined or added line in the chat. A line has no body. Its author joined, or added the subject. */
   kind: 'message' | 'joined' | 'added'
@@ -212,7 +212,7 @@ export interface ReplyTo {
 }
 
 /**
- * A notification for the current user (architecture.md, Notifications). It has the actor, the kind and the group, and
+ * A notification for the current user. It has the actor, the kind and the group, and
  * for a comment, the post. Opening it marks it read.
  */
 export interface Notification {
@@ -233,7 +233,7 @@ export interface Notification {
   read_at: number | null
 }
 
-/** The kinds of item a member can report (architecture.md, Admin tools). */
+/** The kinds of item a member can report. */
 export type ReportKind = 'post' | 'comment' | 'message'
 
 /** One member's report of an item. */
@@ -244,7 +244,7 @@ export interface ReportBy {
 }
 
 /**
- * One reported item with its open reports, for the owner and moderators (architecture.md, Admin tools). `body_html`
+ * One reported item with its open reports, for the owner and moderators. `body_html`
  * is the copy kept when the item was first reported. `deleted` says the item has been deleted since. `can.open` says
  * whether I can open the item where it is.
  */
@@ -284,7 +284,7 @@ export interface Marker {
 }
 
 /**
- * One search result (architecture.md, Search). It has the kind of item, the group, the author, and an excerpt with
+ * One search result. It has the kind of item, the group, the author, and an excerpt with
  * its matches marked.
  */
 export interface Hit {
@@ -358,7 +358,7 @@ const json = (method: string, body: unknown): RequestInit => ({
 const g = (groupId: string) => `/api/groups/${encodeURIComponent(groupId)}`
 
 /**
- * Removes a user from the instance (architecture.md, Admin tools). Their posts, comments and messages stay, under a
+ * Removes a user from the instance. Their posts, comments and messages stay, under a
  * removed name.
  */
 export async function removeUser(userId: string): Promise<void> {
@@ -459,7 +459,7 @@ export function createPost(groupId: string, bodyHtml: string, topicId: string | 
 }
 
 /**
- * Files a post under a topic, or under no topic (architecture.md, Topics). Only the post's author or the community's
+ * Files a post under a topic, or under no topic. Only the post's author or the community's
  * staff can do this.
  */
 export function setPostTopic(id: string, topicId: string | null): Promise<Post> {
@@ -572,7 +572,7 @@ export function login(username: string, password: string): Promise<Session> {
 }
 
 /**
- * My own account (architecture.md, Accounts): the email address, whether it is verified, a new address that is waiting
+ * My own account: the email address, whether it is verified, a new address that is waiting
  * to be confirmed, and whether the account has a password. A password is optional.
  */
 export interface Account {
@@ -616,7 +616,7 @@ export function confirmEmail(token: string): Promise<{ email: string }> {
 }
 
 /**
- * My own settings (architecture.md, Notifications): whether the weekly digest is on or off. `welcomed` is true once I
+ * My own settings: whether the weekly digest is on or off. `welcomed` is true once I
  * have closed the welcome dialog. Sending it as true records that. The server never sets it back to false.
  */
 export interface MySettings {
@@ -671,8 +671,8 @@ export async function removePassword(): Promise<void> {
 }
 
 /**
- * The release the server was built from, such as v1.2.3, the build's own identifier (architecture.md, Updates), and
- * the address of the source code it runs (architecture.md, Licence).
+ * The release the server was built from, such as v1.2.3, the build's own identifier, and
+ * the address of the source code it runs.
  */
 export function getVersion(): Promise<{ release: string; build: string; source_url: string }> {
   return request('/api/version')
@@ -687,8 +687,8 @@ export async function logoutEverywhere(): Promise<void> {
 }
 
 /**
- * A text the owner and moderators write for every member: the rules or the welcome message (architecture.md, Admin
- * tools). An empty body means the community has none.
+ * A text the owner and moderators write for every member: the rules or the welcome message. An empty body means the
+ * community has none.
  */
 export interface CommunityText {
   body_html: string

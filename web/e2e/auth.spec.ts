@@ -1,7 +1,7 @@
 import { emailOf, expect, mailCode, mailLink, member, open, owner, test, uniq } from './helpers'
 
 /**
- * Signing in and joining (architecture.md, Accounts). A password is optional. The usual way in is a sign-in email
+ * Signing in and joining. A password is optional. The usual way in is a sign-in email
  * with a link and a six-digit code. The code works in the browser that asked for it. The link opens a page whose
  * Finish signing in button uses it. The server allows five sign-in emails at once from one address, so these tests
  * ask for few.

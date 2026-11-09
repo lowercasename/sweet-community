@@ -23,7 +23,7 @@ type Message struct {
 	BodyHTML  string `json:"body_html"`
 	BodyText  string `json:"body_text"`
 	CreatedAt int64  `json:"created_at"`
-	// ReplyTo is the message this one replies to, or nil (architecture.md, Chat).
+	// ReplyTo is the message this one replies to, or nil.
 	ReplyTo *ReplyTo `json:"reply_to"`
 	// Kind is "message", or "joined" or "added" for a line in the chat. A line has no body. Its author joined, or
 	// added Subject.
@@ -202,7 +202,7 @@ func replyEvents(ctx context.Context, qtx *store.Queries, messageID string) ([]e
 	return out, nil
 }
 
-// The kinds of message (architecture.md, Chat). A joined or added line is a message with no body, so it is in
+// The kinds of message. A joined or added line is a message with no body, so it is in
 // order with the messages around it.
 const (
 	MessageKind = "message"

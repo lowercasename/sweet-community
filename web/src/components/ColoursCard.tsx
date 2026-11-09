@@ -8,7 +8,7 @@ const OPTIONS: { value: ThemeChoice; label: string }[] = [
   { value: 'dark', label: 'Dark' },
 ]
 
-/** The light or dark choice, on Settings (architecture.md, Interface). It is kept on this device only. */
+/** The light or dark choice, on Settings. It is kept on this device only. */
 export function ColoursCard() {
   const [choice, setChoice] = useState<ThemeChoice>(themeChoice)
   const change = (next: ThemeChoice) => {

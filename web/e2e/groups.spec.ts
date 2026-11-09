@@ -126,7 +126,7 @@ test.describe('groups', () => {
     // Mo is now the owner, sees the settings, and cannot leave.
     await open(mo.page)
     await nav(mo.page).getByRole('button', { name }).click()
-    // The room's chat says who added mo, as a line apart from the messages (architecture.md, Chat).
+    // The room's chat says who added mo, as a line apart from the messages.
     await expect(mo.page.getByText(`${kit.username} added ${mo.username} to the room`)).toBeVisible()
     await mo.page.getByRole('button', { name: 'Members and settings' }).click()
     await expect(mo.page.getByRole('heading', { name: 'Room settings' })).toBeVisible()

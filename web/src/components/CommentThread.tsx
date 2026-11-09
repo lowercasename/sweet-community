@@ -131,7 +131,7 @@ function CommentItem({ comment, groupId, disabled, onEdit, onDelete }: CommentIt
 }
 
 /**
- * The comment thread under a post (architecture.md, Posts). It is a grey
+ * The comment thread under a post. It is a grey
  * panel with its own background. The panel contains the comments, oldest
  * first, with a hairline between each, and the reply editor at the bottom.
  * The reply editor is the only white element in the panel.

@@ -3,7 +3,7 @@
 // rules are in one table-tested place. The frontend does not duplicate the
 // rules. The server sends its decisions as `can` flags on each resource.
 //
-// Roles belong to memberships, not to users (architecture.md, Groups). An
+// Roles belong to memberships, not to users. An
 // Actor is therefore a user together with their role in the group in question.
 // The same functions serve the root group and every other group.
 package perm
@@ -36,7 +36,7 @@ type Actor struct {
 func (a Actor) member() bool { return a.Role != "" }
 func (a Actor) staff() bool  { return a.Role == Owner || a.Role == Moderator }
 
-// CanSee is the visibility rule (architecture.md, Visibility rules). A user
+// CanSee is the visibility rule. A user
 // can see a resource only when they are a member of its group. Staff have no
 // extra visibility.
 func CanSee(a Actor) bool { return a.member() }
@@ -99,7 +99,7 @@ func CreateGroup(root Actor, policy string) bool {
 func ManageInstance(root Actor) bool { return root.Role == Owner }
 
 // ManageTopics allows the root group's staff to manage the community's list
-// of topics (architecture.md, Topics).
+// of topics.
 func ManageTopics(root Actor) bool { return root.staff() }
 
 // ManageRules allows the root group's owner and moderators to write the community's rules (Raphael, 2026-11-08).
@@ -115,7 +115,7 @@ func Report(a Actor, authorID string) bool { return a.member() && a.ID != author
 
 // HandleReports allows the root group's owner and moderators to read reports and to close them by dismissing them or
 // by deleting the item. Deleting works in any group, including a room or conversation the moderator is not in,
-// because a member's report brings the item to the moderators (architecture.md, Groups).
+// because a member's report brings the item to the moderators.
 func HandleReports(root Actor) bool { return root.staff() }
 
 // OpenReported allows a moderator to open a reported item in place when they can see it. An item in a conversation
@@ -123,8 +123,7 @@ func HandleReports(root Actor) bool { return root.staff() }
 func OpenReported(a Actor, g Group) bool { return a.member() && g.Kind != KindDM }
 
 // ByRole reports whether an action is allowed only because of the actor's role in the group. It is allowed, and it
-// would not be allowed if the actor were a plain member. The client marks such an action with a shield
-// (architecture.md, Interface).
+// would not be allowed if the actor were a plain member. The client marks such an action with a shield.
 func ByRole(a Actor, allowed func(Actor) bool) bool {
 	return allowed(a) && !allowed(Actor{ID: a.ID, Role: Member})
 }
@@ -150,7 +149,7 @@ func Transfer(a, target Actor) bool { return a.Role == Owner && target.member() 
 func AddMembers(a Actor, g Group) bool { return g.Kind != KindDM && a.staff() }
 func RemoveMembers(a Actor) bool       { return a.staff() }
 
-// RemoveFromInstance (architecture.md, Admin tools) allows root staff to
+// RemoveFromInstance allows root staff to
 // remove users with a lower role. A moderator can remove members. The owner
 // can remove members and moderators. Any user can remove themselves. The owner
 // cannot be removed and must transfer ownership first.

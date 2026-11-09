@@ -15,8 +15,8 @@ import (
 	"sweet/internal/store"
 )
 
-// This file implements the account settings and the email tokens
-// (architecture.md, Accounts). A password is optional. Signing in by email is
+// This file implements the account settings and the email tokens.
+// A password is optional. Signing in by email is
 // in signin.go. A change of address takes effect once the new address is
 // confirmed by a link, and that link signs nobody in. Tokens are stored by
 // hash, expire, and can be used once. No endpoint reveals whether an address

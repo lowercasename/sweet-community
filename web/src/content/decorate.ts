@@ -1,5 +1,5 @@
 /**
- * Mentions are resolved at render time (architecture.md, Posts). A stored
+ * Mentions are resolved at render time. A stored
  * mention is <span data-mention-id="uuid">@name</span>, and the name shown is
  * the user's current name, so a rename breaks nothing. Each mention becomes
  * an anchor to the user's profile page, which Body routes without a page

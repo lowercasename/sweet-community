@@ -6,7 +6,7 @@ import (
 	"golang.org/x/net/html"
 )
 
-// This file extracts data from a sanitised body (architecture.md, Posts). It
+// This file extracts data from a sanitised body. It
 // walks the parsed tree for mention ids. Hashtag extraction is not written
 // until the decision between tags and topics is made.
 

@@ -4,7 +4,7 @@ import { cleanup, fireEvent, screen, waitFor } from '@testing-library/react'
 import { ROOT, group, paragraph, renderWithQuery, user } from '../test-utils'
 
 /**
- * The welcome dialog (architecture.md, New-instance lifecycle). It opens the first time a user sees Home, shows the
+ * The welcome dialog. It opens the first time a user sees Home, shows the
  * welcome message under the owner's name, and offers the tour.
  */
 vi.mock('../api', async (importOriginal) => ({

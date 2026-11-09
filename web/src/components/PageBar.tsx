@@ -11,7 +11,7 @@ interface PageBarProps {
 }
 
 /**
- * The bar across the top of every view (architecture.md, Layout), on both
+ * The bar across the top of every view, on both
  * phone and desktop. It shows the view's title, a back button when the view
  * is nested under another view, and the view's controls. The controls never
  * wrap. The title shrinks first and is truncated to one line. On a phone the

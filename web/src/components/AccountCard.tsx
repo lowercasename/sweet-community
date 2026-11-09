@@ -6,7 +6,7 @@ import { keys } from '../data/keys'
 import { Alert, Button, Card, ConfirmDialog, Field, Form, Heading, Input, Row, Stack, Text } from '../ui'
 
 /**
- * The user's email address and password (architecture.md, Accounts). A new address stays pending until the link sent
+ * The user's email address and password. A new address stays pending until the link sent
  * to it is used. A password is optional. Setting, changing and removing it ask for no current password, because the
  * account's email can always sign in. Each one signs out every other device and emails a notice.
  */

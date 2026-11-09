@@ -86,7 +86,7 @@ func bombGIF(frames int) []byte {
 }
 
 // An animated GIF is refused when its frames add up to more than
-// maxAnimationPixels, before any frame is decoded (architecture.md, Images).
+// maxAnimationPixels, before any frame is decoded.
 // Before 2026-11-08 every frame was decoded, and one small file could take
 // gigabytes of memory.
 func TestAnimatedGIFIsLimitedByItsFramesBeforeDecoding(t *testing.T) {

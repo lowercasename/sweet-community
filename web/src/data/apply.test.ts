@@ -124,7 +124,7 @@ describe('applyEvent', () => {
     applyEvent(qc, 'message', message('m4', kit, { created_at: 12 }))
     applyEvent(qc, 'message', message('m0', mo, { created_at: 9 }))
     applyEvent(qc, 'message', message('c1', mo, { group_id: CLUB, created_at: 30 }))
-    // A joined or added line does not make the chat unread (architecture.md, Chat).
+    // A joined or added line does not make the chat unread.
     applyEvent(qc, 'message', message('j1', mo, { created_at: 40, kind: 'joined', body_html: '', body_text: '' }))
     expect(unread(`chat:${ROOT}`)).toBe(1)
     expect(unread(`chat:${CLUB}`)).toBe(3)

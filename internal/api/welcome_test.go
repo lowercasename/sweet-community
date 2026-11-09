@@ -2,7 +2,7 @@ package api
 
 import "testing"
 
-// TestWelcome covers the welcome message (architecture.md, Admin tools). It works like the rules: every member reads
+// TestWelcome covers the welcome message. It works like the rules: every member reads
 // it, and the owner and moderators write it.
 func TestWelcome(t *testing.T) {
 	ts, owner := newTestServer(t)

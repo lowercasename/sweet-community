@@ -4,7 +4,7 @@ export const GALLERY_MAX = 8
 /**
  * Wraps each run of adjacent top-level <img> elements in
  * <div class="gallery" data-count="N">, for the .gallery rules in global.css.
- * Stored HTML never contains gallery markup (architecture.md). The gallery is
+ * Stored HTML never contains gallery markup. The gallery is
  * a render-time view of plain images, so the editor and the sanitiser only
  * ever see <img>. A run of 2 or more images becomes galleries of at most
  * GALLERY_MAX images each. A single leftover image stays a plain image.

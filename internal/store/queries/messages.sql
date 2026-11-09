@@ -54,6 +54,6 @@ UPDATE messages SET deleted_at = COALESCE(deleted_at, sqlc.arg(deleted_at)), bod
 WHERE author_id = sqlc.arg(author_id);
 
 -- name: CreateChatLine :exec
--- A joined or added line in a chat (architecture.md, Chat). It has no body.
+-- A joined or added line in a chat. It has no body.
 INSERT INTO messages (id, group_id, author_id, body_html, body_text, created_at, kind, subject_id)
 VALUES (sqlc.arg(id), sqlc.arg(group_id), sqlc.arg(author_id), '', '', sqlc.arg(created_at), sqlc.arg(kind), sqlc.narg(subject_id));

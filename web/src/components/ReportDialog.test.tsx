@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/react'
 
 /**
- * Reporting a post, comment or message (architecture.md, Admin tools). The dialog says who will see the item, takes
+ * Reporting a post, comment or message. The dialog says who will see the item, takes
  * an optional reason, sends the report, and then says it was sent.
  */
 vi.mock('../api', () => ({ createReport: vi.fn(() => Promise.resolve()) }))

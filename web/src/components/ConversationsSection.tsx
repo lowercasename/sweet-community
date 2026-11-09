@@ -34,7 +34,7 @@ interface ConversationsSectionProps {
 }
 
 /**
- * The Conversations section of the nav (architecture.md, Layout). It has a New
+ * The Conversations section of the nav. It has a New
  * message control of its own and the five conversations with the latest
  * messages. The open conversation is also listed if it is older. Each
  * conversation is labelled with the other user's name and shown with their

@@ -1,4 +1,4 @@
-// Package mail sends Sweet's emails (architecture.md, Email). It sends over
+// Package mail sends Sweet's emails. It sends over
 // plain SMTP when SMTP is configured. Otherwise it writes one file per message
 // to a directory, which development and the tests read.
 package mail

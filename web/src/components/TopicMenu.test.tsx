@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import type { Topic } from '../api'
 
-/** The topic menu (architecture.md, Topics). For staff, the feed's menu ends with Edit topics. */
+/** The topic menu. For staff, the feed's menu ends with Edit topics. */
 afterEach(cleanup)
 
 const topic = (id: string, name: string): Topic => ({

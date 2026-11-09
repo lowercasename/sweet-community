@@ -1,7 +1,7 @@
 import { expect, member, open, owner, test, uniq } from './helpers'
 
 /**
- * The community's rules (architecture.md, Admin tools). The owner writes them on the Community page. Home's bar then
+ * The community's rules. The owner writes them on the Community page. Home's bar then
  * has a Rules button that opens them, for every member at once. The join page shows them, and joining agrees to them.
  */
 test.describe('rules', () => {

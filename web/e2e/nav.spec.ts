@@ -26,7 +26,7 @@ test.describe('nav', () => {
     )
     const title = nav(kit).getByRole('group', { name: 'Rooms' }).getByText('Rooms', { exact: true })
     await expect(title).toHaveCSS('color', 'rgb(105, 105, 105)')
-    // The release is no longer in the nav. It is at the bottom of Home's feed (architecture.md, Updates).
+    // The release is no longer in the nav. It is at the bottom of Home's feed.
     await expect(nav(kit).getByText('Sweet dev')).toHaveCount(0)
     await kit.context.close()
   })

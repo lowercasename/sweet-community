@@ -19,8 +19,7 @@ import (
 )
 
 // Group is the wire shape of a group as one viewer sees it. It includes the
-// viewer's role in the group and the actions they may perform on it
-// (architecture.md, Groups).
+// viewer's role in the group and the actions they may perform on it.
 type Group struct {
 	ID   string `json:"id"`
 	Kind string `json:"kind"`
@@ -32,8 +31,7 @@ type Group struct {
 	Picture *string `json:"picture"`
 	// LastMessageAt is the time of the group's newest live message, or null.
 	// It is computed when the response is built and never stored. The
-	// Messages page uses it to order DMs by latest activity (architecture.md,
-	// Layout).
+	// Messages page uses it to order DMs by latest activity.
 	LastMessageAt *int64   `json:"last_message_at"`
 	Role          string   `json:"role,omitempty"`
 	Can           GroupCan `json:"can"`
@@ -70,8 +68,7 @@ type GroupCan struct {
 	HandleReports bool `json:"handle_reports,omitempty"`
 }
 
-// Settings is the wire shape of the instance's settings (architecture.md,
-// Feature flags, Admin tools). The owner sets them. Everyone can read them,
+// Settings is the wire shape of the instance's settings. The owner sets them. Everyone can read them,
 // signed in or not, because the sign-in and join pages show the community's
 // name. OwnerSet is state rather than a setting. It is false until the setup
 // link has been used, which gives the owner a verified email address.
@@ -296,7 +293,7 @@ func (s *Server) createGroup(w http.ResponseWriter, r *http.Request) {
 		for _, id := range in.Members {
 			people[id] = true
 		}
-		// A conversation has two members (architecture.md, Groups). A group with more is a room.
+		// A conversation has two members. A group with more is a room.
 		if len(people) != 2 {
 			writeErr(w, http.StatusBadRequest, "A conversation is between two people. For more people, make a room.")
 			return
@@ -311,8 +308,8 @@ func (s *Server) createGroup(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// openConversation returns the conversation of exactly these two users
-// (architecture.md, Groups). There is one per pair, keyed by the sorted ids.
+// openConversation returns the conversation of exactly these two users.
+// There is one per pair, keyed by the sorted ids.
 // It is found or created inside one transaction, so two concurrent requests
 // cannot create two. The viewer is one of the two. If the viewer had hidden
 // the conversation, it is unhidden, which produces a membership event. The
@@ -591,13 +588,13 @@ func (s *Server) addMember(w http.ResponseWriter, r *http.Request) {
 		}
 		m := wireMembership(g.ID, row)
 		entries := []events.Entry{{Kind: "membership", Payload: m}}
-		// The room's chat says who added whom (architecture.md, Chat).
+		// The room's chat says who added whom.
 		line, err := chatLine(r.Context(), qtx, g.ID, AddedKind, a.ID, in.UserID, now)
 		if err != nil {
 			return nil, nil, http.StatusInternalServerError, err
 		}
 		entries = append(entries, line)
-		// The added user is notified (architecture.md, Notifications). The membership event alone does not produce a notification.
+		// The added user is notified. The membership event alone does not produce a notification.
 		if told, err := notify(r, qtx, NotifyAdded, in.UserID, a.ID, g.ID, nil, now); err != nil {
 			return nil, nil, http.StatusInternalServerError, err
 		} else if told != nil {
@@ -701,8 +698,7 @@ func (s *Server) removeMember(w http.ResponseWriter, r *http.Request) {
 		}
 		if g.Kind == perm.KindDM {
 			// Leaving a conversation hides it. The membership row remains, hidden_at
-			// is set, and opening the conversation again unhides it (architecture.md,
-			// Groups).
+			// is set, and opening the conversation again unhides it.
 			if err := qtx.HideMembership(r.Context(), store.HideMembershipParams{HiddenAt: sql.NullInt64{Int64: db.Now(), Valid: true}, GroupID: g.ID, UserID: uid}); err != nil {
 				return nil, nil, http.StatusInternalServerError, err
 			}
@@ -733,7 +729,7 @@ func (s *Server) removeMember(w http.ResponseWriter, r *http.Request) {
 }
 
 // events is the SSE endpoint, filtered and personalised for the signed-in
-// viewer (architecture.md, Realtime). The connection tracks the viewer's
+// viewer. The connection tracks the viewer's
 // role in each group and updates it from the viewer's own membership events,
 // so an event for a group they are not in is never written.
 func (s *Server) events(w http.ResponseWriter, r *http.Request) {
@@ -927,7 +923,7 @@ func filterEvent(viewer User, roles map[string]string, st *Settings, e events.Ev
 		}
 		return e, true
 	case "report", "report_delete":
-		// Sent to the root group's owner and moderators only (architecture.md, Admin tools). A report is personalised
+		// Sent to the root group's owner and moderators only. A report is personalised
 		// with the viewer's role in the reported item's group, which decides whether they can open it.
 		if !perm.HandleReports(perm.Actor{ID: viewer.ID, Role: roles[perm.Root]}) {
 			return e, false

@@ -14,7 +14,7 @@ interface VerifyProps {
 }
 
 /**
- * The page a link to confirm a changed address opens (architecture.md, Accounts). Email security scanners open the
+ * The page a link to confirm a changed address opens. Email security scanners open the
  * links in a message, so the token is used only when Confirm address is pressed. Confirming signs nobody in.
  */
 export function Verify({ token, name, signedIn, onConfirmed }: VerifyProps) {

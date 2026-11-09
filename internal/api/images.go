@@ -94,7 +94,7 @@ func (s *Server) serveImage(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusInternalServerError, err.Error())
 		return
 	}
-	// The visibility rule for images (architecture.md, Images). The viewer
+	// The visibility rule for images. The viewer
 	// may see an image when they uploaded it, when it is a profile picture,
 	// or when a live body in one of the viewer's groups references it.
 	me, _ := userFrom(r.Context())

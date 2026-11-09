@@ -2,7 +2,7 @@ import type { APIRequestContext } from '@playwright/test'
 import { anyView, article, confirm, expect, member, open, owner, pick, test, uniq, writePost } from './helpers'
 
 /**
- * Reporting (architecture.md, Admin tools). A member reports a post, comment or message from its menu. The owner and
+ * Reporting. A member reports a post, comment or message from its menu. The owner and
  * the moderators are notified, and act on the report from the Reports card at the top of the Community page.
  */
 

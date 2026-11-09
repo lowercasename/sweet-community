@@ -1,4 +1,4 @@
--- Reports (architecture.md, Admin tools). A member reports a post, comment or message to the community's owner and
+-- Reports. A member reports a post, comment or message to the community's owner and
 -- moderators. A report keeps a copy of the item's body as it was when reported. A user reports an item once.
 CREATE TABLE reports (
     id TEXT PRIMARY KEY,

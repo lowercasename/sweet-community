@@ -1,4 +1,4 @@
--- Reports (architecture.md, Admin tools). Only the root group's owner and moderators read them. The handlers check
+-- Reports. Only the root group's owner and moderators read them. The handlers check
 -- perm.HandleReports before running any of these queries except CreateReport.
 
 -- name: CreateReport :execrows

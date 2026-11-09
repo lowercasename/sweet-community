@@ -10,7 +10,7 @@ interface LoginProps {
 }
 
 /**
- * The sign-in page (architecture.md, Accounts). The usual way in is a sign-in email with a link and a code. A
+ * The sign-in page. The usual way in is a sign-in email with a link and a code. A
  * password is optional, so Use a password instead shows a password field. An account whose address is not verified
  * yet is sent a sign-in email instead, because using it verifies the address.
  */

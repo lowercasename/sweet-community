@@ -6,8 +6,8 @@ import { useEventStream, type StreamStatus } from './useEventStream'
 const StreamContext = createContext<StreamStatus>('connecting')
 
 /**
- * One SSE connection per page, writing directly into the query cache
- * (architecture.md, Client data). Nothing else listens to the stream. A
+ * One SSE connection per page, writing directly into the query cache.
+ * Nothing else listens to the stream. A
  * reconnect after a disconnection invalidates every query. The stream replays
  * the missed events, and the invalidation is a second safeguard.
  */

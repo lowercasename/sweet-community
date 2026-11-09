@@ -2,7 +2,7 @@ import type { Page } from '@playwright/test'
 import { expect, member, open, owner, test, uniq } from './helpers'
 
 /**
- * The welcome dialog and the tour (architecture.md, New-instance lifecycle, and docs/tour-script.md). The dialog opens
+ * The welcome dialog and the tour. The dialog opens
  * the first time a user sees Home. The tour's cards point at parts of the page and must fit the screen at each width.
  */
 

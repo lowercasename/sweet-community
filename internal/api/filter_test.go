@@ -8,7 +8,7 @@ import (
 )
 
 // A delete event for a post, comment or message reaches only the members of
-// its group (architecture.md, Realtime). Before 2026-11-08 it reached every
+// its group. Before 2026-11-08 it reached every
 // user, which showed when people were active in rooms and conversations the
 // viewer is not in.
 func TestDeleteEventsReachOnlyTheGroupsMembers(t *testing.T) {

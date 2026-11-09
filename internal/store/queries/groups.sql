@@ -1,4 +1,4 @@
--- Groups and memberships (architecture.md, Groups). Roles are stored on
+-- Groups and memberships. Roles are stored on
 -- memberships, not on users. perm decides who can do what. The queries do
 -- not check permissions.
 
@@ -61,7 +61,7 @@ SELECT m.group_id, m.role, g.kind FROM memberships m JOIN groups g ON g.id = m.g
 WHERE m.user_id = sqlc.arg(user_id) AND g.deleted_at IS NULL;
 
 -- name: NextOwner :one
--- Succession by seniority (architecture.md, Groups). The next owner is the
+-- Succession by seniority. The next owner is the
 -- longest-serving moderator, or else the longest-serving member.
 SELECT user_id FROM memberships WHERE group_id = sqlc.arg(group_id) AND user_id != sqlc.arg(user_id)
 ORDER BY role = 'moderator' DESC, joined_at ASC LIMIT 1;

@@ -5,7 +5,7 @@ import type { Group } from '../api'
 import { ROOT, dm, group, marker, nameOf, notification, renderWithQuery, user } from '../test-utils'
 
 /**
- * The nav column has three blocks (architecture.md, Layout). The first block
+ * The nav column has three blocks. The first block
  * lists the groups. It has Home, the Rooms section with its own New room
  * control, and the Conversations section with the user's five latest conversations
  * and All conversations at the bottom. The second block has the tools, which are
@@ -51,7 +51,7 @@ const groupsSection = () => screen.getByRole('group', { name: 'Rooms' })
 const messages = () => screen.getByRole('group', { name: 'Conversations' })
 
 describe('Sidebar', () => {
-  it("does not name the release, which is at the bottom of Home's feed (architecture.md, Updates)", async () => {
+  it("does not name the release, which is at the bottom of Home's feed", async () => {
     await draw([root(true)])
     await screen.findByRole('button', { name: 'Collapse' })
     expect(screen.queryByText(/^Sweet v/)).toBeNull()

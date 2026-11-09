@@ -36,10 +36,9 @@ var Of = sync.OnceValue(func() string {
 // a tag is named by `git describe`, such as v1.2.3-4-gab1c234.
 var release string
 
-// Release is the release the binary was built from (architecture.md,
-// Updates), shown in the nav as "Sweet v1.2.3". A binary built without the
-// setting, such as go run during development, reports "dev". Of, not
-// Release, decides when an open tab reloads.
+// Release is the release the binary was built from, shown at the bottom of Home's feed as "Sweet v1.2.3". A binary
+// built without the setting, such as go run during development, reports "dev". Of, not Release, decides when an open
+// tab reloads.
 func Release() string {
 	if release == "" {
 		return "dev"

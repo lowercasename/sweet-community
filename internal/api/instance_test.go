@@ -46,7 +46,7 @@ func newFreshServer(t *testing.T) (*httptest.Server, string) {
 	return ts, link
 }
 
-// The instance lifecycle (architecture.md, New-instance lifecycle). The setup
+// The instance lifecycle. The setup
 // link creates the owner, whose address counts as verified because they hold
 // the link. The community has no name until the owner sets one. Every client
 // can read the name, logged in or not.
@@ -155,8 +155,8 @@ func TestVersionIsForSignedInUsers(t *testing.T) {
 	}
 }
 
-// GET /api/version also gives the address of the source code, which the line at the bottom of Home's feed links to
-// (architecture.md, Licence). It is the public repository unless the server names a fork.
+// GET /api/version also gives the address of the source code, which the line at the bottom of Home's feed links to.
+// It is the public repository unless the server names a fork.
 func TestVersionGivesTheSourceAddress(t *testing.T) {
 	_, owner, srv := newTestServerWith(t)
 	if v := owner.mustStatus(200, "GET", "/api/version", nil); v["source_url"] != "https://github.com/lowercasename/sweet-community" {

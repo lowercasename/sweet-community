@@ -213,8 +213,8 @@ export function png(w: number, h: number, rgb: [number, number, number] = [206, 
 }
 
 /**
- * The test function. After every test it checks that no prepared page reported a content security policy violation
- * (architecture.md, Accounts), so a policy that blocks something a flow needs fails that flow.
+ * The test function. After every test it checks that no prepared page reported a content security policy violation,
+ * so a policy that blocks something a flow needs fails that flow.
  */
 export const test = base.extend<{ policyGuard: void }>({
   policyGuard: [

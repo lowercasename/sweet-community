@@ -84,8 +84,7 @@ type EraseAuthorPostsParams struct {
 	AuthorID  string
 }
 
-// Deletes every post of a removed user and clears its text, including posts deleted before (architecture.md, Admin
-// tools).
+// Deletes every post of a removed user and clears its text, including posts deleted before.
 func (q *Queries) EraseAuthorPosts(ctx context.Context, arg EraseAuthorPostsParams) error {
 	_, err := q.db.ExecContext(ctx, eraseAuthorPosts, arg.DeletedAt, arg.AuthorID)
 	return err

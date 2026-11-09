@@ -11,7 +11,7 @@ interface GroupViewProps {
   group: Group
   /** True while the view is behind another page. The view stays mounted so drafts are kept. */
   hidden: boolean
-  /** The topic that the community's feed is filtered to (architecture.md, Topics). */
+  /** The topic that the community's feed is filtered to. */
   topicId?: string | null
   /** A chat message to scroll to, from a notification. The chat pane is shown if it is hidden. */
   focusMessage?: string | null
@@ -38,7 +38,7 @@ export function GroupView({ group, hidden, topicId = null, focusMessage = null, 
   const { layout, narrow, ratio, setLayout, setRatio } = useLayout()
   const both = group.mode === 'both'
   const show = layout === 'both' ? 'both' : layout === 'posts' ? 'left' : 'right'
-  // Home's feed ends with the release and the source code link (architecture.md, Updates and Licence). A room's does not.
+  // Home's feed ends with the release and the source code link. A room's does not.
   const foot = group.kind === 'root' ? <SweetColophon /> : undefined
   // A notification for a chat message opens the chat, on a phone in place of the posts.
   useEffect(() => {

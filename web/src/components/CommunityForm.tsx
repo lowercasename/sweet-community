@@ -17,7 +17,7 @@ const CREATION: { value: Settings['group_creation']; label: string }[] = [
 ]
 
 /**
- * The form for the community's settings (architecture.md, Admin tools). The
+ * The form for the community's settings. The
  * settings are its name, its description and who may create groups. The
  * welcome page and the Community page use this one form, so the two cannot
  * differ on which settings a community has.

@@ -67,8 +67,8 @@ interface HomeProps {
 }
 
 /**
- * The signed-in app: a nav column on the left, then the page the URL names
- * (architecture.md, Layout), under a bar that names it. `/` and `/r/<id>`
+ * The signed-in app: a nav column on the left, then the page the URL names,
+ * under a bar that names it. `/` and `/r/<id>`
  * are a group's view (a DM's too); the other pages show over it, a post's
  * page over its room. The last group the URL named stays mounted behind
  * them, so a half-written post or message survives a visit to Settings or
@@ -85,12 +85,12 @@ export function Home({ me, onSignOut }: HomeProps) {
   const [atMembers, membersParams] = useRoute('/r/:id/members')
   const [atPost, postParams] = useRoute('/p/:id')
   const [atProfile, profileParams] = useRoute('/u/:name')
-  // The words searched for live in the URL, and so does the topic Home is showing (architecture.md, Topics).
+  // The words searched for live in the URL, and so does the topic Home is showing.
   const search = new URLSearchParams(useSearch())
   const searched = search.get('q') ?? ''
   const atRoot = location === '/'
   const topicId = atRoot ? search.get('topic') : null
-  // The chat message to scroll to, from a notification (architecture.md, Notifications).
+  // The chat message to scroll to, from a notification.
   const focusMessage = search.get('message')
   const { topics, loading: topicsLoading } = useTopics()
   const { settings } = useSettings()
@@ -116,7 +116,7 @@ export function Home({ me, onSignOut }: HomeProps) {
           ? 'search'
           : undefined
   const postAuthor = useAuthor(openPost?.author ?? me)
-  // Hiding a conversation (architecture.md, Groups): from its bar's menu, after a word of confirmation.
+  // Hiding a conversation: from its bar's menu, after a word of confirmation.
   const groupActions = useGroupActions()
   const [hiding, setHiding] = useState(false)
   const [busy, setBusy] = useState(false)
@@ -208,7 +208,7 @@ export function Home({ me, onSignOut }: HomeProps) {
                 onChange={setLayout}
               />
             )}
-            {/* The community's rules, when it has some (architecture.md, Admin tools). On the phone they are in the menu. */}
+            {/* The community's rules, when it has some. On the phone they are in the menu. */}
             {atRoot && rules && !narrow && (
               <Button variant="ghost" icon="rules" label="Rules" tour="rules" onClick={() => navigate(RULES)}>
                 Rules
@@ -302,7 +302,7 @@ export function Home({ me, onSignOut }: HomeProps) {
             onFocused={() => navigate(location, { replace: true })}
           />
         )}
-        {/* The welcome dialog and the tour (architecture.md, New-instance lifecycle). Settings asks for it with ?welcome. */}
+        {/* The welcome dialog and the tour. Settings asks for it with ?welcome. */}
         {root && (
           <Welcome
             root={root}

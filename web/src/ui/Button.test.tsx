@@ -4,7 +4,7 @@ import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { ActionRow, ActionRows, Button, ConfirmDialog, Menu } from './index'
 
 /**
- * The button system (architecture.md, Interface): four variants, a busy state that
+ * The button system: four variants, a busy state that
  * keeps the label, a confirm dialog whose confirm button carries the danger
  * icon, danger items in menus, and action rows.
  */

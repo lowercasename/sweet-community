@@ -6,7 +6,7 @@ import (
 	"testing"
 )
 
-// Search (architecture.md, Search). Search matches posts, comments and
+// Search. Search matches posts, comments and
 // messages by their text, only in the groups the searcher is in. A deleted
 // item is no longer found. An edited item is found by its new text. A comment
 // on a deleted post is removed from search with the post. A query can never

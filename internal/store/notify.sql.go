@@ -154,8 +154,7 @@ type GetUserSettingParams struct {
 	Key    string
 }
 
-// Notifications sent to a user outside the app (architecture.md,
-// Notifications). These queries cover the user's own settings, the weekly
+// Notifications sent to a user outside the app. These queries cover the user's own settings, the weekly
 // digest's counts, and the devices the user subscribed for push.
 func (q *Queries) GetUserSetting(ctx context.Context, arg GetUserSettingParams) (string, error) {
 	row := q.db.QueryRowContext(ctx, getUserSetting, arg.UserID, arg.Key)

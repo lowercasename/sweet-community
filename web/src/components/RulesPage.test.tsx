@@ -4,7 +4,7 @@ import { cleanup, screen } from '@testing-library/react'
 import { keys } from '../data/keys'
 import { renderWithQuery, paragraph } from '../test-utils'
 
-/** The rules page, opened from the Rules button on Home (architecture.md, Admin tools). */
+/** The rules page, opened from the Rules button on Home. */
 vi.mock('../api', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../api')>()),
   getRules: vi.fn(() => Promise.resolve({ body_html: '' })),

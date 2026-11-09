@@ -29,7 +29,7 @@ interface SearchPageProps {
 const KIND_WORD: Record<Hit['kind'], string> = { post: 'Post', comment: 'Comment', message: 'Message' }
 
 /**
- * The search page (architecture.md, Search). The query is stored in the URL,
+ * The search page. The query is stored in the URL,
  * so a search can be bookmarked or shared. The hits are posts, comments and
  * messages from the groups the user is in, best match first. Each hit shows
  * its kind, its location, its author and its time, with the matching words

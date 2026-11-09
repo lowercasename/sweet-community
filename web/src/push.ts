@@ -2,7 +2,7 @@ import { getPushKey, subscribePush, unsubscribePush } from './api'
 import { isInstalled, isIOS } from './install'
 
 /**
- * Web push on this device (architecture.md, Notifications). The browser
+ * Web push on this device. The browser
  * holds the subscription, and the server keeps a copy so it can send pushes.
  * On an iPhone push works only once Sweet is added to the home screen.
  */

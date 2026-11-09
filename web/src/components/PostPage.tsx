@@ -12,7 +12,7 @@ interface PostPageProps {
 }
 
 /**
- * The page for a single post at `/p/<id>` (architecture.md, Posts). It shows
+ * The page for a single post at `/p/<id>`. It shows
  * the post with its comment thread open. The bar above it is rendered by
  * Home. The bar shows the post's author and links back to the post's group.
  * Notifications link to this page. A deleted post and a post in a group the

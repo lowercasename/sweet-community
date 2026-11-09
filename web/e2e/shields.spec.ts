@@ -21,7 +21,7 @@ async function shieldDrop(shield: Locator, text: Locator): Promise<number> {
 const onTheLine = (drop: number) => expect(drop).toBeGreaterThanOrEqual(0.5) && expect(drop).toBeLessThanOrEqual(1.6)
 
 /**
- * The shield (architecture.md, Interface) marks what a person sees or can do only because they are an owner or a
+ * The shield marks what a person sees or can do only because they are an owner or a
  * moderator. The owner sees it on Delete for another member's post, on the Community item, and on each card of the
  * Community page. The author's own Delete has none.
  */

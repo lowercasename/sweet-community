@@ -1,8 +1,8 @@
 import { article, expect, member, open, postEditor, test, uniq } from './helpers'
 
 /**
- * Empty paragraphs at the start and end of a body are removed when it is sent
- * (architecture.md, Posts and editor). The server trims them, so the post as
+ * Empty paragraphs at the start and end of a body are removed when it is sent.
+ * The server trims them, so the post as
  * shown, which is the row the server saved, has none.
  */
 test.describe('trimming', () => {

@@ -11,8 +11,8 @@ import (
 	"sweet/internal/store"
 )
 
-// A subscription's endpoint must belong to a browser's push service
-// (architecture.md, Notifications). The server sends a request to every
+// A subscription's endpoint must belong to a browser's push service.
+// The server sends a request to every
 // endpoint it stores, so any other address would let a user make the server
 // send requests to hosts of their choice.
 func TestAllowedEndpoint(t *testing.T) {

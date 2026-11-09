@@ -6,8 +6,8 @@ import (
 	"strings"
 )
 
-// Content is the structure of every email Sweet sends (architecture.md,
-// Email). It has the sender's community name, a heading, a few short lines,
+// Content is the structure of every email Sweet sends. It has the sender's community name, a heading, a few short
+// lines,
 // at most one link, and a note. One renderer produces both the plain text and
 // the HTML of a message, so every email has the same layout and is quick to
 // read on a phone.

@@ -38,7 +38,7 @@
   }
 
   /*
-   * Dark mode (architecture.md, Interface). public/theme.js sets data-theme to dark when the device asks for dark or
+   * Dark mode. public/theme.js sets data-theme to dark when the device asks for dark or
    * when the user chose dark on Settings. Each token gets a dark value that
    * keeps the light palette's contrast rules: text at least 4.5:1 on every surface it sits on, a field's border and
    * the focus ring at least 3:1. Sweet red is lighter, so red text passes on dark surfaces, and text on a red fill is

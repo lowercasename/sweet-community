@@ -7,7 +7,7 @@ import (
 	"sweet/internal/push"
 )
 
-// Replies to chat messages (architecture.md, Chat). A message can reply to an
+// Replies to chat messages. A message can reply to an
 // earlier message in the same chat. The reply carries a snippet of the
 // original, built by the server from the original row: its id, author and
 // plain text, or only its id and deleted once the original is deleted. The

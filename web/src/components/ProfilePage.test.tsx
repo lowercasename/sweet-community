@@ -5,7 +5,7 @@ import { ROOT, group, paragraph, post, renderWithQuery, user } from '../test-uti
 import type { Profile } from '../api'
 
 /**
- * A user's profile page (architecture.md, Accounts). It shows the user's
+ * A user's profile page. It shows the user's
  * details, a bio that only they can edit, a Message button, and their posts
  * from the groups the viewer shares with them.
  */

@@ -41,12 +41,12 @@ type User struct {
 type Can struct {
 	Edit   bool `json:"edit"`
 	Delete bool `json:"delete"`
-	// Report is true for every member but the author (architecture.md, Admin tools).
+	// Report is true for every member but the author.
 	Report bool `json:"report"`
 	// DeleteByRole is true when Delete is allowed only because of the viewer's role in the item's group. The client
-	// marks that Delete with a shield (architecture.md, Interface).
+	// marks that Delete with a shield.
 	DeleteByRole bool `json:"delete_by_role,omitempty"`
-	// SetTopic is set only on a post (architecture.md, Topics). The author or the root group's staff may set its topic.
+	// SetTopic is set only on a post. The author or the root group's staff may set its topic.
 	SetTopic bool `json:"set_topic,omitempty"`
 }
 
@@ -55,7 +55,7 @@ type Can struct {
 type Post struct {
 	ID      string `json:"id"`
 	GroupID string `json:"group_id"`
-	// TopicID is the id of the post's topic, or null (architecture.md, Topics).
+	// TopicID is the id of the post's topic, or null.
 	TopicID      *string `json:"topic_id"`
 	Author       User    `json:"author"`
 	BodyHTML     string  `json:"body_html"`
@@ -140,7 +140,7 @@ type Server struct {
 	// Mail sends verification and reset links. BaseURL is the URL they point to.
 	Mail    mail.Sender
 	BaseURL string
-	// SourceURL is where the Source code link at the bottom of Home's feed points (architecture.md, Licence). Empty
+	// SourceURL is where the Source code link at the bottom of Home's feed points. Empty
 	// means the public repository. Someone who runs a changed version sets it to their own repository.
 	SourceURL string
 	// ProxyHops is the number of reverse proxies in front of the server that
@@ -148,7 +148,7 @@ type Server struct {
 	// directly and the header is ignored, because any client can send one.
 	ProxyHops int
 	// Push sends a push notification to a user's devices for a mention or a
-	// reply (architecture.md, Notifications). It is nil when push is not set
+	// reply. It is nil when push is not set
 	// up. PushKey is the public VAPID key.
 	Push    *push.Pusher
 	PushKey string
@@ -195,7 +195,7 @@ func EnsureOwner(ctx context.Context, d *sql.DB, username, password string) (Use
 	default:
 		u.ID = row.ID
 	}
-	// The owner is the root group's owner (architecture.md, Groups).
+	// The owner is the root group's owner.
 	if _, err := q.GetMembership(ctx, store.GetMembershipParams{GroupID: perm.Root, UserID: u.ID}); errors.Is(err, sql.ErrNoRows) {
 		if err := q.CreateMembership(ctx, store.CreateMembershipParams{GroupID: perm.Root, UserID: u.ID, Role: perm.Owner, JoinedAt: now}); err != nil {
 			return u, err
@@ -345,7 +345,7 @@ func pageParams(r *http.Request, defaultLimit, maxLimit int) (before int64, limi
 func (s *Server) listPosts(w http.ResponseWriter, r *http.Request) {
 	g, a := groupFrom(r.Context())
 	before, limit := pageParams(r, 20, 100)
-	// ?topic= filters the community's feed to one topic (architecture.md, Topics).
+	// ?topic= filters the community's feed to one topic.
 	var topic any
 	if t := r.URL.Query().Get("topic"); t != "" {
 		topic = t
@@ -369,7 +369,7 @@ func (s *Server) listPosts(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{"posts": posts, "next_before": next})
 }
 
-// getPost returns one post by id (architecture.md, Posts). The post page
+// getPost returns one post by id. The post page
 // fetches it when the feed it belongs to is not loaded. As on every endpoint,
 // the response is 404 when the viewer is not a member of the post's group.
 func (s *Server) getPost(w http.ResponseWriter, r *http.Request) {
@@ -542,7 +542,7 @@ func (s *Server) createPost(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	// Only the community's feed has topics (architecture.md, Topics).
+	// Only the community's feed has topics.
 	if topicID != nil && g.ID != perm.Root {
 		writeErr(w, http.StatusBadRequest, "Only posts on the community's feed have topics")
 		return
@@ -689,7 +689,7 @@ const DefaultSourceURL = "https://github.com/lowercasename/sweet-community"
 
 // getVersion is `GET /api/version`, for signed-in users only, so the release is not shown to anyone scanning for
 // old versions. It names the release the binary was built from, the build's own identifier, which open tabs use to
-// reload (architecture.md, Updates), and the address of the source code (architecture.md, Licence). The line at the
+// reload, and the address of the source code. The line at the
 // bottom of Home's feed shows the release and links to the source.
 func (s *Server) getVersion(w http.ResponseWriter, r *http.Request) {
 	source := s.SourceURL

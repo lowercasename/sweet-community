@@ -25,7 +25,7 @@ interface TopicMenuProps {
 }
 
 /**
- * The single topic menu (architecture.md, Topics), used wherever a topic is
+ * The single topic menu, used wherever a topic is
  * chosen. That is at the top of the feed, beside Post, and in the editor. Its
  * trigger is a pill showing the chosen topic's name, or the no-topic label.
  */

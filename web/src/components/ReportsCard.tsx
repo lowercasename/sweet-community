@@ -42,7 +42,7 @@ function pathOf(r: Report): string {
 
 /**
  * One reported item. The author and place come first, then the copy of the body kept by the first report, then each
- * report. The buttons follow, from the least to the most consequential (architecture.md, Interface): Open and Message
+ * report. The buttons follow, from the least to the most consequential: Open and Message
  * on the left, then Dismiss report and Delete at the right end. The resolving pair wraps onto its own line at the
  * right on a phone.
  */
@@ -148,7 +148,7 @@ function ReportEntry({ report, first }: { report: Report; first: boolean }) {
 }
 
 /**
- * The Reports card on the Community page, for the owner and moderators (architecture.md, Admin tools). It lists one
+ * The Reports card on the Community page, for the owner and moderators. It lists one
  * entry per reported item, the item with the newest report first. Report events keep it current.
  */
 export function ReportsCard() {

@@ -2,7 +2,7 @@ import { devices } from '@playwright/test'
 import { expect, member, open, prepare, test } from './helpers'
 
 /**
- * The offer to add the community to the home screen (architecture.md, Mobile). It shows at the top of Home on a touch
+ * The offer to add the community to the home screen. It shows at the top of Home on a touch
  * screen that can add it. Headless browsers never send the install offer, so the tests send a fake one with the same
  * shape: an event the page can cancel, with prompt() and userChoice.
  */

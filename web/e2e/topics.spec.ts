@@ -1,7 +1,7 @@
 import { anyView, article, expect, member, open, owner, postEditor, test, uniq } from './helpers'
 
 /**
- * Topics (architecture.md, Topics). The owner adds a topic on the Community
+ * Topics. The owner adds a topic on the Community
  * page. A new post gets the topic the feed is filtered to. A post's
  * topic pill opens the topic. The author changes the topic while editing the
  * post. The feed header shows the same pill. A subscriber gets a notification

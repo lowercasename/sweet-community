@@ -179,7 +179,7 @@ type ListTopicsRow struct {
 	FollowerCount int64
 }
 
-// Topics (architecture.md, Topics) are the community's labels for posts.
+// Topics are the community's labels for posts.
 // perm decides who can create or change them (root staff). Following a topic
 // is each user's own choice.
 func (q *Queries) ListTopics(ctx context.Context) ([]ListTopicsRow, error) {

@@ -2,7 +2,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 
-/** Signing in by email, with a password as the other way (architecture.md, Accounts). */
+/** Signing in by email, with a password as the other way. */
 vi.mock('../api', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../api')>()),
   login: vi.fn(),

@@ -2,7 +2,7 @@ package api
 
 import "testing"
 
-// The community's rules (architecture.md, Admin tools). The owner and the
+// The community's rules. The owner and the
 // moderators write them on the Community page. Signed-in users read them, and
 // the join page shows them to someone holding an invite. They are not public.
 func TestRules(t *testing.T) {

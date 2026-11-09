@@ -45,7 +45,7 @@ interface LayoutState {
   navExpanded: boolean
 }
 
-// One store for the whole page (architecture.md, Layout). The tab bar in one
+// One store for the whole page. The tab bar in one
 // component changes the layout, and the panes in another component follow.
 // Two hook calls that each kept their own state once left the Posts tab
 // highlighted while the chat pane was still showing.

@@ -956,7 +956,7 @@ func TestRepliesAndEventsMatchTheRow(t *testing.T) {
 	same("dm as mo", mo.mustStatus(200, "GET", "/api/groups/"+did, nil), byID(mo.mustStatus(200, "GET", "/api/groups", nil), "groups", did), lastEvent(mo, "group", isID(did)))
 }
 
-// A post has its own URL (architecture.md, Posts). GET /api/posts/{id}
+// A post has its own URL. GET /api/posts/{id}
 // returns the same post the feed lists, with the viewer's flags. A post in a
 // group the viewer is not in, or a deleted post, returns 404 to that viewer.
 func TestGetPost(t *testing.T) {
@@ -993,7 +993,7 @@ func TestGetPost(t *testing.T) {
 }
 
 // delete_by_role marks a Delete that the viewer has only because of their role in the item's group, in the community
-// or in a room, so the client can show the shield (architecture.md, Interface). It is false for the author, for a
+// or in a room, so the client can show the shield. It is false for the author, for a
 // post's author deleting a comment on their post, and for anyone in a conversation.
 func TestDeleteByRole(t *testing.T) {
 	ts, owner := newTestServer(t)

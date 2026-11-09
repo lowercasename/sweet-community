@@ -1,5 +1,5 @@
 /**
- * Adding Sweet to the home screen (architecture.md, Mobile). Chrome, Edge and Samsung Internet offer an install
+ * Adding Sweet to the home screen. Chrome, Edge and Samsung Internet offer an install
  * dialog, which the page can open once. Safari and every browser on an iPhone or iPad have no such dialog, so the
  * person is told where Add to Home Screen is. On an iPhone, push works only in an app added to the home screen.
  */

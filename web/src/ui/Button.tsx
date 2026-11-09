@@ -4,7 +4,7 @@ import { useTooltip } from './Tooltip'
 
 interface ButtonProps {
   /**
-   * The four variants (architecture.md, Interface). `primary` is the main action of a surface, filled red. `secondary` is any
+   * The four variants. `primary` is the main action of a surface, filled red. `secondary` is any
    * other action, outlined. `ghost` is a quiet action, a toggle, a menu trigger or Cancel. `danger` removes something
    * that cannot simply be undone: outlined in red, always with an icon.
    */

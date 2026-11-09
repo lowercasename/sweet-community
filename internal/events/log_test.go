@@ -54,8 +54,8 @@ func kinds(t *testing.T, d *sql.DB) []string {
 	return out
 }
 
-// The log keeps only the newest event for each resource (architecture.md,
-// Realtime). A delete event replaces the resource's last event, and an event
+// The log keeps only the newest event for each resource. A delete event replaces the resource's last event, and an
+// event
 // without a key is kept.
 func TestLogKeepsTheNewestEventForEachResource(t *testing.T) {
 	d := openLog(t)

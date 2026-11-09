@@ -6,7 +6,7 @@ import { keys } from '../data/keys'
 import { renderWithQuery } from '../test-utils'
 
 /**
- * The account card (architecture.md, Accounts). A password is optional. Settings sets one, changes it or removes it,
+ * The account card. A password is optional. Settings sets one, changes it or removes it,
  * and none of these asks for the current password. A new email address needs no password either.
  */
 vi.mock('../api', async (importOriginal) => ({

@@ -7,7 +7,7 @@ import { useEventStream } from './useEventStream'
  * The stream's first event carries the server's version. A tab keeps the
  * first version it received and reloads when a later connection reports a
  * different one. The frontend is embedded in the binary, so a different
- * version is a different app (architecture.md, Updates: Clients).
+ * version is a different app.
  */
 class FakeEventSource {
   static instances: FakeEventSource[] = []

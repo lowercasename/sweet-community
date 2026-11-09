@@ -8,7 +8,7 @@ import (
 )
 
 // The stream's first event is the binary's version, so a tab that loaded
-// another version can reload (architecture.md, Updates: Clients). The event
+// another version can reload. The event
 // has no id because it is not part of the log.
 func TestServeAnnouncesTheVersionFirst(t *testing.T) {
 	h := NewHub(nil)

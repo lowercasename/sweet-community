@@ -4,11 +4,10 @@ import { pushState, turnPushOff, turnPushOn, type PushState } from '../push'
 import { ActionRow, ActionRows, Alert, Button, Card, Heading, Stack } from '../ui'
 
 /**
- * The settings for notifications sent while the user is away (architecture.md,
- * Notifications). These are the weekly email summarising what the user
+ * The settings for notifications sent while the user is away. These are the weekly email summarising what the user
  * missed, which is on until the user turns it off, and push notifications to
  * this device for mentions, replies to the user's posts and messages. Each is
- * an action row (architecture.md, Interface, pattern 2). Each toggle shows its state,
+ * an action row. Each toggle shows its state,
  * and shows its action on hover.
  */
 export function NotificationsCard() {

@@ -1,5 +1,5 @@
 #!/bin/sh
-# Releases main as a new version (architecture.md, Updates). It names the next version from the newest tag, adds an
+# Releases main as a new version. It names the next version from the newest tag, adds an
 # entry to CHANGELOG.md made of the commit titles since that tag, commits, tags and pushes. The pushed tag makes CI
 # publish the image ghcr.io/lowercasename/sweet-community:<version>, which a server pins with SWEET_IMAGE.
 #

@@ -1,8 +1,7 @@
 import type { Group } from '../api'
 
 /*
- * Views of the user's groups for the nav and the Messages page (architecture.md,
- * Layout). Pure functions over the groups in the cache.
+ * Views of the user's groups for the nav and the Messages page. Pure functions over the groups in the cache.
  */
 
 /** When a conversation's last message was sent, or when the conversation was created if it has no messages. */

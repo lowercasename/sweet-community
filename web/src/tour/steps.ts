@@ -1,5 +1,5 @@
 /**
- * The welcome tour's steps (architecture.md, New-instance lifecycle, and docs/tour-script.md). A pure function of the
+ * The welcome tour's steps. A pure function of the
  * user and the community, so the choice of steps is tested without a browser.
  */
 

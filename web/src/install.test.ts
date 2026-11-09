@@ -2,7 +2,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 /**
- * Adding Sweet to the home screen (architecture.md, Mobile). The browser's install offer is caught at start. An
+ * Adding Sweet to the home screen. The browser's install offer is caught at start. An
  * iPhone or iPad has no offer, so it gets instructions instead. An installed app is never offered it again.
  */
 

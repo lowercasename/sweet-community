@@ -5,7 +5,7 @@ import (
 	"testing"
 )
 
-// Profiles (architecture.md, Accounts). A profile is fetched by username. It
+// Profiles. A profile is fetched by username. It
 // includes the user's role and a bio that only they can edit, sanitised like
 // any body. The user's posts are listed as the viewer is allowed to see them,
 // from the groups the viewer is in. A removed account has no profile.

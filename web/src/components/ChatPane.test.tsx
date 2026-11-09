@@ -4,8 +4,7 @@ import { cleanup, fireEvent, screen } from '@testing-library/react'
 import { ROOT, marker, message, renderWithQuery, user } from '../test-utils'
 
 /**
- * A visible chat pane marks its group's chat as read (architecture.md,
- * Notifications). While the pane is watched, the user's read marker on the
+ * A visible chat pane marks its group's chat as read. While the pane is watched, the user's read marker on the
  * chat moves to the newest message, so the chat's unread count in the nav is
  * cleared. A pane that is closed or behind another page marks nothing as read.
  */
@@ -39,7 +38,7 @@ async function draw(watching: boolean) {
 }
 
 describe('ChatPane lines', () => {
-  it('shows joined and added lines on their own, between runs of messages (architecture.md, Chat)', async () => {
+  it('shows joined and added lines on their own, between runs of messages', async () => {
     const { getMessages } = await import('../api')
     const kit = user('kit')
     vi.mocked(getMessages).mockResolvedValue({

@@ -4,7 +4,7 @@ import { cleanup, fireEvent, screen, waitFor, within } from '@testing-library/re
 import { renderWithQuery, report, user } from '../test-utils'
 
 /**
- * The Reports card on the Community page (architecture.md, Admin tools). The owner and moderators see one entry per
+ * The Reports card on the Community page. The owner and moderators see one entry per
  * reported item: its author and place, the copy of its body, and who reported it and why. Open, Message, Dismiss
  * report and Delete act on the entry.
  */

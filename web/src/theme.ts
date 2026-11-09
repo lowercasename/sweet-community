@@ -1,5 +1,5 @@
 /**
- * The light or dark choice for this device (architecture.md, Interface). The rule lives in public/theme.js, which runs
+ * The light or dark choice for this device. The rule lives in public/theme.js, which runs
  * before the page is drawn. This module only reaches it from the app.
  */
 export type ThemeChoice = 'device' | 'light' | 'dark'

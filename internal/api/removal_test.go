@@ -13,7 +13,7 @@ import (
 	"sweet/internal/store"
 )
 
-// Removing a user from the instance (architecture.md, Admin tools). Staff
+// Removing a user from the instance. Staff
 // remove users from People. Any user can remove themselves from Settings. The
 // removed user's content stays under a removed name. Each room they owned
 // passes to another member by seniority, or is deleted. Their conversations
@@ -153,8 +153,7 @@ func TestRemoveFromInstance(t *testing.T) {
 	}
 }
 
-// A removed account cannot come back and is not notified (architecture.md,
-// Admin tools). Removal deletes the account's email links and push
+// A removed account cannot come back and is not notified. Removal deletes the account's email links and push
 // subscriptions. A session of a removed account is refused. A comment on a
 // removed user's post notifies nobody.
 func TestRemovedUserCannotComeBackAndIsNotNotified(t *testing.T) {

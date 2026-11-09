@@ -6,7 +6,7 @@ import (
 	"strings"
 )
 
-// Hit is one search result (architecture.md, Search). It holds the kind of
+// Hit is one search result. It holds the kind of
 // resource, its location, its author and time, and an excerpt of its text
 // with the matches marked. The excerpt is plain text and the client renders
 // the marks.

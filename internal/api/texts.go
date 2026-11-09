@@ -12,8 +12,8 @@ import (
 	"sweet/internal/store"
 )
 
-// CommunityText is a body that the owner and moderators write for every member to read (architecture.md, Admin
-// tools). There are two, the rules and the welcome message. Each is a body in the same format as a post, stored in
+// CommunityText is a body that the owner and moderators write for every member to read. There are two, the rules and
+// the welcome message. Each is a body in the same format as a post, stored in
 // the settings table. An empty body means the community has none.
 type CommunityText struct {
 	BodyHTML string `json:"body_html"`

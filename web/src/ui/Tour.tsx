@@ -31,7 +31,7 @@ interface TourProps {
 const nextFrame = () => new Promise<void>((resolve) => requestAnimationFrame(() => resolve()))
 
 /**
- * A guided tour (architecture.md, New-instance lifecycle). React Joyride dims the page, cuts a spotlight around the
+ * A guided tour. React Joyride dims the page, cuts a spotlight around the
  * card's element, scrolls it into view and keeps the card on screen at any width. The card itself is drawn here with
  * Sweet's own heading, text and buttons.
  */

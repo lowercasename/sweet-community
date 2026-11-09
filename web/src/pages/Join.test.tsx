@@ -5,7 +5,7 @@ import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 
 /**
  * The join page shows the community: who invited the visitor, to which community, and what it is for. Joining asks
- * for no password, and the first sign-in email finishes joining (architecture.md, Accounts).
+ * for no password, and the first sign-in email finishes joining.
  */
 vi.mock('../api', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../api')>()),

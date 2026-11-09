@@ -54,7 +54,7 @@ func ValidatePassword(p string) error {
 	return nil
 }
 
-// Argon2id parameters at the OWASP minimums (architecture.md, Accounts): 19 MiB
+// Argon2id parameters at the OWASP minimums: 19 MiB
 // of memory, two passes, one lane. The hash is stored in PHC form, so the
 // parameters are stored with it.
 const (

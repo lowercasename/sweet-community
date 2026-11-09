@@ -5,7 +5,7 @@ interface ActionRowsProps {
 }
 
 /**
- * A list of action rows (architecture.md, Interface, pattern 2): each row is one thing the user can do or turn on. Rows are
+ * A list of action rows: each row is one thing the user can do or turn on. Rows are
  * separated by hairlines. Destructive actions are action rows in the last card of a page, ordered from the least to
  * the most consequential (pattern 3).
  */

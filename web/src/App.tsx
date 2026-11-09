@@ -14,8 +14,8 @@ import { Welcome } from './pages/Welcome'
 
 /**
  * The root component. It checks who the user is, and whether they opened a
- * link from an email, an invite link or the setup link. Every page has a URL
- * (architecture.md, Layout). The join, sign-in link, verify and setup pages
+ * link from an email, an invite link or the setup link. Every page has a URL.
+ * The join, sign-in link, verify and setup pages
  * are the pages a signed-out user can see. The owner of a community that has no name
  * yet is kept on the welcome page.
  */

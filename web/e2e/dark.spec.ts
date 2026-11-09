@@ -1,7 +1,7 @@
 import { anyView, article, expect, member, open, owner, sendMessage, test, uniq, writePost } from './helpers'
 
 /**
- * Dark mode (architecture.md, Interface). Sweet follows the device's light or dark setting. Every colour is a token in
+ * Dark mode. Sweet follows the device's light or dark setting. Every colour is a token in
  * global.css, and the dark values replace the light ones when the device asks for dark.
  */
 test.use({ colorScheme: 'dark' })

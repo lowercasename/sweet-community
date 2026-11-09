@@ -47,7 +47,7 @@ describe('Welcome', () => {
       group_creation: 'anyone',
     })
     await screen.findByText('Invite people')
-    // One primary button at a time (architecture.md, Interface). Before the link exists, the main action is Create
+    // One primary button at a time. Before the link exists, the main action is Create
     // invite link, with Skip for now beside it. After, the main action is going to the community.
     const primaries = () =>
       screen

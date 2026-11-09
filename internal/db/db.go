@@ -22,7 +22,7 @@ type Option func(q url.Values)
 
 // LitestreamOwnsCheckpoints turns the automatic WAL checkpoint off. It is
 // used when Litestream replicates the database, because Litestream
-// checkpoints itself after it has copied the pages (architecture.md, Backups).
+// checkpoints itself after it has copied the pages.
 func LitestreamOwnsCheckpoints(q url.Values) { q.Add("_pragma", "wal_autocheckpoint(0)") }
 
 // Open opens the database at path, creating it if it does not exist.
@@ -73,7 +73,7 @@ const BackupSuffix = ".before-upgrade"
 //
 // When the database has been migrated before, the run is an upgrade. A
 // VACUUM INTO copy is taken first and replaces the previous copy, so a bad
-// migration is recoverable (architecture.md, Config). A new database is not
+// migration is recoverable. A new database is not
 // copied.
 func Migrate(ctx context.Context, db *sql.DB, migrations fs.FS) error {
 	conn, err := db.Conn(ctx)
@@ -150,8 +150,8 @@ func Migrate(ctx context.Context, db *sql.DB, migrations fs.FS) error {
 	return nil
 }
 
-// Migrations 001 to 028 were squashed into one file before v1.0.0
-// (architecture.md, Data model notes). lastSquashed is the last of them.
+// Migrations 001 to 028 were squashed into one file before v1.0.0.
+// lastSquashed is the last of them.
 const (
 	lastSquashed = "028_signin.sql"
 	baseline     = "001_v1.sql"

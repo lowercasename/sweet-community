@@ -4,7 +4,7 @@ import { cleanup, fireEvent, screen, within } from '@testing-library/react'
 import { renderWithQuery } from '../test-utils'
 
 /**
- * The owner's list of topics (architecture.md, Topics). The owner can add,
+ * The owner's list of topics. The owner can add,
  * rename and delete topics. The delete confirmation states its effect with
  * the post and subscriber counts.
  */

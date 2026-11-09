@@ -21,7 +21,7 @@ const TITLE: Record<ReportKind, string> = { post: 'Post', comment: 'Comment', me
 const MAX_REASON = 500
 
 /**
- * Reports a post, comment or message to the owner and moderators (architecture.md, Admin tools). The reason is
+ * Reports a post, comment or message to the owner and moderators. The reason is
  * optional. After the report is sent, the dialog says so and offers Done. The same dialog serves posts, comments and
  * messages.
  */

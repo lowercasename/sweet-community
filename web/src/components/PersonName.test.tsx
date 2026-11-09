@@ -6,7 +6,7 @@ import { dm, member, renderWithQuery, user } from '../test-utils'
 
 /**
  * A user's name, wherever it is shown, opens a card about the user with a
- * Message button (architecture.md, Layout). The card shows the user's current
+ * Message button. The card shows the user's current
  * data from the users cache. The viewer's own card has no Message button.
  */
 vi.mock('../api', () => ({

@@ -1,5 +1,5 @@
-// Package digest sends the weekly email to users who have not visited
-// (architecture.md, Notifications). The email holds counts and metadata only,
+// Package digest sends the weekly email to users who have not visited.
+// The email holds counts and metadata only,
 // covering what happened since the user's feed read marker, and a link. It
 // holds no post content and no images. Its purpose is to bring inactive users
 // back.

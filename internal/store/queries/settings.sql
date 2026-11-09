@@ -1,4 +1,4 @@
--- Instance settings are key-value pairs (architecture.md, Feature flags).
+-- Instance settings are key-value pairs.
 
 -- name: GetSetting :one
 SELECT value FROM settings WHERE key = sqlc.arg(key);

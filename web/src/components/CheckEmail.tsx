@@ -17,7 +17,7 @@ interface CheckEmailProps {
 }
 
 /**
- * The screen shown after a sign-in email is sent (architecture.md, Accounts). The email holds a link and a six-digit
+ * The screen shown after a sign-in email is sent. The email holds a link and a six-digit
  * code. The code is typed here, and it works only in this browser. That is what signs in a web app on an iPhone's
  * home screen, which does not share sign-in with Safari.
  */

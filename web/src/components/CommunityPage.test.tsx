@@ -4,8 +4,7 @@ import { cleanup, fireEvent, screen } from '@testing-library/react'
 import { ROOT, group, renderWithQuery } from '../test-utils'
 
 /**
- * The Community page: the community's settings for the owner, and the topics for the owner and moderators
- * (architecture.md, Admin tools and Topics).
+ * The Community page: the community's settings for the owner, and the topics for the owner and moderators.
  */
 vi.mock('../api', () => ({
   listTopics: vi.fn(() => Promise.resolve({ topics: [] })),

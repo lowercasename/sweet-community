@@ -19,7 +19,7 @@ import (
 	"sweet/internal/store"
 )
 
-// This file implements signing in by email (architecture.md, Accounts). A
+// This file implements signing in by email. A
 // sign-in email holds a link and a six-digit code for one token. The code
 // works only in the browser that asked for the email, which the sweet_signin
 // cookie identifies. The link opens a page whose button uses it, in any

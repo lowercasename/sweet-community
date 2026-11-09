@@ -160,7 +160,7 @@ func lastAt(v any) *int64 {
 	return nil
 }
 
-// Report is one reported item with its open reports (architecture.md, Admin tools). Only the root group's owner and
+// Report is one reported item with its open reports. Only the root group's owner and
 // moderators receive it. BodyHTML is the copy kept by the item's first open report. Deleted says the item has been
 // deleted since. Can.Open is personalised by forViewer.
 type Report struct {

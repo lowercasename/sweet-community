@@ -23,7 +23,7 @@ const ROLE_WORD: Record<Profile['role'], string> = {
 }
 
 /**
- * A user's profile page at /u/<name> (architecture.md, Accounts). It shows
+ * A user's profile page at /u/<name>. It shows
  * their picture, name, role and join date, a bio that only they can edit, a
  * Message button, and their posts from the groups the viewer shares with
  * them, newest first. It has no chat, because chat with a user is a

@@ -45,7 +45,7 @@ export function SettingsPage({ me, root, onSignOut }: SettingsPageProps) {
   const [removing, setRemoving] = useState(false)
   const [removeBusy, setRemoveBusy] = useState(false)
   const [removeError, setRemoveError] = useState<string | null>(null)
-  // Permanently removes the user from this community (architecture.md, Admin tools). The instance owner must transfer
+  // Permanently removes the user from this community. The instance owner must transfer
   // ownership first.
   const removeMe = async () => {
     setRemoveBusy(true)

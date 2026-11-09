@@ -1,5 +1,4 @@
--- Notifications sent to a user outside the app (architecture.md,
--- Notifications). These queries cover the user's own settings, the weekly
+-- Notifications sent to a user outside the app. These queries cover the user's own settings, the weekly
 -- digest's counts, and the devices the user subscribed for push.
 
 -- name: GetUserSetting :one

@@ -4,7 +4,7 @@ import { cleanup, fireEvent, screen, within } from '@testing-library/react'
 import { ROOT, group, notification, renderWithQuery, user } from '../test-utils'
 
 /**
- * The Notifications page (architecture.md, Notifications) lists the user's
+ * The Notifications page lists the user's
  * notifications, newest first, in two sections. New holds the unopened
  * notifications. Earlier holds the opened ones, and Clear deletes them.
  * Viewing the page marks nothing as read. Opening a notification marks it as

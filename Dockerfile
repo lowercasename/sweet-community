@@ -13,7 +13,7 @@ RUN pnpm build
 
 FROM --platform=$BUILDPLATFORM golang:1.26-alpine AS build
 ARG TARGETOS TARGETARCH
-# The release the nav names, such as v1.2.3 (architecture.md, Updates). CI passes it from git describe. A build without
+# The release the nav names, such as v1.2.3. CI passes it from git describe. A build without
 # it reports dev.
 ARG VERSION=
 WORKDIR /src

@@ -28,7 +28,7 @@ type Event struct {
 type Hub struct {
 	db *sql.DB
 	// Version identifies the running binary. The stream sends it first, so
-	// a tab that loaded another version can reload (architecture.md, Updates).
+	// a tab that loaded another version can reload.
 	Version string
 	mu      sync.Mutex
 	subs    map[chan Event]struct{}
@@ -62,8 +62,8 @@ func Log(ctx context.Context, tx *sql.Tx, kind string, payload any, now int64) (
 	return Event{Seq: seq, Kind: kind, Payload: raw}, nil
 }
 
-// Key names the resource that an event describes, such as "post:<id>"
-// (architecture.md, Realtime). A resource's event and its delete event share
+// Key names the resource that an event describes, such as "post:<id>".
+// A resource's event and its delete event share
 // a key. A kind that describes no single resource, such as
 // notification_delete, has no key, and its events are never replaced.
 func Key(kind string, raw []byte) string {

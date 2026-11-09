@@ -112,7 +112,7 @@ export function useSession() {
   }
 }
 
-/** Removes a user from the instance (architecture.md, Admin tools). Staff do this from People, and any user does it to themselves from Settings. */
+/** Removes a user from the instance. Staff do this from People, and any user does it to themselves from Settings. */
 export function useRemoveUser() {
   const qc = useQueryClient()
   return async (userId: string) => {
@@ -195,7 +195,7 @@ export function usePostActions(groupId: string) {
     async edit(id: string, html: string) {
       applyEvent(qc, 'post', await updatePost(id, html))
     },
-    /** Sets a post's topic, or clears it with null (architecture.md, Topics). */
+    /** Sets a post's topic, or clears it with null. */
     async setTopic(id: string, topicId: string | null) {
       applyEvent(qc, 'post', await setPostTopic(id, topicId))
     },
@@ -407,8 +407,7 @@ const pendingMarks = new Map<string, ReturnType<typeof setTimeout>>()
 /**
  * Marks a stream read up to a time. The cache is updated at once, and the
  * server's reply is applied through the same path. A chat marks with a
- * debounce (architecture.md says "updated from the client with a debounce"),
- * so a busy room sends one PUT, not one per message.
+ * debounce, so a busy room sends one PUT, not one per message.
  */
 export function useMarkRead() {
   const qc = useQueryClient()
@@ -477,7 +476,7 @@ export function useSetBio() {
 
 /** The instance's settings. Only the root owner may request them. */
 /** The community's settings, mainly its name, which every page shows. Public, so the sign-in page reads them too. */
-/** The community's topics, alphabetical, each with whether the user follows it (architecture.md, Topics). */
+/** The community's topics, alphabetical, each with whether the user follows it. */
 export function useTopics(): { topics: Topic[]; loading: boolean; error: Error | null } {
   const q = useQuery({ queryKey: keys.topics, queryFn: listTopics })
   return { topics: q.data?.topics ?? [], loading: q.isPending, error: q.error }
@@ -544,7 +543,7 @@ export function useChangeEmail() {
 }
 
 /**
- * The release the server was built from, shown in the nav (architecture.md, Updates). It does not change while the
+ * The release the server was built from, shown in the nav. It does not change while the
  * page is open, because a new build makes open tabs reload.
  */
 export function useRelease(): string | undefined {
@@ -556,7 +555,7 @@ export function useSourceUrl(): string | undefined {
   return useQuery({ queryKey: keys.version, queryFn: getVersion, staleTime: Infinity }).data?.source_url
 }
 
-/** The two texts the owner and moderators write for every member (architecture.md, Admin tools). */
+/** The two texts the owner and moderators write for every member. */
 export type TextKind = 'rules' | 'welcome'
 
 // The API functions are looked up when a hook calls them, not when this module loads.
@@ -582,7 +581,7 @@ export const useRules = () => useCommunityText('rules')
 /** The community's welcome message, which the welcome dialog shows. */
 export const useWelcome = () => useCommunityText('welcome')
 
-/** The items with open reports, for the owner and moderators (architecture.md, Admin tools). Report events keep them current. */
+/** The items with open reports, for the owner and moderators. Report events keep them current. */
 export function useReports() {
   const q = useQuery({ queryKey: keys.reports, queryFn: listReports })
   return { reports: q.data?.reports ?? [], loading: q.isPending, error: q.error }

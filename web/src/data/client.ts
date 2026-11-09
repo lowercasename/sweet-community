@@ -1,7 +1,7 @@
 import { QueryClient } from '@tanstack/react-query'
 
 /**
- * The one cache for server data (architecture.md, Client data). Nothing
+ * The one cache for server data. Nothing
  * goes stale on its own. The event stream keeps the cache current, and a
  * reconnect invalidates every query. So there is no refetch on focus or on
  * an interval.

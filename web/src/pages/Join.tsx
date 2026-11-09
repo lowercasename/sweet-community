@@ -13,7 +13,7 @@ interface JoinProps {
 }
 
 /**
- * The page an invite link opens (architecture.md, Accounts). It shows who
+ * The page an invite link opens. It shows who
  * invited the visitor and to which community. The visitor picks a username
  * and gives an email address. There is no password. The first sign-in email,
  * with a link and a code, finishes joining.

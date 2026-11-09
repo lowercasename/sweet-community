@@ -87,12 +87,12 @@ type ImageVisibleToParams struct {
 	ViewerID string
 }
 
-// Reports whether a viewer can see an image (architecture.md, Images). The
+// Reports whether a viewer can see an image. The
 // viewer can see it if they uploaded it, if it is any user's profile picture,
 // if it is the picture of a group they are in, or if it appears in a live
 // post, comment or message in a group they are in. The root group's owner and
 // moderators also see an image in the copy kept by an open report, so they can
-// judge the report (architecture.md, Admin tools). instr() on the id is
+// judge the report. instr() on the id is
 // enough because bodies reference images as /img/<id> and data-image-id="<id>".
 func (q *Queries) ImageVisibleTo(ctx context.Context, arg ImageVisibleToParams) (sql.NullBool, error) {
 	row := q.db.QueryRowContext(ctx, imageVisibleTo, arg.ImageID, arg.ViewerID)

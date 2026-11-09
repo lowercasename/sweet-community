@@ -159,7 +159,7 @@ const contentSecurityPolicy = "default-src 'self'; script-src 'self'; style-src 
 	"img-src 'self' data:; font-src 'self' data:; connect-src 'self'; manifest-src 'self'; worker-src 'self'; " +
 	"object-src 'none'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'"
 
-// SecurityHeaders sets the security headers on every response (architecture.md, Accounts). HSTS is sent only over
+// SecurityHeaders sets the security headers on every response. HSTS is sent only over
 // HTTPS.
 func SecurityHeaders(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

@@ -16,7 +16,7 @@ function dismissedRecently(): boolean {
 }
 
 /**
- * The offer to add the community to the home screen, at the top of Home (architecture.md, Mobile). It shows only on
+ * The offer to add the community to the home screen, at the top of Home. It shows only on
  * a touch screen that can add it and has not, because on an iPhone push works only in the added app. Where the
  * browser has an install dialog, the button opens it. On an iPhone or iPad the strip says where Add to Home Screen
  * is. Not now hides it in this browser for 30 days.

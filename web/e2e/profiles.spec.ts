@@ -50,7 +50,7 @@ test.describe('profiles', () => {
     await open(mo.page)
     await article(mo.page, shown).getByRole('button', { name: kit.username }).hover()
     const card = mo.page.getByRole('dialog', { name: `About ${kit.username}` })
-    // View profile and Message sit side by side, least consequential first (architecture.md, Interface).
+    // View profile and Message sit side by side, least consequential first.
     const view = await card.getByRole('button', { name: 'View profile' }).boundingBox()
     const message = await card.getByRole('button', { name: 'Message' }).boundingBox()
     expect(view && message && Math.abs(view.y - message.y) < 2 && view.x < message.x).toBeTruthy()

@@ -55,8 +55,7 @@ func (s *Server) listUsers(w http.ResponseWriter, r *http.Request) {
 // Nobody can register a name with this prefix (auth.ValidateUsername).
 func removedName(id string) string { return "removed-" + id[len(id)-8:] }
 
-// removeUser removes a user from the instance (architecture.md, Admin
-// tools). Staff do this from People, or the user does it themselves from
+// removeUser removes a user from the instance. Staff do this from People, or the user does it themselves from
 // Settings. The user's posts, comments and messages are deleted, and the open
 // reports of them are closed. Each room they own passes to the next most senior member, or is
 // deleted if they were the only member. Their conversation memberships are

@@ -5,7 +5,7 @@ import { keys } from '../data/keys'
 import { renderWithQuery, paragraph } from '../test-utils'
 
 /**
- * The Rules card and the Welcome message card on the Community page (architecture.md, Admin tools), for the owner
+ * The Rules card and the Welcome message card on the Community page, for the owner
  * and moderators. Both are the same card with different words.
  */
 vi.mock('../api', async (importOriginal) => ({

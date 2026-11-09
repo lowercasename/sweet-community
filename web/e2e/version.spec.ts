@@ -3,7 +3,7 @@ import { expect, open, owner, test } from './helpers'
 /**
  * An upgrade replaces the binary, including the frontend. The first event on
  * the stream carries the server's version, and a tab that received a different
- * version reloads (architecture.md, Updates: Clients). A second binary cannot
+ * version reloads. A second binary cannot
  * be started during the test, so the first connection is answered by a fake
  * stream that sends an older version. The real server's response on
  * reconnection then acts as the upgrade.

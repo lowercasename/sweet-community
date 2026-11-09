@@ -1,4 +1,4 @@
-// Light or dark colours (architecture.md, Interface). The page loads this script in its head, before anything is
+// Light or dark colours. The page loads this script in its head, before anything is
 // drawn, so the colours never flash. It sets data-theme on the html element to "light" or "dark". The choice is kept
 // on this device in localStorage under sweet.theme: "light", "dark", or nothing to match the device's setting. The
 // Settings page reads and changes the choice through window.sweetTheme.

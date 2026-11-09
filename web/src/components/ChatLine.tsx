@@ -3,7 +3,7 @@ import { useAuthor } from '../data/hooks'
 import { ChatNote } from '../ui'
 
 /**
- * A joined or added line in a chat (architecture.md, Chat). It is centred light text, apart from the messages. It
+ * A joined or added line in a chat. It is centred light text, apart from the messages. It
  * uses the users cache, so a changed name shows at once.
  */
 export function ChatLine({ line }: { line: Message }) {

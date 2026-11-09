@@ -9,7 +9,7 @@ import { ROOT, group, notification, post, user } from '../test-utils'
 import type { PostPage, Topic } from '../api'
 
 /**
- * Topics in the cache (architecture.md, Topics). The list is instance-wide
+ * Topics in the cache. The list is instance-wide
  * and alphabetical. A post belongs in the topic view it is filed under and
  * in no other. A deleted topic leaves its posts with no topic.
  */

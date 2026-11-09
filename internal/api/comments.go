@@ -88,7 +88,7 @@ func (s *Server) createComment(w http.ResponseWriter, r *http.Request) {
 	}
 	author, _ := userFrom(r.Context())
 	now := db.Now()
-	// The comment and the notification to the post's author (architecture.md, Notifications) are written in one transaction.
+	// The comment and the notification to the post's author are written in one transaction.
 	s.loggedMany(w, r, now, func(qtx *store.Queries) ([]events.Entry, any, int, error) {
 		owners, a, status, err := s.postActor(r, qtx, postID)
 		if err != nil {

@@ -21,7 +21,7 @@ import type {
 import { ROOT_ID, keys } from './keys'
 
 /**
- * The kinds of event the stream listens for (architecture.md, Realtime): the whole resource, or its deletion. The
+ * The kinds of event the stream listens for: the whole resource, or its deletion. The
  * browser drops an event whose kind is not listed, so every kind applyEvent handles must be here. A test checks this.
  */
 export const EVENT_KINDS = [
@@ -227,8 +227,7 @@ function upsertPost(qc: QueryClient, post: Post) {
   // The post's page query, if loaded, gets the same post.
   qc.setQueryData<Post>(keys.post(post.id), (old) => (old ? post : old))
   // Update the group's feed and each loaded topic view of it. The post goes
-  // into the view of the topic it is filed under and out of every other view
-  // (architecture.md, Topics).
+  // into the view of the topic it is filed under and out of every other view.
   for (const [key] of qc.getQueriesData<Posts>({ queryKey: keys.posts(post.group_id) })) {
     const topicId = key[2]
     const belongs = topicId === undefined || topicId === post.topic_id
@@ -306,8 +305,8 @@ function deleteComment(qc: QueryClient, id: string, postId: string, groupId: str
 }
 
 function upsertMessage(qc: QueryClient, m: Message) {
-  // A message by another user that the viewer has not read counts as unread on the group (architecture.md, Notifications).
-  // A joined or added line does not, and it does not move the group's newest message time (architecture.md, Chat).
+  // A message by another user that the viewer has not read counts as unread on the group.
+  // A joined or added line does not, and it does not move the group's newest message time.
   const me = qc.getQueryData<User | null>(keys.me)
   if (m.kind === 'message' && (!me || me.id !== m.author.id)) bumpMarker(qc, `chat:${m.group_id}`, m.created_at)
   // The group's newest message time orders the Conversations page. A replay never moves it backwards.
@@ -506,7 +505,7 @@ function dropGroup(qc: QueryClient, id: string) {
 const ROOT_KIND = 'root'
 
 function upsertMembership(qc: QueryClient, m: Membership) {
-  // The user hid a conversation (architecture.md, Groups). The conversation
+  // The user hid a conversation. The conversation
   // stays in the groups list marked hidden, and everything else about it is
   // removed. Its members do not change.
   const viewer = qc.getQueryData<User | null>(keys.me)

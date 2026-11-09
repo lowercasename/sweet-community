@@ -43,7 +43,7 @@ interface PostProps {
   onEdit: (bodyHtml: string) => Promise<void>
   /** Resolves when the server has deleted the post. The post is then removed from the query cache. */
   onDelete: () => Promise<void>
-  /** Sets the post's topic, or clears it (architecture.md, Topics). Called from the editor when the author saves. */
+  /** Sets the post's topic, or clears it. Called from the editor when the author saves. */
   onSetTopic?: (topicId: string | null) => Promise<void>
 }
 
@@ -79,7 +79,7 @@ export function Post({
     setEditing(true)
   }
 
-  // The topic pill (architecture.md, Topics) comes after the time in the author line, which shows who, when and
+  // The topic pill comes after the time in the author line, which shows who, when and
   // where. For every user, the pill links to the topic. The card's right edge holds the menu, which is hidden until
   // hovered. The topic is changed while editing the post.
   const pill = topic ? (

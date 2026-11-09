@@ -57,7 +57,7 @@ export function ChatPane({ groupId, side = 'full', watching, focusMessage = null
   // In a conversation, the report dialog says that moderators will see the reported message.
   const conversation = useGroups().groups.find((g) => g.id === groupId)?.kind === 'dm'
 
-  // A visible chat is marked read (architecture.md, Notifications). While the
+  // A visible chat is marked read. While the
   // pane is watched and the page is in the foreground, the user's read marker
   // on this chat moves to its newest message.
   const { markers, loaded } = useMarkers()

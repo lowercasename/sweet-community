@@ -16,8 +16,7 @@ const NotifyMention = "mention"
 // mentionEvents writes a mention notification for each user the body
 // mentions who is a member of the group, is not the author, and is not
 // `skip`, which is a user already notified of this write another way. It
-// returns the notification events (architecture.md, Posts: extraction;
-// Notifications). A mention of a user outside the group is left as text,
+// returns the notification events. A mention of a user outside the group is left as text,
 // because that user could not see the body anyway.
 func mentionEvents(r *http.Request, qtx *store.Queries, body, author, groupID string, postID, messageID *string, now int64, skip string) ([]events.Entry, error) {
 	var out []events.Entry

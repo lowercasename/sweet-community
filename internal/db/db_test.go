@@ -12,8 +12,7 @@ import (
 func file(s string) *fstest.MapFile { return &fstest.MapFile{Data: []byte(s)} }
 
 // A migration on a database that has been migrated before is an upgrade,
-// and an upgrade copies the database first (architecture.md, Config:
-// "a VACUUM INTO copy is taken first so a bad migration is recoverable").
+// and an upgrade copies the database first.
 func TestMigrateCopiesTheDatabaseBeforeAnUpgrade(t *testing.T) {
 	ctx := context.Background()
 	path := filepath.Join(t.TempDir(), "sweet.db")
@@ -80,8 +79,7 @@ func TestMigrateCopiesTheDatabaseBeforeAnUpgrade(t *testing.T) {
 	}
 }
 
-// When Litestream is running, the binary leaves checkpointing to Litestream
-// (architecture.md, Backups: wal_autocheckpoint=0 in the app).
+// When Litestream is running, the binary leaves checkpointing to Litestream.
 func TestLitestreamOwnsCheckpoints(t *testing.T) {
 	ctx := context.Background()
 	check := func(opts ...Option) int {
@@ -105,8 +103,8 @@ func TestLitestreamOwnsCheckpoints(t *testing.T) {
 	}
 }
 
-// Migrations 001 to 028 were squashed into 001_v1.sql before v1.0.0
-// (architecture.md, Data model notes). A database that had run 028_signin.sql
+// Migrations 001 to 028 were squashed into 001_v1.sql before v1.0.0.
+// A database that had run 028_signin.sql
 // already has that schema, so it is recorded as having run 001_v1.sql, and its
 // rows are kept. A database from before 028 cannot be upgraded by this binary,
 // and Migrate says so instead of running the baseline over it.

@@ -38,7 +38,7 @@ func canReport(v map[string]any) bool {
 	return r
 }
 
-// Reporting (architecture.md, Admin tools). Any member except the author reports a post, comment or message. The
+// Reporting. Any member except the author reports a post, comment or message. The
 // owner and the moderators are notified, see one entry per reported item with a copy of the body as it was when it
 // was first reported, and close it by dismissing the reports or by deleting the item. The author is not told who
 // reported them, and members see nothing of reports.
@@ -138,7 +138,7 @@ func TestReports(t *testing.T) {
 }
 
 // Deleting through a report works wherever the item is, including a room or a conversation that the moderator is
-// not in, because the member's report brings the item to the moderators (architecture.md, Groups). Open is offered
+// not in, because the member's report brings the item to the moderators. Open is offered
 // only for an item the moderator can see that is not in a conversation.
 func TestReportedItemsAreDeletedAnywhere(t *testing.T) {
 	ts, owner := newTestServer(t)

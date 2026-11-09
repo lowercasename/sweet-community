@@ -2,7 +2,7 @@ package api
 
 import "testing"
 
-// Joined and added lines in chat (architecture.md, Chat). Someone joining the
+// Joined and added lines in chat. Someone joining the
 // community puts a joined line in the community's chat. Someone added to a
 // room puts an added line in the room's chat, naming who added whom. A line has
 // no body, cannot be deleted or replied to, and does not make the chat unread.

@@ -1,7 +1,7 @@
 import { defineConfig, devices } from '@playwright/test'
 
 /**
- * Playwright tests in a real browser (architecture.md, Testing). Three servers:
+ * Playwright tests in a real browser. Three servers:
  * the built binary on a fresh database, the Vite dev server in front of it
  * (because Raphael uses dev mode, with React StrictMode and hot reload), and
  * a new instance with no owner, used only by the setup test. Four projects:

@@ -17,7 +17,7 @@ import (
 	"sweet/internal/store"
 )
 
-// The kinds of item a member can report (architecture.md, Admin tools).
+// The kinds of item a member can report.
 const (
 	ReportPost    = "post"
 	ReportComment = "comment"

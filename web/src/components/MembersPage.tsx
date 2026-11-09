@@ -114,7 +114,7 @@ export function MembersPage({ group, me, onLeft }: MembersPageProps) {
       })
     return out
   }
-  // The last card: the room's destructive actions, least to most consequential (architecture.md, Interface, pattern 3).
+  // The last card: the room's destructive actions, least to most consequential.
   // The owner cannot leave, so in practice it holds Leave room for everyone else and Delete room for the owner.
   const ending = group.can.leave || group.can.delete
 

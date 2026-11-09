@@ -2,7 +2,7 @@ import { Icon } from './Icon'
 import { useTooltip } from './Tooltip'
 
 /**
- * The words for the shield, in one place (architecture.md, Interface). A shield marks an area or an action that a
+ * The words for the shield, in one place. A shield marks an area or an action that a
  * person has only because they are an owner or a moderator.
  */
 export const shieldText = {

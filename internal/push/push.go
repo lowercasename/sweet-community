@@ -1,4 +1,4 @@
-// Package push sends web push notifications (architecture.md, Notifications).
+// Package push sends web push notifications.
 // For a mention or a comment on the user's post, it sends a short message to
 // each device the user has subscribed. The browser's subscription is stored
 // as the browser describes it. A subscription the push service reports as

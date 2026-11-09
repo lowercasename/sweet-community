@@ -1,4 +1,4 @@
-// Sweet's service worker (architecture.md, Notifications). It handles web push only.
+// Sweet's service worker. It handles web push only.
 // It caches nothing and serves nothing, so the app is always the version that the
 // server has. A push notification shows its title and body text, and a tap opens its URL.
 

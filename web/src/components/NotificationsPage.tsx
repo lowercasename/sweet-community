@@ -27,7 +27,7 @@ interface NotificationsPageProps {
 }
 
 /**
- * The user's notifications (architecture.md, Notifications), newest first, in
+ * The user's notifications, newest first, in
  * two sections. Each notification is a sentence that opens its target when
  * clicked. New holds the unopened notifications. Opening one marks it read
  * and moves it to Earlier. Viewing the page marks nothing as read (Raphael,
@@ -133,7 +133,7 @@ function NotificationRow({ notification: n, groups, onOpen }: NotificationRowPro
         <Text as="span" variant="body" weight={fresh ? 'bold' : 'normal'}>
           {sentence}
         </Text>
-        {/* Only the owner and moderators get these, so they carry the shield (architecture.md, Interface). */}
+        {/* Only the owner and moderators get these, so they carry the shield. */}
         {(n.kind === 'joined' || n.kind === 'report') && <ShieldMark />}
         <Text as="span" variant="small">
           <Time at={n.created_at} />

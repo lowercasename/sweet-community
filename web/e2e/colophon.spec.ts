@@ -2,7 +2,7 @@ import type { Page } from '@playwright/test'
 import { anyView, expect, member, open, test, uniq } from './helpers'
 
 /**
- * The line at the bottom of Home's feed (architecture.md, Updates and Licence): the release, a link to the source
+ * The line at the bottom of Home's feed: the release, a link to the source
  * code, and who built Sweet. The nav no longer names the release. A room's feed has no such line.
  */
 // A footer inside the pane's section has no landmark role, so it is found as an element.

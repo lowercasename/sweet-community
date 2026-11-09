@@ -46,7 +46,7 @@ interface CommunityTextCardProps {
 }
 
 /**
- * A text the owner and moderators write for every member, on the Community page (architecture.md, Admin tools). The
+ * A text the owner and moderators write for every member, on the Community page. The
  * rules and the welcome message are written in the same editor as a bio.
  */
 export function CommunityTextCard({ kind, editing: startEditing = false }: CommunityTextCardProps) {

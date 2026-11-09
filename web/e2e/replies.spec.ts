@@ -3,7 +3,7 @@ import { chatEditor, expect, member, open, test, uniq } from './helpers'
 const ROOT = '00000000-0000-7000-8000-000000000000'
 
 /**
- * Replies in chat (architecture.md, Chat). Reply on a message attaches it
+ * Replies in chat. Reply on a message attaches it
  * above the chat editor. The sent reply shows a quote of the original, which
  * scrolls to it. The original's author is notified with the reply kind.
  */

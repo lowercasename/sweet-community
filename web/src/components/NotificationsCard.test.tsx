@@ -4,8 +4,7 @@ import { cleanup, fireEvent, screen } from '@testing-library/react'
 import { renderWithQuery } from '../test-utils'
 
 /**
- * The settings for notifications sent while the user is away (architecture.md,
- * Notifications). These are the weekly digest, which is on until the user
+ * The settings for notifications sent while the user is away. These are the weekly digest, which is on until the user
  * turns it off, and push notifications to this device, when the browser
  * supports them.
  */

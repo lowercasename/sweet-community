@@ -30,7 +30,7 @@ beforeEach(async () => {
 })
 
 describe('MenuPage', () => {
-  it('ends with Rules, before Sign out, when the community has rules (architecture.md, Admin tools)', async () => {
+  it('ends with Rules, before Sign out, when the community has rules', async () => {
     const { getRules } = await import('../api')
     vi.mocked(getRules).mockResolvedValue({ body_html: paragraph('Be kind.') })
     const { MenuPage } = await import('./MenuPage')
@@ -51,7 +51,7 @@ describe('MenuPage', () => {
     expect(item.getAttribute('aria-description')).toBe('Only the owner and moderators see this')
   })
 
-  it("does not name the release, which is at the bottom of Home's feed (architecture.md, Updates)", async () => {
+  it("does not name the release, which is at the bottom of Home's feed", async () => {
     const { MenuPage } = await import('./MenuPage')
     renderWithQuery(<MenuPage me={raphael} groups={[group(ROOT, 'owner')]} onGo={() => {}} onLogout={() => {}} />)
     await screen.findByRole('button', { name: /Sign out/ })

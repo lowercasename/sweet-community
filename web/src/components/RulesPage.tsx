@@ -2,7 +2,7 @@ import { useRules } from '../data/hooks'
 import { Card, Measure, Pane, ScrollArea, Text } from '../ui'
 import { Body } from './Body'
 
-/** The community's rules, opened from the Rules button on Home, or from the menu on a phone (architecture.md, Admin tools). */
+/** The community's rules, opened from the Rules button on Home, or from the menu on a phone. */
 export function RulesPage() {
   const rules = useRules()
   return (

@@ -17,7 +17,7 @@ import (
 )
 
 // Topic is a label a post on the community's feed can carry, at most one per
-// post (architecture.md, Topics). The root group's staff manage the list. Any
+// post. The root group's staff manage the list. Any
 // user may follow a topic to be notified of posts in it. The counts are for
 // the owner's list. Following is the viewer's own state and is filled in
 // when the response is built.

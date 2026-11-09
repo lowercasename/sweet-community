@@ -24,7 +24,7 @@ type CreateChatLineParams struct {
 	SubjectID sql.NullString
 }
 
-// A joined or added line in a chat (architecture.md, Chat). It has no body.
+// A joined or added line in a chat. It has no body.
 func (q *Queries) CreateChatLine(ctx context.Context, arg CreateChatLineParams) error {
 	_, err := q.db.ExecContext(ctx, createChatLine,
 		arg.ID,

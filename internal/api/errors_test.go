@@ -8,7 +8,7 @@ import (
 )
 
 // A 500 response sends a fixed sentence, and the internal error is only
-// logged (architecture.md, Testing and operations). Before 2026-11-08 the
+// logged. Before 2026-11-08 the
 // response carried the error text, such as a SQLite or S3 message.
 func TestServerErrorsSendAFixedSentence(t *testing.T) {
 	for _, c := range []struct {

@@ -10,7 +10,7 @@ interface ReplyQuoteProps {
 }
 
 /**
- * The snippet of the message a reply answers, above the reply's body (architecture.md, Chat): a red rule on the left
+ * The snippet of the message a reply answers, above the reply's body: a red rule on the left
  * and one line of text, "kit: the first line of their message". It scrolls to the original when clicked. Once the
  * original is deleted it says so and does nothing.
  */

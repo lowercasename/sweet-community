@@ -71,7 +71,7 @@ function PersonCard({ person, me }: { person: Member | User; me: User | null | u
 }
 
 /**
- * A user's name, wherever it is shown (architecture.md, Layout). It is a
+ * A user's name, wherever it is shown. It is a
  * control that opens a card about the user. The name and the card use the
  * users cache, so a new picture or name is shown at once. The snapshot
  * included in the content is the fallback.

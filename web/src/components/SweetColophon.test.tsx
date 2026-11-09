@@ -4,7 +4,7 @@ import { cleanup, screen, waitFor } from '@testing-library/react'
 import { renderWithQuery } from '../test-utils'
 
 /**
- * The line at the bottom of Home's feed (architecture.md, Updates and Licence): the release, a link to the source
+ * The line at the bottom of Home's feed: the release, a link to the source
  * code, and who built Sweet.
  */
 vi.mock('../api', async (importOriginal) => ({

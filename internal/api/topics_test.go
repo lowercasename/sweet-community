@@ -7,7 +7,7 @@ import (
 	"sweet/internal/perm"
 )
 
-// Topics (architecture.md, Topics). A topic is a label on a post, and a post
+// Topics. A topic is a label on a post, and a post
 // has at most one. The root group's staff manage topics. Any user can follow
 // a topic to be notified of posts in it.
 
@@ -229,8 +229,8 @@ func TestFollowingATopicTellsYouOfPostsInIt(t *testing.T) {
 	kit.mustStatus(404, "PUT", "/api/topics/nonsense/follow", nil)
 }
 
-// The root group carries manage_topics for its owner and moderators
-// (architecture.md, Topics). The Community page and the feed's topic controls
+// The root group carries manage_topics for its owner and moderators.
+// The Community page and the feed's topic controls
 // read it, so a moderator can reach the Topics card. Only the owner has
 // manage_instance, for the community's own settings.
 func TestStaffCarryManageTopics(t *testing.T) {

@@ -5,7 +5,7 @@ import { ROOT, group, renderWithQuery, user } from '../test-utils'
 import type { Hit } from '../api'
 
 /**
- * The search page (architecture.md, Search). The query is stored in the URL.
+ * The search page. The query is stored in the URL.
  * Each hit shows its kind, location and author, with the matches in bold.
  */
 vi.mock('../api', () => ({

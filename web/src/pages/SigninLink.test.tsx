@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 
 /**
- * The page a sign-in link opens (architecture.md, Accounts). Email security scanners open links, so the token is used
+ * The page a sign-in link opens. Email security scanners open links, so the token is used
  * only when Finish signing in is pressed.
  */
 vi.mock('../api', async (importOriginal) => ({

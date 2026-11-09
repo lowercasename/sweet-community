@@ -107,7 +107,7 @@ export function PeoplePage({ me, root, onOpenGroup }: PeoplePageProps) {
       setError(e instanceof Error ? e.message : 'Could not change the role')
     }
   }
-  // The server decides for each user whether they can be removed (architecture.md, Admin tools).
+  // The server decides for each user whether they can be removed.
   const remove = async () => {
     if (!removing) return
     setBusy(true)

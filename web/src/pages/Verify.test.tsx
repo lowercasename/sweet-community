@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 
 /**
- * The page a link to confirm a changed address opens (architecture.md, Accounts). Email security scanners open links,
+ * The page a link to confirm a changed address opens. Email security scanners open links,
  * so the token is used only when Confirm address is pressed. Confirming signs nobody in.
  */
 vi.mock('../api', async (importOriginal) => ({

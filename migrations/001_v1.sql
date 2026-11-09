@@ -1,4 +1,4 @@
--- The schema of Sweet v1 (architecture.md, Data model notes). Migrations 001 to 028 were squashed into this one file
+-- The schema of Sweet v1. Migrations 001 to 028 were squashed into this one file
 -- before v1.0.0, so a new instance creates its database in one step. A database that had already run 028_signin.sql
 -- is recorded as having run this file instead (db.Migrate). Later migrations follow this one.
 

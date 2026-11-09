@@ -11,7 +11,7 @@ interface MessageBlockProps {
 }
 
 /**
- * One message in a run (architecture.md, Chat). The body is rendered with
+ * One message in a run. The body is rendered with
  * space reserved on the right for the actions, which are positioned at the top
  * right regardless of how tall the body is or how much it wraps. The block
  * gets a soft blush background on hover, and full blush while highlighted. It

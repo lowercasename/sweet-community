@@ -6,8 +6,8 @@ import (
 	"testing"
 )
 
-// The event log is replayed to a client that reconnects (architecture.md,
-// Realtime). It keeps only the newest event for each resource. A replay from
+// The event log is replayed to a client that reconnects. It keeps only the newest event for each resource. A replay
+// from
 // the start therefore holds no earlier version of an edited post, no deleted
 // post or message, no comment of a deleted post, no deleted message's text in
 // a reply's quote, and no removed user's bio.

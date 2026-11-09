@@ -4,7 +4,7 @@ import { cleanup, fireEvent, screen, within } from '@testing-library/react'
 import { ROOT, dm, group, renderWithQuery, user } from '../test-utils'
 
 /**
- * The Conversations page (architecture.md, Layout) lists only the user's DMs, with
+ * The Conversations page lists only the user's DMs, with
  * the most recent message first. Each DM is labelled with the names of its
  * other members. With no DMs, the page shows where to start a conversation.
  */

@@ -15,7 +15,7 @@ import (
 	"sweet/internal/push"
 )
 
-// Notifications (architecture.md, Notifications). There is one row per user
+// Notifications. There is one row per user
 // per action that affects them. The row is written in the same transaction
 // as the action and sent over the stream to that user only. This test covers
 // two kinds, a comment on the user's post and being added to a room. A
@@ -171,7 +171,7 @@ func TestNotifications(t *testing.T) {
 	}
 }
 
-// Chat unread counts (architecture.md, Notifications). There is a marker row
+// Chat unread counts. There is a marker row
 // for every room the user is in, whether or not they have read anything. It
 // includes the number of other users' messages newer than the user's read
 // position. After a join, the count starts from the join time, so earlier
@@ -288,7 +288,7 @@ func TestChatUnread(t *testing.T) {
 	}
 }
 
-// A user's own settings (architecture.md, Notifications). The digest is weekly until the user turns it off.
+// A user's own settings. The digest is weekly until the user turns it off.
 func TestMySettings(t *testing.T) {
 	ts, owner := newTestServer(t)
 	kit, _ := registerMember(t, ts, owner, "kit")
@@ -334,7 +334,7 @@ func (f *fakePush) all() []string {
 	return append([]string(nil), f.sent...)
 }
 
-// Web push (architecture.md, Notifications). A mention, or a comment on the
+// Web push. A mention, or a comment on the
 // user's post, is pushed to each device the user subscribed. Nothing else is
 // pushed. A device that the push service reports as gone is removed.
 func TestPushForMentionsAndReplies(t *testing.T) {
@@ -430,8 +430,7 @@ func waitPushes(t *testing.T, fake *fakePush, n int) []string {
 	return nil
 }
 
-// A message in a conversation creates a notification (architecture.md,
-// Notifications, 2026-11-08). There is at most one unread row per
+// A message in a conversation creates a notification. There is at most one unread row per
 // conversation. It is marked read either by opening it from the
 // notifications page or by reading the conversation. A message in a room's
 // chat creates no notification.

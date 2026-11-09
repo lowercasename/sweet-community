@@ -236,7 +236,7 @@ func TestDMFindOrCreate(t *testing.T) {
 	}
 }
 
-// A conversation is identified by its members (architecture.md, Groups).
+// A conversation is identified by its members.
 // There is one conversation per set of users, and nobody can be added. A
 // message to someone else is a different conversation. Each member's hidden
 // state is their own. Hiding a conversation removes it from that user's list
@@ -527,7 +527,7 @@ func TestGroupsCarryLastActivity(t *testing.T) {
 	}
 }
 
-// A room's picture (architecture.md, Groups). The owner sets it from an
+// A room's picture. The owner sets it from an
 // uploaded image. The group event includes it. Only the room's members can
 // fetch the image. The sweep keeps it. A conversation has no picture.
 func TestGroupPicture(t *testing.T) {

@@ -11,8 +11,7 @@ import (
 	"sweet/internal/store"
 )
 
-// MySettings holds a user's own settings (architecture.md, Notifications:
-// per-person, with off one click away). Digest is "weekly" or "off".
+// MySettings holds a user's own settings. Digest is "weekly" or "off".
 type MySettings struct {
 	Digest string `json:"digest"`
 	// Welcomed is true once the user has closed the welcome dialog. It is state rather than a setting. It only moves

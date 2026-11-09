@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 
 /**
- * The light or dark choice on Settings (architecture.md, Interface). It is kept on the device by public/theme.js,
+ * The light or dark choice on Settings. It is kept on the device by public/theme.js,
  * which the page loads before anything is drawn. The card reads and sets the choice through that script.
  */
 afterEach(() => {

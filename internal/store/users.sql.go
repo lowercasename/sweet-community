@@ -446,7 +446,7 @@ type RemoveUserParams struct {
 	ID        string
 }
 
-// Anonymises a user (architecture.md, Admin tools). The username becomes
+// Anonymises a user. The username becomes
 // removed-<id prefix>, and the password, picture and bio are cleared. The row
 // and the id stay so that the user's content keeps its author.
 func (q *Queries) RemoveUser(ctx context.Context, arg RemoveUserParams) error {

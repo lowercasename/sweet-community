@@ -4,7 +4,7 @@ import (
 	"testing"
 )
 
-// Mentions (architecture.md, Posts, Notifications). A mention span in a body
+// Mentions. A mention span in a body
 // identifies a user by id. Each mentioned user who is in the group, other
 // than the author, is notified. This applies to posts, comments and
 // messages. An edit sends no new notifications.

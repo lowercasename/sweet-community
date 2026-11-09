@@ -11,7 +11,7 @@ interface SigninLinkProps {
 }
 
 /**
- * The page a sign-in link opens (architecture.md, Accounts). Email security scanners open the links in a message, so
+ * The page a sign-in link opens. Email security scanners open the links in a message, so
  * the token is used only when Finish signing in is pressed. The link works in any browser.
  */
 export function SigninLink({ token, name, onSignedIn }: SigninLinkProps) {

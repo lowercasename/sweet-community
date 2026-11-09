@@ -12,7 +12,7 @@ import { TopicMenu } from './TopicMenu'
 interface BodyEditorProps {
   /**
    * The group this text is written in. The @ suggestion list offers this
-   * group's members only (architecture.md, Posts).
+   * group's members only.
    */
   groupId: string
   extensions: Extensions
@@ -44,7 +44,7 @@ interface BodyEditorProps {
   /** Allows submitting an empty body, for example a cleared bio. */
   allowEmpty?: boolean
   /**
-   * The topic control in the post edit form, for posts on the community's feed (architecture.md, Topics). It is a
+   * The topic control in the post edit form, for posts on the community's feed. It is a
    * pill after the toolbar, with the formatting controls and apart from Cancel and Save. The composer for new posts
    * does not pass it. Nothing is shown while no topics exist.
    */

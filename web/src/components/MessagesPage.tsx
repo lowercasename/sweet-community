@@ -29,8 +29,8 @@ interface MessagesPageProps {
 }
 
 /**
- * Lists all the user's conversations, most recent message first
- * (architecture.md, Layout). The nav shows the latest five and this page
+ * Lists all the user's conversations, most recent message first.
+ * The nav shows the latest five and this page
  * shows all of them. Each is labelled with the other user's name and opens at
  * its own URL, under its bar, like any group. Hidden conversations are listed
  * below the others. Opening one unhides it.

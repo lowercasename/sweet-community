@@ -11,7 +11,7 @@ interface BodyProps {
 }
 
 /**
- * Renders a body (architecture.md, Posts). It shows the sanitised HTML, with
+ * Renders a body. It shows the sanitised HTML, with
  * each mention showing the mentioned user's current name and linking to their
  * profile. The app's router handles those links, so tapping a name changes
  * the route without a full page load.

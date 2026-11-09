@@ -7,7 +7,7 @@ import (
 	"testing"
 )
 
-// Every response carries the security headers (architecture.md, Accounts). The content security policy allows
+// Every response carries the security headers. The content security policy allows
 // scripts, images, fonts and connections from the server's own origin only, and no framing. HSTS is sent only over
 // HTTPS, because over plain HTTP it would be ignored and it would break a local development server.
 func TestSecurityHeaders(t *testing.T) {

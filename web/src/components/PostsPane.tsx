@@ -35,7 +35,7 @@ interface PostsPaneProps {
   side?: 'left' | 'right' | 'full'
   /** True while the pane is open and not behind another page. A visible pane marks its feed as read. */
   watching: boolean
-  /** The topic that the community's feed is filtered to (architecture.md, Topics), read from the URL. */
+  /** The topic that the community's feed is filtered to, read from the URL. */
   topicId?: string | null
   /** Shown after the posts, at the very end of the feed. Home's feed shows the release and the source code link. */
   foot?: ReactNode
@@ -75,7 +75,7 @@ export function PostsPane({ groupId, side = 'full', watching, topicId = null, fo
     await create(html, topical ? (topic?.id ?? null) : null)
   }
 
-  // A visible feed is marked read (architecture.md, Notifications). While the
+  // A visible feed is marked read. While the
   // pane is watched and the page is in the foreground, the user's read marker
   // on this feed moves to its newest post.
   const { markers, loaded } = useMarkers()

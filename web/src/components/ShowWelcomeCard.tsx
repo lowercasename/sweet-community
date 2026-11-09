@@ -2,7 +2,7 @@ import { useLocation } from 'wouter'
 import { useSettings } from '../data/hooks'
 import { ActionRow, ActionRows, Button, Card, Heading, Stack } from '../ui'
 
-/** Opens the welcome dialog again, on Settings (architecture.md, New-instance lifecycle). */
+/** Opens the welcome dialog again, on Settings. */
 export function ShowWelcomeCard() {
   const { settings } = useSettings()
   const [, navigate] = useLocation()

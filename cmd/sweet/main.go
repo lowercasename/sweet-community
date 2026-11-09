@@ -105,8 +105,7 @@ func main() {
 
 	base := strings.TrimRight(*baseURL, "/")
 	// The owner is created from the password when one is given. Otherwise,
-	// on a new instance, the owner is whoever opens the setup link
-	// (architecture.md, New-instance lifecycle).
+	// on a new instance, the owner is whoever opens the setup link.
 	if *ownerPassword != "" {
 		if _, err := api.EnsureOwner(ctx, d, *owner, *ownerPassword); err != nil {
 			log.Fatalf("owner: %v", err)
@@ -132,16 +131,16 @@ func main() {
 	go images.SweepEvery(ctx, d, imgStore, time.Hour, 24*time.Hour, log.Printf)
 
 	sender := mail.FromEnv(*mailDir)
-	// The weekly digest for users who have not visited (architecture.md, Notifications) is checked every hour.
+	// The weekly digest for users who have not visited is checked every hour.
 	go digest.Every(ctx, d, sender, base, time.Hour, log.Printf)
 
-	// The event log keeps a day of events (architecture.md, Realtime).
+	// The event log keeps a day of events.
 	go events.PruneEvery(ctx, d, time.Hour, log.Printf)
 
 	hub := events.NewHub(d)
 	hub.Version = version.Of()
 	srv := &api.Server{DB: d, Hub: hub, Images: imgStore, Mail: sender, BaseURL: base, SourceURL: *sourceURL, ProxyHops: *trustProxy}
-	// Web push (architecture.md, Notifications) uses the instance's VAPID keys, which are generated on first start.
+	// Web push uses the instance's VAPID keys, which are generated on first start.
 	if keys, err := push.LoadKeys(ctx, d); err != nil {
 		log.Printf("push: %v (push is off)", err)
 	} else {

@@ -12,7 +12,7 @@ interface WelcomeProps {
 }
 
 /**
- * Onboarding (architecture.md, New-instance lifecycle). The newly set up owner names the community and describes what
+ * Onboarding. The newly set up owner names the community and describes what
  * it is for, then gets an invite link for the first users. Ends on Home. Each step has one primary button: Next, then
  * Create invite link with Skip for now beside it, then Go to the community once the link exists.
  */

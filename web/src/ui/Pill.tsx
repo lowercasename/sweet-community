@@ -41,7 +41,7 @@ interface PillProps {
 }
 
 /**
- * A topic as a small rounded label (architecture.md, Topics). This is the only
+ * A topic as a small rounded label. This is the only
  * shape a topic takes, on a post, at the top of the feed, and beside the Post
  * button. The tag icon is part of the shape, so a topic is recognisable at a
  * glance. A pill that opens a menu is a Menu with the pill trigger, which uses

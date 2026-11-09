@@ -5,7 +5,7 @@
 cmd/sweet/migrations: migrations/*.sql
 	rm -rf cmd/sweet/migrations && cp -R migrations cmd/sweet/migrations
 
-# The release the nav names (architecture.md, Updates): the newest tag, or the commit after it.
+# The release the nav names: the newest tag, or the commit after it.
 RELEASE := $(shell git describe --tags --always --dirty 2>/dev/null)
 LDFLAGS := -X sweet/internal/version.release=$(RELEASE)
 

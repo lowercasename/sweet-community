@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 
 /**
- * The install prompt on Home (architecture.md, Mobile). It shows only on a touch screen that can add Sweet to the
+ * The install prompt on Home. It shows only on a touch screen that can add Sweet to the
  * home screen and has not done so. Not now hides it in this browser for 30 days.
  */
 const state = vi.hoisted(() => ({ way: 'dialog' as 'installed' | 'dialog' | 'ios' | 'none' }))

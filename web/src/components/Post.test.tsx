@@ -111,7 +111,7 @@ describe('Post menu', () => {
 })
 
 /**
- * The topic pill (architecture.md, Topics). For every user, it links to the
+ * The topic pill. For every user, it links to the
  * topic. The author changes a post's topic in the edit form.
  */
 describe('Post topic pill', () => {

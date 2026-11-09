@@ -7,7 +7,7 @@ import type { User } from '../api'
 import { SuggestionList, type SuggestionListHandle } from '../ui'
 
 /**
- * A mention in the editor (architecture.md, Posts). Typing @ offers the
+ * A mention in the editor. Typing @ offers the
  * users of the group, and picking one inserts a node that serialises to
  * <span data-type="mention" data-mention-id="<id>">@name</span>, which is the
  * only shape the server's sanitiser policy keeps. The name shown later is the

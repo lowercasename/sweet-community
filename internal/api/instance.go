@@ -17,8 +17,7 @@ import (
 	"sweet/internal/store"
 )
 
-// This file implements a new instance's setup (architecture.md, New-instance
-// lifecycle). An instance started with no owner creates a one-time setup
+// This file implements a new instance's setup. An instance started with no owner creates a one-time setup
 // link and prints it. Whoever opens the link becomes the owner. The address
 // they give is treated as verified, because access to the link implies
 // access to the server. Then onboarding follows. The community has no name

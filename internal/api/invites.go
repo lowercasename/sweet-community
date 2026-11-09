@@ -89,7 +89,7 @@ func (s *Server) getInvite(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusInternalServerError, err.Error())
 		return
 	}
-	// The join page shows the rules, which a person agrees to by joining (architecture.md, Admin tools).
+	// The join page shows the rules, which a person agrees to by joining.
 	rules, err := rulesText.of(r.Context(), s.q())
 	if err != nil {
 		writeErr(w, http.StatusInternalServerError, err.Error())
@@ -196,7 +196,7 @@ func (s *Server) register(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusInternalServerError, err.Error())
 		return
 	}
-	// The community's chat says that they joined (architecture.md, Chat).
+	// The community's chat says that they joined.
 	line, err := chatLine(ctx, qtx, perm.Root, JoinedKind, u.ID, "", now)
 	if err != nil {
 		writeErr(w, http.StatusInternalServerError, err.Error())
