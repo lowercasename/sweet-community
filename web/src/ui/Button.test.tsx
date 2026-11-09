@@ -30,7 +30,7 @@ describe('Button', () => {
   it('a disabled primary is faded red, not grey', () => {
     render(<Button disabled>Save</Button>)
     const b = screen.getByRole('button', { name: 'Save' })
-    expect(b.className).toContain('disabled:bg-sweet/45')
+    expect(b.className).toContain('disabled:bg-sweet-off')
     expect(b.className).not.toContain('disabled:bg-line')
   })
 

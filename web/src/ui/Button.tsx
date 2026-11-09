@@ -63,12 +63,18 @@ export const REVEAL: Record<'post' | 'comment' | 'message', string> = {
  * instead of drawing a grey square on it.
  */
 export const GHOST_HOVER = 'hover:bg-ink/5 hover:text-ink'
+/**
+ * The same hover for a control that has its own card background, such as a collapsed pane's rail. The tint is mixed
+ * into the card colour, so the control stays opaque and the dotted page does not show through it (Raphael,
+ * 2026-11-09).
+ */
+export const GHOST_HOVER_SOLID = 'hover:bg-[color-mix(in_oklab,var(--color-ink)_5%,var(--color-card))] hover:text-ink'
 export const GHOST_CURRENT = 'aria-[current=page]:bg-blush aria-[current=page]:text-sweet'
 
 const VARIANTS: Record<NonNullable<ButtonProps['variant']>, string> = {
   primary:
-    'border border-sweet bg-sweet font-medium text-white hover:border-sweet-dark hover:bg-sweet-dark ' +
-    'disabled:border-transparent disabled:bg-sweet/45 disabled:hover:bg-sweet/45',
+    'border border-sweet bg-sweet font-medium text-on-sweet hover:border-sweet-dark hover:bg-sweet-dark ' +
+    'disabled:border-transparent disabled:bg-sweet-off disabled:text-on-sweet-off disabled:hover:bg-sweet-off',
   secondary:
     'border border-line bg-card text-ink hover:border-pink hover:text-sweet disabled:text-mute disabled:hover:border-line disabled:hover:text-mute',
   ghost:

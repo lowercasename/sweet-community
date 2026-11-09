@@ -4,6 +4,7 @@ import { useRemoveUser, useSession } from '../data/hooks'
 import { useAuthor, useSetPicture } from '../data/hooks'
 import { IMAGE_ACCEPT } from '../editor/images'
 import { AccountCard } from './AccountCard'
+import { ColoursCard } from './ColoursCard'
 import { NotificationsCard } from './NotificationsCard'
 import {
   ActionRow,
@@ -130,6 +131,7 @@ export function SettingsPage({ me, root, onSignOut }: SettingsPageProps) {
             </Card>
             <AccountCard />
             <NotificationsCard />
+            <ColoursCard />
             <Card>
               <Stack gap={2}>
                 <Heading level={2}>Sign out and leave</Heading>

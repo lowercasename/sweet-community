@@ -120,7 +120,7 @@ export function Split({ ratio, onRatio, onCollapse, show, leftRail, rightRail, h
         >
           <span
             aria-hidden
-            className="absolute inset-y-2 w-0.5 rounded-full bg-pink opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100 group-active:bg-sweet group-active:opacity-100"
+            className="absolute inset-y-2 w-0.5 rounded-full bg-input opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100 group-active:opacity-100"
           />
           <span className="relative h-10 w-1 rounded-full bg-line transition-[background-color,height] group-hover:h-16 group-hover:bg-sweet group-focus-visible:bg-sweet group-active:bg-sweet" />
         </div>

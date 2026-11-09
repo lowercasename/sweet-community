@@ -1,4 +1,4 @@
-import { GHOST_HOVER } from './Button'
+import { GHOST_HOVER_SOLID } from './Button'
 import { Dotted } from './Dotted'
 import { Icon, type IconName } from './Icon'
 
@@ -18,7 +18,7 @@ export function Rail({ side, icon, label, dot = false, onOpen }: RailProps) {
   return (
     <button
       type="button"
-      className={`flex w-10 cursor-pointer flex-col items-center gap-3 ${border} border-line bg-card pt-4 text-mute transition-colors ${GHOST_HOVER} focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-pink`}
+      className={`flex w-10 cursor-pointer flex-col items-center gap-3 ${border} border-line bg-card pt-4 text-mute transition-colors ${GHOST_HOVER_SOLID} focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-pink`}
       aria-label={`Show ${label.toLowerCase()}${dot ? ', unread' : ''}`}
       onClick={onOpen}
     >

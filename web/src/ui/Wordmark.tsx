@@ -32,7 +32,7 @@ export function Wordmark({ expanded = true, label, size = 'md' }: WordmarkProps)
         aria-hidden={expanded ? 'true' : undefined}
         role={expanded ? undefined : 'img'}
         aria-label={expanded ? undefined : words}
-        className={`flex ${s.mark} flex-none items-center justify-center rounded-full bg-sweet font-bold leading-none text-white select-none`}
+        className={`flex ${s.mark} flex-none items-center justify-center rounded-full bg-brand font-bold leading-none text-white select-none`}
       >
         S
       </span>

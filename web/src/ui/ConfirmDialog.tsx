@@ -48,7 +48,7 @@ export function ConfirmDialog({
   return (
     <dialog
       ref={ref}
-      className="m-auto w-[min(92vw,24rem)] rounded-card border border-line bg-card p-4 text-ink backdrop:bg-ink/30"
+      className="m-auto w-[min(92vw,24rem)] rounded-card border border-line bg-card p-4 text-ink backdrop:bg-scrim"
       onCancel={(e) => {
         e.preventDefault()
         onClose()

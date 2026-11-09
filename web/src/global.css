@@ -19,11 +19,55 @@
   --color-blush-soft: #fdf2f2;
   --color-sky: #1c6fa6;
   --color-input: #929292;
+  /* Text on a Sweet red fill, such as the Post button. */
+  --color-on-sweet: #ffffff;
+  /* A disabled red button's fill and text. It stays red, so the main action is still recognisable. */
+  --color-sweet-off: rgb(206 23 23 / 0.45);
+  --color-on-sweet-off: #ffffff;
+  /* The page behind an open dialog. */
+  --color-scrim: rgb(26 23 23 / 0.3);
+  /* Sweet's mark, the S in the red circle. It is the same red in light and dark mode. */
+  --color-brand: #ce1717;
 
   --radius-card: 6px;
 }
 
 @layer base {
+  :root {
+    color-scheme: light;
+  }
+
+  /*
+   * Dark mode (architecture.md, Interface). public/theme.js sets data-theme to dark when the device asks for dark or
+   * when the user chose dark on Settings. Each token gets a dark value that
+   * keeps the light palette's contrast rules: text at least 4.5:1 on every surface it sits on, a field's border and
+   * the focus ring at least 3:1. Sweet red is lighter, so red text passes on dark surfaces, and text on a red fill is
+   * dark. A raised surface is lighter than the page, and a recessed one, such as the comment thread, is darker.
+   */
+  :root[data-theme='dark'] {
+    color-scheme: dark;
+    --color-ink: #f2eeee;
+    --color-paper: #141212;
+    --color-dot: #2a2626;
+    --color-card: #1f1c1c;
+    --color-field: #2a2626;
+    --color-ground: #191616;
+    --color-line: #383333;
+    --color-mute: #a59d9d;
+    --color-sweet: #ff6b6b;
+    --color-sweet-dark: #ff8a8a;
+    --color-pink: #ff7a7a;
+    --color-blush: #3d2325;
+    --color-blush-line: #7a3a3c;
+    --color-blush-soft: #2b2021;
+    --color-sky: #6db3e6;
+    --color-input: #7a7272;
+    --color-on-sweet: #1a1717;
+    --color-sweet-off: #552829;
+    --color-on-sweet-off: #9c7373;
+    --color-scrim: rgb(0 0 0 / 0.6);
+  }
+
   html,
   body {
     height: 100%;
