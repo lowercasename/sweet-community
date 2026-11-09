@@ -1,5 +1,9 @@
 # Changelog
 
+## v1.2.1 (2026-11-09)
+
+- Say that the setup page's email address is for later sign-ins
+
 ## v1.2.0 (2026-11-09)
 
 - Show each tour card's number out of the total
