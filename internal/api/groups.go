@@ -72,7 +72,7 @@ type GroupCan struct {
 // Feature flags, Admin tools). The owner sets them. Everyone can read them,
 // signed in or not, because the sign-in and join pages show the community's
 // name. OwnerSet is state rather than a setting. It is false until the setup
-// link has been used.
+// link has been used, which gives the owner a verified email address.
 type Settings struct {
 	GroupCreation string `json:"group_creation"`
 	// Name is the community's name. It is empty until the owner sets it during onboarding.
@@ -109,17 +109,15 @@ func settingsOf(ctx context.Context, q *store.Queries) (Settings, error) {
 	if st.Description, err = get("description", ""); err != nil {
 		return st, err
 	}
+	// The owner is set once they can sign in: with a verified email address, which is the usual way in, or with a
+	// password. Until 2026-11-09 only a password counted, so a setup without one left the community looking unset.
 	ownerID, err := q.GetGroupOwnerID(ctx, perm.Root)
 	if err == nil {
-		row, err := q.GetUser(ctx, ownerID)
+		acct, err := q.GetAccount(ctx, ownerID)
 		if err != nil {
 			return st, err
 		}
-		hash, err := q.GetUserPasswordHash(ctx, row.Username)
-		if err != nil {
-			return st, err
-		}
-		st.OwnerSet = hash.PasswordHash.Valid
+		st.OwnerSet = acct.EmailVerifiedAt.Valid || acct.PasswordHash.Valid
 	} else if !errors.Is(err, sql.ErrNoRows) {
 		return st, err
 	}

@@ -35,6 +35,8 @@ describe('Welcome', () => {
     const { qc } = renderWithQuery(<Welcome settings={unnamed} onDone={onDone} />)
     // The page also reads the live settings query. Wait for that first read to complete before saving over it.
     await vi.waitFor(() => expect(qc.getQueryData(['settings'])).toBeTruthy())
+    // The step after "Set up your account" is "Set up your community" (Raphael, 2026-11-09).
+    expect(screen.getByRole('heading', { name: 'Set up your community' })).toBeTruthy()
     expect((screen.getByRole('button', { name: 'Next' }) as HTMLButtonElement).disabled).toBe(true)
     fireEvent.change(screen.getByLabelText('Community name'), { target: { value: 'Knitting Circle' } })
     fireEvent.change(screen.getByLabelText('Short community description'), { target: { value: 'Wool.' } })

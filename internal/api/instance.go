@@ -47,18 +47,19 @@ func NeedsSetup(ctx context.Context, d *sql.DB) (bool, error) {
 	return !st.OwnerSet, err
 }
 
-// setup is `POST /api/setup {token, username, email, password}`, with the password optional. It creates
-// the owner's account from the setup link and signs them in. It works once,
-// because the token is deleted with it.
+// setup is `POST /api/setup {token, username, email}`. It creates the owner's account from the setup link and
+// signs them in. It takes no password, because a password is always the secondary way in (Raphael, 2026-11-09).
+// The owner signs in by email and can add a password on Settings. It works once, because the token is deleted
+// with it.
 func (s *Server) setup(w http.ResponseWriter, r *http.Request) {
 	if !s.limiter.open(s.clientAddr(r)) {
 		writeErr(w, http.StatusTooManyRequests, "Too many attempts. Wait a moment and try again.")
 		return
 	}
 	var in struct {
-		Token string `json:"token"`
-		Email string `json:"email"`
-		credentials
+		Token    string `json:"token"`
+		Username string `json:"username"`
+		Email    string `json:"email"`
 	}
 	r.Body = http.MaxBytesReader(w, r.Body, 4096)
 	if err := json.NewDecoder(r.Body).Decode(&in); err != nil {
@@ -73,20 +74,6 @@ func (s *Server) setup(w http.ResponseWriter, r *http.Request) {
 	if err := auth.ValidateEmail(in.Email); err != nil {
 		writeErr(w, http.StatusBadRequest, err.Error())
 		return
-	}
-	// The password is optional (architecture.md, Accounts). Without one, the owner signs in by email.
-	var hash sql.NullString
-	if in.Password != "" {
-		if err := auth.ValidatePassword(in.Password); err != nil {
-			writeErr(w, http.StatusBadRequest, err.Error())
-			return
-		}
-		h, err := auth.HashPassword(in.Password)
-		if err != nil {
-			writeErr(w, http.StatusInternalServerError, err.Error())
-			return
-		}
-		hash = sql.NullString{String: h, Valid: true}
 	}
 	ctx := r.Context()
 	tx, err := s.DB.BeginTx(ctx, nil)
@@ -158,7 +145,8 @@ func (s *Server) setup(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusInternalServerError, err.Error())
 		return
 	}
-	if err := qtx.SetUserPassword(ctx, store.SetUserPasswordParams{PasswordHash: hash, ID: id.String()}); err != nil {
+	// An existing account taken over by the setup link keeps no earlier password.
+	if err := qtx.SetUserPassword(ctx, store.SetUserPasswordParams{PasswordHash: sql.NullString{}, ID: id.String()}); err != nil {
 		writeErr(w, http.StatusInternalServerError, err.Error())
 		return
 	}

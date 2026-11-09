@@ -26,13 +26,17 @@ test.describe('a fresh instance', () => {
     await expect(page.getByText(/has not been set up yet/)).toBeVisible()
     await expect(page).toHaveTitle('Sweet')
     await page.goto(setupPath)
+    // The owner sets up their account with a username and an email address. There is no password (Raphael,
+    // 2026-11-09). Then they set up the community.
+    await expect(page.getByRole('heading', { name: 'Set up your account' })).toBeVisible()
+    await expect(page.getByLabel('Password')).toHaveCount(0)
+    await page.screenshot({ path: 'test-results/setup-account.png' })
     await page.getByLabel('Username').fill('raphael')
     await page.getByLabel('Email address').fill('raphael@example.test')
-    await page.getByLabel('Password').fill('correct horse')
     await page.getByRole('button', { name: 'Set up' }).click()
 
     // Onboarding sets the community name and then creates an invite link.
-    await expect(page.getByRole('heading', { name: 'Community settings' })).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Set up your community' })).toBeVisible()
     await page.getByLabel('Community name').fill('Knitting Circle')
     await page.getByLabel('Short community description').fill('Wool and gossip.')
     await page.getByRole('button', { name: 'Next' }).click()
@@ -47,7 +51,7 @@ test.describe('a fresh instance', () => {
     // A reload opens Home, not the welcome page again.
     await page.reload()
     await expect(page.getByRole('navigation', { name: 'Main' })).toBeVisible()
-    await expect(page.getByRole('heading', { name: 'Community settings' })).toHaveCount(0)
+    await expect(page.getByRole('heading', { name: 'Set up your community' })).toHaveCount(0)
     // The new community has no topics. Home offers the owner Add topics, which opens the Topics card.
     await page.getByRole('link', { name: 'Add topics' }).click()
     await expect(page).toHaveURL(/\/community$/)
@@ -65,6 +69,8 @@ test.describe('a fresh instance', () => {
       await p.goto(joinPath)
       await expect(p.getByText('raphael invited you to Knitting Circle.')).toBeVisible()
       await expect(p.getByText('Wool and gossip.')).toBeVisible()
+      await expect(p.getByRole('heading', { name: 'Set up your account' })).toBeVisible()
+      await p.screenshot({ path: 'test-results/setup-join.png' })
       await p.getByLabel('Username').fill(name)
       await p.getByLabel('Email address').fill(emailOf(name))
       await p.getByRole('button', { name: 'Join Knitting Circle' }).click()

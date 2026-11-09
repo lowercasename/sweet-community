@@ -396,8 +396,9 @@ export function setSettings(s: Pick<Settings, 'group_creation' | 'name' | 'descr
  * Used by the setup link's page. Creates the owner's account with a fresh instance's one-time token and returns a
  * signed-in session.
  */
-export function setup(token: string, username: string, email: string, password: string): Promise<Session> {
-  return request<Session>('/api/setup', json('POST', { token, username, email, password }))
+/** Sets up the owner's account from the setup link. There is no password. One can be added on Settings later. */
+export function setup(token: string, username: string, email: string): Promise<Session> {
+  return request<Session>('/api/setup', json('POST', { token, username, email }))
 }
 
 /** Opens the conversation with one user. Returns the existing conversation if there is one, or creates a new one. */

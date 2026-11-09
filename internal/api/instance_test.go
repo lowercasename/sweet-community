@@ -35,11 +35,14 @@ func newFreshServer(t *testing.T) (*httptest.Server, string) {
 		t.Fatal(err)
 	}
 	imgs, _ := images.NewLocal(filepath.Join(t.TempDir(), "images"))
-	srv := &Server{DB: d, Hub: events.NewHub(d), Images: imgs, Mail: mail.Dir{Path: filepath.Join(t.TempDir(), "mail")}, BaseURL: "http://sweet.test"}
+	mailDir := filepath.Join(t.TempDir(), "mail")
+	srv := &Server{DB: d, Hub: events.NewHub(d), Images: imgs, Mail: mail.Dir{Path: mailDir}, BaseURL: "http://sweet.test"}
 	mux := http.NewServeMux()
 	srv.Routes(mux)
 	ts := httptest.NewServer(Protect(mux))
 	t.Cleanup(ts.Close)
+	// The mail helpers find the server's sent mail by its address.
+	mailDirs.Store(ts.URL, mailDir)
 	return ts, link
 }
 
@@ -58,11 +61,10 @@ func TestSetupLinkMakesTheOwner(t *testing.T) {
 	if st := anon.mustStatus(200, "GET", "/api/settings", nil); st["owner_set"] != false || st["name"] != "" {
 		t.Fatalf("settings before setup: %v", st)
 	}
-	anon.mustStatus(404, "POST", "/api/setup", map[string]string{"token": "nope", "username": "raphael", "email": "r@example.test", "password": "correct horse"})
-	anon.mustStatus(400, "POST", "/api/setup", map[string]string{"token": token, "username": "raphael", "email": "nope", "password": "correct horse"})
-	anon.mustStatus(400, "POST", "/api/setup", map[string]string{"token": token, "username": "raphael", "email": "r@example.test", "password": "short"})
+	anon.mustStatus(404, "POST", "/api/setup", map[string]string{"token": "nope", "username": "raphael", "email": "r@example.test"})
+	anon.mustStatus(400, "POST", "/api/setup", map[string]string{"token": token, "username": "raphael", "email": "nope"})
 	owner := newClient(t, ts)
-	res := owner.mustStatus(201, "POST", "/api/setup", map[string]string{"token": token, "username": "raphael", "email": "r@example.test", "password": "correct horse"})
+	res := owner.mustStatus(201, "POST", "/api/setup", map[string]string{"token": token, "username": "raphael", "email": "r@example.test"})
 	if res["user"].(map[string]any)["username"] != "raphael" {
 		t.Fatalf("setup: %v", res)
 	}
@@ -74,7 +76,7 @@ func TestSetupLinkMakesTheOwner(t *testing.T) {
 	if !groupCan(myGroups(owner)[rootID(owner)], "manage_instance") {
 		t.Fatal("the person from the setup link is not the owner")
 	}
-	newClient(t, ts).mustStatus(404, "POST", "/api/setup", map[string]string{"token": token, "username": "other", "email": "o@example.test", "password": "correct horse"})
+	newClient(t, ts).mustStatus(404, "POST", "/api/setup", map[string]string{"token": token, "username": "other", "email": "o@example.test"})
 	if st := anon.mustStatus(200, "GET", "/api/settings", nil); st["owner_set"] != true {
 		t.Fatalf("settings after setup: %v", st)
 	}
@@ -88,7 +90,8 @@ func TestSetupLinkMakesTheOwner(t *testing.T) {
 	if st := anon.mustStatus(200, "GET", "/api/settings", nil); st["name"] != "Knitting Circle" {
 		t.Fatalf("signed out, the name: %v", st)
 	}
-	newClient(t, ts).login("r@example.test", "correct horse")
+	// The owner signs in again by email, the usual way in.
+	signIn(t, ts, "r@example.test", "r@example.test")
 }
 
 func rootID(c *client) string {
@@ -127,17 +130,17 @@ func TestStaffHearOfEachArrival(t *testing.T) {
 	}
 }
 
-// The setup page's password is optional (architecture.md, Accounts). Without
-// one, the owner signs in by email.
+// Setup takes no password (Raphael, 2026-11-09: passwords are always the secondary way in). The owner signs in by
+// email, and can add a password on Settings later. A password sent to setup is not stored.
 func TestSetupWithoutAPassword(t *testing.T) {
 	ts, link := newFreshServer(t)
 	token := link[strings.LastIndex(link, "/")+1:]
 	owner := newClient(t, ts)
-	owner.mustStatus(201, "POST", "/api/setup", map[string]string{"token": token, "username": "raphael", "email": "r@example.test"})
+	owner.mustStatus(201, "POST", "/api/setup", map[string]string{"token": token, "username": "raphael", "email": "r@example.test", "password": "correct horse"})
 	if acct := owner.mustStatus(200, "GET", "/api/me/account", nil); acct["has_password"] != false || acct["email_verified"] != true {
 		t.Fatalf("the owner's account after a setup without a password: %v", acct)
 	}
-	newClient(t, ts).mustStatus(401, "POST", "/api/login", map[string]string{"username": "raphael", "password": "anything at all"})
+	newClient(t, ts).mustStatus(401, "POST", "/api/login", map[string]string{"username": "raphael", "password": "correct horse"})
 }
 
 // GET /api/version names the release the binary was built from and the

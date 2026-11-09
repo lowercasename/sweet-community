@@ -75,7 +75,7 @@ export function Welcome({ settings: initial, onDone }: WelcomeProps) {
         </Stack>
       ) : (
         <Stack gap={3}>
-          <Heading level={2}>Community settings</Heading>
+          <Heading level={2}>Set up your community</Heading>
           <Text>This is your community. Give it a name, and say what it is for.</Text>
           <CommunityForm settings={settings} submitLabel="Next" onSaved={() => setNamed(true)} />
         </Stack>
