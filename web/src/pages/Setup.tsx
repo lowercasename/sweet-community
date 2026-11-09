@@ -41,7 +41,7 @@ export function Setup({ token, onSetUp }: SetupProps) {
         <Field label="Username" hint="Letters, numbers, and underscores.">
           <Input name="username" value={username} onChange={setUsername} autoComplete="username" autoFocus required />
         </Field>
-        <Field label="Email address" hint="You will sign in with a link and a code sent here.">
+        <Field label="Email address" hint="When you sign in later, a link and a code are sent here.">
           <Input type="email" name="email" value={email} onChange={setEmail} autoComplete="email" required />
         </Field>
         {error && <Alert tone="error">{error}</Alert>}

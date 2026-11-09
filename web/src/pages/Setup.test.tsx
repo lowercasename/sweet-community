@@ -22,7 +22,7 @@ describe('Setup', () => {
     render(<Setup token="tok" onSetUp={onSetUp} />)
     expect(screen.getByRole('heading', { name: 'Set up your account' })).toBeTruthy()
     expect(screen.getByText('Letters, numbers, and underscores.')).toBeTruthy()
-    expect(screen.getByText('You will sign in with a link and a code sent here.')).toBeTruthy()
+    expect(screen.getByText('When you sign in later, a link and a code are sent here.')).toBeTruthy()
     expect(screen.queryByLabelText('Password')).toBeNull()
     fireEvent.change(screen.getByLabelText('Username'), { target: { value: ' raphael ' } })
     fireEvent.change(screen.getByLabelText('Email address'), { target: { value: 'r@example.test' } })
