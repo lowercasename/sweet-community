@@ -2,7 +2,7 @@
 
 React 18, TypeScript, Vite, TanStack Query for server data, wouter for routing, TipTap for the editor, Tailwind v4 for styling, Floating UI for menus and cards, Lucide for icons. No component framework. The Ubuntu font is bundled with fontsource, so the app makes no requests to Google.
 
-`architecture.md` at the repository root describes the layout, every page and the rules behind them. This file covers how the client code is organised and how to run it.
+`architecture.md` at the repository root records Sweet's design and the reasons for it. This file covers how the client code is organised and how to run it.
 
 ## Commands
 
