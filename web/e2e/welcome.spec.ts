@@ -12,16 +12,18 @@ const tourCard = (page: Page) => page.getByRole('alertdialog')
 
 /**
  * Steps through the tour with each card's primary button and returns the cards' titles. Each card must sit inside the
- * screen with at least the 16px gutter.
+ * screen with at least the 16px gutter, and show its number out of the total.
  */
 async function walk(page: Page): Promise<string[]> {
   const titles: string[] = []
+  const counts: string[] = []
   const width = page.viewportSize()!.width
   for (;;) {
     const card = tourCard(page)
     await expect(card).toBeVisible()
     const title = (await card.getByRole('heading').textContent()) ?? ''
     titles.push(title)
+    counts.push((await card.getByText(/^\d+ of \d+$/).textContent()) ?? '')
     const box = (await card.boundingBox())!
     expect(box.x, `left edge of "${title}"`).toBeGreaterThanOrEqual(15.5)
     // On a phone the card spans the screen less the gutters, so its two margins match.
@@ -34,6 +36,7 @@ async function walk(page: Page): Promise<string[]> {
     await expect(card.getByRole('heading')).not.toHaveText(title)
   }
   await expect(tourCard(page)).toHaveCount(0)
+  expect(counts).toEqual(titles.map((_, i) => `${i + 1} of ${titles.length}`))
   return titles
 }
 

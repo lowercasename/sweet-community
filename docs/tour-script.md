@@ -18,7 +18,7 @@ Buttons: Not now, Show me around
 
 ## The tour
 
-Each card has Back from the second card on, Skip tour, and Next. The last card a user sees has Done in place of Next.
+Each card has Back from the second card on, Skip tour, and Next. The last card a user sees has Done in place of Next. Each card shows its number out of the total, such as 2 of 7, at the right of its heading. The welcome dialog is not counted.
 
 ### 2. Posts
 
