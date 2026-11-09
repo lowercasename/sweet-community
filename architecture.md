@@ -14,6 +14,8 @@ The server and the React app are licensed AGPL-3.0-or-later. There is no CLA. Co
 
 This choice has a known cost, and the cost was accepted deliberately. Without a CLA, the project can never be relicensed as source-available. This audience wants that guarantee as a signal that the project is credible.
 
+**As built (2026-11-09).** Raphael asked for the licence on 2026-11-09. `LICENSE` holds the text of the GNU AGPL, version 3, from gnu.org. `web/package.json` declares `AGPL-3.0-or-later`, and the README's Licence section says the same. The API client stays in `web/src/api.ts`, under the AGPL like the rest of the app, for now (Raphael, 2026-11-09). Its own directory under the MIT licence is deferred. The Source code link is not built yet. The footer has no such link, and there is no setting for it.
+
 ## Shape of an instance
 
 Each instance is one social community with one feed and one chat room.

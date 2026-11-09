@@ -138,3 +138,9 @@ internal/web        embeds the frontend build
 migrations/         *.sql, forward-only
 web/                React + TipTap. See web/README.md
 ```
+
+## Licence
+
+Sweet is free software. You can share it and change it under the terms of the GNU Affero General Public License, version 3 or any later version, as published by the Free Software Foundation. The full text is in [LICENSE](LICENSE).
+
+If you run a changed version of Sweet for other people, the licence requires you to offer them the source code of your version.
