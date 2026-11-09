@@ -1,5 +1,11 @@
 # Changelog
 
+## v1.2.0 (2026-11-09)
+
+- Show each tour card's number out of the total
+- Welcome new members with a dialog and a tour
+- Record the scripts that remove and update communities
+
 ## v1.1.0 (2026-11-09)
 
 - Keep 30 days of database history, with hourly snapshots
