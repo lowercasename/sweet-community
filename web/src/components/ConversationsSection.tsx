@@ -56,6 +56,7 @@ export function ConversationsSection({ groups, me, location, places, expanded, o
   return (
     <NavSection
       title="Conversations"
+      tour="conversations"
       expanded={expanded}
       action={{
         icon: 'plus',

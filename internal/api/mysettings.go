@@ -5,7 +5,9 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
+	"strconv"
 
+	"sweet/internal/db"
 	"sweet/internal/store"
 )
 
@@ -13,23 +15,34 @@ import (
 // per-person, with off one click away). Digest is "weekly" or "off".
 type MySettings struct {
 	Digest string `json:"digest"`
+	// Welcomed is true once the user has closed the welcome dialog. It is state rather than a setting. It only moves
+	// from false to true, so a request that leaves it out or sends false does not show the dialog again.
+	Welcomed bool `json:"welcomed"`
 }
 
 const (
 	DigestWeekly = "weekly"
 	DigestOff    = "off"
+	// welcomedKey is stored once the user has closed the welcome dialog. Its value is the time.
+	welcomedKey = "welcomed_at"
 )
 
 func mySettingsOf(r *http.Request, q *store.Queries, userID string) (MySettings, error) {
 	st := MySettings{Digest: DigestWeekly}
 	v, err := q.GetUserSetting(r.Context(), store.GetUserSettingParams{UserID: userID, Key: "digest"})
-	if errors.Is(err, sql.ErrNoRows) {
-		return st, nil
-	}
-	if err != nil {
+	switch {
+	case err == nil:
+		st.Digest = v
+	case !errors.Is(err, sql.ErrNoRows):
 		return st, err
 	}
-	st.Digest = v
+	_, err = q.GetUserSetting(r.Context(), store.GetUserSettingParams{UserID: userID, Key: welcomedKey})
+	switch {
+	case err == nil:
+		st.Welcomed = true
+	case !errors.Is(err, sql.ErrNoRows):
+		return st, err
+	}
 	return st, nil
 }
 
@@ -44,7 +57,7 @@ func (s *Server) getMySettings(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, st)
 }
 
-// setMySettings is `PUT /api/me/settings {digest}`. The settings are the
+// setMySettings is `PUT /api/me/settings {digest, welcomed}`. The settings are the
 // user's own, so no event is logged.
 func (s *Server) setMySettings(w http.ResponseWriter, r *http.Request) {
 	var in MySettings
@@ -61,6 +74,12 @@ func (s *Server) setMySettings(w http.ResponseWriter, r *http.Request) {
 	if err := s.q().SetUserSetting(r.Context(), store.SetUserSettingParams{UserID: me.ID, Key: "digest", Value: in.Digest}); err != nil {
 		writeErr(w, http.StatusInternalServerError, err.Error())
 		return
+	}
+	if in.Welcomed {
+		if err := s.q().SetUserSetting(r.Context(), store.SetUserSettingParams{UserID: me.ID, Key: welcomedKey, Value: strconv.FormatInt(db.Now(), 10)}); err != nil {
+			writeErr(w, http.StatusInternalServerError, err.Error())
+			return
+		}
 	}
 	st, err := mySettingsOf(r, s.q(), me.ID)
 	if err != nil {

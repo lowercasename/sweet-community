@@ -24,6 +24,8 @@ interface NavItemProps {
   dot?: boolean
   /** Who sees this page, for a page only owners or moderators see. A shield follows the label, and the words are the item's description. */
   shield?: string
+  /** Names this element for the welcome tour, which points at it (src/tour/steps.ts). */
+  tour?: string
   onClick?: () => void
 }
 
@@ -44,6 +46,7 @@ export function NavItem({
   size = 'md',
   dot = false,
   shield,
+  tour,
   onClick,
 }: NavItemProps) {
   const tip = useTooltip(label, !expanded, 'right')
@@ -57,6 +60,7 @@ export function NavItem({
         aria-current={current ? 'page' : undefined}
         aria-label={name === label && expanded ? undefined : name}
         aria-description={shield}
+        data-tour={tour}
         className={`group flex cursor-pointer items-center gap-3 rounded-[4px] text-mute transition-colors ${GHOST_HOVER} focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-pink ${GHOST_CURRENT} ${size === 'sm' ? 'h-8 text-sm' : 'h-10'} ${expanded ? 'px-3' : 'justify-center'}`}
         {...tip.props({ onClick })}
       >

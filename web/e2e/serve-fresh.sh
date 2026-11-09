@@ -4,6 +4,9 @@
 # serve.sh already (the frontend and the migrations copy), so only the binary.
 set -e
 cd "$(dirname "$0")/../.."
+# The Makefile exports Raphael's .env. Its bucket settings would send the tests' images to a real bucket, so they are
+# cleared and images go to the local directory.
+unset SWEET_S3_ENDPOINT SWEET_S3_BUCKET SWEET_S3_ACCESS_KEY SWEET_S3_SECRET_KEY SWEET_S3_REGION SWEET_S3_PREFIX SWEET_S3_FOLDER SWEET_S3_INSECURE
 rm -rf data/e2e-fresh.db data/e2e-fresh.db-shm data/e2e-fresh.db-wal data/e2e-fresh-images data/e2e-fresh-mail data/e2e-fresh.log
 mkdir -p data
 # The Makefile exports Raphael's .env, SWEET_OWNER_PASSWORD included; this instance must have no owner.

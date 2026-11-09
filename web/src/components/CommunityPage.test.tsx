@@ -10,6 +10,7 @@ import { ROOT, group, renderWithQuery } from '../test-utils'
 vi.mock('../api', () => ({
   listTopics: vi.fn(() => Promise.resolve({ topics: [] })),
   getRules: vi.fn(() => Promise.resolve({ body_html: '' })),
+  getWelcome: vi.fn(() => Promise.resolve({ body_html: '' })),
   listReports: vi.fn(() => Promise.resolve({ reports: [] })),
   getSettings: vi.fn(() =>
     Promise.resolve({ group_creation: 'anyone', name: 'Knitting Circle', description: 'Wool.', owner_set: true }),
@@ -53,17 +54,38 @@ describe('CommunityPage', () => {
     expect(screen.getAllByRole('img', { name: 'Only the owner sees this' })).toHaveLength(1)
   })
 
-  it('a moderator sees the reports first, then the rules and topics, and not the community settings', async () => {
+  it('the owner sees the reports, the community settings, the welcome message, the rules and the topics', async () => {
+    const { CommunityPage } = await import('./CommunityPage')
+    renderWithQuery(<CommunityPage root={group(ROOT, 'owner')} />)
+    await screen.findByRole('heading', { name: 'Topics' })
+    expect(screen.getAllByRole('heading', { level: 2 }).map((h) => h.textContent)).toEqual([
+      'Reports',
+      'About this community',
+      'Welcome message',
+      'Rules',
+      'Topics',
+    ])
+  })
+
+  it('opens the welcome message in the editor when asked to', async () => {
+    const { CommunityPage } = await import('./CommunityPage')
+    renderWithQuery(<CommunityPage root={group(ROOT, 'owner')} editing="welcome" />)
+    await screen.findByRole('heading', { name: 'Welcome message' })
+    expect(await screen.findByRole('button', { name: 'Save' })).toBeTruthy()
+  })
+
+  it('a moderator sees the reports first, then the welcome message, rules and topics, and not the community settings', async () => {
     const { CommunityPage } = await import('./CommunityPage')
     renderWithQuery(<CommunityPage root={group(ROOT, 'moderator')} />)
     await screen.findByRole('heading', { name: 'Topics' })
     expect(screen.getAllByRole('heading', { level: 2 }).map((h) => h.textContent)).toEqual([
       'Reports',
+      'Welcome message',
       'Rules',
       'Topics',
     ])
     // Each card is marked with the shield, and the page says once what the shield means.
-    expect(screen.getAllByRole('img', { name: 'Only the owner and moderators see this' })).toHaveLength(3)
+    expect(screen.getAllByRole('img', { name: 'Only the owner and moderators see this' })).toHaveLength(4)
     expect(screen.getByText(/marks what only owners and moderators can see and do\./)).toBeTruthy()
     expect(screen.queryByRole('heading', { name: 'About this community' })).toBeNull()
     expect(screen.queryByLabelText('Community name')).toBeNull()

@@ -70,6 +70,8 @@ interface MenuProps {
    * is hovered. A message's menu shows while its own row is hovered.
    */
   reveal?: 'post' | 'comment' | 'message'
+  /** Names the trigger for the welcome tour, which points at it (src/tour/steps.ts). */
+  tour?: string
 }
 
 /**
@@ -90,6 +92,7 @@ export function Menu({
   quiet = false,
   size = 'md',
   disabled,
+  tour,
   children,
 }: MenuProps) {
   const [open, setOpen] = useState(false)
@@ -124,6 +127,7 @@ export function Menu({
         aria-label={label}
         aria-haspopup="menu"
         aria-expanded={open}
+        data-tour={tour}
         disabled={disabled}
         {...getReferenceProps(tip.props())}
       >

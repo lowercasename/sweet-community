@@ -43,6 +43,7 @@ import { ProfilePage } from '../components/ProfilePage'
 import { RulesPage } from '../components/RulesPage'
 import { SearchPage } from '../components/SearchPage'
 import { SettingsPage } from '../components/SettingsPage'
+import { Welcome } from '../components/Welcome'
 import { Sidebar } from '../components/Sidebar'
 import { Button, ConfirmDialog, Menu, Segmented, Shell, TabBar, Text } from '../ui'
 
@@ -191,12 +192,14 @@ export function Home({ me, onSignOut }: HomeProps) {
                     key: 'posts',
                     icon: 'posts',
                     label: 'Posts',
+                    tour: 'view-posts',
                     dot: layout !== 'posts' && places.get(current.id)?.feed === true,
                   },
                   {
                     key: 'chat',
                     icon: 'chat',
                     label: 'Chat',
+                    tour: 'view-chat',
                     dot: layout !== 'chat' && places.get(current.id)?.chat === true,
                   },
                 ]}
@@ -207,7 +210,7 @@ export function Home({ me, onSignOut }: HomeProps) {
             )}
             {/* The community's rules, when it has some (architecture.md, Admin tools). On the phone they are in the menu. */}
             {atRoot && rules && !narrow && (
-              <Button variant="ghost" icon="rules" label="Rules" onClick={() => navigate(RULES)}>
+              <Button variant="ghost" icon="rules" label="Rules" tour="rules" onClick={() => navigate(RULES)}>
                 Rules
               </Button>
             )}
@@ -239,7 +242,7 @@ export function Home({ me, onSignOut }: HomeProps) {
           <Route path={COMMUNITY}>
             {root &&
               (root.can.manage_instance || root.can.manage_topics ? (
-                <CommunityPage root={root} />
+                <CommunityPage root={root} editing={search.get('edit') === 'welcome' ? 'welcome' : undefined} />
               ) : (
                 <Redirect to="/" replace />
               ))}
@@ -299,6 +302,17 @@ export function Home({ me, onSignOut }: HomeProps) {
             onFocused={() => navigate(location, { replace: true })}
           />
         )}
+        {/* The welcome dialog and the tour (architecture.md, New-instance lifecycle). Settings asks for it with ?welcome. */}
+        {root && (
+          <Welcome
+            root={root}
+            atHome={atRoot}
+            asked={atRoot && search.has('welcome')}
+            onClosed={() => {
+              if (search.has('welcome')) navigate('/', { replace: true })
+            }}
+          />
+        )}
         <ConfirmDialog
           open={hiding}
           title="Hide this conversation?"
@@ -317,7 +331,7 @@ export function Home({ me, onSignOut }: HomeProps) {
               { key: 'home', icon: 'home', label: 'Home', dot: !atRoot && !!root && anyUnread(places.get(root.id)) },
               { key: 'search', icon: 'search', label: 'Search' },
               { key: 'bell', icon: 'bell', label: 'Notifications', dot: unread },
-              { key: 'menu', icon: 'menu', label: 'Menu' },
+              { key: 'menu', icon: 'menu', label: 'Menu', tour: 'menu' },
             ]}
             active={tabActive}
             onSelect={(key) => {

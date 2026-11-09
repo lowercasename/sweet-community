@@ -64,6 +64,8 @@ type GroupCan struct {
 	ManageTopics bool `json:"manage_topics,omitempty"`
 	// ManageRules is meaningful on the root group only. The owner and moderators may write the rules.
 	ManageRules bool `json:"manage_rules,omitempty"`
+	// ManageWelcome is meaningful on the root group only. The owner and moderators may write the welcome message.
+	ManageWelcome bool `json:"manage_welcome,omitempty"`
 	// HandleReports is meaningful on the root group only. The owner and moderators read and close reports.
 	HandleReports bool `json:"handle_reports,omitempty"`
 }
@@ -153,6 +155,7 @@ func groupFor(a perm.Actor, g Group, st Settings) Group {
 		g.Can.ManageInstance = perm.ManageInstance(a)
 		g.Can.ManageTopics = perm.ManageTopics(a)
 		g.Can.ManageRules = perm.ManageRules(a)
+		g.Can.ManageWelcome = perm.ManageWelcome(a)
 		g.Can.HandleReports = perm.HandleReports(a)
 	}
 	return g

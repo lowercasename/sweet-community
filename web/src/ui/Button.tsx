@@ -26,6 +26,8 @@ interface ButtonProps {
   icon?: IconName
   /** A small number shown after the icon, as old Sweet's post toolbar showed comment counts. Hidden when 0. */
   count?: number
+  /** Names this element for the welcome tour, which points at it (src/tour/steps.ts). */
+  tour?: string
   onClick?: () => void
   /** Called when the pointer enters or leaves. A toggle shows its action (Unsubscribe) instead of its state (Subscribed) while hovered. */
   onHoverChange?: (hovered: boolean) => void
@@ -119,6 +121,7 @@ export function Button({
   label,
   icon,
   count,
+  tour,
   onClick,
   onHoverChange,
   labels,
@@ -138,6 +141,7 @@ export function Button({
         disabled={disabled || busy}
         aria-busy={busy || undefined}
         aria-pressed={pressed === undefined ? undefined : pressed}
+        data-tour={tour}
         aria-current={current ? 'page' : undefined}
         aria-label={wordless ? label : undefined}
         {...tip.props({

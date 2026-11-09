@@ -22,7 +22,10 @@ vi.mock('../api', () => ({
   ),
   setPassword: vi.fn(() => Promise.resolve()),
   removePassword: vi.fn(() => Promise.resolve()),
-  getMySettings: vi.fn(() => Promise.resolve({ digest: 'weekly' })),
+  getMySettings: vi.fn(() => Promise.resolve({ digest: 'weekly', welcomed: true })),
+  getSettings: vi.fn(() =>
+    Promise.resolve({ group_creation: 'anyone', name: 'Knitting Circle', description: '', owner_set: true }),
+  ),
   setMySettings: vi.fn(),
   getPushKey: vi.fn(),
   subscribePush: vi.fn(),
@@ -33,6 +36,14 @@ afterEach(cleanup)
 beforeEach(() => vi.clearAllMocks())
 
 describe('SettingsPage', () => {
+  it('offers the welcome dialog again, which Home opens from ?welcome', async () => {
+    const { SettingsPage } = await import('./SettingsPage')
+    renderWithQuery(<SettingsPage me={user('kit')} root={group(ROOT, 'member')} onSignOut={() => {}} />)
+    await screen.findByText("Read Knitting Circle's welcome message again, or take the tour.")
+    fireEvent.click(screen.getByRole('button', { name: 'Show welcome' }))
+    expect(window.location.pathname + window.location.search).toBe('/?welcome')
+  })
+
   it('lets a non-owner remove their account after confirming, and asks the owner to transfer ownership', async () => {
     const { removeUser } = await import('../api')
     const { SettingsPage } = await import('./SettingsPage')

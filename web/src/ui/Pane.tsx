@@ -5,6 +5,8 @@ interface PaneProps {
   side?: 'left' | 'right' | 'full'
   /** No side padding. The content sits against the pane's edges. Used by chat. */
   flush?: boolean
+  /** Names this element for the welcome tour, which points at it (src/tour/steps.ts). */
+  tour?: string
   children?: ReactNode
 }
 
@@ -16,7 +18,11 @@ const PADS: Record<NonNullable<PaneProps['side']>, string> = {
 }
 
 /** One column of the layout. Its ScrollArea or Card child is the element that scrolls. */
-export function Pane({ side = 'full', flush = false, children }: PaneProps) {
+export function Pane({ side = 'full', flush = false, tour, children }: PaneProps) {
   const edge = flush ? (side === 'right' ? 'border-l border-line' : '') : PADS[side]
-  return <section className={`flex min-h-0 min-w-0 flex-1 flex-col gap-2 overflow-hidden ${edge}`}>{children}</section>
+  return (
+    <section data-tour={tour} className={`flex min-h-0 min-w-0 flex-1 flex-col gap-2 overflow-hidden ${edge}`}>
+      {children}
+    </section>
+  )
 }

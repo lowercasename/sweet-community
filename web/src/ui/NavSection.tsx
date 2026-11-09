@@ -13,6 +13,8 @@ interface NavSectionProps {
     current?: boolean
     onClick: () => void
   }
+  /** Names the section's title row for the welcome tour, which points at it (src/tour/steps.ts). */
+  tour?: string
   children?: ReactNode
 }
 
@@ -24,7 +26,7 @@ interface NavSectionProps {
  * the space of a group item. Its items use the small size and have no gap
  * between them, as a stack under the title.
  */
-export function NavSection({ title, expanded, action, children }: NavSectionProps) {
+export function NavSection({ title, expanded, action, tour, children }: NavSectionProps) {
   // When collapsed, a section with no items renders nothing. Rendering only its padding left a gap in the bar.
   if (!expanded && Children.toArray(children).length === 0) return null
   return (
@@ -32,7 +34,7 @@ export function NavSection({ title, expanded, action, children }: NavSectionProp
     // leave the same space before whatever follows it, such as a rule or another section.
     <div role="group" aria-label={title} className="flex flex-col gap-0 pb-1.5">
       {expanded && (
-        <div className="mt-1 flex h-7 items-center justify-between pr-1 pl-3">
+        <div data-tour={tour} className="mt-1 flex h-7 items-center justify-between pr-1 pl-3">
           <span className="text-sm font-medium text-mute">{title}</span>
           {action && (
             <Button

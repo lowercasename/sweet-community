@@ -86,7 +86,7 @@ export function PostsPane({ groupId, side = 'full', watching, topicId = null }: 
   }, [watching, visible, loaded, newest, readAt, groupId, markRead])
 
   return (
-    <Pane side={side}>
+    <Pane side={side} tour="posts">
       <ScrollArea>
         <Measure>
           <Stack gap={3}>
@@ -115,6 +115,7 @@ export function PostsPane({ groupId, side = 'full', watching, topicId = null }: 
                           onChange={(id) => navigate(id ? topicPath(id) : '/')}
                           noneLabel="Everything"
                           label="Showing"
+                          tour="topics"
                           onEdit={staff ? () => navigate(COMMUNITY) : undefined}
                         />
                         {topic && (

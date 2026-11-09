@@ -3,16 +3,17 @@ import { useSettings } from '../data/hooks'
 import { Alert, Card, Heading, Measure, Pane, ScrollArea, PageNote, ShieldMark, shieldText, Stack } from '../ui'
 import { CommunityForm } from './CommunityForm'
 import { ReportsCard } from './ReportsCard'
-import { RulesCard } from './RulesCard'
+import { RulesCard, WelcomeCard } from './CommunityTextCard'
 import { TopicsCard } from './TopicsCard'
 
 /**
- * The page for the community's reports, settings, rules and topics. It is linked from the nav, not from the owner's
- * profile page (Raphael, 2026-11-06). The reports come first, because they wait for someone to act on them. A
- * moderator sees the reports, the rules and the topics, and not the community's settings (Raphael, 2026-11-08). The
- * root group's flags decide which cards show.
+ * The page for the community's reports, settings, welcome message, rules and topics. It is linked from the nav, not
+ * from the owner's profile page (Raphael, 2026-11-06). The reports come first, because they wait for someone to act on
+ * them. A moderator sees the reports, the welcome message, the rules and the topics, and not the community's settings
+ * (Raphael, 2026-11-08). The root group's flags decide which cards show. `editing` opens the welcome message in the
+ * editor, for the tour's last step for the owner.
  */
-export function CommunityPage({ root }: { root: Group }) {
+export function CommunityPage({ root, editing }: { root: Group; editing?: 'welcome' }) {
   const { settings, error } = useSettings()
   return (
     <Pane>
@@ -35,6 +36,7 @@ export function CommunityPage({ root }: { root: Group }) {
                 </Stack>
               </Card>
             )}
+            {root.can.manage_welcome && <WelcomeCard editing={editing === 'welcome'} />}
             {root.can.manage_rules && <RulesCard />}
             {root.can.manage_topics && <TopicsCard />}
           </Stack>

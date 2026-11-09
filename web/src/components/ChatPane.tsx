@@ -158,7 +158,7 @@ export function ChatPane({ groupId, side = 'full', watching, focusMessage = null
   }, [target, loading, hasEarlier, messages.length])
 
   return (
-    <Pane side={side} flush>
+    <Pane side={side} flush tour="chat">
       <Card fill flush>
         <ScrollArea ref={scrollRef} pad="inner" onScroll={onScroll}>
           <Stack gap={3}>

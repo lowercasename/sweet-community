@@ -77,6 +77,7 @@ export function Sidebar({ me, groups, location, expanded, onGo, onToggle }: Side
       {(mine.length > 0 || canCreate) && (
         <NavSection
           title="Rooms"
+          tour="rooms"
           expanded={expanded}
           action={
             canCreate
@@ -139,6 +140,7 @@ export function Sidebar({ me, groups, location, expanded, onGo, onToggle }: Side
         <NavItem
           icon="settings"
           label="Community"
+          tour="community"
           expanded={expanded}
           shield={shieldText.staffSee}
           current={at(location, COMMUNITY)}

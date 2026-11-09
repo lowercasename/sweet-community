@@ -62,6 +62,10 @@ test.describe('a fresh instance', () => {
     await page.evaluate(() => localStorage.removeItem('sweet.nav'))
     await page.getByRole('button', { name: 'Go to Knitting Circle' }).click()
     await expect(page.getByRole('navigation', { name: 'Main' })).toBeVisible()
+    // Home opens with the welcome dialog, which offers the tour (architecture.md, New-instance lifecycle).
+    await expect(page.getByRole('heading', { name: 'Welcome to Knitting Circle' })).toBeVisible()
+    await shoot(page, 'welcome')
+    await page.getByRole('button', { name: 'Not now' }).click()
     await expect(page.getByRole('navigation', { name: 'Main' }).getByRole('button', { name: 'Collapse' })).toBeVisible()
     await expect(page.getByRole('navigation', { name: 'Main' })).toContainText('Knitting Circle')
     await expect(page).toHaveTitle('Knitting Circle')

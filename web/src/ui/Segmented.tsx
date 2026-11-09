@@ -8,6 +8,8 @@ interface Segment<K extends string> {
   label: string
   /** Whether this view has unread content. Shows a dot and adds "unread" to the accessible name. */
   dot?: boolean
+  /** Names this element for the welcome tour, which points at it (src/tour/steps.ts). */
+  tour?: string
 }
 
 interface SegmentedProps<K extends string> {
@@ -29,6 +31,7 @@ export function Segmented<K extends string>({ label, segments, value, compact = 
           key={s.key}
           type="button"
           aria-pressed={s.key === value}
+          data-tour={s.tour}
           aria-label={s.dot ? `${s.label}, unread` : compact ? s.label : undefined}
           className={buttonClass('ghost', compact)}
           onClick={() => onChange(s.key)}

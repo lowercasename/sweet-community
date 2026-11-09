@@ -21,6 +21,9 @@ export default async function globalSetup(config: FullConfig) {
     data: { name: 'Sweet e2e', description: '', group_creation: 'anyone' },
   })
   if (!named.ok()) throw new Error(`naming the community: ${named.status()} ${await named.text()}`)
+  // The owner has seen the welcome dialog, so it does not cover the page in every test. welcome.spec.ts opens it.
+  const welcomed = await ctx.put('/api/me/settings', { data: { digest: 'weekly', welcomed: true } })
+  if (!welcomed.ok()) throw new Error(`welcoming the owner: ${welcomed.status()} ${await welcomed.text()}`)
   for (const project of config.projects) {
     await ctx.storageState({ path: `e2e/.auth/owner-${project.name}.json` })
   }

@@ -13,7 +13,7 @@ import type {
   PostPage,
   Profile,
   Report,
-  Rules,
+  CommunityText,
   Settings,
   Topic,
   User,
@@ -38,6 +38,7 @@ export const EVENT_KINDS = [
   'membership_delete',
   'settings',
   'rules',
+  'welcome',
   'notification',
   'notification_delete',
   'marker',
@@ -104,8 +105,9 @@ export function applyEvent(qc: QueryClient, kind: string, data: unknown): void {
       if (isProfile(data)) qc.setQueryData<Profile>(keys.profile(data.username), data)
       break
     case 'rules':
-      if (typeof data === 'object' && data !== null && typeof (data as Rules).body_html === 'string') {
-        qc.setQueryData<Rules>(keys.rules, data as Rules)
+    case 'welcome':
+      if (typeof data === 'object' && data !== null && typeof (data as CommunityText).body_html === 'string') {
+        qc.setQueryData<CommunityText>(keys[kind], data as CommunityText)
       }
       break
     case 'settings':

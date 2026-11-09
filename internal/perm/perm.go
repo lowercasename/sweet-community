@@ -105,6 +105,10 @@ func ManageTopics(root Actor) bool { return root.staff() }
 // ManageRules allows the root group's owner and moderators to write the community's rules (Raphael, 2026-11-08).
 func ManageRules(root Actor) bool { return root.staff() }
 
+// ManageWelcome allows the root group's owner and moderators to write the welcome message, as they write the rules
+// (Raphael, 2026-11-09).
+func ManageWelcome(root Actor) bool { return root.staff() }
+
 // Report allows any member of the group an item is in, except the item's author, to report it to the community's
 // owner and moderators (Raphael, 2026-11-08). Moderators may report too.
 func Report(a Actor, authorID string) bool { return a.member() && a.ID != authorID }

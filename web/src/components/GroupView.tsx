@@ -48,6 +48,7 @@ export function GroupView({ group, hidden, topicId = null, focusMessage = null, 
     <Stack gap={0} fill hidden={hidden}>
       {both ? (
         <Split
+          tour="divider"
           show={show}
           ratio={ratio}
           onRatio={setRatio}

@@ -112,7 +112,7 @@ func Key(kind string, raw []byte) string {
 			return ""
 		}
 		return "report:" + p.Kind + ":" + p.ID
-	case "settings", "rules":
+	case "settings", "rules", "welcome":
 		return kind
 	}
 	return ""

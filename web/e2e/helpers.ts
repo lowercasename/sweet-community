@@ -100,9 +100,10 @@ export function mailCode(to: string, dir = MAIL_DIR): string {
 
 /**
  * Creates a new member. The owner creates an invite, the new user registers with it, with no password, and uses the
- * sign-in link they were sent. Their browser context is then signed in.
+ * sign-in link they were sent. Their browser context is then signed in. Unless `welcomed` is false, the member has
+ * already closed the welcome dialog, so it does not cover the page.
  */
-export async function member(browser: Browser, info: TestInfo, prefix = 'kit'): Promise<Person> {
+export async function member(browser: Browser, info: TestInfo, prefix = 'kit', welcomed = true): Promise<Person> {
   const o = await owner(browser, info)
   const invite = await o.context.request.post('/api/invites')
   expect(invite.ok()).toBeTruthy()
@@ -116,6 +117,10 @@ export async function member(browser: Browser, info: TestInfo, prefix = 'kit'): 
   const token = mailLink(emailOf(username), 'signin').split('/').pop()!
   const signedIn = await context.request.post('/api/signin/link', { data: { token } })
   expect(signedIn.ok(), await signedIn.text()).toBeTruthy()
+  if (welcomed) {
+    const done = await context.request.put('/api/me/settings', { data: { digest: 'weekly', welcomed: true } })
+    expect(done.ok(), await done.text()).toBeTruthy()
+  }
   const page = await context.newPage()
   await prepare(page)
   return { context, page, username }

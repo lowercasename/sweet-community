@@ -7,6 +7,8 @@ import {
   getVersion,
   getRules,
   setRules,
+  getWelcome,
+  setWelcome,
   listReports,
   closeReport,
   getMySettings,
@@ -61,7 +63,7 @@ import {
   type GroupMode,
   type Invite,
   type Member,
-  type MySettings,
+  type MySettingsUpdate,
   type Notification,
   type ReportKind,
   type Role,
@@ -525,7 +527,7 @@ export function useMySettings() {
 }
 export function useSetMySettings() {
   const qc = useQueryClient()
-  return async (s: MySettings) => {
+  return async (s: MySettingsUpdate) => {
     qc.setQueryData(keys.mySettings, await setMySettings(s))
   }
 }
@@ -549,18 +551,31 @@ export function useRelease(): string | undefined {
   return useQuery({ queryKey: keys.version, queryFn: getVersion, staleTime: Infinity }).data?.release
 }
 
-/** The community's rules (architecture.md, Admin tools). A rules event keeps them current. */
-export function useRules(): string | undefined {
-  return useQuery({ queryKey: keys.rules, queryFn: getRules }).data?.body_html
+/** The two texts the owner and moderators write for every member (architecture.md, Admin tools). */
+export type TextKind = 'rules' | 'welcome'
+
+// The API functions are looked up when a hook calls them, not when this module loads.
+const fetchText = (kind: TextKind) => (kind === 'rules' ? getRules() : getWelcome())
+const saveText = (kind: TextKind, html: string) => (kind === 'rules' ? setRules(html) : setWelcome(html))
+
+/** A community text's body. Its event keeps it current. */
+export function useCommunityText(kind: TextKind): string | undefined {
+  return useQuery({ queryKey: keys[kind], queryFn: () => fetchText(kind) }).data?.body_html
 }
 
-/** Writes the rules. The reply is the rules as stored. */
-export function useSetRules() {
+/** Writes a community text. The reply is the text as stored. */
+export function useSetCommunityText(kind: TextKind) {
   const qc = useQueryClient()
   return async (bodyHtml: string) => {
-    qc.setQueryData(keys.rules, await setRules(bodyHtml))
+    qc.setQueryData(keys[kind], await saveText(kind, bodyHtml))
   }
 }
+
+/** The community's rules. */
+export const useRules = () => useCommunityText('rules')
+
+/** The community's welcome message, which the welcome dialog shows. */
+export const useWelcome = () => useCommunityText('welcome')
 
 /** The items with open reports, for the owner and moderators (architecture.md, Admin tools). Report events keep them current. */
 export function useReports() {

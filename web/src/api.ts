@@ -65,6 +65,8 @@ export interface GroupCan {
   manage_topics?: boolean
   /** Root group only. Whether the current user may write the rules. The owner and moderators may. */
   manage_rules?: boolean
+  /** Root group only. Whether the current user may write the welcome message. The owner and moderators may. */
+  manage_welcome?: boolean
   /** Root group only. Whether the current user reads and closes reports. The owner and moderators do. */
   handle_reports?: boolean
 }
@@ -613,16 +615,23 @@ export function confirmEmail(token: string): Promise<{ email: string }> {
   return request('/api/verify', json('POST', { token }))
 }
 
-/** My own settings (architecture.md, Notifications): whether the weekly digest is on or off. */
+/**
+ * My own settings (architecture.md, Notifications): whether the weekly digest is on or off. `welcomed` is true once I
+ * have closed the welcome dialog. Sending it as true records that. The server never sets it back to false.
+ */
 export interface MySettings {
   digest: 'weekly' | 'off'
+  welcomed: boolean
 }
+
+export type MySettingsUpdate = Pick<MySettings, 'digest'> & { welcomed?: true }
 
 export function getMySettings(): Promise<MySettings> {
   return request('/api/me/settings')
 }
 
-export function setMySettings(s: MySettings): Promise<MySettings> {
+/** Saves my settings. A save without `welcomed` leaves it as it is. */
+export function setMySettings(s: MySettingsUpdate): Promise<MySettings> {
   return request<MySettings>('/api/me/settings', json('PUT', s))
 }
 
@@ -674,18 +683,30 @@ export async function logoutEverywhere(): Promise<void> {
   await fetch('/api/logout-all', { method: 'POST' })
 }
 
-/** The community's rules (architecture.md, Admin tools). An empty body means there are none. */
-export interface Rules {
+/**
+ * A text the owner and moderators write for every member: the rules or the welcome message (architecture.md, Admin
+ * tools). An empty body means the community has none.
+ */
+export interface CommunityText {
   body_html: string
 }
 
-export function getRules(): Promise<Rules> {
+export function getRules(): Promise<CommunityText> {
   return request('/api/rules')
 }
 
 /** Writes the rules, for the owner and moderators. An empty body clears them. */
-export function setRules(bodyHtml: string): Promise<Rules> {
-  return request<Rules>('/api/rules', json('PUT', { body_html: bodyHtml }))
+export function setRules(bodyHtml: string): Promise<CommunityText> {
+  return request<CommunityText>('/api/rules', json('PUT', { body_html: bodyHtml }))
+}
+
+export function getWelcome(): Promise<CommunityText> {
+  return request('/api/welcome')
+}
+
+/** Writes the welcome message, for the owner and moderators. An empty body clears it. */
+export function setWelcome(bodyHtml: string): Promise<CommunityText> {
+  return request<CommunityText>('/api/welcome', json('PUT', { body_html: bodyHtml }))
 }
 
 /** Reports a post, comment or message to the owner and moderators. Reporting the same item again changes nothing. */

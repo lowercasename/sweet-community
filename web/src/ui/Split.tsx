@@ -21,6 +21,8 @@ interface SplitProps {
   rightRail?: ReactNode
   /** Hide the whole split while keeping everything in it mounted. Used while another page is showing. */
   hidden?: boolean
+  /** Names the divider for the welcome tour, which points at it (src/tour/steps.ts). */
+  tour?: string
   left: ReactNode
   right: ReactNode
 }
@@ -36,7 +38,18 @@ interface SplitProps {
  * in it. The children also keep their positions in the tree. A conditional
  * child renders as an empty slot, not a shift of the other children.
  */
-export function Split({ ratio, onRatio, onCollapse, show, leftRail, rightRail, hidden, left, right }: SplitProps) {
+export function Split({
+  ratio,
+  onRatio,
+  onCollapse,
+  show,
+  leftRail,
+  rightRail,
+  hidden,
+  tour,
+  left,
+  right,
+}: SplitProps) {
   const ref = useRef<HTMLDivElement>(null)
   const dragging = useRef(false)
   // The ratio before the current drag began. A drag that ends in a collapse
@@ -104,6 +117,7 @@ export function Split({ ratio, onRatio, onCollapse, show, leftRail, rightRail, h
       {show === 'both' && (
         <div
           role="separator"
+          data-tour={tour}
           aria-orientation="vertical"
           aria-label="Resize panes"
           aria-valuemin={Math.round(SPLIT_MIN * 100)}

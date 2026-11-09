@@ -66,6 +66,7 @@ export const group = (id: string, role: Group['role'], extra: Partial<Group> = {
     manage_instance: id === ROOT ? role === 'owner' : undefined,
     manage_topics: id === ROOT ? role !== 'member' : undefined,
     manage_rules: id === ROOT ? role !== 'member' : undefined,
+    manage_welcome: id === ROOT ? role !== 'member' : undefined,
     handle_reports: id === ROOT ? role !== 'member' : undefined,
   },
   ...extra,

@@ -75,7 +75,8 @@ test.describe('shields', () => {
       const reports = o.page.getByRole('heading', { name: 'Reports', exact: true })
       onTheLine(await shieldDrop(reports.locator('xpath=..').locator('[data-shield]'), reports))
       await expect(o.page.getByRole('img', { name: 'Only the owner sees this' })).toHaveCount(1)
-      await expect(o.page.getByRole('img', { name: 'Only the owner and moderators see this' })).toHaveCount(3)
+      // Reports, Welcome message, Rules and Topics.
+      await expect(o.page.getByRole('img', { name: 'Only the owner and moderators see this' })).toHaveCount(4)
       await o.page.screenshot({ path: `test-results/shields-${info.project.name}-community.png` })
       await o.context.close()
       await kit.context.close()

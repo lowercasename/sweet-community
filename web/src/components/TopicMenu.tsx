@@ -20,6 +20,8 @@ interface TopicMenuProps {
   disabled?: boolean
   /** Given to the owner and moderators in the feed's menu. The menu then ends with Edit topics. */
   onEdit?: () => void
+  /** Names the trigger for the welcome tour (src/tour/steps.ts). */
+  tour?: string
 }
 
 /**
@@ -37,6 +39,7 @@ export function TopicMenu({
   size = 'md',
   disabled,
   onEdit,
+  tour,
 }: TopicMenuProps) {
   const chosen = topics.find((t) => t.id === value)
   const items: MenuItem[] = [
@@ -52,7 +55,7 @@ export function TopicMenu({
       : []),
   ]
   return (
-    <Menu label={label} items={items} trigger="pill" quiet={!chosen} size={size} disabled={disabled}>
+    <Menu label={label} items={items} trigger="pill" quiet={!chosen} size={size} disabled={disabled} tour={tour}>
       {chosen ? chosen.name : (emptyLabel ?? noneLabel)}
     </Menu>
   )

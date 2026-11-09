@@ -7,6 +7,8 @@ interface Tab<K extends string> {
   label: string
   /** Whether the tab has unread content. Shows a dot, never a count. */
   dot?: boolean
+  /** Names this element for the welcome tour, which points at it (src/tour/steps.ts). */
+  tour?: string
 }
 
 interface TabBarProps<K extends string> {
@@ -25,6 +27,7 @@ export function TabBar<K extends string>({ tabs, active, onSelect }: TabBarProps
           key={t.key}
           type="button"
           aria-current={t.key === active ? 'page' : undefined}
+          data-tour={t.tour}
           aria-label={t.dot ? `${t.label}, unread` : undefined}
           className="flex flex-1 cursor-pointer flex-col items-center gap-0.5 pt-2 pb-1.5 text-[11px] font-medium text-mute transition-colors hover:text-ink aria-[current=page]:text-sweet focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-pink"
           onClick={() => onSelect(t.key)}

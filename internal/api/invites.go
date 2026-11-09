@@ -90,7 +90,7 @@ func (s *Server) getInvite(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	// The join page shows the rules, which a person agrees to by joining (architecture.md, Admin tools).
-	rules, err := rulesOf(r.Context(), s.q())
+	rules, err := rulesText.of(r.Context(), s.q())
 	if err != nil {
 		writeErr(w, http.StatusInternalServerError, err.Error())
 		return

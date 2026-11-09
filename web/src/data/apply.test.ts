@@ -347,6 +347,16 @@ describe('applyEvent', () => {
     expect(qc.getQueryState(keys.groups)?.isInvalidated).toBe(true)
   })
 
+  it('a rules or welcome event replaces that text, and leaves the other alone', () => {
+    qc.setQueryData(keys.rules, { body_html: '<p>Be kind.</p>' })
+    applyEvent(qc, 'welcome', { body_html: '<p>Hello.</p>' })
+    expect(qc.getQueryData(keys.welcome)).toEqual({ body_html: '<p>Hello.</p>' })
+    expect(qc.getQueryData(keys.rules)).toEqual({ body_html: '<p>Be kind.</p>' })
+    applyEvent(qc, 'rules', { body_html: '' })
+    expect(qc.getQueryData(keys.rules)).toEqual({ body_html: '' })
+    expect(qc.getQueryData(keys.welcome)).toEqual({ body_html: '<p>Hello.</p>' })
+  })
+
   it('ignores events for caches that are not loaded', () => {
     const empty = makeQueryClient()
     applyEvent(empty, 'post', post('p9', kit))
