@@ -47,11 +47,30 @@ describe('Welcome', () => {
       group_creation: 'anyone',
     })
     await screen.findByText('Invite people')
+    // One primary button at a time (architecture.md, Interface). Before the link exists, the main action is Create
+    // invite link, with Skip for now beside it. After, the main action is going to the community.
+    const primaries = () =>
+      screen
+        .getAllByRole('button')
+        .filter((b) => b.className.includes('bg-sweet'))
+        .map((b) => b.textContent)
+    expect(screen.getAllByRole('button').map((b) => b.textContent)).toEqual(['Skip for now', 'Create invite link'])
+    expect(primaries()).toEqual(['Create invite link'])
     fireEvent.click(screen.getByRole('button', { name: 'Create invite link' }))
     expect(createInvite).toHaveBeenCalled()
     const field = (await screen.findByLabelText('Invite link')) as HTMLInputElement
     expect(field.value).toMatch(/\/join\/abc$/)
+    expect(screen.getAllByRole('button').map((b) => b.textContent)).toEqual(['Copy', 'Go to Knitting Circle'])
+    expect(primaries()).toEqual(['Go to Knitting Circle'])
     fireEvent.click(await screen.findByRole('button', { name: 'Go to Knitting Circle' }))
+    expect(onDone).toHaveBeenCalled()
+  })
+
+  it('lets the owner skip the invite link and go to the community', async () => {
+    const { Welcome } = await import('./Welcome')
+    const onDone = vi.fn()
+    renderWithQuery(<Welcome settings={{ ...unnamed, name: 'Knitting Circle' }} onDone={onDone} />)
+    fireEvent.click(await screen.findByRole('button', { name: 'Skip for now' }))
     expect(onDone).toHaveBeenCalled()
   })
 })

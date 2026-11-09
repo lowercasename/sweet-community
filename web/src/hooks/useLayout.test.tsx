@@ -1,5 +1,5 @@
 // @vitest-environment happy-dom
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { useLayout } from './useLayout'
 
@@ -34,5 +34,21 @@ describe('useLayout', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Posts tab' }))
     expect(screen.getByText('layout: posts')).toBeTruthy()
     expect(localStorage.getItem('sweet.layout')).toBe('posts')
+  })
+
+  it('starts with the nav expanded when this browser has stored nothing, and remembers a collapse', async () => {
+    // A new user, or the owner just after onboarding, sees the nav's labels (Raphael, 2026-11-09).
+    localStorage.removeItem('sweet.nav')
+    vi.resetModules()
+    const fresh = await import('./useLayout')
+    function Nav() {
+      const { navExpanded, toggleNav } = fresh.useLayout()
+      return <button onClick={toggleNav}>{navExpanded ? 'expanded' : 'collapsed'}</button>
+    }
+    render(<Nav />)
+    expect(screen.getByRole('button').textContent).toBe('expanded')
+    fireEvent.click(screen.getByRole('button'))
+    expect(screen.getByRole('button').textContent).toBe('collapsed')
+    expect(localStorage.getItem('sweet.nav')).toBe('collapsed')
   })
 })

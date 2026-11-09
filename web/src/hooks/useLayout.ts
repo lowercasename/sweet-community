@@ -59,7 +59,9 @@ function current(): LayoutState {
     state = {
       stored: v === 'both' || v === 'posts' || v === 'chat' ? v : 'both',
       ratio: r >= SPLIT_MIN && r <= SPLIT_MAX ? r : SPLIT_DEFAULT,
-      navExpanded: read(NAV_KEY) === 'expanded',
+      // The nav starts expanded, so a new user sees its labels. It stays collapsed only once someone collapses it
+      // (Raphael, 2026-11-09).
+      navExpanded: read(NAV_KEY) !== 'collapsed',
     }
   }
   return state

@@ -1,5 +1,6 @@
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
+import type { Page } from '@playwright/test'
 import { FRESH_MAIL_DIR, emailOf, expect, mailCode, prepare, test, uniq } from './helpers'
 
 /**
@@ -9,6 +10,15 @@ import { FRESH_MAIL_DIR, emailOf, expect, mailCode, prepare, test, uniq } from '
  * everywhere, new users register through the link, and the owner gets a
  * notification for each of them.
  */
+/** Screenshots a step of onboarding at desktop width and at phone width. Only this test passes through these pages. */
+async function shoot(page: Page, name: string) {
+  const size = page.viewportSize()!
+  await page.screenshot({ path: `test-results/setup-${name}.png` })
+  await page.setViewportSize({ width: 390, height: 844 })
+  await page.screenshot({ path: `test-results/setup-${name}-phone.png` })
+  await page.setViewportSize(size)
+}
+
 test.describe('a fresh instance', () => {
   test('the setup link, the welcome page and the first invite @fresh', async ({ browser }, testInfo) => {
     test.slow()
@@ -30,22 +40,29 @@ test.describe('a fresh instance', () => {
     // 2026-11-09). Then they set up the community.
     await expect(page.getByRole('heading', { name: 'Set up your account' })).toBeVisible()
     await expect(page.getByLabel('Password')).toHaveCount(0)
-    await page.screenshot({ path: 'test-results/setup-account.png' })
+    await shoot(page, 'account')
     await page.getByLabel('Username').fill('raphael')
     await page.getByLabel('Email address').fill('raphael@example.test')
     await page.getByRole('button', { name: 'Set up' }).click()
 
     // Onboarding sets the community name and then creates an invite link.
     await expect(page.getByRole('heading', { name: 'Set up your community' })).toBeVisible()
+    await shoot(page, 'community')
     await page.getByLabel('Community name').fill('Knitting Circle')
     await page.getByLabel('Short community description').fill('Wool and gossip.')
     await page.getByRole('button', { name: 'Next' }).click()
     await expect(page.getByRole('heading', { name: 'Invite people' })).toBeVisible()
+    await shoot(page, 'invite')
     await page.getByRole('button', { name: 'Create invite link' }).click()
     const url = await page.getByLabel('Invite link').inputValue()
     expect(url).toMatch(/\/join\//)
+    await shoot(page, 'invite-link')
+    // The nav starts expanded for someone who has never collapsed it (Raphael, 2026-11-09). The test setup stores
+    // expanded for every other test, so this browser forgets that first.
+    await page.evaluate(() => localStorage.removeItem('sweet.nav'))
     await page.getByRole('button', { name: 'Go to Knitting Circle' }).click()
     await expect(page.getByRole('navigation', { name: 'Main' })).toBeVisible()
+    await expect(page.getByRole('navigation', { name: 'Main' }).getByRole('button', { name: 'Collapse' })).toBeVisible()
     await expect(page.getByRole('navigation', { name: 'Main' })).toContainText('Knitting Circle')
     await expect(page).toHaveTitle('Knitting Circle')
     // A reload opens Home, not the welcome page again.

@@ -12,9 +12,9 @@ interface WelcomeProps {
 }
 
 /**
- * Onboarding (architecture.md, New-instance lifecycle). The newly set up
- * owner names the community and describes what it is for, then gets an
- * invite link for the first users. Ends on Home.
+ * Onboarding (architecture.md, New-instance lifecycle). The newly set up owner names the community and describes what
+ * it is for, then gets an invite link for the first users. Ends on Home. Each step has one primary button: Next, then
+ * Create invite link with Skip for now beside it, then Go to the community once the link exists.
  */
 export function Welcome({ settings: initial, onDone }: WelcomeProps) {
   // The current name. The form's save reaches the cache before the step changes.
@@ -51,32 +51,39 @@ export function Welcome({ settings: initial, onDone }: WelcomeProps) {
       {named ? (
         <Stack gap={3}>
           <Heading level={2}>Invite people</Heading>
-          <Text>
+          <Text variant="small">
             Anyone with this link can join {settings.name} for the next seven days. After that, you can create a new
             link from the People page. You will receive a notification each time someone joins.
           </Text>
           {link ? (
-            <Row gap={2} align="center">
-              <Input value={url} readOnly selectOnFocus label="Invite link" />
-              <Button variant="secondary" onClick={() => void copy()}>
-                {copied ? 'Copied' : 'Copy'}
-              </Button>
-            </Row>
+            <>
+              <Row gap={2} align="center" wrap="never">
+                <Input value={url} readOnly selectOnFocus label="Invite link" />
+                <Button variant="secondary" onClick={() => void copy()}>
+                  {copied ? 'Copied' : 'Copy'}
+                </Button>
+              </Row>
+              <Row justify="end">
+                <Button onClick={onDone}>Go to {settings.name}</Button>
+              </Row>
+            </>
           ) : (
-            <Row>
+            <Row gap={2} justify="end" align="center">
+              <Button variant="ghost" onClick={onDone}>
+                Skip for now
+              </Button>
               <Button busy={busy} onClick={() => void mint()}>
                 Create invite link
               </Button>
             </Row>
           )}
-          <Row justify="end">
-            <Button onClick={onDone}>Go to {settings.name}</Button>
-          </Row>
         </Stack>
       ) : (
         <Stack gap={3}>
           <Heading level={2}>Set up your community</Heading>
-          <Text>This is your community. Give it a name, and say what it is for.</Text>
+          <Text variant="small">
+            This is your community. Give it a name and a description to help your new arrivals feel at home.
+          </Text>
           <CommunityForm settings={settings} submitLabel="Next" onSaved={() => setNamed(true)} />
         </Stack>
       )}
