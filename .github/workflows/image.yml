@@ -64,6 +64,9 @@ jobs:
             type=raw,value=latest,enable={{is_default_branch}}
             type=sha,prefix=sha-
             type=semver,pattern={{version}}
+            # The major version, such as 1. It moves to each new 1.x release, so a server that pins it updates within
+            # 1.x and never jumps to 2.0, which needs the person running Sweet to act.
+            type=semver,pattern={{major}}
       - uses: docker/build-push-action@v6
         with:
           context: .
