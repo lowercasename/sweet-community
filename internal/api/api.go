@@ -140,6 +140,9 @@ type Server struct {
 	// Mail sends verification and reset links. BaseURL is the URL they point to.
 	Mail    mail.Sender
 	BaseURL string
+	// SourceURL is where the Source code link at the bottom of Home's feed points (architecture.md, Licence). Empty
+	// means the public repository. Someone who runs a changed version sets it to their own repository.
+	SourceURL string
 	// ProxyHops is the number of reverse proxies in front of the server that
 	// add the address they saw to X-Forwarded-For. Zero means requests arrive
 	// directly and the header is ignored, because any client can send one.
@@ -681,9 +684,17 @@ func removePost(ctx context.Context, qtx *store.Queries, id, groupID string, now
 	return []events.Entry{{Kind: "post_delete", Payload: map[string]string{"id": id, "group_id": groupID}}}, nil
 }
 
+// DefaultSourceURL is the public repository, where the Source code link points unless the server names another.
+const DefaultSourceURL = "https://github.com/lowercasename/sweet-community"
+
 // getVersion is `GET /api/version`, for signed-in users only, so the release is not shown to anyone scanning for
-// old versions. It names the release the binary was built from, which the nav
-// shows, and the build's own identifier, which open tabs use to reload (architecture.md, Updates).
+// old versions. It names the release the binary was built from, the build's own identifier, which open tabs use to
+// reload (architecture.md, Updates), and the address of the source code (architecture.md, Licence). The line at the
+// bottom of Home's feed shows the release and links to the source.
 func (s *Server) getVersion(w http.ResponseWriter, r *http.Request) {
-	writeJSON(w, http.StatusOK, map[string]string{"release": version.Release(), "build": version.Of()})
+	source := s.SourceURL
+	if source == "" {
+		source = DefaultSourceURL
+	}
+	writeJSON(w, http.StatusOK, map[string]string{"release": version.Release(), "build": version.Of(), "source_url": source})
 }

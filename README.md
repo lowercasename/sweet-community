@@ -143,4 +143,4 @@ web/                React + TipTap. See web/README.md
 
 Sweet is free software. You can share it and change it under the terms of the GNU Affero General Public License, version 3 or any later version, as published by the Free Software Foundation. The full text is in [LICENSE](LICENSE).
 
-If you run a changed version of Sweet for other people, the licence requires you to offer them the source code of your version.
+If you run a changed version of Sweet for other people, the licence requires you to offer them the source code of your version. Set `SWEET_SOURCE_URL` to your repository, and the Source code link at the bottom of Home's feed points there.

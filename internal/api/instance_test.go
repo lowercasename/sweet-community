@@ -154,3 +154,16 @@ func TestVersionIsForSignedInUsers(t *testing.T) {
 		t.Fatalf("version: %v", v)
 	}
 }
+
+// GET /api/version also gives the address of the source code, which the line at the bottom of Home's feed links to
+// (architecture.md, Licence). It is the public repository unless the server names a fork.
+func TestVersionGivesTheSourceAddress(t *testing.T) {
+	_, owner, srv := newTestServerWith(t)
+	if v := owner.mustStatus(200, "GET", "/api/version", nil); v["source_url"] != "https://github.com/lowercasename/sweet-community" {
+		t.Fatalf("default source: %v", v)
+	}
+	srv.SourceURL = "https://code.example.test/fork"
+	if v := owner.mustStatus(200, "GET", "/api/version", nil); v["source_url"] != "https://code.example.test/fork" {
+		t.Fatalf("a fork's source: %v", v)
+	}
+}

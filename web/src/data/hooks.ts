@@ -551,6 +551,11 @@ export function useRelease(): string | undefined {
   return useQuery({ queryKey: keys.version, queryFn: getVersion, staleTime: Infinity }).data?.release
 }
 
+/** The address of the source code the server runs, which the line at the bottom of Home's feed links to. */
+export function useSourceUrl(): string | undefined {
+  return useQuery({ queryKey: keys.version, queryFn: getVersion, staleTime: Infinity }).data?.source_url
+}
+
 /** The two texts the owner and moderators write for every member (architecture.md, Admin tools). */
 export type TextKind = 'rules' | 'welcome'
 

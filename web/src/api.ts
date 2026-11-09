@@ -670,8 +670,11 @@ export async function removePassword(): Promise<void> {
   await request('/api/me/password', { method: 'DELETE' })
 }
 
-/** The release the server was built from, such as v1.2.3, and the build's own identifier (architecture.md, Updates). */
-export function getVersion(): Promise<{ release: string; build: string }> {
+/**
+ * The release the server was built from, such as v1.2.3, the build's own identifier (architecture.md, Updates), and
+ * the address of the source code it runs (architecture.md, Licence).
+ */
+export function getVersion(): Promise<{ release: string; build: string; source_url: string }> {
   return request('/api/version')
 }
 

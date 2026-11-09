@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react'
 import { useEffect, useState } from 'react'
 import { useLocation } from 'wouter'
 import { useGroups, useMarkRead, useMarkers, usePostActions, usePosts, useTopicActions, useTopics } from '../data/hooks'
@@ -36,12 +37,14 @@ interface PostsPaneProps {
   watching: boolean
   /** The topic that the community's feed is filtered to (architecture.md, Topics), read from the URL. */
   topicId?: string | null
+  /** Shown after the posts, at the very end of the feed. Home's feed shows the release and the source code link. */
+  foot?: ReactNode
 }
 
 /** The delay after the newest shown post before the feed is marked read. */
 const READ_DEBOUNCE_MS = 800
 
-export function PostsPane({ groupId, side = 'full', watching, topicId = null }: PostsPaneProps) {
+export function PostsPane({ groupId, side = 'full', watching, topicId = null, foot }: PostsPaneProps) {
   const status = useStreamStatus()
   const { posts, loading, error, hasMore, loadMore } = usePosts(groupId, topicId)
   const { create, edit, remove, setTopic } = usePostActions(groupId)
@@ -173,6 +176,7 @@ export function PostsPane({ groupId, side = 'full', watching, topicId = null }: 
                 </Row>
               )}
             </Stack>
+            {foot}
           </Stack>
         </Measure>
       </ScrollArea>

@@ -51,13 +51,10 @@ const groupsSection = () => screen.getByRole('group', { name: 'Rooms' })
 const messages = () => screen.getByRole('group', { name: 'Conversations' })
 
 describe('Sidebar', () => {
-  it('names the release under Collapse when expanded, and not when collapsed (architecture.md, Updates)', async () => {
+  it("does not name the release, which is at the bottom of Home's feed (architecture.md, Updates)", async () => {
     await draw([root(true)])
-    await screen.findByText('Sweet v1.2.3')
-    cleanup()
-    await draw([root(true)], '/', false)
-    await screen.findByRole('button', { name: 'Expand' })
-    expect(screen.queryByText('Sweet v1.2.3')).toBeNull()
+    await screen.findByRole('button', { name: 'Collapse' })
+    expect(screen.queryByText(/^Sweet v/)).toBeNull()
   })
 
   it('shows the groups block, the tools block and the community block, with a rule between each block', async () => {

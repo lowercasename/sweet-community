@@ -51,10 +51,11 @@ describe('MenuPage', () => {
     expect(item.getAttribute('aria-description')).toBe('Only the owner and moderators see this')
   })
 
-  it('names the release at the bottom (architecture.md, Updates)', async () => {
+  it("does not name the release, which is at the bottom of Home's feed (architecture.md, Updates)", async () => {
     const { MenuPage } = await import('./MenuPage')
     renderWithQuery(<MenuPage me={raphael} groups={[group(ROOT, 'owner')]} onGo={() => {}} onLogout={() => {}} />)
-    await screen.findByText('Sweet v1.2.3')
+    await screen.findByRole('button', { name: /Sign out/ })
+    expect(screen.queryByText(/^Sweet v/)).toBeNull()
   })
 
   it('lists the user, Home, the Rooms section, the Conversations section, People and Sign out, in that order', async () => {

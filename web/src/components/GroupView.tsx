@@ -5,6 +5,7 @@ import { useLayout } from '../hooks/useLayout'
 import { Rail, Split, Stack } from '../ui'
 import { ChatPane } from './ChatPane'
 import { PostsPane } from './PostsPane'
+import { SweetColophon } from './SweetColophon'
 
 interface GroupViewProps {
   group: Group
@@ -37,6 +38,8 @@ export function GroupView({ group, hidden, topicId = null, focusMessage = null, 
   const { layout, narrow, ratio, setLayout, setRatio } = useLayout()
   const both = group.mode === 'both'
   const show = layout === 'both' ? 'both' : layout === 'posts' ? 'left' : 'right'
+  // Home's feed ends with the release and the source code link (architecture.md, Updates and Licence). A room's does not.
+  const foot = group.kind === 'root' ? <SweetColophon /> : undefined
   // A notification for a chat message opens the chat, on a phone in place of the posts.
   useEffect(() => {
     if (focusMessage && both && show === 'left') setLayout(narrow ? 'chat' : 'both')
@@ -81,6 +84,7 @@ export function GroupView({ group, hidden, topicId = null, focusMessage = null, 
               side={show === 'both' ? 'left' : 'full'}
               watching={!hidden && show !== 'right'}
               topicId={topicId}
+              foot={foot}
             />
           }
           right={
@@ -94,7 +98,7 @@ export function GroupView({ group, hidden, topicId = null, focusMessage = null, 
           }
         />
       ) : group.mode === 'posts' ? (
-        <PostsPane groupId={group.id} watching={!hidden} topicId={topicId} />
+        <PostsPane groupId={group.id} watching={!hidden} topicId={topicId} foot={foot} />
       ) : (
         <ChatPane groupId={group.id} watching={!hidden} focusMessage={focusMessage} onFocused={onFocused} />
       )}

@@ -66,6 +66,8 @@ func main() {
 	imagesDir := flag.String("images-dir", "data/images", "directory for uploaded images when SWEET_S3_* is not set")
 	mailDir := flag.String("mail-dir", "data/mail", "directory that receives email as files when SWEET_SMTP_HOST is not set")
 	baseURL := flag.String("base-url", envOr("SWEET_BASE_URL", "http://localhost:8080"), "the address links in email point at (or SWEET_BASE_URL)")
+	sourceURL := flag.String("source-url", envOr("SWEET_SOURCE_URL", api.DefaultSourceURL),
+		"where the Source code link points, the repository of the code this server runs (or SWEET_SOURCE_URL)")
 	proxies, _ := strconv.Atoi(os.Getenv("SWEET_TRUST_PROXY"))
 	trustProxy := flag.Int("trust-proxy", proxies,
 		"the number of reverse proxies in front of Sweet that add the client's address to X-Forwarded-For, usually 1 (or SWEET_TRUST_PROXY)")
@@ -138,7 +140,7 @@ func main() {
 
 	hub := events.NewHub(d)
 	hub.Version = version.Of()
-	srv := &api.Server{DB: d, Hub: hub, Images: imgStore, Mail: sender, BaseURL: base, ProxyHops: *trustProxy}
+	srv := &api.Server{DB: d, Hub: hub, Images: imgStore, Mail: sender, BaseURL: base, SourceURL: *sourceURL, ProxyHops: *trustProxy}
 	// Web push (architecture.md, Notifications) uses the instance's VAPID keys, which are generated on first start.
 	if keys, err := push.LoadKeys(ctx, d); err != nil {
 		log.Printf("push: %v (push is off)", err)

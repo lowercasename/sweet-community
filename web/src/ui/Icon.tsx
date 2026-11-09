@@ -1,5 +1,6 @@
 import {
   ArrowLeft,
+  Heart,
   Bell,
   BellOff,
   BellRing,
@@ -75,8 +76,10 @@ export type IconName =
   | 'rules'
   | 'flag'
   | 'shield'
+  | 'heart'
 
 const ICONS: Record<IconName, LucideIcon> = {
+  heart: Heart,
   bold: Bold,
   italic: Italic,
   link: Link,
