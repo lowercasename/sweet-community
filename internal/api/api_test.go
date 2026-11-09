@@ -991,3 +991,57 @@ func TestGetPost(t *testing.T) {
 	kit.mustStatus(404, "GET", "/api/posts/"+pid, nil)
 	kit.mustStatus(404, "GET", "/api/posts/nothing", nil)
 }
+
+// delete_by_role marks a Delete that the viewer has only because of their role in the item's group, in the community
+// or in a room, so the client can show the shield (architecture.md, Interface). It is false for the author, for a
+// post's author deleting a comment on their post, and for anyone in a conversation.
+func TestDeleteByRole(t *testing.T) {
+	ts, owner := newTestServer(t)
+	kit, _ := registerMember(t, ts, owner, "kit")
+	mo, moID := registerMember(t, ts, owner, "mo")
+	byRole := func(v map[string]any) bool {
+		c, _ := v["can"].(map[string]any)
+		b, _ := c["delete_by_role"].(bool)
+		return b
+	}
+	post := kit.mustStatus(201, "POST", rootPath+"/posts", map[string]string{"body_html": "<p>hello</p>"})
+	pid := post["id"].(string)
+	if byRole(post) {
+		t.Fatal("the author's own post is marked as deleted by role")
+	}
+	if p := owner.mustStatus(200, "GET", "/api/posts/"+pid, nil); !byRole(p) {
+		t.Fatalf("the owner's view of kit's post: %v", p["can"])
+	}
+	comment := mo.mustStatus(201, "POST", "/api/posts/"+pid+"/comments", map[string]string{"body_html": "<p>hi</p>"})
+	for _, c := range kit.mustStatus(200, "GET", "/api/posts/"+pid+"/comments", nil)["comments"].([]any) {
+		if m := c.(map[string]any); m["id"] == comment["id"] && (byRole(m) || !groupCan(m, "delete")) {
+			t.Fatalf("the post's author's view of a comment on it: %v", m["can"])
+		}
+	}
+	msg := kit.mustStatus(201, "POST", rootPath+"/messages", map[string]string{"body_html": "<p>chat</p>"})
+	found := false
+	for _, m := range owner.mustStatus(200, "GET", rootPath+"/messages", nil)["messages"].([]any) {
+		if mm := m.(map[string]any); mm["id"] == msg["id"] {
+			found = byRole(mm)
+		}
+	}
+	if !found {
+		t.Fatal("the owner's view of kit's chat message is not marked as deleted by role")
+	}
+	// In kit's room, kit is the owner and deletes mo's post by role.
+	room := kit.mustStatus(201, "POST", "/api/groups", map[string]string{"name": "Knitting"})
+	gid := room["id"].(string)
+	kit.mustStatus(201, "POST", "/api/groups/"+gid+"/members", map[string]string{"user_id": moID})
+	rp := mo.mustStatus(201, "POST", "/api/groups/"+gid+"/posts", map[string]string{"body_html": "<p>room</p>"})
+	if p := kit.mustStatus(200, "GET", "/api/posts/"+rp["id"].(string), nil); !byRole(p) {
+		t.Fatalf("the room owner's view of a member's post: %v", p["can"])
+	}
+	// In a conversation, nobody has a role, so nothing is deleted by role.
+	dm := mo.mustStatus(201, "POST", "/api/groups", map[string]any{"kind": "dm", "members": []string{kit.mustStatus(200, "GET", "/api/me", nil)["id"].(string)}})
+	dmsg := kit.mustStatus(201, "POST", "/api/groups/"+dm["id"].(string)+"/messages", map[string]string{"body_html": "<p>dm</p>"})
+	for _, m := range mo.mustStatus(200, "GET", "/api/groups/"+dm["id"].(string)+"/messages", nil)["messages"].([]any) {
+		if mm := m.(map[string]any); mm["id"] == dmsg["id"] && byRole(mm) {
+			t.Fatal("a conversation message is marked as deleted by role")
+		}
+	}
+}

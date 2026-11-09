@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import type { Message } from '../api'
 import { useAuthor } from '../data/hooks'
-import { Box, Button, ConfirmDialog, Menu, MessageBlock, ReplyQuote, Row, Stack, Text, Time } from '../ui'
+import { Box, Button, ConfirmDialog, Menu, MessageBlock, ReplyQuote, Row, shieldText, Stack, Text, Time } from '../ui'
 import { Body } from './Body'
 import { PersonName } from './PersonName'
 import { ReportDialog } from './ReportDialog'
@@ -93,6 +93,7 @@ export function MessageGroup({
                                 label: 'Delete',
                                 icon: 'trash' as const,
                                 danger: true,
+                                shield: m.can.delete_by_role ? shieldText.rolesDo : undefined,
                                 onSelect: () => setConfirming(m.id),
                               },
                             ]

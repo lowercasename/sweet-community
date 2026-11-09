@@ -16,6 +16,7 @@ import {
 import type { ReactNode } from 'react'
 import { REVEAL, buttonClass } from './Button'
 import { Icon, type IconName } from './Icon'
+import { ShieldMark } from './ShieldMark'
 import { PILL_ICON, pillClass, type PillSize } from './Pill'
 import { useTooltip } from './Tooltip'
 
@@ -28,6 +29,8 @@ export interface MenuItem {
   checked?: boolean
   /** An item that removes something. Shown in red. */
   danger?: boolean
+  /** Who can do this, for an action only owners or moderators have. A shield ends the item, and the words are its description. */
+  shield?: string
   onSelect: () => void
 }
 
@@ -147,6 +150,7 @@ export function Menu({
                   type="button"
                   role={item.checked === undefined ? 'menuitem' : 'menuitemradio'}
                   aria-checked={item.checked}
+                  aria-description={item.shield}
                   tabIndex={activeIndex === i ? 0 : -1}
                   className={`flex w-full cursor-pointer items-center gap-2 px-3 py-1.5 text-left hover:bg-field focus:bg-field focus:outline-none ${item.checked || item.danger ? 'text-sweet' : 'text-ink'}`}
                   {...getItemProps({
@@ -168,6 +172,11 @@ export function Menu({
                   {item.checked && (
                     <span className="ml-auto">
                       <Icon name="check" size={16} />
+                    </span>
+                  )}
+                  {item.shield !== undefined && (
+                    <span className="ml-auto pl-4">
+                      <ShieldMark size={16} />
                     </span>
                   )}
                 </button>

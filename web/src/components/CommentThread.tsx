@@ -2,7 +2,20 @@ import { useState } from 'react'
 import type { Comment as CommentData } from '../api'
 import { useAuthor, useCommentActions, useComments } from '../data/hooks'
 import { commentExtensions } from '../editor/extensions'
-import { Alert, Box, Card, ConfirmDialog, Hairline, Menu, type MenuItem, Row, Stack, Text, Time } from '../ui'
+import {
+  Alert,
+  Box,
+  Card,
+  ConfirmDialog,
+  Hairline,
+  Menu,
+  type MenuItem,
+  Row,
+  shieldText,
+  Stack,
+  Text,
+  Time,
+} from '../ui'
 import { Body } from './Body'
 import { BodyEditor } from './BodyEditor'
 import { PersonName } from './PersonName'
@@ -53,7 +66,13 @@ function CommentItem({ comment, groupId, disabled, onEdit, onDelete }: CommentIt
   if (comment.can.edit) items.push({ label: 'Edit', icon: 'pencil', onSelect: () => setEditing(true) })
   if (comment.can.report) items.push({ label: 'Report', icon: 'flag', onSelect: () => setReporting(true) })
   if (comment.can.delete)
-    items.push({ label: 'Delete', icon: 'trash', danger: true, onSelect: () => setConfirming(true) })
+    items.push({
+      label: 'Delete',
+      icon: 'trash',
+      danger: true,
+      shield: comment.can.delete_by_role ? shieldText.rolesDo : undefined,
+      onSelect: () => setConfirming(true),
+    })
 
   return (
     <Box as="article">

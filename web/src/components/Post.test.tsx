@@ -92,6 +92,17 @@ describe('Post menu', () => {
     fireEvent.click(screen.getByRole('menuitem', { name: 'Report' }))
     expect(screen.getByRole('heading', { name: 'Report this post?', hidden: true })).toBeTruthy()
   })
+  it("marks Delete with the shield when only the viewer's role allows it, and not otherwise", async () => {
+    await render({ edit: false, delete: true, report: true, delete_by_role: true })
+    fireEvent.click(screen.getByLabelText('Post options'))
+    const del = screen.getByRole('menuitem', { name: 'Delete' })
+    expect(del.querySelector('[data-shield]')).toBeTruthy()
+    expect(del.getAttribute('aria-description')).toBe('Only owners and moderators can do this')
+    cleanup()
+    await render(mine)
+    fireEvent.click(screen.getByLabelText('Post options'))
+    expect(screen.getByRole('menuitem', { name: 'Delete' }).querySelector('[data-shield]')).toBeNull()
+  })
   it('puts Report before Delete, so the item that removes something is last', async () => {
     await render({ edit: false, delete: true, report: true })
     fireEvent.click(screen.getByLabelText('Post options'))

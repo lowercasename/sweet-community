@@ -43,6 +43,9 @@ type Can struct {
 	Delete bool `json:"delete"`
 	// Report is true for every member but the author (architecture.md, Admin tools).
 	Report bool `json:"report"`
+	// DeleteByRole is true when Delete is allowed only because of the viewer's role in the item's group. The client
+	// marks that Delete with a shield (architecture.md, Interface).
+	DeleteByRole bool `json:"delete_by_role,omitempty"`
 	// SetTopic is set only on a post (architecture.md, Topics). The author or the root group's staff may set its topic.
 	SetTopic bool `json:"set_topic,omitempty"`
 }
@@ -77,18 +80,29 @@ func forViewer(a perm.Actor, v any, st Settings) any {
 	case *Post:
 		p := *x
 		pp := perm.Post{AuthorID: p.Author.ID}
-		p.Can = Can{Edit: perm.EditPost(a, pp), Delete: perm.DeletePost(a, pp), Report: perm.Report(a, pp.AuthorID), SetTopic: p.GroupID == perm.Root && perm.SetTopic(a, pp)}
+		p.Can = Can{
+			Edit: perm.EditPost(a, pp), Delete: perm.DeletePost(a, pp), Report: perm.Report(a, pp.AuthorID),
+			DeleteByRole: perm.ByRole(a, func(x perm.Actor) bool { return perm.DeletePost(x, pp) }),
+			SetTopic:     p.GroupID == perm.Root && perm.SetTopic(a, pp),
+		}
 		return &p
 	case *Comment:
 		c := *x
 		pc := perm.Comment{AuthorID: c.Author.ID, PostAuthorID: c.PostAuthorID}
-		c.Can = Can{Edit: perm.EditComment(a, pc), Delete: perm.DeleteComment(a, pc), Report: perm.Report(a, pc.AuthorID)}
+		c.Can = Can{
+			Edit: perm.EditComment(a, pc), Delete: perm.DeleteComment(a, pc), Report: perm.Report(a, pc.AuthorID),
+			DeleteByRole: perm.ByRole(a, func(x perm.Actor) bool { return perm.DeleteComment(x, pc) }),
+		}
 		return &c
 	case *Message:
 		m := *x
 		// A joined or added line cannot be deleted or reported by anyone.
 		if m.Kind == MessageKind {
-			m.Can = Can{Delete: perm.DeleteMessage(a, perm.Message{AuthorID: m.Author.ID}), Report: perm.Report(a, m.Author.ID)}
+			pm := perm.Message{AuthorID: m.Author.ID}
+			m.Can = Can{
+				Delete: perm.DeleteMessage(a, pm), Report: perm.Report(a, m.Author.ID),
+				DeleteByRole: perm.ByRole(a, func(x perm.Actor) bool { return perm.DeleteMessage(x, pm) }),
+			}
 		}
 		return &m
 	case *Report:

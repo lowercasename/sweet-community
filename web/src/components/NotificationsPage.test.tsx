@@ -105,6 +105,10 @@ describe('NotificationsPage', () => {
       Promise.resolve(notification(id, 'report', mo, { group_id: ROOT, report_kind: 'comment', read_at: 51 })),
     )
     const onGo = await draw()
+    // Only the owner and moderators get a report notification, so it carries the shield.
+    expect(
+      (await screen.findByRole('button', { name: 'mo reported a comment, new' })).querySelector('[data-shield]'),
+    ).toBeTruthy()
     fireEvent.click(await screen.findByRole('button', { name: 'mo reported a comment, new' }))
     expect(onGo).toHaveBeenCalledWith('/community')
   })

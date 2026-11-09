@@ -46,6 +46,13 @@ describe('CommunityPage', () => {
     expect(setSettings).not.toHaveBeenCalled()
   })
 
+  it("marks the owner's own card as the owner's only", async () => {
+    const { CommunityPage } = await import('./CommunityPage')
+    renderWithQuery(<CommunityPage root={group(ROOT, 'owner')} />)
+    await screen.findByRole('heading', { name: 'About this community' })
+    expect(screen.getAllByRole('img', { name: 'Only the owner sees this' })).toHaveLength(1)
+  })
+
   it('a moderator sees the reports first, then the rules and topics, and not the community settings', async () => {
     const { CommunityPage } = await import('./CommunityPage')
     renderWithQuery(<CommunityPage root={group(ROOT, 'moderator')} />)
@@ -55,6 +62,9 @@ describe('CommunityPage', () => {
       'Rules',
       'Topics',
     ])
+    // Each card is marked with the shield, and the page says once what the shield means.
+    expect(screen.getAllByRole('img', { name: 'Only the owner and moderators see this' })).toHaveLength(3)
+    expect(screen.getByText(/marks what only owners and moderators can see and do\./)).toBeTruthy()
     expect(screen.queryByRole('heading', { name: 'About this community' })).toBeNull()
     expect(screen.queryByLabelText('Community name')).toBeNull()
   })

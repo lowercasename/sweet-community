@@ -43,6 +43,14 @@ describe('MenuPage', () => {
     expect(onGo).toHaveBeenCalledWith('/rules')
   })
 
+  it('marks Community with the shield for the owner', async () => {
+    const { MenuPage } = await import('./MenuPage')
+    renderWithQuery(<MenuPage me={raphael} groups={[group(ROOT, 'owner')]} onGo={() => {}} onLogout={() => {}} />)
+    const item = screen.getByRole('button', { name: 'Community' })
+    expect(item.querySelector('[data-shield]')).toBeTruthy()
+    expect(item.getAttribute('aria-description')).toBe('Only the owner and moderators see this')
+  })
+
   it('names the release at the bottom (architecture.md, Updates)', async () => {
     const { MenuPage } = await import('./MenuPage')
     renderWithQuery(<MenuPage me={raphael} groups={[group(ROOT, 'owner')]} onGo={() => {}} onLogout={() => {}} />)

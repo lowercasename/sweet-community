@@ -15,6 +15,7 @@ import {
   ListItem,
   Menu,
   Row,
+  shieldText,
   Stack,
   Text,
 } from '../ui'
@@ -61,7 +62,9 @@ export function TopicsCard() {
   return (
     <Card>
       <Stack gap={2}>
-        <Heading level={2}>Topics</Heading>
+        <Heading level={2} shield={shieldText.staffSee}>
+          Topics
+        </Heading>
         <Text variant="small">{ABOUT}</Text>
         <Form onSubmit={() => void add()}>
           <Field label="Topic name" hint="Up to 40 characters.">

@@ -1,6 +1,6 @@
 import type { Group } from '../api'
 import { useSettings } from '../data/hooks'
-import { Alert, Card, Heading, Measure, Pane, ScrollArea, Stack } from '../ui'
+import { Alert, Card, Heading, Measure, Pane, ScrollArea, PageNote, ShieldMark, shieldText, Stack } from '../ui'
 import { CommunityForm } from './CommunityForm'
 import { ReportsCard } from './ReportsCard'
 import { RulesCard } from './RulesCard'
@@ -19,11 +19,17 @@ export function CommunityPage({ root }: { root: Group }) {
       <ScrollArea>
         <Measure>
           <Stack gap={3}>
+            {/* The page says once what the shield means. Every card here carries it. */}
+            <PageNote>
+              The shield <ShieldMark size={14} /> marks what only owners and moderators can see and do.
+            </PageNote>
             {root.can.handle_reports && <ReportsCard />}
             {root.can.manage_instance && (
               <Card>
                 <Stack gap={2}>
-                  <Heading level={2}>About this community</Heading>
+                  <Heading level={2} shield={shieldText.ownerSees}>
+                    About this community
+                  </Heading>
                   {error && <Alert tone="error">{error.message}</Alert>}
                   {settings && <CommunityForm settings={settings} submitLabel="Save" />}
                 </Stack>

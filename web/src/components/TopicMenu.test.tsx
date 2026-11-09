@@ -32,6 +32,7 @@ describe('TopicMenu', () => {
       />,
     )
     fireEvent.click(screen.getByRole('button', { name: 'Showing' }))
+    expect((await screen.findByRole('menuitem', { name: 'Edit topics' })).querySelector('[data-shield]')).toBeTruthy()
     fireEvent.click(await screen.findByRole('menuitem', { name: 'Edit topics' }))
     expect(onEdit).toHaveBeenCalled()
     rerender(<TopicMenu topics={topics} value={null} onChange={() => {}} noneLabel="Everything" label="Showing" />)

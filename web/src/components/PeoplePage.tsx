@@ -17,6 +17,7 @@ import {
   Pane,
   Row,
   ScrollArea,
+  shieldText,
   Stack,
   Text,
   Time,
@@ -133,9 +134,17 @@ export function PeoplePage({ me, root, onOpenGroup }: PeoplePageProps) {
     if (root.can.set_roles && u.role !== 'owner')
       out.push({
         label: u.role === 'moderator' ? 'Make member' : 'Make moderator',
+        shield: shieldText.ownerDoes,
         onSelect: () => void change(u),
       })
-    if (u.can.remove) out.push({ label: 'Remove', icon: 'remove', danger: true, onSelect: () => setRemoving(u) })
+    if (u.can.remove)
+      out.push({
+        label: 'Remove',
+        icon: 'remove',
+        danger: true,
+        shield: shieldText.staffDo,
+        onSelect: () => setRemoving(u),
+      })
     return out
   }
 
@@ -147,7 +156,9 @@ export function PeoplePage({ me, root, onOpenGroup }: PeoplePageProps) {
             {root.can.add_members && (
               <Card>
                 <Stack gap={2}>
-                  <Heading level={2}>Invite someone</Heading>
+                  <Heading level={2} shield={shieldText.staffSee}>
+                    Invite someone
+                  </Heading>
                   <Text variant="small">
                     Invite links are active for seven days and can be used multiple times. Create a new one whenever you
                     need to.

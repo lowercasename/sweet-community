@@ -3,7 +3,7 @@ import { roomsOf } from '../data/groups'
 import { useAuthor, useRelease, useSettings, useUnreadPlaces, useUnreadNotifications } from '../data/hooks'
 import { anyUnread } from '../data/notifications'
 import { COMMUNITY, NEW_ROOM, NOTIFICATIONS, SEARCH, groupPath, profilePath } from '../routes'
-import { Avatar, Hairline, NavBar, NavItem, NavNote, NavSection, Tile, Wordmark } from '../ui'
+import { Avatar, Hairline, NavBar, NavItem, NavNote, NavSection, shieldText, Tile, Wordmark } from '../ui'
 import { ConversationsSection } from './ConversationsSection'
 
 interface SidebarProps {
@@ -140,6 +140,7 @@ export function Sidebar({ me, groups, location, expanded, onGo, onToggle }: Side
           icon="settings"
           label="Community"
           expanded={expanded}
+          shield={shieldText.staffSee}
           current={at(location, COMMUNITY)}
           onClick={() => onGo(COMMUNITY)}
         />

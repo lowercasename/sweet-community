@@ -118,6 +118,13 @@ func HandleReports(root Actor) bool { return root.staff() }
 // is never opened, because a conversation belongs to its two people (Raphael, 2026-11-08).
 func OpenReported(a Actor, g Group) bool { return a.member() && g.Kind != KindDM }
 
+// ByRole reports whether an action is allowed only because of the actor's role in the group. It is allowed, and it
+// would not be allowed if the actor were a plain member. The client marks such an action with a shield
+// (architecture.md, Interface).
+func ByRole(a Actor, allowed func(Actor) bool) bool {
+	return allowed(a) && !allowed(Actor{ID: a.ID, Role: Member})
+}
+
 // SetTopic allows the author to set the topic of their own post, and the root
 // group's staff to set the topic of any post. It is the only change staff may
 // make to another user's post (Raphael, 2026-11-07: setting a topic is

@@ -14,6 +14,7 @@ import {
   type MenuItem,
   Pill,
   Row,
+  shieldText,
   Stack,
   Text,
   Tile,
@@ -104,7 +105,14 @@ export function Post({
   const items: MenuItem[] = []
   if (post.can.edit) items.push({ label: 'Edit', icon: 'pencil', onSelect: startEditing })
   if (post.can.report) items.push({ label: 'Report', icon: 'flag', onSelect: () => setReporting(true) })
-  if (post.can.delete) items.push({ label: 'Delete', icon: 'trash', danger: true, onSelect: () => setConfirming(true) })
+  if (post.can.delete)
+    items.push({
+      label: 'Delete',
+      icon: 'trash',
+      danger: true,
+      shield: post.can.delete_by_role ? shieldText.rolesDo : undefined,
+      onSelect: () => setConfirming(true),
+    })
 
   const when = (
     <>

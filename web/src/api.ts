@@ -13,6 +13,8 @@ export interface Can {
   delete: boolean
   /** Whether I may report it to the owner and moderators. True for every member except the author. */
   report: boolean
+  /** Whether I may delete it only because of my role in its group. Such a Delete is marked with the shield. */
+  delete_by_role?: boolean
   /**
    * Posts only (architecture.md, Topics). Whether I may file the post under a topic. This is true for the post's
    * author and for the community's staff.

@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { ROOT_ID } from '../data/keys'
 import { useRules, useSetRules } from '../data/hooks'
 import { commentExtensions } from '../editor/extensions'
-import { Alert, Button, Card, Heading, Row, Stack, Text } from '../ui'
+import { Alert, Button, Card, Heading, Row, shieldText, Stack, Text } from '../ui'
 import { Body } from './Body'
 import { BodyEditor } from './BodyEditor'
 
@@ -28,9 +28,12 @@ export function RulesCard() {
   return (
     <Card>
       <Stack gap={2}>
-        <Heading level={2}>Rules</Heading>
+        <Heading level={2} shield={shieldText.staffSee}>
+          Rules
+        </Heading>
         <Text variant="small">
-          Everyone can read the rules from the Rules button on Home. People read them before they join.
+          Everyone can read the rules from the Rules button on Home, or from the menu on a phone. People read them
+          before they join.
         </Text>
         {editing ? (
           <BodyEditor

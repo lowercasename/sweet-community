@@ -81,6 +81,13 @@ func TestRules(t *testing.T) {
 		{"outsider opens a reported item", OpenReported(outsider, club), false},
 		{"member of a conversation opens a reported item", OpenReported(kit, Group{Kind: KindDM}), false},
 
+		{"owner deletes another's post by role", ByRole(owner, func(a Actor) bool { return DeletePost(a, kitsPost) }), true},
+		{"moderator deletes another's post by role", ByRole(mod, func(a Actor) bool { return DeletePost(a, kitsPost) }), true},
+		{"author deletes own post, not by role", ByRole(kit, func(a Actor) bool { return DeletePost(a, kitsPost) }), false},
+		{"post author deletes a comment on their post, not by role", ByRole(kit, func(a Actor) bool { return DeleteComment(a, mosComment) }), false},
+		{"moderator deletes own post, not by role", ByRole(Actor{ID: "kit", Role: Moderator}, func(a Actor) bool { return DeletePost(a, kitsPost) }), false},
+		{"member cannot delete, so not by role", ByRole(mo, func(a Actor) bool { return DeletePost(a, kitsPost) }), false},
+
 		{"owner hands over to a member", Transfer(owner, kit), true},
 		{"owner hands over to a moderator", Transfer(owner, mod), true},
 		{"owner hands over to self", Transfer(owner, owner), false},

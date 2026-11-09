@@ -3,7 +3,7 @@ import { roomsOf } from '../data/groups'
 import { useAuthor, useRelease, useRules, useUnreadPlaces } from '../data/hooks'
 import { anyUnread } from '../data/notifications'
 import { NEW_ROOM, RULES, groupPath, profilePath, COMMUNITY } from '../routes'
-import { Avatar, Card, Hairline, NavItem, NavNote, NavSection, Pane, Stack, Tile } from '../ui'
+import { Avatar, Card, Hairline, NavItem, NavNote, NavSection, Pane, shieldText, Stack, Tile } from '../ui'
 import { ConversationsSection } from './ConversationsSection'
 
 interface MenuPageProps {
@@ -69,7 +69,13 @@ export function MenuPage({ me, groups, onGo, onLogout }: MenuPageProps) {
           <Hairline />
           <NavItem icon="people" label="People" expanded onClick={() => onGo('/people')} />
           {(root?.can.manage_instance || root?.can.manage_topics) && (
-            <NavItem icon="settings" label="Community" expanded onClick={() => onGo(COMMUNITY)} />
+            <NavItem
+              icon="settings"
+              label="Community"
+              expanded
+              shield={shieldText.staffSee}
+              onClick={() => onGo(COMMUNITY)}
+            />
           )}
           {/* On the phone the rules are here, at the end of the menu, not in Home's bar (Raphael, 2026-11-08). */}
           {rules && <NavItem icon="rules" label="Rules" expanded onClick={() => onGo(RULES)} />}

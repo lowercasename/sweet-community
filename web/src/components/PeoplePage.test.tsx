@@ -63,6 +63,9 @@ describe('PeoplePage', () => {
       users: [member('raphael', 'owner'), member('kit', 'moderator', true), member('mo', 'moderator', true)],
     })
     fireEvent.click(within(rowOf('kit')).getByRole('button', { name: 'Options for kit' }))
+    expect(screen.getByRole('menuitem', { name: 'Make moderator' }).getAttribute('aria-description')).toBe(
+      'Only the owner can do this',
+    )
     fireEvent.click(screen.getByRole('menuitem', { name: 'Make moderator' }))
     expect(setMemberRole).toHaveBeenCalledWith(ROOT, 'kit', 'moderator')
     await vi.waitFor(() => fireEvent.click(within(rowOf('kit')).getByRole('button', { name: 'Options for kit' })))
@@ -95,9 +98,14 @@ describe('PeoplePage', () => {
     renderWithQuery(<PeoplePage me={user('mo')} root={group(ROOT, 'moderator')} onOpenGroup={() => {}} />)
     await screen.findByText('kit')
     expect(screen.getByText('Invite someone')).toBeTruthy()
-    // A moderator can remove a member but cannot set roles. The row's menu contains only Remove.
+    expect(screen.getByRole('img', { name: 'Only the owner and moderators see this' })).toBeTruthy()
+    // A moderator can remove a member but cannot set roles. The row's menu contains only Remove, marked with the
+    // shield.
     fireEvent.click(screen.getByRole('button', { name: 'Options for kit' }))
     expect(screen.getAllByRole('menuitem').map((b) => b.textContent)).toEqual(['Remove'])
+    const remove = screen.getByRole('menuitem', { name: 'Remove' })
+    expect(remove.querySelector('[data-shield]')).toBeTruthy()
+    expect(remove.getAttribute('aria-description')).toBe('Only the owner and moderators can do this')
   })
 
   it('shows a member only the list', async () => {

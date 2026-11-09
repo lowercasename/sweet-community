@@ -80,6 +80,9 @@ describe('Sidebar', () => {
     expect(within(groupsSection()).getByRole('button', { name: 'New room' })).toBeTruthy()
     expect(within(messages()).getByRole('button', { name: 'kit' })).toBeTruthy()
     expect(screen.getByRole('navigation').querySelectorAll('hr').length).toBe(2)
+    // Community is there because of the viewer's role, so it carries the shield.
+    expect(screen.getByRole('button', { name: 'Community' }).querySelector('[data-shield]')).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'People' }).querySelector('[data-shield]')).toBeNull()
 
     fireEvent.click(screen.getByRole('button', { name: 'New room' }))
     expect(onGo).toHaveBeenCalledWith('/rooms/new')

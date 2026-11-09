@@ -6,7 +6,21 @@ import { feedStream, markerOf } from '../data/notifications'
 import { usePageVisible } from '../hooks/usePageVisible'
 import { useStreamStatus } from '../hooks/StreamContext'
 import { COMMUNITY, topicPath } from '../routes'
-import { Alert, Button, Card, Measure, Pane, Pill, PillCaption, Row, ScrollArea, Stack, Text } from '../ui'
+import {
+  Alert,
+  Button,
+  Card,
+  Measure,
+  Pane,
+  Pill,
+  PillCaption,
+  Row,
+  ScrollArea,
+  ShieldMark,
+  shieldText,
+  Stack,
+  Text,
+} from '../ui'
 import { postExtensions } from '../editor/extensions'
 import { BodyEditor } from './BodyEditor'
 import { ConnectionStatus } from './ConnectionStatus'
@@ -80,10 +94,11 @@ export function PostsPane({ groupId, side = 'full', watching, topicId = null }: 
               head={
                 !topical && staff ? (
                   <Stack gap={2}>
-                    <Row>
+                    <Row align="center">
                       <Pill href={COMMUNITY} tone="quiet" size="md">
                         Add topics
                       </Pill>
+                      <ShieldMark label={shieldText.staffSee} />
                     </Row>
                     <PillCaption>
                       Topics sort posts by subject, like Introductions or Questions. Members see them once you add one.

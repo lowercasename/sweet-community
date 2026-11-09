@@ -1,5 +1,5 @@
 import type { Topic } from '../api'
-import { Menu, type MenuItem, type PillSize } from '../ui'
+import { Menu, type MenuItem, type PillSize, shieldText } from '../ui'
 
 interface TopicMenuProps {
   topics: Topic[]
@@ -47,7 +47,9 @@ export function TopicMenu({
       checked: t.id === value,
       onSelect: () => onChange(t.id),
     })),
-    ...(onEdit ? [{ label: 'Edit topics', icon: 'settings' as const, onSelect: onEdit }] : []),
+    ...(onEdit
+      ? [{ label: 'Edit topics', icon: 'settings' as const, shield: shieldText.staffDo, onSelect: onEdit }]
+      : []),
   ]
   return (
     <Menu label={label} items={items} trigger="pill" quiet={!chosen} size={size} disabled={disabled}>

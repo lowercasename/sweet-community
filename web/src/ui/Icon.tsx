@@ -27,6 +27,7 @@ import {
   Reply,
   ScrollText,
   Flag,
+  Shield,
   Search,
   Settings,
   TabletSmartphone,
@@ -73,6 +74,7 @@ export type IconName =
   | 'reply'
   | 'rules'
   | 'flag'
+  | 'shield'
 
 const ICONS: Record<IconName, LucideIcon> = {
   bold: Bold,
@@ -110,6 +112,7 @@ const ICONS: Record<IconName, LucideIcon> = {
   reply: Reply,
   rules: ScrollText,
   flag: Flag,
+  shield: Shield,
 }
 
 interface IconProps {

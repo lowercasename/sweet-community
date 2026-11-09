@@ -15,6 +15,7 @@ import {
   List,
   ListItem,
   Row,
+  shieldText,
   Stack,
   Text,
   Time,
@@ -156,7 +157,9 @@ export function ReportsCard() {
     <Card>
       <Stack gap={3}>
         <Stack gap={2}>
-          <Heading level={2}>Reports</Heading>
+          <Heading level={2} shield={shieldText.staffSee}>
+            Reports
+          </Heading>
           <Text variant="small">
             Posts, comments and messages that members reported. Only the owner and moderators see them.
           </Text>
