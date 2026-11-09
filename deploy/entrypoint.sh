@@ -26,8 +26,11 @@ if [ -z "$SWEET_S3_ENDPOINT" ] || [ -z "$SWEET_S3_ACCESS_KEY" ] || [ -z "$SWEET_
   exit 1
 fi
 
-# Images go under images/ and the database under db/ in the same bucket.
-export SWEET_S3_PREFIX=${SWEET_S3_PREFIX:-images}
+# Images go under images/ and the database under db/ in the same bucket. SWEET_S3_FOLDER puts both under one
+# folder, <folder>/images and <folder>/db, so several instances can share a bucket.
+folder=${SWEET_S3_FOLDER:+${SWEET_S3_FOLDER%/}/}
+export SWEET_S3_PREFIX=${SWEET_S3_PREFIX:-${folder}images}
+export SWEET_S3_DB_PATH=${folder}db
 export SWEET_S3_REGION=${SWEET_S3_REGION:-auto}
 if [ "$SWEET_S3_INSECURE" = 1 ]; then
   export SWEET_S3_URL="http://$SWEET_S3_ENDPOINT"

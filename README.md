@@ -71,6 +71,8 @@ Then `docker compose up -d`. Images are stored in the bucket under `images/` and
 
 Any S3 service works in place of R2. Set `SWEET_S3_REGION` to its region.
 
+Several instances can share one bucket if each has its own folder in it. `SWEET_S3_FOLDER=<name>` puts that instance's images under `<name>/images` and its database under `<name>/db`.
+
 ### Upgrading
 
 ```

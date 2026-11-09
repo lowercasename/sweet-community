@@ -4,7 +4,7 @@ dbs:
     replica:
       type: s3
       bucket: ${SWEET_S3_BUCKET}
-      path: db
+      path: ${SWEET_S3_DB_PATH}
       endpoint: ${SWEET_S3_URL}
       region: ${SWEET_S3_REGION}
       access-key-id: ${SWEET_S3_ACCESS_KEY}
