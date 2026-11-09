@@ -67,7 +67,7 @@ SWEET_S3_ACCESS_KEY=<the token's access key id>
 SWEET_S3_SECRET_KEY=<the token's secret access key>
 ```
 
-Then `docker compose up -d`. Images are stored in the bucket under `images/` and the database is replicated to it under `db/`, a second or so behind. The bucket and your `.env` together are the whole backup, so keep a copy of `.env` somewhere safe.
+Then `docker compose up -d`. Images are stored in the bucket under `images/` and the database is replicated to it under `db/`, a second or so behind. The bucket keeps 30 days of history, with a full copy every hour (see Restoring). The bucket and your `.env` together are the whole backup, so keep a copy of `.env` somewhere safe.
 
 Any S3 service works in place of R2. Set `SWEET_S3_REGION` to its region.
 
@@ -89,7 +89,7 @@ docker compose up -d
 
 - **The server is gone.** On a new one, install as above with the same `.env`. Sweet finds no database, fetches the latest from the bucket and starts. The images are already there.
 - **An upgrade went wrong.** `docker compose down`. Put the release you were on in `.env`, for example `SWEET_IMAGE=ghcr.io/lowercasename/sweet-community:1.0.0`. The nav shows the release under Collapse, and `CHANGELOG.md` lists them all. Then `docker compose run --rm sweet sh -c 'cp /data/sweet.db.before-upgrade /data/sweet.db'` and `docker compose up -d`.
-- **Something was deleted and you want the database as it was at a moment.** Stop Sweet, restore the database as of that moment (UTC), start it:
+- **Something was deleted and you want the database as it was at a moment.** Any moment in the last 30 days can be restored. Stop Sweet, restore the database as of that moment (UTC), start it:
 
   ```
   docker compose stop sweet

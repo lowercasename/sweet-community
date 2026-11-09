@@ -1,4 +1,11 @@
 # Litestream replicates the database to the bucket. The entrypoint sets these variables.
+
+# A full snapshot every hour, and 30 days of history. A restore can go back to any point in the last 30 days. Litestream
+# takes durations in hours only.
+snapshot:
+  interval: 1h
+  retention: 720h
+
 dbs:
   - path: ${SWEET_DATA}/sweet.db
     replica:
