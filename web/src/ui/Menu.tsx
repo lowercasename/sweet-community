@@ -20,6 +20,16 @@ import { ShieldMark } from './ShieldMark'
 import { PILL_ICON, pillClass, type PillSize } from './Pill'
 import { useTooltip } from './Tooltip'
 
+/**
+ * An item's colours. Items use the buttons' 15px text. An item that removes something is red and turns blush on hover,
+ * as a danger button does, rather than grey (Raphael, 2026-11-09).
+ */
+const ITEM_TONE = {
+  plain: 'text-ink hover:bg-field focus:bg-field',
+  checked: 'text-sweet hover:bg-field focus:bg-field',
+  danger: 'text-sweet hover:bg-blush focus:bg-blush',
+}
+
 export interface MenuItem {
   label: string
   icon?: IconName
@@ -152,7 +162,7 @@ export function Menu({
                   aria-checked={item.checked}
                   aria-description={item.shield}
                   tabIndex={activeIndex === i ? 0 : -1}
-                  className={`flex w-full cursor-pointer items-center gap-2 px-3 py-1.5 text-left hover:bg-field focus:bg-field focus:outline-none ${item.checked || item.danger ? 'text-sweet' : 'text-ink'}`}
+                  className={`flex w-full cursor-pointer items-center gap-2 px-3 py-1.5 text-left text-[15px] leading-[22px] focus:outline-none ${ITEM_TONE[item.danger ? 'danger' : item.checked ? 'checked' : 'plain']}`}
                   {...getItemProps({
                     onClick() {
                       setOpen(false)
@@ -175,7 +185,7 @@ export function Menu({
                     </span>
                   )}
                   {item.shield !== undefined && (
-                    <span className="ml-auto pl-4">
+                    <span className="ml-auto flex pl-4">
                       <ShieldMark size={16} />
                     </span>
                   )}

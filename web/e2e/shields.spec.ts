@@ -1,4 +1,24 @@
+import type { Locator } from '@playwright/test'
 import { anyView, article, expect, member, open, owner, test, uniq, writePost } from './helpers'
+
+/**
+ * How far the shield's centre sits below the centre of the text beside it, in pixels. The shield is centred on the
+ * text and then lowered by about a pixel, because its point is narrow and a centred shield looks high. Raphael found
+ * it off the text's line on 2026-11-09, when it was up to 2px high.
+ */
+async function shieldDrop(shield: Locator, text: Locator): Promise<number> {
+  const s = (await shield.locator('svg').boundingBox())!
+  const t = await text.evaluate((el) => {
+    const node = document.createTreeWalker(el, NodeFilter.SHOW_TEXT).nextNode()!
+    const r = document.createRange()
+    r.selectNodeContents(node)
+    const b = r.getClientRects()[0]
+    return b.y + b.height / 2
+  })
+  return s.y + s.height / 2 - t
+}
+
+const onTheLine = (drop: number) => expect(drop).toBeGreaterThanOrEqual(0.5) && expect(drop).toBeLessThanOrEqual(1.6)
 
 /**
  * The shield (architecture.md, Interface) marks what a person sees or can do only because they are an owner or a
@@ -31,6 +51,12 @@ test.describe('shields', () => {
       const del = o.page.getByRole('menuitem', { name: 'Delete' })
       await expect(del).toHaveAttribute('aria-description', 'Only owners and moderators can do this')
       await expect(del.locator('[data-shield]')).toBeVisible()
+      onTheLine(await shieldDrop(del.locator('[data-shield]'), del))
+      // Menu items use the buttons' 15px text. A destructive item turns blush on hover, as a danger button does
+      // (Raphael, 2026-11-09).
+      await expect(del).toHaveCSS('font-size', '15px')
+      await del.hover()
+      await expect(del).toHaveCSS('background-color', 'rgb(253, 232, 232)')
       await o.page.screenshot({ path: `test-results/shields-${info.project.name}-menu.png` })
       await o.page.keyboard.press('Escape')
 
@@ -40,9 +66,14 @@ test.describe('shields', () => {
         ? o.page.getByRole('button', { name: 'Community' })
         : o.page.getByRole('navigation', { name: 'Main' }).getByRole('button', { name: 'Community' })
       await expect(item.locator('[data-shield]')).toBeVisible()
+      onTheLine(await shieldDrop(item.locator('[data-shield]'), item))
       if (phone) await o.page.screenshot({ path: 'test-results/shields-phone-nav.png' })
       await item.click()
-      await expect(o.page.getByText(/marks what only owners and moderators can see and do\./)).toBeVisible()
+      const note = o.page.getByText(/marks what only owners and moderators can see and do\./)
+      await expect(note).toBeVisible()
+      onTheLine(await shieldDrop(note.locator('[data-shield]'), note))
+      const reports = o.page.getByRole('heading', { name: 'Reports', exact: true })
+      onTheLine(await shieldDrop(reports.locator('xpath=..').locator('[data-shield]'), reports))
       await expect(o.page.getByRole('img', { name: 'Only the owner sees this' })).toHaveCount(1)
       await expect(o.page.getByRole('img', { name: 'Only the owner and moderators see this' })).toHaveCount(3)
       await o.page.screenshot({ path: `test-results/shields-${info.project.name}-community.png` })

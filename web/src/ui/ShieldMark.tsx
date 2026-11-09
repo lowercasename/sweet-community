@@ -25,28 +25,28 @@ interface ShieldMarkProps {
    */
   label?: string
   size?: 14 | 16
+  /** Inside a line of text, rather than as an item in a centred row. */
+  inline?: boolean
 }
 
-/** The grey shield that marks what only owners and moderators see or can do. */
-export function ShieldMark({ label, size = 16 }: ShieldMarkProps) {
+/**
+ * The grey shield that marks what only owners and moderators see or can do. In a centred row it is centred on the
+ * text and moved down 1px, because its point is narrow and a centred shield looks high. Inside a line of text it is
+ * placed below the baseline by the same rule. Raphael found it off the text's line on 2026-11-09.
+ */
+export function ShieldMark({ label, size = 16, inline = false }: ShieldMarkProps) {
   const tip = useTooltip(label ?? '', label !== undefined)
+  const place = inline ? 'inline-block align-[-0.2em]' : 'inline-flex flex-none translate-y-px'
   if (label === undefined) {
     return (
-      <span data-shield aria-hidden className="inline-flex flex-none text-mute">
+      <span data-shield aria-hidden className={`${place} text-mute`}>
         <Icon name="shield" size={size} />
       </span>
     )
   }
   return (
     <>
-      <span
-        ref={tip.ref}
-        data-shield
-        role="img"
-        aria-label={label}
-        className="inline-flex flex-none text-mute"
-        {...tip.props()}
-      >
+      <span ref={tip.ref} data-shield role="img" aria-label={label} className={`${place} text-mute`} {...tip.props()}>
         <Icon name="shield" size={size} />
       </span>
       {tip.tooltip}

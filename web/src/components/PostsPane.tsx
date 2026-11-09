@@ -101,7 +101,8 @@ export function PostsPane({ groupId, side = 'full', watching, topicId = null }: 
                       <ShieldMark label={shieldText.staffSee} />
                     </Row>
                     <PillCaption>
-                      Topics sort posts by subject, like Introductions or Questions. Members see them once you add one.
+                      Topics sort posts by subject, like Introductions or Questions. Until you add some, members won't
+                      see this section.
                     </PillCaption>
                   </Stack>
                 ) : (

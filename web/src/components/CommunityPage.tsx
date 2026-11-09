@@ -21,7 +21,7 @@ export function CommunityPage({ root }: { root: Group }) {
           <Stack gap={3}>
             {/* The page says once what the shield means. Every card here carries it. */}
             <PageNote>
-              The shield <ShieldMark size={14} /> marks what only owners and moderators can see and do.
+              The shield <ShieldMark size={14} inline /> marks what only owners and moderators can see and do.
             </PageNote>
             {root.can.handle_reports && <ReportsCard />}
             {root.can.manage_instance && (
