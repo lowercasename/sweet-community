@@ -4,11 +4,13 @@ go 1.26.4
 
 require (
 	code.dny.dev/ssrf v0.3.0
+	github.com/KimMachineGun/automemlimit v1.0.1
 	github.com/SherClockHolmes/webpush-go v1.4.0
 	github.com/disintegration/imaging v1.6.2
 	github.com/google/uuid v1.6.0
 	github.com/microcosm-cc/bluemonday v1.0.27
 	github.com/minio/minio-go/v7 v7.4.1
+	github.com/rwcarlsen/goexif v0.0.0-20190401172101-9e8deecbddbd
 	golang.org/x/crypto v0.58.0
 	golang.org/x/image v0.47.0
 	golang.org/x/net v0.60.0
@@ -19,7 +21,6 @@ require (
 require (
 	cel.dev/expr v0.25.1 // indirect
 	filippo.io/edwards25519 v1.1.1 // indirect
-	github.com/KimMachineGun/automemlimit v1.0.1 // indirect
 	github.com/antlr4-go/antlr/v4 v4.13.1 // indirect
 	github.com/aymerick/douceur v0.2.0 // indirect
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect

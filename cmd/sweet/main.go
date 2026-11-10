@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"io/fs"
 	"log"
+	"log/slog"
 	"net/http"
 	"os"
 	"os/signal"
@@ -28,9 +29,7 @@ import (
 	"sweet/internal/version"
 	"sweet/internal/web"
 
-	// Sets Go's memory limit to 90% of the container's memory limit, so the garbage collector frees memory before
-	// the kernel kills the server. A community may run in a 128 MB container.
-	_ "github.com/KimMachineGun/automemlimit"
+	"github.com/KimMachineGun/automemlimit/memlimit"
 )
 
 // imageStore returns an S3 store when SWEET_S3_ENDPOINT and SWEET_S3_BUCKET
@@ -62,6 +61,12 @@ func envOr(key, fallback string) string {
 }
 
 func main() {
+	// Go's memory limit is set to 90% of the container's, so the garbage collector frees memory before the kernel
+	// kills the server. A community may run in a 128 MB container. Outside a container with a limit nothing is set,
+	// and nothing is logged.
+	if limit, err := memlimit.Set(memlimit.WithProvider(memlimit.FromCgroup), memlimit.WithLogger(slog.New(slog.DiscardHandler))); err == nil && limit > 0 {
+		log.Printf("memory limit %d MB, from the container", limit>>20)
+	}
 	addr := flag.String("addr", ":8080", "listen address")
 	dbPath := flag.String("db", "data/sweet.db", "SQLite database path")
 	owner := flag.String("owner", "owner", "username of the instance owner, when -owner-password makes one without the setup link")

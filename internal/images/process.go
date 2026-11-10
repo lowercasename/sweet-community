@@ -11,6 +11,7 @@ import (
 	"net/http"
 
 	"github.com/disintegration/imaging"
+	"github.com/rwcarlsen/goexif/exif"
 	_ "golang.org/x/image/webp" // decode only, since Go cannot encode WebP
 )
 
@@ -59,7 +60,7 @@ func Ext(contentType string) string {
 }
 
 // Process validates the image by its content rather than its file name, caps
-// its dimensions, strips metadata by re-encoding it, and returns a JPEG for an
+// its dimensions, turns a photo upright, strips metadata by re-encoding it, and returns a JPEG for an
 // opaque image or a PNG for an image with transparency. An animated GIF is the
 // exception. It is stored as uploaded, because re-encoding would lose the
 // animation.
@@ -126,6 +127,12 @@ func Process(r io.Reader) (Processed, error) {
 		// scaler kept 32 bytes a pixel, about 194 MB for a 12-megapixel phone photo, and the server was killed.
 		src = imaging.Resize(src, w, h, imaging.CatmullRom)
 	}
+	// A phone stores a photo as its sensor read it and records in EXIF how to turn it upright. The image is turned
+	// after the resize, because turning it at full size takes another 4 bytes a pixel.
+	if http.DetectContentType(data) == "image/jpeg" {
+		src = upright(src, orientation(data))
+		w, h = src.Bounds().Dx(), src.Bounds().Dy()
+	}
 
 	var buf bytes.Buffer
 	out := Processed{Width: w, Height: h}
@@ -142,6 +149,50 @@ func Process(r io.Reader) (Processed, error) {
 	}
 	out.Data = buf.Bytes()
 	return out, nil
+}
+
+// orientation returns a JPEG's EXIF orientation, from 1 to 8. It returns 1, upright, when the file has no EXIF block
+// or the block cannot be read, so a damaged block does not reject the photo.
+func orientation(data []byte) (o int) {
+	defer func() {
+		if recover() != nil {
+			o = 1
+		}
+	}()
+	x, err := exif.Decode(bytes.NewReader(data))
+	if err != nil {
+		return 1
+	}
+	tag, err := x.Get(exif.Orientation)
+	if err != nil {
+		return 1
+	}
+	o, err = tag.Int(0)
+	if err != nil || o < 1 || o > 8 {
+		return 1
+	}
+	return o
+}
+
+// upright turns or flips an image as its EXIF orientation says.
+func upright(img image.Image, o int) image.Image {
+	switch o {
+	case 2:
+		return imaging.FlipH(img)
+	case 3:
+		return imaging.Rotate180(img)
+	case 4:
+		return imaging.FlipV(img)
+	case 5:
+		return imaging.Transpose(img)
+	case 6:
+		return imaging.Rotate270(img)
+	case 7:
+		return imaging.Transverse(img)
+	case 8:
+		return imaging.Rotate90(img)
+	}
+	return img
 }
 
 func opaque(img image.Image) bool {
