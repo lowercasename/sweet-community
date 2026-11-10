@@ -89,7 +89,7 @@ export function ImageCard({
               className="block h-1.5 w-full overflow-hidden rounded-full bg-line"
             >
               <span
-                className="block h-full rounded-full bg-sweet transition-[width] duration-200"
+                className="block h-full rounded-full bg-mute transition-[width] duration-200"
                 style={{ width: `${Math.round(upload.progress * 100)}%` }}
               />
             </span>
