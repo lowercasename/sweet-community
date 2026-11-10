@@ -1,6 +1,6 @@
 import { useState } from 'react'
-import { uploadImage, type Group, type GroupMode, type Membership, type User } from '../api'
-import { IMAGE_ACCEPT } from '../editor/images'
+import { type Group, type GroupMode, type Membership, type User } from '../api'
+import { IMAGE_ACCEPT, uploadPicture } from '../editor/images'
 import { useGroupActions, useMembers, useSetRole, useUsers } from '../data/hooks'
 import {
   ActionRow,
@@ -87,7 +87,7 @@ export function MembersPage({ group, me, onLeft }: MembersPageProps) {
   }
 
   const choosePicture = async (file: File) => {
-    const img = await uploadImage(file)
+    const img = await uploadPicture(file)
     await actions.setPicture(group.id, img.id)
   }
 

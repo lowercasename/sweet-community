@@ -1,8 +1,8 @@
 import { useState } from 'react'
-import { logoutEverywhere, uploadImage, type Group, type User } from '../api'
+import { logoutEverywhere, type Group, type User } from '../api'
 import { useRemoveUser, useSession } from '../data/hooks'
 import { useAuthor, useSetPicture } from '../data/hooks'
-import { IMAGE_ACCEPT } from '../editor/images'
+import { IMAGE_ACCEPT, uploadPicture } from '../editor/images'
 import { AccountCard } from './AccountCard'
 import { ColoursCard } from './ColoursCard'
 import { ShowWelcomeCard } from './ShowWelcomeCard'
@@ -69,7 +69,7 @@ export function SettingsPage({ me, root, onSignOut }: SettingsPageProps) {
     setPictureBusy('choose')
     setPictureError(null)
     try {
-      const img = await uploadImage(file)
+      const img = await uploadPicture(file)
       await setPicture(img.id)
     } catch (e) {
       setPictureError(e instanceof Error ? e.message : 'Could not set the picture')

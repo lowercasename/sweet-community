@@ -184,7 +184,14 @@ export function BodyEditor({
       return
     }
     void Promise.all(files.map(shrink)).then((shrunk) => {
-      const added = shrunk.map((s) => ({ ...s, key: crypto.randomUUID(), alt: '', progress: 0, failed: null }))
+      const added = shrunk.map((s) => ({
+        ...s,
+        key: crypto.randomUUID(),
+        preview: URL.createObjectURL(s.file),
+        alt: '',
+        progress: 0,
+        failed: null,
+      }))
       setAttached((prev) => [...prev, ...added])
       for (const a of added) uploadAttachment(a.key, a.file)
     })

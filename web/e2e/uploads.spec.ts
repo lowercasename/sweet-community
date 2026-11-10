@@ -167,6 +167,39 @@ test.describe('image uploads', () => {
     await kit.context.close()
   })
 
+  test('a profile picture and a room picture are shrunk before uploading', async ({ browser }, testInfo) => {
+    const kit = await member(browser, testInfo)
+    const name = uniq('Fells')
+    const room = await kit.context.request.post('/api/groups', { data: { kind: 'group', name, mode: 'both' } })
+    const gid = ((await room.json()) as { id: string }).id
+    const widths: number[] = []
+    await kit.page.route('**/api/images', async (route) => {
+      widths.push(pngWidth(route.request().postDataBuffer() ?? Buffer.alloc(0)))
+      await route.continue()
+    })
+    const nav = kit.page.getByRole('navigation', { name: 'Main' })
+
+    await open(kit.page, '/settings')
+    await kit.page
+      .locator('input[type=file]')
+      .first()
+      .setInputFiles({ name: 'me.png', mimeType: 'image/png', buffer: png(3000, 2000) })
+    await expect(nav.getByRole('button', { name: kit.username }).locator('img')).toHaveAttribute('src', /\/img\//)
+
+    await open(kit.page, `/r/${gid}/members`)
+    await kit.page
+      .locator('section')
+      .filter({ hasText: 'Room settings' })
+      .locator('input[type=file]')
+      .setInputFiles({ name: 'fells.png', mimeType: 'image/png', buffer: png(3000, 2000) })
+    await expect(nav.getByRole('button', { name: new RegExp(`^${name}`) }).locator('img')).toHaveAttribute(
+      'src',
+      /\/img\//,
+    )
+    expect(widths).toEqual([2000, 2000])
+    await kit.context.close()
+  })
+
   test('a phone photo is stored upright, whether the browser shrinks it or sends it as it is', async ({
     browser,
   }, testInfo) => {

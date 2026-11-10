@@ -18,10 +18,9 @@ export interface AttachedImage extends UploadedImage {
   alt: string
 }
 
-/** An image ready to upload: the file to send, an address for showing it at once, and its size in pixels. */
+/** An image ready to upload: the file to send and its size in pixels. */
 export interface Shrunk {
   file: Blob
-  preview: string
   width: number
   height: number
 }
@@ -45,7 +44,7 @@ export function failureReason(e: unknown): string {
  * animated. An image the browser cannot read is sent as it is, and the server decides.
  */
 export async function shrink(file: File): Promise<Shrunk> {
-  const original = (width = 0, height = 0): Shrunk => ({ file, preview: URL.createObjectURL(file), width, height })
+  const original = (width = 0, height = 0): Shrunk => ({ file, width, height })
   let bitmap: ImageBitmap
   try {
     bitmap = await createImageBitmap(file)
@@ -75,7 +74,12 @@ export async function shrink(file: File): Promise<Shrunk> {
   if (!blob) return original(width, height)
   const name = file.name.replace(/\.[^.]*$/, '') + (type === 'image/png' ? '.png' : '.jpg')
   const shrunk = new File([blob], name, { type })
-  return { file: shrunk, preview: URL.createObjectURL(shrunk), width: w, height: h }
+  return { file: shrunk, width: w, height: h }
+}
+
+/** Shrinks an image and uploads it. Used for profile and room pictures, which show no upload progress. */
+export async function uploadPicture(file: File): Promise<UploadedImage> {
+  return uploadImage((await shrink(file)).file)
 }
 
 /**
@@ -151,22 +155,23 @@ export function retryUpload(editor: Editor, tr: Transaction, key: string): boole
  */
 export async function insertImages(editor: Editor, files: File[]): Promise<void> {
   const shrunk = await Promise.all(files.map(shrink))
-  const keys = shrunk.map((s) => {
+  const added = shrunk.map((s) => {
     const key = crypto.randomUUID()
-    pending.set(key, { file: s.file, preview: s.preview })
-    return key
+    const preview = URL.createObjectURL(s.file)
+    pending.set(key, { file: s.file, preview })
+    return { ...s, key, preview }
   })
   editor
     .chain()
     .focus()
     .insertContent(
-      shrunk.map((s, i) => ({
+      added.map((a) => ({
         type: 'image',
-        attrs: { src: s.preview, alt: '', width: s.width, height: s.height, upload: keys[i], progress: 0 },
+        attrs: { src: a.preview, alt: '', width: a.width, height: a.height, upload: a.key, progress: 0 },
       })),
     )
     .run()
-  for (const key of keys) upload(editor, key)
+  for (const a of added) upload(editor, a.key)
 }
 
 /** The <img> elements for the images attached above a message, serialised as the editor would serialise them. */
