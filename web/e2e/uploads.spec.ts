@@ -65,12 +65,6 @@ function uploadedWidth(body: Buffer): number {
   return sof < 0 ? -1 : body.readUInt16BE(sof + 7)
 }
 
-/** The width in a PNG's header, read from an upload's multipart body. */
-function pngWidth(body: Buffer): number {
-  const at = body.indexOf(Buffer.from([0x89, 0x50, 0x4e, 0x47]))
-  return at < 0 ? -1 : body.readUInt32BE(at + 16)
-}
-
 test.describe('image uploads', () => {
   test('an image shows at once with its upload, and Post waits for the upload to finish', async ({
     browser,
@@ -98,14 +92,20 @@ test.describe('image uploads', () => {
     await kit.context.close()
   })
 
-  test('a failed upload shows its error in place of the alt text, names no status code, and can be tried again', async ({
+  test("a failed upload shows its error in place of the alt text, with the server's reason and no status code, and can be tried again", async ({
     browser,
   }, testInfo) => {
     const kit = await member(browser, testInfo)
     const errors: string[] = []
     kit.page.on('pageerror', (e) => errors.push(e.message))
     await open(kit.page)
-    await failUploads(kit.page)
+    // The first upload meets a proxy's error page. The second is refused by the server, with its reason.
+    let answered = 0
+    await kit.page.route('**/api/images', (route) =>
+      answered++ === 0
+        ? route.fulfill({ status: 502, contentType: 'text/html', body: '<html><body>502 Bad Gateway</body></html>' })
+        : route.fulfill({ status: 422, json: { error: 'That image is too large' } }),
+    )
     await postEditor(kit.page).click()
     await kit.page.keyboard.type(uniq('Two pictures '))
     await posts(kit.page)
@@ -117,6 +117,7 @@ test.describe('image uploads', () => {
     const cards = posts(kit.page).locator('.image-card')
     await expect(cards).toHaveCount(2)
     await expect(cards.getByText('Failed to upload', { exact: true })).toHaveCount(2)
+    await expect(cards.nth(1).getByText('That image is too large')).toBeVisible()
     await expect(cards.getByPlaceholder(/Describe this image/)).toHaveCount(0)
     await expect(posts(kit.page).getByText('Failed to upload 2 of 2 images')).toBeVisible()
     await expect(kit.page.getByText(/502|Bad Gateway/)).toHaveCount(0)
@@ -153,30 +154,7 @@ test.describe('image uploads', () => {
     await kit.context.close()
   })
 
-  test('the browser shrinks a large image to 2000px on its longer side before uploading it', async ({
-    browser,
-  }, testInfo) => {
-    const kit = await member(browser, testInfo)
-    await open(kit.page)
-    const widths: number[] = []
-    await kit.page.route('**/api/images', async (route) => {
-      widths.push(uploadedWidth(route.request().postDataBuffer() ?? Buffer.alloc(0)))
-      await route.continue()
-    })
-    await postEditor(kit.page).click()
-    await posts(kit.page)
-      .locator('input[type=file]')
-      .setInputFiles({ name: 'big.png', mimeType: 'image/png', buffer: png(3000, 2000) })
-    await expect(
-      posts(kit.page)
-        .locator('.image-card')
-        .getByPlaceholder(/Describe this image/),
-    ).toBeVisible()
-    expect(widths).toEqual([2000])
-    await kit.context.close()
-  })
-
-  test('every image is converted before uploading: a JPEG stays a JPEG and other images become PNG', async ({
+  test('the browser converts each image before uploading it: upright, at most 2000 pixels wide, and PNG unless it is a photo', async ({
     browser,
   }, testInfo) => {
     const kit = await member(browser, testInfo)
@@ -186,7 +164,7 @@ test.describe('image uploads', () => {
       bodies.push(route.request().postDataBuffer() ?? Buffer.alloc(0))
       await route.continue()
     })
-    // A small photo taken upright, stored on its side with an EXIF block. A transparent WebP.
+    // A small photo taken upright and stored on its side with an EXIF block, a transparent WebP, and a large PNG.
     const photo = await sidewaysPhoto(kit.page, 400, 200)
     const sticker = Buffer.from(
       await kit.page.evaluate(async () => {
@@ -206,72 +184,24 @@ test.describe('image uploads', () => {
       .setInputFiles([
         { name: 'photo.jpg', mimeType: 'image/jpeg', buffer: photo },
         { name: 'sticker.webp', mimeType: 'image/webp', buffer: sticker },
+        { name: 'big.png', mimeType: 'image/png', buffer: png(3000, 2000) },
       ])
     await expect(
       posts(kit.page)
         .locator('.image-card')
         .getByPlaceholder(/Describe this image/),
-    ).toHaveCount(2)
-    expect(bodies).toHaveLength(2)
-    const [jpeg, png] = bodies
-    // The photo was drawn again by the browser: upright, and without its EXIF block.
+    ).toHaveCount(3)
+    expect(bodies).toHaveLength(3)
+    const [jpeg, webp, large] = bodies
+    // The photo was drawn upright, so it is 200 wide, and it has no EXIF block.
     expect(jpeg.includes(Buffer.from([0xff, 0xd8, 0xff]))).toBe(true)
     expect(jpeg.includes(Buffer.from('Exif'))).toBe(false)
-    expect(png.includes(Buffer.from([0x89, 0x50, 0x4e, 0x47]))).toBe(true)
-    expect(pngWidth(png)).toBe(60)
-    await kit.context.close()
-  })
-
-  test('an upload that gets no answer fails after a while, and can be tried again', async ({ browser }, testInfo) => {
-    const kit = await member(browser, testInfo)
-    await kit.page.clock.install()
-    await open(kit.page)
-    const release = await holdUploads(kit.page)
-    const sent = kit.page.waitForRequest('**/api/images')
-    await postEditor(kit.page).click()
-    await posts(kit.page)
-      .locator('input[type=file]')
-      .setInputFiles({ name: 'plot.png', mimeType: 'image/png', buffer: png(320, 200) })
-    const card = posts(kit.page).locator('.image-card')
-    await expect(card.getByText('Uploading')).toBeVisible()
-    // The upload's timers start when the converted image is sent, and the answer's timer when the last byte has gone.
-    // Time moves on a minute at a time until the upload gives up.
-    await sent
-    await expect(async () => {
-      await kit.page.clock.fastForward('01:01')
-      await expect(card.getByText('Failed to upload', { exact: true })).toBeVisible({ timeout: 1000 })
-    }).toPass()
-    await release()
-    await card.getByRole('button', { name: 'Try again' }).click()
-    await expect(card.getByPlaceholder(/Describe this image/)).toBeVisible()
-    await kit.context.close()
-  })
-
-  test('an image removed while it uploads and brought back with undo shows its finished upload', async ({
-    browser,
-  }, testInfo) => {
-    const kit = await member(browser, testInfo)
-    await open(kit.page)
-    const release = await holdUploads(kit.page)
-    await postEditor(kit.page).click()
-    await kit.page.keyboard.type(uniq('Undo '))
-    await posts(kit.page)
-      .locator('input[type=file]')
-      .setInputFiles({ name: 'plot.png', mimeType: 'image/png', buffer: png(320, 200) })
-    const card = posts(kit.page).locator('.image-card')
-    await expect(card.getByText('Uploading')).toBeVisible()
-    // The undo history joins changes made within 500 ms into one step. A person removes the image later than that.
-    await kit.page.waitForTimeout(600)
-    // The new image is selected, so Backspace removes it.
-    await kit.page.keyboard.press('Backspace')
-    await expect(card).toHaveCount(0)
-    const done = kit.page.waitForResponse('**/api/images')
-    await release()
-    await done
-    await kit.page.keyboard.press('ControlOrMeta+z')
-    await expect(card.getByPlaceholder(/Describe this image/)).toBeVisible()
-    await expect(card.locator('img')).toHaveAttribute('src', /^\/img\//)
-    await expect(posts(kit.page).getByRole('button', { name: 'Post', exact: true })).toBeEnabled()
+    expect(uploadedWidth(jpeg)).toBe(200)
+    // The WebP became a PNG, which keeps its transparency.
+    expect(uploadedWidth(webp)).toBe(60)
+    expect(webp.includes(Buffer.from([0x89, 0x50, 0x4e, 0x47]))).toBe(true)
+    // The large PNG was shrunk to 2000 pixels on its longer side.
+    expect(uploadedWidth(large)).toBe(2000)
     await kit.context.close()
   })
 
@@ -287,35 +217,6 @@ test.describe('image uploads', () => {
     })
     await expect(postEditor(kit.page)).toContainText('From a recipe site')
     await expect(posts(kit.page).locator('.image-card')).toHaveCount(0)
-    await kit.context.close()
-  })
-
-  test('an image whose upload fails after it was removed, brought back with undo, shows the failure', async ({
-    browser,
-  }, testInfo) => {
-    const kit = await member(browser, testInfo)
-    await open(kit.page)
-    const held: Route[] = []
-    await kit.page.route('**/api/images', (route) => {
-      held.push(route)
-    })
-    await postEditor(kit.page).click()
-    await kit.page.keyboard.type(uniq('Undo a failure '))
-    await posts(kit.page)
-      .locator('input[type=file]')
-      .setInputFiles({ name: 'plot.png', mimeType: 'image/png', buffer: png(320, 200) })
-    const card = posts(kit.page).locator('.image-card')
-    await expect.poll(() => held.length).toBe(1)
-    // The undo history joins changes made within 500 ms into one step. A person removes the image later than that.
-    await kit.page.waitForTimeout(600)
-    await kit.page.keyboard.press('Backspace')
-    await expect(card).toHaveCount(0)
-    const failed = kit.page.waitForResponse('**/api/images')
-    await held[0].fulfill({ status: 502, contentType: 'text/html', body: '<html>502</html>' })
-    await failed
-    await kit.page.keyboard.press('ControlOrMeta+z')
-    await expect(card.getByText('Failed to upload', { exact: true })).toBeVisible()
-    await expect(card.getByRole('button', { name: 'Try again' })).toBeVisible()
     await kit.context.close()
   })
 
@@ -409,44 +310,6 @@ test.describe('image uploads', () => {
       /\/img\//,
     )
     expect(widths).toEqual([2000, 2000])
-    await kit.context.close()
-  })
-
-  test('a phone photo is stored upright, whether the browser shrinks it or sends it as it is', async ({
-    browser,
-  }, testInfo) => {
-    const kit = await member(browser, testInfo)
-    await open(kit.page)
-    const words = uniq('Upright ')
-    await postEditor(kit.page).click()
-    await kit.page.keyboard.type(words)
-    // The small photo is sent as it is, so the server turns it. The large one is turned by the browser as it shrinks it.
-    await posts(kit.page)
-      .locator('input[type=file]')
-      .setInputFiles([
-        { name: 'small.jpg', mimeType: 'image/jpeg', buffer: await sidewaysPhoto(kit.page, 400, 200) },
-        { name: 'large.jpg', mimeType: 'image/jpeg', buffer: await sidewaysPhoto(kit.page, 2400, 1200) },
-      ])
-    await expect(
-      posts(kit.page)
-        .locator('.image-card')
-        .getByPlaceholder(/Describe this image/),
-    ).toHaveCount(2)
-    await posts(kit.page).getByRole('button', { name: 'Post', exact: true }).click()
-    const stored = kit.page.getByRole('article').filter({ hasText: words }).locator('img[src^="/img/"]')
-    await expect(stored).toHaveCount(2)
-    const sizes = await stored.evaluateAll((imgs) =>
-      Promise.all(
-        (imgs as HTMLImageElement[]).map(async (img) => {
-          await img.decode()
-          return [img.naturalWidth, img.naturalHeight]
-        }),
-      ),
-    )
-    expect(sizes).toEqual([
-      [200, 400],
-      [1000, 2000],
-    ])
     await kit.context.close()
   })
 

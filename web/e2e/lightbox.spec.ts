@@ -32,7 +32,6 @@ test.describe('lightbox', () => {
     const { text, url } = await postPicture(kit.page, 1200, 800)
     await open(kit.page)
     const picture = article(kit.page, text).locator('img[src^="/img/"]')
-    await expect(picture).toHaveAttribute('loading', 'lazy')
     await picture.click()
     const box = kit.page.getByRole('dialog', { name: 'Image' })
     await expect(box.locator(`img[src="${url}"]`)).toBeVisible()

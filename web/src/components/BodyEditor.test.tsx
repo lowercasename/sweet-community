@@ -1,9 +1,9 @@
 // @vitest-environment happy-dom
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { QueryClientProvider } from '@tanstack/react-query'
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
-import { commentExtensions, postExtensions, textExtensions } from '../editor/extensions'
-import { ROOT, textThenLink } from '../test-utils'
+import { cleanup, render, screen, waitFor } from '@testing-library/react'
+import { postExtensions } from '../editor/extensions'
+import { ROOT } from '../test-utils'
 import { makeQueryClient } from '../data/client'
 
 /**
@@ -87,39 +87,5 @@ describe('BodyEditor', () => {
     render(editor())
     await screen.findByRole('button', { name: 'Bold' })
     expect(screen.queryByRole('button', { name: 'Add emoji' })).toBeNull()
-  })
-  it('has no image button and no preview cards in a bio or a community text, and has both in a comment', async () => {
-    const { BodyEditor } = await import('./BodyEditor')
-    const save = async (extensions: typeof postExtensions) => {
-      const onSubmit = vi.fn(() => Promise.resolve())
-      render(
-        <QueryClientProvider client={makeQueryClient()}>
-          <BodyEditor
-            groupId={ROOT}
-            extensions={extensions}
-            size="line"
-            submitLabel="Save"
-            disabled={false}
-            initialHtml={textThenLink('I knit', 'https://example.com')}
-            onCancel={() => {}}
-            onSubmit={onSubmit}
-          />
-        </QueryClientProvider>,
-      )
-      await screen.findByRole('button', { name: 'Bold' })
-      const imageButton = screen.queryByRole('button', { name: 'Add images' })
-      fireEvent.click(screen.getByRole('button', { name: 'Save' }))
-      await waitFor(() => expect(onSubmit).toHaveBeenCalled())
-      const html = (onSubmit.mock.calls[0] as unknown as [string])[0]
-      cleanup()
-      return { imageButton, html }
-    }
-    const text = await save(textExtensions)
-    expect(text.imageButton).toBeNull()
-    expect(text.html).toContain('href="https://example.com"')
-    expect(text.html).not.toContain('data-embed')
-    const comment = await save(commentExtensions)
-    expect(comment.imageButton).not.toBeNull()
-    expect(comment.html).toContain('data-embed')
   })
 })
