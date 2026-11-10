@@ -1,5 +1,19 @@
 # Changelog
 
+## v1.6.1 (2026-11-10)
+
+- Correct the image records after the second review
+- Fix the client faults that the second image review found
+- Fix the server faults that the second image review found
+- Record the image decisions
+- Open images full screen, and load them lazily
+- Convert every image in the browser, and make uploads recover
+- Record the images each body uses, and check them when it is saved
+- Keep images and preview cards out of bios and community texts
+- Remove metadata blocks from animated GIFs
+- Keep the image sweep going, and release a deleted room's picture
+- Refuse images that would take too much memory to decode
+
 ## v1.6.0 (2026-11-10)
 
 - Show upload progress in grey
