@@ -62,7 +62,7 @@ func Ext(contentType string) string {
 // take more than decodeBudget, judged from the header before any pixel is decoded. It caps the dimensions, turns a
 // photo upright and strips metadata by re-encoding. A transparent image becomes a PNG. An opaque JPEG stays a JPEG.
 // Any other opaque image becomes whichever of JPEG and PNG is smaller. An animated GIF is the exception. It is
-// stored as uploaded, because re-encoding would lose the animation.
+// stored without its metadata blocks but otherwise as uploaded, because re-encoding would lose the animation.
 func Process(r io.Reader) (Processed, error) {
 	data, err := io.ReadAll(io.LimitReader(r, MaxUpload+1))
 	if err != nil {
@@ -86,7 +86,7 @@ func Process(r io.Reader) (Processed, error) {
 		return Processed{}, ErrTooLarge
 	}
 	if format == "gif" {
-		frames, area, err := gifFrames(data)
+		frames, area, clean, err := scanGIF(data)
 		if err != nil {
 			return Processed{}, ErrNotImage
 		}
@@ -95,10 +95,10 @@ func Process(r io.Reader) (Processed, error) {
 				return Processed{}, ErrTooLarge
 			}
 			// Only the first frame is decoded, to check that the file is a GIF. Its size is within the budget.
-			if _, err := gif.Decode(bytes.NewReader(data)); err != nil {
+			if _, err := gif.Decode(bytes.NewReader(clean)); err != nil {
 				return Processed{}, ErrNotImage
 			}
-			return Processed{Data: data, ContentType: "image/gif", Ext: "gif", Width: cfg.Width, Height: cfg.Height}, nil
+			return Processed{Data: clean, ContentType: "image/gif", Ext: "gif", Width: cfg.Width, Height: cfg.Height}, nil
 		}
 	}
 	src, _, err := image.Decode(bytes.NewReader(data))
@@ -298,20 +298,25 @@ func opaque(img image.Image) bool {
 	return true
 }
 
-// gifFrames reads a GIF's block structure and returns the number of frames and
-// the sum of their areas. It skips the compressed image data without
-// decompressing it, so a file whose frames would take gigabytes to decode
-// costs one pass over its bytes. A file that ends without the trailer byte is
-// accepted if it has a frame, because browsers show such files.
-func gifFrames(data []byte) (frames int, area int64, err error) {
+// scanGIF reads a GIF's block structure. It returns the number of frames, the sum of their areas, and a copy of the
+// file without its metadata blocks. It skips the compressed image data without decompressing it, so a file whose
+// frames would take gigabytes to decode costs one pass over its bytes. The copy keeps the frames, their timing and
+// the loop count. It drops comments, plain text and every other application block, such as XMP. A file that ends
+// without the trailer byte is accepted if it has a frame, because browsers show such files. The copy gets the
+// trailer.
+func scanGIF(data []byte) (frames int, area int64, clean []byte, err error) {
 	bad := errors.New("malformed GIF")
 	if len(data) < 13 || (string(data[:6]) != "GIF87a" && string(data[:6]) != "GIF89a") {
-		return 0, 0, bad
+		return 0, 0, nil, bad
 	}
 	i := 13
 	if data[10]&0x80 != 0 {
 		i += 3 << ((data[10] & 7) + 1) // the global colour table
 	}
+	if i > len(data) {
+		return 0, 0, nil, bad
+	}
+	clean = append(make([]byte, 0, len(data)), data[:i]...)
 	// skip moves past a run of data sub-blocks and the zero byte that ends it.
 	skip := func() bool {
 		for i < len(data) {
@@ -325,17 +330,28 @@ func gifFrames(data []byte) (frames int, area int64, err error) {
 		return false
 	}
 	for i < len(data) {
+		start := i
 		switch data[i] {
 		case 0x3b: // trailer
-			return frames, area, nil
+			return frames, area, append(clean, 0x3b), nil
 		case 0x21: // extension: introducer, label, sub-blocks
+			if i+2 > len(data) {
+				return 0, 0, nil, bad
+			}
+			label := data[i+1]
+			// An application block's first sub-block is 11 bytes: its identifier and version.
+			loop := label == 0xff && i+14 <= len(data) && data[i+2] == 11 &&
+				(string(data[i+3:i+14]) == "NETSCAPE2.0" || string(data[i+3:i+14]) == "ANIMEXTS1.0")
 			i += 2
 			if !skip() {
-				return 0, 0, bad
+				return 0, 0, nil, bad
+			}
+			if label == 0xf9 || loop { // graphic control, which holds a frame's timing, or the loop count
+				clean = append(clean, data[start:i]...)
 			}
 		case 0x2c: // image descriptor
 			if i+10 > len(data) {
-				return 0, 0, bad
+				return 0, 0, nil, bad
 			}
 			w := int(data[i+5]) | int(data[i+6])<<8
 			h := int(data[i+7]) | int(data[i+8])<<8
@@ -346,16 +362,17 @@ func gifFrames(data []byte) (frames int, area int64, err error) {
 			}
 			i++ // the LZW minimum code size
 			if !skip() {
-				return 0, 0, bad
+				return 0, 0, nil, bad
 			}
 			frames++
 			area += int64(w) * int64(h)
+			clean = append(clean, data[start:i]...)
 		default:
-			return 0, 0, bad
+			return 0, 0, nil, bad
 		}
 	}
 	if frames == 0 {
-		return 0, 0, bad
+		return 0, 0, nil, bad
 	}
-	return frames, area, nil
+	return frames, area, append(clean, 0x3b), nil
 }

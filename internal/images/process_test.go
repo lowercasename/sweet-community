@@ -117,11 +117,11 @@ func TestAnimatedGIFIsLimitedByItsFramesBeforeDecoding(t *testing.T) {
 	if _, err := Process(bytes.NewReader(bombGIF(30))); err != ErrTooLarge {
 		t.Fatalf("a GIF of thirty 2000 by 2000 frames: %v", err)
 	}
-	frames, area, err := gifFrames(gifOf(3))
+	frames, area, _, err := scanGIF(gifOf(3))
 	if err != nil || frames != 3 || area != 3*8*8 {
-		t.Fatalf("gifFrames of a three-frame 8 by 8 GIF: %d %d %v", frames, area, err)
+		t.Fatalf("scanGIF of a three-frame 8 by 8 GIF: %d %d %v", frames, area, err)
 	}
-	if _, _, err := gifFrames([]byte("GIF89a\x01")); err == nil {
+	if _, _, _, err := scanGIF([]byte("GIF89a\x01")); err == nil {
 		t.Fatal("a truncated GIF was accepted")
 	}
 }
@@ -296,4 +296,68 @@ func TestProcessTheMostExpensiveAcceptedImagesStayWithinMemory(t *testing.T) {
 			t.Errorf("%s: allocated %d MB, more than 80 MB", name, got>>20)
 		}
 	}
+}
+
+// withMetadata inserts a comment block and an XMP block before a GIF's first frame, as an editing program may.
+func withMetadata(data []byte) []byte {
+	i := 13
+	if data[10]&0x80 != 0 {
+		i += 3 << ((data[10] & 7) + 1)
+	}
+	comment := append([]byte{0x21, 0xfe, 17}, "camera serial 123"...)
+	comment = append(comment, 0)
+	xmp := append([]byte{0x21, 0xff, 11}, "XMP DataXMP"...)
+	xmp = append(xmp, 20)
+	xmp = append(xmp, "<x:xmpmeta>secret</x"...)
+	xmp = append(xmp, 0)
+	out := append([]byte{}, data[:i]...)
+	out = append(out, comment...)
+	out = append(out, xmp...)
+	return append(out, data[i:]...)
+}
+
+// An animated GIF is stored without re-encoding, so its metadata blocks are removed from it directly. The frames, their
+// timing and the loop count stay.
+func TestProcessStripsMetadataFromAnAnimatedGIF(t *testing.T) {
+	data := withMetadata(gifOf(3))
+	if !bytes.Contains(data, []byte("camera serial")) {
+		t.Fatal("the test file has no comment")
+	}
+	p, err := Process(bytes.NewReader(data))
+	if err != nil || p.ContentType != "image/gif" {
+		t.Fatalf("%s %v", p.ContentType, err)
+	}
+	for _, s := range []string{"camera serial", "xmpmeta", "XMP DataXMP"} {
+		if bytes.Contains(p.Data, []byte(s)) {
+			t.Errorf("the stored GIF still has %q", s)
+		}
+	}
+	g, err := gif.DecodeAll(bytes.NewReader(p.Data))
+	if err != nil || len(g.Image) != 3 || g.Delay[0] != 10 {
+		t.Fatalf("the stored GIF: %v, %d frames", err, len(g.Image))
+	}
+	if !bytes.Contains(p.Data, []byte("NETSCAPE2.0")) {
+		t.Error("the loop count was removed")
+	}
+}
+
+// Any input either is refused or gives a clean GIF with the same frames and no metadata blocks.
+func FuzzScanGIF(f *testing.F) {
+	f.Add(gifOf(3))
+	f.Add(withMetadata(gifOf(2)))
+	f.Add(bombGIF(2))
+	f.Add([]byte("GIF89a\x01"))
+	f.Fuzz(func(t *testing.T, data []byte) {
+		frames, area, clean, err := scanGIF(data)
+		if err != nil {
+			return
+		}
+		again, area2, clean2, err := scanGIF(clean)
+		if err != nil || again != frames || area2 != area {
+			t.Fatalf("the clean copy scans differently: %d %d %v, want %d %d", again, area2, err, frames, area)
+		}
+		if !bytes.Equal(clean, clean2) {
+			t.Fatal("cleaning a clean GIF changed it")
+		}
+	})
 }
