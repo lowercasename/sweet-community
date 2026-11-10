@@ -107,7 +107,7 @@ A post is long-form text with inline images. Comments are a flat list, oldest fi
 - The author edits a post or comment as a whole, and the post is marked as edited. There is no version history.
 - Deleting a post deletes its comments, because the author asked for the post to go.
 - Every post has its own address, which notifications link to.
-- Drafts are kept in the browser. Safari clears them after seven days without a visit unless the app is installed, and this is accepted.
+- Drafts kept in the browser are coming soon (Raphael, 2026-11-10). Until then a draft lasts while its page is open. Safari will clear saved drafts after seven days without a visit unless the app is installed, and this is accepted.
 - The @ list offers only the members of the current group (Raphael, 2026-11-08).
 - Links are added and edited in a small panel from the editor's Link button or Cmd+K, in place of the browser's prompt box (Raphael, 2026-11-10). Like the emoji picker, the panel never covers the text being written. An address without https:// gets it.
 - On a device with a mouse or trackpad, every composer has an emoji picker. Phones have none, because their keyboards have emoji (Raphael, 2026-11-10). The picker shows the device's own emoji, so it loads nothing from another site.
@@ -118,6 +118,7 @@ The editor is TipTap. **The body is the HTML that TipTap produces.** The server 
 
 - HTML was chosen over ProseMirror JSON after two debates. The schema causes lock-in, not the storage format. HTML renders in any browser and imports into any editor. JSON means nothing without the exact editor extensions. The question should be reopened only for collaborative editing.
 - One bluemonday policy checks every body. The policy is the schema. Nothing is trusted before the policy, and everything after it is trusted.
+- Bios, the rules and the welcome message use the same policy without images and preview cards (Raphael, 2026-11-10). They hold text, bold and italic, links, mentions and emoji. Images in them were never shown to other members.
 - The server derives mentions and search text from the sanitised body. The client never sends them, because derived data that the client controls can disagree with the body.
 - Saving an unchanged body returns the same bytes. Editor upgrades are deliberate, and a test checks that the bytes stay the same.
 
@@ -139,14 +140,20 @@ A message uses part of the same schema and passes the same policy. Chat history 
 - Storage has two drivers. A local directory is the default, so a first install needs no bucket. An S3-compatible bucket is used when configured.
 - An image's address is a path on the instance, so storage can move without changing posts.
 - The server accepts JPEG, PNG, WebP and GIF, detected from the content. HEIC is not decoded, because Go would need C libraries. The upload control asks for JPEG first, so iPhones convert HEIC photos.
-- Uploads are turned upright and stripped of metadata. Smaller sizes are JPEG or PNG, because Go cannot encode WebP.
-- The server processes one image at a time, with a resizer that keeps 4 bytes a pixel, and sets its memory limit from its container's (2026-11-10). A server may run with little memory, and resizing one 12-megapixel phone photo once needed about 260 MB, so the kernel killed the server and the upload failed.
-- The browser shrinks an image to the server's largest size before uploading it (Raphael, 2026-11-10). A phone then uploads a much smaller file, and the server seldom has to resize. The server still checks every upload, turns it upright, strips its metadata and resizes it if it is too large, because a client can send anything.
+- Only posts, comments and chat messages show images in their text (Raphael, 2026-11-10).
+- The browser converts every image before uploading it, whatever its size, except a GIF, which may be animated (Raphael, 2026-11-10). It draws the image upright, in standard colour, at no more than the server's largest size. A photo becomes a JPEG. Any other image becomes a PNG, which keeps transparency. Images are converted one at a time, so a phone does not decode every photo at once.
+- The server still checks every upload, turns it upright and strips its metadata, animated GIFs included, because a client can send anything. A transparent image is stored as PNG. A JPEG stays a JPEG. Any other opaque image is stored as whichever of PNG and JPEG is smaller, so a screenshot keeps sharp text (Raphael, 2026-11-10). Go cannot encode WebP.
+- The server refuses an image whose decoding would take more than 64 MB, judged from its header before any pixel is decoded (Raphael, 2026-11-10). It processes one image at a time and sets its memory limit from its container's. A server may run in 128 MB. Resizing one 12-megapixel phone photo once needed about 260 MB, and the kernel killed the server. A 454 KB progressive JPEG was measured at 642 MB. A JPEG is counted at its progressive cost, so the server takes JPEGs of up to about 4 million pixels. The browser sends at most 2000 by 2000.
 - An image shows in the editor as soon as it is chosen, and its card shows its upload (Raphael, 2026-11-10). If the upload fails, the card shows the failure and Try again in place of the alt text field, and a line under the editor counts the failed images. A post or message cannot be sent until every upload has finished.
-- An image is served only to its uploader or to someone who can see content that uses it. No image leaves the app, so there are no signed URLs.
+- An upload fails when nothing has been sent for 30 seconds, or no answer comes a minute after the last byte (Raphael, 2026-11-10). A lost connection would otherwise block the post.
+- An image is served only to its uploader or to someone who can see content that shows it. No image leaves the app, so there are no signed URLs.
+- The server records which images each post, comment and message shows when it is saved (Raphael, 2026-11-10). An image's id written as text gives no access. Before, any body that contained the id counted, so a member could make a private room's image visible to the whole community by posting its id.
+- A post, comment or message may show only images its writer uploaded or can already see (Raphael, 2026-11-10). Any other image, including one deleted while a draft was open, is refused with a message to remove it.
 - A profile picture or a room picture must be an image that the person setting it uploaded (Raphael, 2026-11-10). Every signed-in user can see a profile picture, so any other image would let a member show an image from a private room or a conversation to the whole community.
-- Images that nothing has used for a day are deleted.
+- Images that nothing has used for a day are deleted. A deleted room releases its picture. The cleanup never stops at a failure, and tries the image again on its next run (Raphael, 2026-11-10).
 - Adjacent images are shown as a gallery. The stored HTML stays a plain run of images.
+- Clicking an image in a post, comment or message opens it alone, full screen, with nothing else (Raphael, 2026-11-10). Escape, the close button, a click beside it or pulling down on a phone closes it.
+- Images load only when they come near the screen (Raphael, 2026-11-10). Each image is stored at one size.
 
 A storage quota per instance is planned.
 
@@ -154,7 +161,7 @@ A storage quota per instance is planned.
 
 A link on its own line becomes a preview card, as in WhatsApp and Signal (Raphael, 2026-11-10). The card shows the page's picture, title and description, taken from the page's OpenGraph tags, and the page's domain. The domain is shown instead of a name the page gives itself, so a card shows where its link really goes (Raphael, 2026-11-10). Clicking it opens the page in a new tab. The card's shape follows old Sweet's link preview, which Raphael chose: a picture on the left, then the title, a short description and the domain, at a fixed height. The picture area is 1.91 times as wide as it is tall, the shape of the pictures most pages give, so those are not cropped. Old Sweet's was square (Raphael, 2026-11-10).
 
-- Previews appear in posts, comments and chat. There is no button for them.
+- Previews appear in posts, comments and chat, not in bios, the rules or the welcome message. There is no button for them.
 - In a post or a comment, pressing Enter after a link on its own line turns it into a card. A link on the last line is turned into a card when the post is saved, without the author seeing it happen. The editor shows "Embedded link" above a card, with "Turn back into regular link", and a link turned back stays a link when the post is saved again.
 - In chat, a link on its own line becomes a card when the message is sent. A sent message cannot be edited, so the card stays.
 - A page that gives no title, or cannot be fetched, stays a plain link.
@@ -445,6 +452,8 @@ These decisions came from a security audit (2026-11-08).
 - **GPL-3.0, MIT or Apache-2.0.** None of them stops a closed hosted fork.
 - **Source-available licences.** They are not open source, and Debian and Fedora do not package them.
 - **A CLA.** Contributors read it as preparation for dual licensing.
+- **browser-image-compression for converting images** (Raphael, 2026-11-10). It resizes at the browser's low-quality setting. It re-compresses an image that came out larger than the original until it is smaller, and for a PNG it does so by removing colours. It was last updated in 2023. Sweet's own conversion asks the browser for high quality.
+- **Smaller stored sizes for avatars and room pictures** (Raphael, 2026-11-10). A community is small, so the full image is fetched once and cached.
 
 ### Deferred
 
