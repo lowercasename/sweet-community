@@ -69,8 +69,9 @@ ORDER BY role = 'moderator' DESC, joined_at ASC LIMIT 1;
 -- name: CountMembers :one
 SELECT COUNT(*) FROM memberships WHERE group_id = sqlc.arg(group_id) AND hidden_at IS NULL;
 
+-- Marks a group deleted. Its picture is released, so the image sweep can remove it.
 -- name: DeleteGroup :exec
-UPDATE groups SET deleted_at = sqlc.arg(deleted_at) WHERE id = sqlc.arg(id) AND deleted_at IS NULL;
+UPDATE groups SET deleted_at = sqlc.arg(deleted_at), picture_id = NULL WHERE id = sqlc.arg(id) AND deleted_at IS NULL;
 
 -- name: CreateMembership :exec
 INSERT INTO memberships (group_id, user_id, role, joined_at) VALUES (sqlc.arg(group_id), sqlc.arg(user_id), sqlc.arg(role), sqlc.arg(joined_at));

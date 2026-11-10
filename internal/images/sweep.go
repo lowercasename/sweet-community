@@ -3,6 +3,7 @@ package images
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"time"
 
 	"sweet/internal/store"
@@ -17,24 +18,28 @@ import (
 // removed while editing, and images from deleted posts. Sweep returns the
 // number of images removed. The database row is deleted only after the file.
 func Sweep(ctx context.Context, q *store.Queries, st Store, before int64) (int, error) {
+	var errs []error
 	if _, err := q.DeleteUnusedLinkPreviews(ctx, before); err != nil {
-		return 0, err
+		errs = append(errs, err)
 	}
 	rows, err := q.ListUnreferencedImages(ctx, before)
 	if err != nil {
-		return 0, err
+		return 0, errors.Join(append(errs, err)...)
 	}
+	// A failure on one image does not stop the others. The image is listed again on the next run.
 	n := 0
 	for _, row := range rows {
 		if err := st.Delete(ctx, row.ID+"."+Ext(row.ContentType)); err != nil {
-			return n, err
+			errs = append(errs, err)
+			continue
 		}
 		if err := q.DeleteImage(ctx, row.ID); err != nil {
-			return n, err
+			errs = append(errs, err)
+			continue
 		}
 		n++
 	}
-	return n, nil
+	return n, errors.Join(errs...)
 }
 
 // SweepEvery runs Sweep immediately and then once per interval until ctx is

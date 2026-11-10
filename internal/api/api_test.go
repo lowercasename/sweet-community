@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"image"
 	"image/color"
 	"image/png"
@@ -1076,5 +1077,92 @@ func TestUploadWithoutAFileIsABadRequest(t *testing.T) {
 	res.Body.Close()
 	if res.StatusCode != http.StatusBadRequest {
 		t.Fatalf("got %d, want 400", res.StatusCode)
+	}
+}
+
+// The sweep removes a picture once nothing uses it: a profile picture that was replaced or removed, the picture of a
+// removed user and the picture of a deleted room. Current pictures stay. A deleted room once kept its picture, and
+// the failed delete of that picture stopped every later sweep.
+func TestSweepRemovesPicturesThatNothingUses(t *testing.T) {
+	ts, owner, srv := newTestServerWith(t)
+	ctx := context.Background()
+	kit, _ := registerMember(t, ts, owner, "kit")
+	mo, moID := registerMember(t, ts, owner, "mo")
+	up := func(c *client) string {
+		t.Helper()
+		status, img := c.upload(testPNG(40, 40))
+		if status != 201 {
+			t.Fatalf("upload: %d %v", status, img)
+		}
+		return img["id"].(string)
+	}
+	replaced, current := up(owner), up(owner)
+	owner.mustStatus(200, "PUT", "/api/me/picture", map[string]any{"image_id": replaced})
+	owner.mustStatus(200, "PUT", "/api/me/picture", map[string]any{"image_id": current})
+	removed := up(kit)
+	kit.mustStatus(200, "PUT", "/api/me/picture", map[string]any{"image_id": removed})
+	kit.mustStatus(200, "PUT", "/api/me/picture", map[string]any{"image_id": nil})
+	ofRemovedUser := up(mo)
+	mo.mustStatus(200, "PUT", "/api/me/picture", map[string]any{"image_id": ofRemovedUser})
+	owner.mustStatus(204, "DELETE", "/api/users/"+moID, nil)
+	room := func(name, picture string) string {
+		gid := owner.mustStatus(201, "POST", "/api/groups", map[string]any{"kind": "group", "name": name, "mode": "both"})["id"].(string)
+		owner.mustStatus(200, "PUT", "/api/groups/"+gid+"/picture", map[string]any{"image_id": picture})
+		return gid
+	}
+	ofLiveRoom, ofDeletedRoom := up(owner), up(owner)
+	room("Fells", ofLiveRoom)
+	owner.mustStatus(200, "DELETE", "/api/groups/"+room("Moors", ofDeletedRoom), nil)
+
+	n, err := images.Sweep(ctx, srv.q(), srv.Images, db.Now()+1)
+	if err != nil || n != 4 {
+		t.Fatalf("sweep: removed %d, want 4: %v", n, err)
+	}
+	for id, want := range map[string]bool{replaced: false, removed: false, ofRemovedUser: false, ofDeletedRoom: false, current: true, ofLiveRoom: true} {
+		if _, err := srv.q().GetImage(ctx, id); (err == nil) != want {
+			t.Errorf("image %s: exists %v, want %v", id, err == nil, want)
+		}
+	}
+}
+
+// failingStore fails to delete one key.
+type failingStore struct {
+	images.Store
+	fail string
+}
+
+func (f failingStore) Delete(ctx context.Context, key string) error {
+	if key == f.fail {
+		return errors.New("storage is unavailable")
+	}
+	return f.Store.Delete(ctx, key)
+}
+
+// A failure on one image does not stop the sweep. The image that failed is tried again on the next run.
+func TestSweepKeepsGoingPastAFailure(t *testing.T) {
+	_, owner, srv := newTestServerWith(t)
+	ctx := context.Background()
+	var ids []string
+	for range 2 {
+		status, img := owner.upload(testPNG(40, 40))
+		if status != 201 {
+			t.Fatalf("upload: %d", status)
+		}
+		ids = append(ids, img["id"].(string))
+	}
+	first, err := srv.q().GetImage(ctx, ids[0])
+	if err != nil {
+		t.Fatal(err)
+	}
+	st := failingStore{Store: srv.Images, fail: ids[0] + "." + images.Ext(first.ContentType)}
+	n, err := images.Sweep(ctx, srv.q(), st, db.Now()+1)
+	if err == nil || n != 1 {
+		t.Fatalf("sweep with one failure: removed %d, error %v; want 1 removed and the error", n, err)
+	}
+	if _, err := srv.q().GetImage(ctx, ids[1]); err == nil {
+		t.Fatal("the second image was not removed")
+	}
+	if n, err := images.Sweep(ctx, srv.q(), srv.Images, db.Now()+1); err != nil || n != 1 {
+		t.Fatalf("next sweep: removed %d, want 1: %v", n, err)
 	}
 }

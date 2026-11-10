@@ -3,6 +3,7 @@ package db
 import (
 	"context"
 	"database/sql"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"testing"
@@ -154,5 +155,61 @@ func TestMigrateCountsASquashedDatabaseAsAtTheBaseline(t *testing.T) {
 	}
 	if err := Migrate(ctx, early, v1); err == nil {
 		t.Fatal("a database from before 028 was migrated")
+	}
+}
+
+// Migration 005 releases the pictures of rooms deleted before it. A deleted room kept its picture, and the image sweep
+// failed on that picture and stopped.
+func TestMigrationReleasesThePicturesOfDeletedRooms(t *testing.T) {
+	ctx := context.Background()
+	d, err := Open(filepath.Join(t.TempDir(), "sweet.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer d.Close()
+	all := os.DirFS("../../migrations")
+	upTo := func(last string) fstest.MapFS {
+		files := fstest.MapFS{}
+		names, err := fs.Glob(all, "*.sql")
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, name := range names {
+			if name <= last {
+				data, _ := fs.ReadFile(all, name)
+				files[name] = &fstest.MapFile{Data: data}
+			}
+		}
+		return files
+	}
+	if err := Migrate(ctx, d, upTo("004_~")); err != nil {
+		t.Fatal(err)
+	}
+	for _, q := range []string{
+		`INSERT INTO users (id, username, created_at) VALUES ('u', 'kit', 1)`,
+		`INSERT INTO images (id, uploader_id, content_type, width, height, bytes, created_at) VALUES ('a', 'u', 'image/png', 1, 1, 1, 1), ('b', 'u', 'image/png', 1, 1, 1, 1)`,
+		`INSERT INTO groups (id, kind, name, created_at, picture_id, deleted_at) VALUES ('deleted', 'group', 'Moors', 1, 'a', 2), ('live', 'group', 'Fells', 1, 'b', NULL)`,
+	} {
+		if _, err := d.ExecContext(ctx, q); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := Migrate(ctx, d, upTo("005_~")); err != nil {
+		t.Fatal(err)
+	}
+	pictures := map[string]sql.NullString{}
+	rows, err := d.QueryContext(ctx, `SELECT id, picture_id FROM groups WHERE id IN ('deleted', 'live')`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for rows.Next() {
+		var id string
+		var pic sql.NullString
+		rows.Scan(&id, &pic)
+		pictures[id] = pic
+	}
+	rows.Close()
+	if pictures["deleted"].Valid || pictures["live"].String != "b" {
+		t.Fatalf("pictures after the migration: %v, want the deleted room's released and the live room's kept", pictures)
 	}
 }

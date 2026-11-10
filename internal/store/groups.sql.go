@@ -69,7 +69,7 @@ func (q *Queries) CreateMembership(ctx context.Context, arg CreateMembershipPara
 }
 
 const deleteGroup = `-- name: DeleteGroup :exec
-UPDATE groups SET deleted_at = ?1 WHERE id = ?2 AND deleted_at IS NULL
+UPDATE groups SET deleted_at = ?1, picture_id = NULL WHERE id = ?2 AND deleted_at IS NULL
 `
 
 type DeleteGroupParams struct {
@@ -77,6 +77,7 @@ type DeleteGroupParams struct {
 	ID        string
 }
 
+// Marks a group deleted. Its picture is released, so the image sweep can remove it.
 func (q *Queries) DeleteGroup(ctx context.Context, arg DeleteGroupParams) error {
 	_, err := q.db.ExecContext(ctx, deleteGroup, arg.DeletedAt, arg.ID)
 	return err
