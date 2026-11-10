@@ -11,10 +11,10 @@ import (
 
 // Sweep deletes images uploaded before `before` that nothing references. An image is referenced when it is a
 // profile picture, a live group's picture or a link preview's picture, or when a live post, comment or message, or
-// an open report's copy, uses it. Link previews that nothing links to any more are deleted first, so their pictures
-// go in the same run. An image is stored as soon as it is uploaded, so the unreferenced images are those from drafts
-// that were never posted, images removed while editing, and images from deleted content. A failure on one image
-// does not stop the others. Sweep returns the number of images removed and every error.
+// an open report's copy, uses it. Link previews that no live body shows as a card are deleted first, so their
+// pictures go in the same run. An image is stored as soon as it is uploaded, so the unreferenced images are those
+// from drafts that were never posted, images removed while editing, and images from deleted content. A failure on
+// one image does not stop the others. Sweep returns the number of images removed and every error.
 func Sweep(ctx context.Context, d *sql.DB, st Store, before int64) (int, error) {
 	q := store.New(d)
 	var errs []error
@@ -27,7 +27,7 @@ func Sweep(ctx context.Context, d *sql.DB, st Store, before int64) (int, error) 
 	}
 	n := 0
 	for _, row := range rows {
-		removed, err := sweepOne(ctx, d, st, row)
+		removed, err := sweepOne(ctx, d, row)
 		if err != nil {
 			errs = append(errs, err)
 		}
@@ -35,26 +35,52 @@ func Sweep(ctx context.Context, d *sql.DB, st Store, before int64) (int, error) 
 			n++
 		}
 	}
-	return n, errors.Join(errs...)
+	return n, errors.Join(append(errs, deleteFiles(ctx, q, st)...)...)
 }
 
-// sweepOne deletes one image's row and its file in one write transaction. The row is deleted only if nothing has
-// started to use the image since the list was made. If the file cannot be deleted, the row is kept, and the next
-// run tries again.
-func sweepOne(ctx context.Context, d *sql.DB, st Store, row store.ListUnreferencedImagesRow) (bool, error) {
+// sweepOne deletes one image's row and lists its file for deletion, in one short write transaction. The row is
+// deleted only if nothing has started to use the image since the list was made.
+func sweepOne(ctx context.Context, d *sql.DB, row store.ListUnreferencedImagesRow) (bool, error) {
 	tx, err := d.BeginTx(ctx, nil)
 	if err != nil {
 		return false, err
 	}
 	defer tx.Rollback()
-	deleted, err := store.New(tx).DeleteUnreferencedImage(ctx, row.ID)
+	qtx := store.New(tx)
+	deleted, err := qtx.DeleteUnreferencedImage(ctx, row.ID)
 	if err != nil || deleted == 0 {
 		return false, err
 	}
-	if err := st.Delete(ctx, row.ID+"."+Ext(row.ContentType)); err != nil {
+	if err := qtx.AddFileToDelete(ctx, row.ID+"."+Ext(row.ContentType)); err != nil {
 		return false, err
 	}
 	return true, tx.Commit()
+}
+
+// fileDeleteTime is the longest one file's deletion may take. A bucket that does not answer is tried again on the
+// next run.
+const fileDeleteTime = 30 * time.Second
+
+// deleteFiles deletes the listed files from storage, outside any transaction. A file that cannot be deleted stays
+// listed.
+func deleteFiles(ctx context.Context, q *store.Queries, st Store) []error {
+	keys, err := q.ListFilesToDelete(ctx)
+	if err != nil {
+		return []error{err}
+	}
+	var errs []error
+	for _, key := range keys {
+		dctx, cancel := context.WithTimeout(ctx, fileDeleteTime)
+		err := st.Delete(dctx, key)
+		cancel()
+		if err == nil {
+			err = q.RemoveFileToDelete(ctx, key)
+		}
+		if err != nil {
+			errs = append(errs, err)
+		}
+	}
+	return errs
 }
 
 // SweepEvery runs Sweep immediately and then once per interval until ctx is

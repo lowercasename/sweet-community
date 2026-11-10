@@ -62,3 +62,40 @@ func Images(sanitised string) []string {
 	walk(root)
 	return out
 }
+
+// EmbedLinks returns the addresses of the links that a sanitised body shows as preview cards, without repeats. A card
+// is a paragraph marked data-embed that holds one link.
+func EmbedLinks(sanitised string) []string {
+	if !strings.Contains(sanitised, "data-embed") {
+		return nil
+	}
+	root, err := html.Parse(strings.NewReader(sanitised))
+	if err != nil {
+		return nil
+	}
+	var out []string
+	seen := map[string]bool{}
+	var walk func(*html.Node, bool)
+	walk = func(n *html.Node, inCard bool) {
+		if n.Type == html.ElementNode && n.Data == "p" {
+			for _, a := range n.Attr {
+				if a.Key == "data-embed" {
+					inCard = true
+				}
+			}
+		}
+		if inCard && n.Type == html.ElementNode && n.Data == "a" {
+			for _, a := range n.Attr {
+				if a.Key == "href" && a.Val != "" && !seen[a.Val] {
+					seen[a.Val] = true
+					out = append(out, a.Val)
+				}
+			}
+		}
+		for c := n.FirstChild; c != nil; c = c.NextSibling {
+			walk(c, inCard)
+		}
+	}
+	walk(root, false)
+	return out
+}

@@ -1138,31 +1138,38 @@ func (f failingStore) Delete(ctx context.Context, key string) error {
 	return f.Store.Delete(ctx, key)
 }
 
-// A failure on one image does not stop the sweep. The image that failed is tried again on the next run.
+// A failure on one image does not stop the sweep. The images' rows go, and a file that cannot be deleted stays listed
+// and is tried again on the next run.
 func TestSweepKeepsGoingPastAFailure(t *testing.T) {
 	_, owner, srv := newTestServerWith(t)
 	ctx := context.Background()
-	var ids []string
+	var keys []string
 	for range 2 {
 		status, img := owner.upload(testPNG(40, 40))
 		if status != 201 {
 			t.Fatalf("upload: %d", status)
 		}
-		ids = append(ids, img["id"].(string))
+		row, err := srv.q().GetImage(ctx, img["id"].(string))
+		if err != nil {
+			t.Fatal(err)
+		}
+		keys = append(keys, row.ID+"."+images.Ext(row.ContentType))
 	}
-	first, err := srv.q().GetImage(ctx, ids[0])
-	if err != nil {
-		t.Fatal(err)
+	stored := func(key string) bool {
+		r, err := srv.Images.Get(ctx, key)
+		if err == nil {
+			r.Close()
+		}
+		return err == nil
 	}
-	st := failingStore{Store: srv.Images, fail: ids[0] + "." + images.Ext(first.ContentType)}
-	n, err := images.Sweep(ctx, srv.DB, st, db.Now()+1)
-	if err == nil || n != 1 {
-		t.Fatalf("sweep with one failure: removed %d, error %v; want 1 removed and the error", n, err)
+	n, err := images.Sweep(ctx, srv.DB, failingStore{Store: srv.Images, fail: keys[0]}, db.Now()+1)
+	if err == nil || n != 2 {
+		t.Fatalf("sweep with one failure: removed %d, error %v; want 2 removed and the error", n, err)
 	}
-	if _, err := srv.q().GetImage(ctx, ids[1]); err == nil {
-		t.Fatal("the second image was not removed")
+	if !stored(keys[0]) || stored(keys[1]) {
+		t.Fatalf("after the first sweep: first file stored %v, second %v; want true, false", stored(keys[0]), stored(keys[1]))
 	}
-	if n, err := images.Sweep(ctx, srv.DB, srv.Images, db.Now()+1); err != nil || n != 1 {
-		t.Fatalf("next sweep: removed %d, want 1: %v", n, err)
+	if _, err := images.Sweep(ctx, srv.DB, srv.Images, db.Now()+1); err != nil || stored(keys[0]) {
+		t.Fatalf("next sweep: %v, the first file is still stored: %v", err, stored(keys[0]))
 	}
 }

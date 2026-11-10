@@ -10,20 +10,43 @@ import (
 	"database/sql"
 )
 
+const addLinkUse = `-- name: AddLinkUse :exec
+INSERT OR IGNORE INTO link_uses (url, kind, id) VALUES (?1, ?2, ?3)
+`
+
+type AddLinkUseParams struct {
+	Url  string
+	Kind string
+	ID   string
+}
+
+func (q *Queries) AddLinkUse(ctx context.Context, arg AddLinkUseParams) error {
+	_, err := q.db.ExecContext(ctx, addLinkUse, arg.Url, arg.Kind, arg.ID)
+	return err
+}
+
+const deleteLinkUses = `-- name: DeleteLinkUses :exec
+DELETE FROM link_uses WHERE kind = ?1 AND id = ?2
+`
+
+type DeleteLinkUsesParams struct {
+	Kind string
+	ID   string
+}
+
+func (q *Queries) DeleteLinkUses(ctx context.Context, arg DeleteLinkUsesParams) error {
+	_, err := q.db.ExecContext(ctx, deleteLinkUses, arg.Kind, arg.ID)
+	return err
+}
+
 const deleteUnusedLinkPreviews = `-- name: DeleteUnusedLinkPreviews :execrows
 DELETE FROM link_previews
 WHERE fetched_at < ?1
-  AND NOT EXISTS (SELECT 1 FROM posts p WHERE p.deleted_at IS NULL
-                  AND (instr(p.body_html, link_previews.url) > 0 OR instr(p.body_html, replace(link_previews.url, '&', '&amp;')) > 0))
-  AND NOT EXISTS (SELECT 1 FROM comments c WHERE c.deleted_at IS NULL
-                  AND (instr(c.body_html, link_previews.url) > 0 OR instr(c.body_html, replace(link_previews.url, '&', '&amp;')) > 0))
-  AND NOT EXISTS (SELECT 1 FROM messages x WHERE x.deleted_at IS NULL
-                  AND (instr(x.body_html, link_previews.url) > 0 OR instr(x.body_html, replace(link_previews.url, '&', '&amp;')) > 0))
+  AND NOT EXISTS (SELECT 1 FROM live_link_uses u WHERE u.url = link_previews.url)
 `
 
-// Deletes the previews fetched before `before` that no live post, comment or message links to. A body stores & in an
-// address as &amp;, so the address is searched for in that form too. The previews' pictures are then unreferenced,
-// and the image sweep deletes them.
+// Deletes the previews fetched before `before` that no live post, comment or message shows as a card. The previews'
+// pictures are then unreferenced, and the image sweep deletes them.
 func (q *Queries) DeleteUnusedLinkPreviews(ctx context.Context, before int64) (int64, error) {
 	result, err := q.db.ExecContext(ctx, deleteUnusedLinkPreviews, before)
 	if err != nil {

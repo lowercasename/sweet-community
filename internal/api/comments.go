@@ -102,7 +102,7 @@ func (s *Server) createComment(w http.ResponseWriter, r *http.Request) {
 		}); err != nil {
 			return nil, nil, http.StatusInternalServerError, err
 		}
-		if status, err := recordImages(r.Context(), qtx, "comment", id.String(), author.ID, clean); err != nil {
+		if status, err := recordUses(r.Context(), qtx, "comment", id.String(), author.ID, clean); err != nil {
 			return nil, nil, status, err
 		}
 		row, err := qtx.GetComment(r.Context(), id.String())
@@ -172,7 +172,7 @@ func (s *Server) editComment(w http.ResponseWriter, r *http.Request) {
 		}); err != nil {
 			return nil, http.StatusInternalServerError, err
 		}
-		if status, err := recordImages(r.Context(), qtx, "comment", id, writer.ID, clean); err != nil {
+		if status, err := recordUses(r.Context(), qtx, "comment", id, writer.ID, clean); err != nil {
 			return nil, status, err
 		}
 		row, err := qtx.GetComment(r.Context(), id)

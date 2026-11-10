@@ -1,7 +1,6 @@
 package api
 
 import (
-	"bytes"
 	"context"
 	"database/sql"
 	"errors"
@@ -70,14 +69,16 @@ func (s *Server) fetchPreview(ctx context.Context, raw, uploader string) (store.
 	save := store.SaveLinkPreviewParams{Url: raw, FetchedAt: db.Now()}
 	if p, err := preview.Fetch(ctx, c, raw); err == nil {
 		save.Found, save.Title, save.Description = 1, p.Title, p.Description
-		if p.ImageURL != "" && s.Images != nil {
+		// A picture counts against the same memory budget as an upload, for the largest picture that is fetched.
+		if p.ImageURL != "" && s.Images != nil && uploads.Acquire(ctx, preview.MaxImageBytes) == nil {
 			if data, err := preview.FetchImage(ctx, c, p.ImageURL); err == nil {
-				if processed, err := images.Process(bytes.NewReader(data)); err == nil {
+				if processed, err := images.Process(data); err == nil {
 					if img, err := s.storeImage(ctx, processed, uploader); err == nil {
 						save.ImageID = sql.NullString{String: img.ID, Valid: true}
 					}
 				}
 			}
+			uploads.Release(preview.MaxImageBytes)
 		}
 	}
 	if err := s.q().SaveLinkPreview(ctx, save); err != nil {

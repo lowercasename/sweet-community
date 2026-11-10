@@ -10,8 +10,10 @@ import (
 	"math/rand"
 	"os"
 	"runtime"
-	"strings"
+	"runtime/metrics"
+	"sync/atomic"
 	"testing"
+	"time"
 )
 
 func gifOf(frames int) []byte {
@@ -59,38 +61,38 @@ func pngOf(w, h int, c color.Color) []byte {
 func TestProcess(t *testing.T) {
 	// An opaque image from a lossless file is stored in whichever of PNG and JPEG is smaller. A flat image, such as a
 	// screenshot, stays a PNG. A photo becomes a JPEG. A transparent image stays a PNG.
-	p, err := Process(bytes.NewReader(pngOf(10, 10, color.NRGBA{200, 30, 30, 255})))
+	p, err := Process(pngOf(10, 10, color.NRGBA{200, 30, 30, 255}))
 	if err != nil || p.ContentType != "image/png" || p.Width != 10 {
 		t.Fatalf("flat opaque: %s %v", p.ContentType, err)
 	}
-	p, err = Process(bytes.NewReader(noisyPNG(200, 150)))
+	p, err = Process(noisyPNG(200, 150))
 	if err != nil || p.ContentType != "image/jpeg" || p.Width != 200 {
 		t.Fatalf("photo-like opaque: %s %v", p.ContentType, err)
 	}
-	p, err = Process(bytes.NewReader(pngOf(10, 10, color.NRGBA{200, 30, 30, 120})))
+	p, err = Process(pngOf(10, 10, color.NRGBA{200, 30, 30, 120}))
 	if err != nil || p.ContentType != "image/png" {
 		t.Fatalf("transparent: %+v %v", p, err)
 	}
 	// The longer side is capped at MaxSide and the aspect ratio is kept.
-	p, err = Process(bytes.NewReader(pngOf(3000, 150, color.NRGBA{0, 0, 0, 255})))
+	p, err = Process(pngOf(3000, 150, color.NRGBA{0, 0, 0, 255}))
 	if err != nil || p.Width != MaxSide || p.Height != 100 {
 		t.Fatalf("resize: %+v %v", p, err)
 	}
 	// An animated GIF is stored unchanged. A static GIF is re-encoded.
 	anim := gifOf(3)
-	p, err = Process(bytes.NewReader(anim))
+	p, err = Process(anim)
 	if err != nil || p.ContentType != "image/gif" || !bytes.Equal(p.Data, anim) || p.Width != 8 {
 		t.Fatalf("animated gif: %+v %v", p.ContentType, err)
 	}
-	p, err = Process(bytes.NewReader(gifOf(1)))
+	p, err = Process(gifOf(1))
 	if err != nil || p.ContentType == "image/gif" {
 		t.Fatalf("static gif should be re-encoded: %+v %v", p.ContentType, err)
 	}
 	// Input that is not an image is rejected regardless of what it claims to be.
-	if _, err := Process(strings.NewReader("<svg xmlns='http://www.w3.org/2000/svg'></svg>")); err != ErrNotImage {
+	if _, err := Process([]byte("<svg xmlns='http://www.w3.org/2000/svg'></svg>")); err != ErrNotImage {
 		t.Fatalf("svg: %v", err)
 	}
-	if _, err := Process(strings.NewReader("hello")); err != ErrNotImage {
+	if _, err := Process([]byte("hello")); err != ErrNotImage {
 		t.Fatalf("text: %v", err)
 	}
 }
@@ -114,14 +116,14 @@ func bombGIF(frames int) []byte {
 // Before 2026-11-08 every frame was decoded, and one small file could take
 // gigabytes of memory.
 func TestAnimatedGIFIsLimitedByItsFramesBeforeDecoding(t *testing.T) {
-	if _, err := Process(bytes.NewReader(bombGIF(30))); err != ErrTooLarge {
+	if _, err := Process(bombGIF(30)); err != ErrTooLarge {
 		t.Fatalf("a GIF of thirty 2000 by 2000 frames: %v", err)
 	}
-	frames, area, _, err := scanGIF(gifOf(3))
+	frames, area, _, err := scanGIF(gifOf(3), true)
 	if err != nil || frames != 3 || area != 3*8*8 {
 		t.Fatalf("scanGIF of a three-frame 8 by 8 GIF: %d %d %v", frames, area, err)
 	}
-	if _, _, _, err := scanGIF([]byte("GIF89a\x01")); err == nil {
+	if _, _, _, err := scanGIF([]byte("GIF89a\x01"), true); err == nil {
 		t.Fatal("a truncated GIF was accepted")
 	}
 }
@@ -142,7 +144,7 @@ func TestProcessALargePhotoFitsInASmallContainer(t *testing.T) {
 	data := withOrientation(buf.Bytes(), 6)
 	var p Processed
 	var err error
-	got := allocated(func() { p, err = Process(bytes.NewReader(data)) })
+	got := allocated(func() { p, err = Process(data) })
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -154,15 +156,55 @@ func TestProcessALargePhotoFitsInASmallContainer(t *testing.T) {
 	}
 }
 
-// A 12-megapixel phone photo sent straight to the server is refused, because a JPEG of that size could be
-// progressive and need about 200 MB. The app shrinks every image to 2000 pixels before uploading it.
-func TestProcessRefusesAFullSizePhonePhoto(t *testing.T) {
+// A full-size phone photo sent straight to the server is processed, because a baseline JPEG costs little to decode.
+// The same photo saved as a progressive JPEG is refused, because its decoder keeps 4 bytes for each colour sample:
+// about 110 MB. The app converts every image to 2000 pixels before uploading it.
+func TestProcessTakesAFullSizePhotoButNotAProgressiveOne(t *testing.T) {
 	img := image.NewYCbCr(image.Rect(0, 0, 4032, 3024), image.YCbCrSubsampleRatio420)
 	var buf bytes.Buffer
 	jpeg.Encode(&buf, img, &jpeg.Options{Quality: 50})
-	if _, err := Process(bytes.NewReader(buf.Bytes())); err != ErrTooLarge {
-		t.Fatalf("got %v, want ErrTooLarge", err)
+	if p, err := Process(withOrientation(buf.Bytes(), 6)); err != nil || p.Height != MaxSide {
+		t.Fatalf("a baseline 12-megapixel photo: %v %dx%d", err, p.Width, p.Height)
 	}
+	if _, err := Process(testdata(t, "progressive-420-4032x3024.jpg")); err != ErrTooLarge {
+		t.Fatalf("a progressive 12-megapixel photo: got %v, want ErrTooLarge", err)
+	}
+}
+
+// jpegFrame reads the frame header of the JPEGs that Go and cjpeg write.
+func TestJPEGFrame(t *testing.T) {
+	var buf bytes.Buffer
+	jpeg.Encode(&buf, image.NewYCbCr(image.Rect(0, 0, 16, 16), image.YCbCrSubsampleRatio420), nil)
+	for name, want := range map[string]struct {
+		data        []byte
+		progressive bool
+		samples     float64
+		components  int
+	}{
+		"Go's 4:2:0":            {buf.Bytes(), false, 1.5, 3},
+		"cjpeg progressive 444": {testdata(t, "progressive-444-2000.jpg"), true, 3, 3},
+		"progressive CMYK":      {testdata(t, "progressive-cmyk-2000.jpg"), true, 4, 4},
+		"cjpeg progressive 420": {testdata(t, "progressive-420-4032x3024.jpg"), true, 1.5, 3},
+	} {
+		progressive, samples, components, ok := jpegFrame(want.data)
+		if !ok || progressive != want.progressive || samples != want.samples || components != want.components {
+			t.Errorf("%s: %v %v %v %v", name, progressive, samples, components, ok)
+		}
+	}
+}
+
+// Any input either gives no frame or a frame with sensible values, and never panics.
+func FuzzJPEGFrame(f *testing.F) {
+	var buf bytes.Buffer
+	jpeg.Encode(&buf, image.NewYCbCr(image.Rect(0, 0, 16, 16), image.YCbCrSubsampleRatio420), nil)
+	f.Add(buf.Bytes())
+	f.Add([]byte{0xff, 0xd8, 0xff, 0xc2, 0x00, 0x08, 8, 0, 1, 0, 1, 1})
+	f.Fuzz(func(t *testing.T, data []byte) {
+		_, samples, components, ok := jpegFrame(data)
+		if ok && (components < 1 || samples <= 0 || samples > float64(components)) {
+			t.Fatalf("frame with %v samples and %d components", samples, components)
+		}
+	})
 }
 
 // withOrientation adds an EXIF block with this orientation tag to a JPEG, as a phone camera does. The camera stores
@@ -200,7 +242,7 @@ func halves(w, h int) []byte {
 
 func TestProcessTurnsAPhonePhotoUpright(t *testing.T) {
 	// Orientation 6: the stored pixels must be turned 90 degrees clockwise. The left half ends up at the top.
-	p, err := Process(bytes.NewReader(withOrientation(halves(40, 20), 6)))
+	p, err := Process(withOrientation(halves(40, 20), 6))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -240,6 +282,41 @@ func testdata(t *testing.T, name string) []byte {
 	return data
 }
 
+// heapPeak returns the most heap that objects held while fn ran, above what they held before. It is sampled every
+// 100 µs, and counts garbage that has not been collected yet, so it is at least the memory that fn needed.
+func heapPeak(fn func()) uint64 {
+	runtime.GC()
+	sample := func() uint64 {
+		s := []metrics.Sample{{Name: "/memory/classes/heap/objects:bytes"}}
+		metrics.Read(s)
+		return s[0].Value.Uint64()
+	}
+	base := sample()
+	var peak atomic.Uint64
+	stop, done := make(chan struct{}), make(chan struct{})
+	go func() {
+		defer close(done)
+		for {
+			select {
+			case <-stop:
+				return
+			default:
+			}
+			if v := sample(); v > peak.Load() {
+				peak.Store(v)
+			}
+			time.Sleep(100 * time.Microsecond)
+		}
+	}()
+	fn()
+	close(stop)
+	<-done
+	if p := peak.Load(); p > base {
+		return p - base
+	}
+	return 0
+}
+
 // allocated returns the bytes that fn allocates.
 func allocated(fn func()) uint64 {
 	runtime.GC()
@@ -268,12 +345,12 @@ func TestProcessRefusesBeforeDecodingAnImageThatWouldNeedTooMuchMemory(t *testin
 		"a 2100 by 2000 16-bit PNG":            png16(2100, 2000),
 	} {
 		var err error
-		got := allocated(func() { _, err = Process(bytes.NewReader(data)) })
+		got := allocated(func() { _, err = Process(data) })
 		if err != ErrTooLarge {
 			t.Errorf("%s: got %v, want ErrTooLarge", name, err)
 		}
-		if extra := got - uint64(len(data)); extra > 1<<20 {
-			t.Errorf("%s: allocated %d KB besides the file, so it was decoded", name, extra>>10)
+		if got > 1<<20 {
+			t.Errorf("%s: allocated %d KB, so it was decoded", name, got>>10)
 		}
 	}
 }
@@ -288,7 +365,7 @@ func TestProcessTheMostExpensiveAcceptedImagesStayWithinMemory(t *testing.T) {
 	} {
 		var p Processed
 		var err error
-		got := allocated(func() { p, err = Process(bytes.NewReader(data)) })
+		got := allocated(func() { p, err = Process(data) })
 		if err != nil || p.Width != 2000 {
 			t.Errorf("%s: %v %dx%d", name, err, p.Width, p.Height)
 		}
@@ -323,7 +400,7 @@ func TestProcessStripsMetadataFromAnAnimatedGIF(t *testing.T) {
 	if !bytes.Contains(data, []byte("camera serial")) {
 		t.Fatal("the test file has no comment")
 	}
-	p, err := Process(bytes.NewReader(data))
+	p, err := Process(data)
 	if err != nil || p.ContentType != "image/gif" {
 		t.Fatalf("%s %v", p.ContentType, err)
 	}
@@ -348,11 +425,11 @@ func FuzzScanGIF(f *testing.F) {
 	f.Add(bombGIF(2))
 	f.Add([]byte("GIF89a\x01"))
 	f.Fuzz(func(t *testing.T, data []byte) {
-		frames, area, clean, err := scanGIF(data)
+		frames, area, clean, err := scanGIF(data, true)
 		if err != nil {
 			return
 		}
-		again, area2, clean2, err := scanGIF(clean)
+		again, area2, clean2, err := scanGIF(clean, true)
 		if err != nil || again != frames || area2 != area {
 			t.Fatalf("the clean copy scans differently: %d %d %v, want %d %d", again, area2, err, frames, area)
 		}
@@ -360,4 +437,35 @@ func FuzzScanGIF(f *testing.F) {
 			t.Fatal("cleaning a clean GIF changed it")
 		}
 	})
+}
+
+// An image larger than MaxSide is resized, which takes memory besides the decoded image: an intermediate image as
+// wide as the result and as tall as the original, then the result. The estimate counts both. A 3600 by 3600 PNG was
+// once estimated at 61 MB and took 92 MB.
+func TestTheEstimateCountsTheResize(t *testing.T) {
+	rgb := func(n int) []byte {
+		img := image.NewRGBA(image.Rect(0, 0, n, n))
+		for i := range img.Pix {
+			img.Pix[i] = byte(i)
+			if i%4 == 3 {
+				img.Pix[i] = 255
+			}
+		}
+		var buf bytes.Buffer
+		(&png.Encoder{CompressionLevel: png.BestSpeed}).Encode(&buf, img)
+		return buf.Bytes()
+	}
+	if _, err := Process(rgb(3600)); err != ErrTooLarge {
+		t.Fatalf("a 3600 by 3600 PNG: got %v, want ErrTooLarge", err)
+	}
+	var p Processed
+	var err error
+	data := rgb(2450)
+	peak := heapPeak(func() { p, err = Process(data) })
+	if err != nil || p.Width != MaxSide {
+		t.Fatalf("a 2450 by 2450 PNG: %v %d", err, p.Width)
+	}
+	if peak > decodeBudget {
+		t.Fatalf("resizing a 2450 by 2450 PNG held %d MB, more than the budget", peak>>20)
+	}
 }

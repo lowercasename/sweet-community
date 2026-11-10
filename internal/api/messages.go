@@ -108,7 +108,7 @@ func (s *Server) createMessage(w http.ResponseWriter, r *http.Request) {
 		if err := qtx.CreateMessage(r.Context(), store.CreateMessageParams{ID: id.String(), GroupID: g.ID, AuthorID: author.ID, BodyHtml: clean, BodyText: sanitize.Text(clean), CreatedAt: now, ReplyTo: reply}); err != nil {
 			return nil, nil, http.StatusInternalServerError, err
 		}
-		if status, err := recordImages(r.Context(), qtx, "message", id.String(), author.ID, clean); err != nil {
+		if status, err := recordUses(r.Context(), qtx, "message", id.String(), author.ID, clean); err != nil {
 			return nil, nil, status, err
 		}
 		row, err := qtx.GetMessage(r.Context(), id.String())

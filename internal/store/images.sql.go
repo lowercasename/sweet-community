@@ -10,6 +10,15 @@ import (
 	"database/sql"
 )
 
+const addFileToDelete = `-- name: AddFileToDelete :exec
+INSERT OR IGNORE INTO image_files_to_delete (key) VALUES (?1)
+`
+
+func (q *Queries) AddFileToDelete(ctx context.Context, key string) error {
+	_, err := q.db.ExecContext(ctx, addFileToDelete, key)
+	return err
+}
+
 const addImageUse = `-- name: AddImageUse :exec
 INSERT OR IGNORE INTO image_uses (image_id, kind, id) VALUES (?1, ?2, ?3)
 `
@@ -144,6 +153,33 @@ func (q *Queries) ImageVisibleTo(ctx context.Context, arg ImageVisibleToParams) 
 	return visible, err
 }
 
+const listFilesToDelete = `-- name: ListFilesToDelete :many
+SELECT key FROM image_files_to_delete
+`
+
+func (q *Queries) ListFilesToDelete(ctx context.Context) ([]string, error) {
+	rows, err := q.db.QueryContext(ctx, listFilesToDelete)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []string{}
+	for rows.Next() {
+		var key string
+		if err := rows.Scan(&key); err != nil {
+			return nil, err
+		}
+		items = append(items, key)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listUnreferencedImages = `-- name: ListUnreferencedImages :many
 SELECT i.id, i.content_type FROM images i
 WHERE i.created_at < ?1
@@ -177,6 +213,15 @@ func (q *Queries) ListUnreferencedImages(ctx context.Context, before int64) ([]L
 		return nil, err
 	}
 	return items, nil
+}
+
+const removeFileToDelete = `-- name: RemoveFileToDelete :exec
+DELETE FROM image_files_to_delete WHERE key = ?1
+`
+
+func (q *Queries) RemoveFileToDelete(ctx context.Context, key string) error {
+	_, err := q.db.ExecContext(ctx, removeFileToDelete, key)
+	return err
 }
 
 const setUserPicture = `-- name: SetUserPicture :exec

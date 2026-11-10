@@ -95,3 +95,38 @@ func TestSweepKeepsLinkedPreviews(t *testing.T) {
 	}
 	owner.mustStatus(404, "GET", gone["image"].(string), nil)
 }
+
+// A preview stays while a live post, comment or message shows its link as a card. It goes when none does: when the
+// card's post is deleted, when an edit removes the card, or when the link is plain. The server records which cards each
+// body shows when it is saved. It once searched every body for each preview's address, while it held the database's
+// write lock.
+func TestPreviewsStayWhileABodyShowsThemAsCards(t *testing.T) {
+	_, owner, srv := newTestServerWith(t)
+	site, _ := previewSite(t)
+	srv.PreviewClient = site.Client()
+	link := func(n string) string { return site.URL + "/open-day?n=" + n }
+	for _, n := range []string{"post", "comment", "message", "deleted", "edited", "plain"} {
+		owner.mustStatus(200, "GET", "/api/previews?url="+url.QueryEscape(link(n)), nil)
+	}
+	card := func(n string) map[string]string {
+		return map[string]string{"body_html": `<p data-embed=""><a href="` + link(n) + `">` + link(n) + `</a></p>`}
+	}
+	post := owner.mustStatus(201, "POST", rootPath+"/posts", card("post"))
+	owner.mustStatus(201, "POST", "/api/posts/"+post["id"].(string)+"/comments", card("comment"))
+	owner.mustStatus(201, "POST", rootPath+"/messages", card("message"))
+	deleted := owner.mustStatus(201, "POST", rootPath+"/posts", card("deleted"))
+	owner.mustStatus(200, "DELETE", "/api/posts/"+deleted["id"].(string), nil)
+	edited := owner.mustStatus(201, "POST", rootPath+"/posts", card("edited"))
+	owner.mustStatus(200, "PUT", "/api/posts/"+edited["id"].(string), map[string]string{"body_html": "<p>no card now</p>"})
+	owner.mustStatus(201, "POST", rootPath+"/posts", map[string]string{"body_html": `<p><a href="` + link("plain") + `">` + link("plain") + `</a></p>`})
+
+	if _, err := images.Sweep(context.Background(), srv.DB, srv.Images, db.Now()+1000); err != nil {
+		t.Fatal(err)
+	}
+	q := store.New(srv.DB)
+	for n, kept := range map[string]bool{"post": true, "comment": true, "message": true, "deleted": false, "edited": false, "plain": false} {
+		if _, err := q.GetLinkPreview(context.Background(), link(n)); (err == nil) != kept {
+			t.Errorf("the %s preview: kept %v, want %v", n, err == nil, kept)
+		}
+	}
+}

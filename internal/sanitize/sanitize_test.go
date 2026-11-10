@@ -156,3 +156,26 @@ func TestWithoutMedia(t *testing.T) {
 		t.Fatalf("not a fixed point:\n%s", got)
 	}
 }
+
+// An image whose address is not an uploaded image's is removed, with its attributes. It was once kept as a broken
+// <img alt="">, and a body of only that image was not empty.
+func TestAnImageWithoutAnUploadedAddressIsRemoved(t *testing.T) {
+	const id = "0190a0b0-0000-7000-8000-000000000001"
+	for _, in := range []string{
+		`<img src="blob:https://sweet.test/1" alt="" width="10" data-image-id="` + id + `">`,
+		`<img src="https://example.com/a.png" alt="a cat">`,
+		`<img alt="no address">`,
+		`<img src="/img/` + strings.Repeat("-", 36) + `" alt="">`,
+	} {
+		if got := Body(`<p>hi</p>` + in); got != `<p>hi</p>` {
+			t.Errorf("Body(%q) = %q", in, got)
+		}
+		if !IsEmpty(Body(in)) {
+			t.Errorf("a body of only %q is not empty", in)
+		}
+	}
+	kept := `<img src="/img/` + id + `" alt="" data-image-id="` + id + `">`
+	if got := Body(kept); got != kept {
+		t.Errorf("an uploaded image changed: %q", got)
+	}
+}

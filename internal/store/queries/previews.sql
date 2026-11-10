@@ -8,14 +8,14 @@ ON CONFLICT (url) DO UPDATE SET found = excluded.found, title = excluded.title, 
     image_id = excluded.image_id, fetched_at = excluded.fetched_at;
 
 -- name: DeleteUnusedLinkPreviews :execrows
--- Deletes the previews fetched before `before` that no live post, comment or message links to. A body stores & in an
--- address as &amp;, so the address is searched for in that form too. The previews' pictures are then unreferenced,
--- and the image sweep deletes them.
+-- Deletes the previews fetched before `before` that no live post, comment or message shows as a card. The previews'
+-- pictures are then unreferenced, and the image sweep deletes them.
 DELETE FROM link_previews
 WHERE fetched_at < sqlc.arg(before)
-  AND NOT EXISTS (SELECT 1 FROM posts p WHERE p.deleted_at IS NULL
-                  AND (instr(p.body_html, link_previews.url) > 0 OR instr(p.body_html, replace(link_previews.url, '&', '&amp;')) > 0))
-  AND NOT EXISTS (SELECT 1 FROM comments c WHERE c.deleted_at IS NULL
-                  AND (instr(c.body_html, link_previews.url) > 0 OR instr(c.body_html, replace(link_previews.url, '&', '&amp;')) > 0))
-  AND NOT EXISTS (SELECT 1 FROM messages x WHERE x.deleted_at IS NULL
-                  AND (instr(x.body_html, link_previews.url) > 0 OR instr(x.body_html, replace(link_previews.url, '&', '&amp;')) > 0));
+  AND NOT EXISTS (SELECT 1 FROM live_link_uses u WHERE u.url = link_previews.url);
+
+-- name: DeleteLinkUses :exec
+DELETE FROM link_uses WHERE kind = sqlc.arg(kind) AND id = sqlc.arg(id);
+
+-- name: AddLinkUse :exec
+INSERT OR IGNORE INTO link_uses (url, kind, id) VALUES (sqlc.arg(url), sqlc.arg(kind), sqlc.arg(id));

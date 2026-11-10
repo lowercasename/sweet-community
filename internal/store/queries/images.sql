@@ -45,3 +45,12 @@ INSERT OR IGNORE INTO image_uses (image_id, kind, id) VALUES (sqlc.arg(image_id)
 -- name: AddReportImageUse :exec
 INSERT OR IGNORE INTO image_uses (image_id, kind, id) SELECT i.id, 'report', sqlc.arg(report_id) FROM images i WHERE i.id = sqlc.arg(image_id);
 
+
+-- name: AddFileToDelete :exec
+INSERT OR IGNORE INTO image_files_to_delete (key) VALUES (sqlc.arg(key));
+
+-- name: ListFilesToDelete :many
+SELECT key FROM image_files_to_delete;
+
+-- name: RemoveFileToDelete :exec
+DELETE FROM image_files_to_delete WHERE key = sqlc.arg(key);

@@ -1,6 +1,7 @@
 package api
 
 import (
+	"bytes"
 	"context"
 	"database/sql"
 	"encoding/json"
@@ -8,6 +9,7 @@ import (
 	"io"
 	"net/http"
 	"strconv"
+	"time"
 
 	"github.com/google/uuid"
 	"golang.org/x/sync/semaphore"
@@ -42,6 +44,10 @@ const uploadBytes = 24 << 20
 
 var uploads = semaphore.NewWeighted(uploadBytes)
 
+// uploadReadTime is the longest an upload's body may take to arrive. A client that sends slowly would otherwise hold
+// its share of uploadBytes. Twenty megabytes take about two minutes on a slow mobile connection.
+var uploadReadTime = 2 * time.Minute
+
 // uploadImage reads the multipart field "file", processes the image and stores it.
 func (s *Server) uploadImage(w http.ResponseWriter, r *http.Request) {
 	if s.Images == nil {
@@ -57,6 +63,10 @@ func (s *Server) uploadImage(w http.ResponseWriter, r *http.Request) {
 	if size <= 0 {
 		size = limit
 	}
+	if err := http.NewResponseController(w).SetReadDeadline(time.Now().Add(uploadReadTime)); err != nil {
+		writeErr(w, http.StatusInternalServerError, err.Error())
+		return
+	}
 	if err := uploads.Acquire(r.Context(), size); err != nil {
 		return // the client has gone
 	}
@@ -64,16 +74,20 @@ func (s *Server) uploadImage(w http.ResponseWriter, r *http.Request) {
 	r.Body = http.MaxBytesReader(w, r.Body, limit)
 	file, err := filePart(r)
 	if err == nil {
-		var p images.Processed
-		if p, err = images.Process(file); err == nil {
-			me, _ := userFrom(r.Context())
-			img, err := s.storeImage(r.Context(), p, me.ID)
-			if err != nil {
-				writeErr(w, http.StatusInternalServerError, err.Error())
+		// The file is read into a buffer the size of the request, so it is held once and never copied to grow.
+		buf := bytes.NewBuffer(make([]byte, 0, size+bytes.MinRead))
+		if _, err = buf.ReadFrom(io.LimitReader(file, images.MaxUpload+1)); err == nil {
+			var p images.Processed
+			if p, err = images.Process(buf.Bytes()); err == nil {
+				me, _ := userFrom(r.Context())
+				img, err := s.storeImage(r.Context(), p, me.ID)
+				if err != nil {
+					writeErr(w, http.StatusInternalServerError, err.Error())
+					return
+				}
+				writeJSON(w, http.StatusCreated, img)
 				return
 			}
-			writeJSON(w, http.StatusCreated, img)
-			return
 		}
 	}
 	var tooBig *http.MaxBytesError
@@ -131,6 +145,8 @@ func (s *Server) storeImage(ctx context.Context, p images.Processed, uploader st
 		ID: id.String(), UploaderID: uploader, ContentType: p.ContentType,
 		Width: int64(p.Width), Height: int64(p.Height), Bytes: int64(len(p.Data)), CreatedAt: db.Now(),
 	}); err != nil {
+		// The file has no row, so the image sweep would never find it. It is listed for deletion instead.
+		s.q().AddFileToDelete(ctx, key)
 		return Image{}, err
 	}
 	return Image{ID: id.String(), URL: imageURL(id.String()), Width: int64(p.Width), Height: int64(p.Height)}, nil

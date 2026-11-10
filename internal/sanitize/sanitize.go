@@ -14,9 +14,11 @@ import (
 var (
 	uuidRe    = regexp.MustCompile(`^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$`)
 	mentionRe = regexp.MustCompile(`^mention$`)
-	imgSrcRe  = regexp.MustCompile(`^/img/[0-9a-fA-F-]{36}$`)
-	targetRe  = regexp.MustCompile(`^_blank$`)
-	emptyRe   = regexp.MustCompile(`^$`)
+	imgSrcRe  = regexp.MustCompile(`^/img/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$`)
+	// imgTag matches an <img> element in sanitised HTML. The policy escapes > inside attribute values.
+	imgTag   = regexp.MustCompile(`<img[^>]*>`)
+	targetRe = regexp.MustCompile(`^_blank$`)
+	emptyRe  = regexp.MustCompile(`^$`)
 	// relRe accepts TipTap's default rel value and the rel value this policy
 	// adds to a link that has none. The second keeps a post created via the
 	// API stable once it has been edited in TipTap.
@@ -94,7 +96,21 @@ var (
 // after this point. Empty paragraphs at the start and end are removed
 // (Raphael, 2026-11-08). Empty paragraphs between others are kept as spacing.
 func Body(in string) string {
-	return trim(body.Sanitize(in))
+	return trim(withoutBrokenImages(body.Sanitize(in)))
+}
+
+// withoutBrokenImages removes the <img> elements that the policy left without a src, because their address was not
+// an uploaded image's, such as a picture pasted from another site. They would show as broken images.
+func withoutBrokenImages(s string) string {
+	if !strings.Contains(s, "<img") {
+		return s
+	}
+	return imgTag.ReplaceAllStringFunc(s, func(tag string) string {
+		if strings.Contains(tag, ` src="`) {
+			return tag
+		}
+		return ""
+	})
 }
 
 // WithoutMedia sanitises a bio, the rules or the welcome message. It is Body without images and preview cards, so a
