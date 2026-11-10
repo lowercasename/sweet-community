@@ -1,5 +1,9 @@
 # Changelog
 
+## v1.4.0 (2026-11-10)
+
+- Add an emoji picker to every composer on devices with a mouse or trackpad
+
 ## v1.3.1 (2026-11-10)
 
 - Shorten the colophon to one line and pin it to the bottom of a short feed
