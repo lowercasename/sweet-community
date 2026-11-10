@@ -230,3 +230,26 @@
     transition: none !important;
   }
 }
+
+/* The emoji picker (emoji-picker-react) in Sweet's colours. The tokens change in dark mode, so the picker follows.
+   This rule is outside the layers, because the library's own variables are not in a layer and would otherwise win. */
+.emoji-picker {
+  --epr-font-family: var(--font-sans);
+  --epr-bg-color: var(--color-card);
+  --epr-text-color: var(--color-mute);
+  --epr-picker-border-color: var(--color-line);
+  --epr-picker-border-radius: var(--radius-card);
+  --epr-highlight-color: var(--color-sweet);
+  --epr-hover-bg-color: var(--color-blush);
+  --epr-focus-bg-color: var(--color-blush);
+  --epr-category-label-bg-color: var(--color-card);
+  --epr-category-label-text-color: var(--color-mute);
+  --epr-category-icon-active-color: var(--color-sweet);
+  --epr-search-input-bg-color: var(--color-field);
+  --epr-search-input-bg-color-active: var(--color-card);
+  --epr-search-input-text-color: var(--color-ink);
+  --epr-search-input-placeholder-color: var(--color-mute);
+  --epr-search-border-color: var(--color-line);
+  --epr-search-border-color-active: var(--color-pink);
+  --epr-emoji-size: 26px;
+}

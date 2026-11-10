@@ -107,6 +107,7 @@ A post is long-form text with inline images. Comments are a flat list, oldest fi
 - Every post has its own address, which notifications link to.
 - Drafts are kept in the browser. Safari clears them after seven days without a visit unless the app is installed, and this is accepted.
 - The @ list offers only the members of the current group (Raphael, 2026-11-08).
+- On a device with a mouse or trackpad, every composer has an emoji picker. Phones have none, because their keyboards have emoji (Raphael, 2026-11-10). The picker shows the device's own emoji, so it loads nothing from another site.
 
 ### Body format
 

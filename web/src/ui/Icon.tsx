@@ -29,6 +29,7 @@ import {
   Flag,
   Shield,
   Search,
+  Smile,
   Settings,
   TabletSmartphone,
   Trash2,
@@ -77,6 +78,7 @@ export type IconName =
   | 'flag'
   | 'shield'
   | 'offline'
+  | 'smile'
 
 const ICONS: Record<IconName, LucideIcon> = {
   bold: Bold,
@@ -116,6 +118,7 @@ const ICONS: Record<IconName, LucideIcon> = {
   flag: Flag,
   shield: Shield,
   offline: WifiOff,
+  smile: Smile,
 }
 
 interface IconProps {

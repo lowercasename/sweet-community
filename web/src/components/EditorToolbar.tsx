@@ -1,5 +1,6 @@
 import { useEditorState, type Editor } from '@tiptap/react'
-import { Button, FilePicker, Row } from '../ui'
+import { Button, EmojiButton, FilePicker, Row } from '../ui'
+import { useMediaQuery } from '../hooks/useLayout'
 import { IMAGE_ACCEPT } from '../editor/images'
 
 interface EditorToolbarProps {
@@ -18,8 +19,13 @@ export function promptLink(editor: Editor) {
   else chain.setLink({ href: href.trim() }).run()
 }
 
-/** The Bold, Italic and Link buttons. Phones have no ⌘ key, so these buttons are always shown. */
+/**
+ * The Bold, Italic and Link buttons, the image button when `onImage` is set, and the emoji button. Phones have no ⌘
+ * key, so the formatting buttons are always shown. The emoji button is shown only on a device with a mouse or
+ * trackpad, because a phone's keyboard has emoji (Raphael, 2026-11-10).
+ */
 export function EditorToolbar({ editor, onImage }: EditorToolbarProps) {
+  const pointer = useMediaQuery('(pointer: fine)')
   const active = useEditorState({
     editor,
     selector: ({ editor }) => ({
@@ -47,6 +53,7 @@ export function EditorToolbar({ editor, onImage }: EditorToolbarProps) {
       />
       <Button variant="ghost" icon="link" label="Link" pressed={!!active?.link} onClick={() => promptLink(editor)} />
       {onImage && <FilePicker accept={IMAGE_ACCEPT} icon="image" label="Add images" multiple onPick={onImage} />}
+      {pointer && <EmojiButton onPick={(emoji) => editor.chain().focus().insertContent(emoji).run()} />}
     </Row>
   )
 }
