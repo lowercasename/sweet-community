@@ -8,7 +8,6 @@ import { Alert, Bar, Button, Card, Pane, ReplyStrip, Row, ScrollArea, Stack } fr
 import { chatExtensions } from '../editor/extensions'
 import { BodyEditor } from './BodyEditor'
 import { ChatLine } from './ChatLine'
-import { ConnectionStatus } from './ConnectionStatus'
 import { MessageGroup } from './MessageGroup'
 
 interface ChatPaneProps {
@@ -189,30 +188,27 @@ export function ChatPane({ groupId, side = 'full', watching, focusMessage = null
           </Stack>
         </ScrollArea>
         <Bar as="footer" edge="footer">
-          <Stack gap={1}>
-            <ConnectionStatus status={status} />
-            <BodyEditor
-              groupId={groupId}
-              extensions={chatExtensions}
-              size="line"
-              enterSubmits
-              images="attached"
-              submitLabel="Send"
-              disabled={status === 'offline'}
-              onSubmit={send}
-              head={
-                replying && (
-                  <ReplyStrip
-                    author={replying.author.username}
-                    text={replying.body_text}
-                    onCancel={() => setReplying(null)}
-                  />
-                )
-              }
-              onEscape={replying ? () => setReplying(null) : undefined}
-              focus={replying?.id}
-            />
-          </Stack>
+          <BodyEditor
+            groupId={groupId}
+            extensions={chatExtensions}
+            size="line"
+            enterSubmits
+            images="attached"
+            submitLabel="Send"
+            disabled={status === 'offline'}
+            onSubmit={send}
+            head={
+              replying && (
+                <ReplyStrip
+                  author={replying.author.username}
+                  text={replying.body_text}
+                  onCancel={() => setReplying(null)}
+                />
+              )
+            }
+            onEscape={replying ? () => setReplying(null) : undefined}
+            focus={replying?.id}
+          />
         </Bar>
       </Card>
     </Pane>

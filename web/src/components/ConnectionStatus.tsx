@@ -1,18 +1,15 @@
 import type { StreamStatus } from '../hooks/useEventStream'
-import { Alert } from '../ui'
+import { Badge } from '../ui'
 
 interface ConnectionStatusProps {
   status: StreamStatus
 }
 
-const LABELS: Record<Exclude<StreamStatus, 'live'>, string> = {
-  connecting: 'Connecting…',
-  reconnecting: 'Reconnecting…',
-  offline: 'Offline: you can read but not post',
-}
-
-/** Shows the event stream's state as a notice above the editor. Renders nothing while live. */
+/**
+ * An Offline badge for the page bar while the device is offline. Live, connecting and reconnecting render nothing,
+ * because a short reconnect is not something the user needs to act on.
+ */
 export function ConnectionStatus({ status }: ConnectionStatusProps) {
-  if (status === 'live') return null
-  return <Alert tone={status === 'offline' ? 'warning' : 'notice'}>{LABELS[status]}</Alert>
+  if (status !== 'offline') return null
+  return <Badge icon="offline">Offline</Badge>
 }

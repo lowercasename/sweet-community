@@ -24,7 +24,6 @@ import {
 } from '../ui'
 import { postExtensions } from '../editor/extensions'
 import { BodyEditor } from './BodyEditor'
-import { ConnectionStatus } from './ConnectionStatus'
 import { PostList } from './PostList'
 import { TopicMenu } from './TopicMenu'
 
@@ -142,18 +141,15 @@ export function PostsPane({ groupId, side = 'full', watching, topicId = null, fo
                 )
               }
             >
-              <Stack gap={1}>
-                <ConnectionStatus status={status} />
-                <BodyEditor
-                  groupId={groupId}
-                  extensions={postExtensions}
-                  size="post"
-                  placeholder={topic ? `Say something in ${topic.name}…` : undefined}
-                  submitLabel="Post"
-                  disabled={offline}
-                  onSubmit={post}
-                />
-              </Stack>
+              <BodyEditor
+                groupId={groupId}
+                extensions={postExtensions}
+                size="post"
+                placeholder={topic ? `Say something in ${topic.name}…` : undefined}
+                submitLabel="Post"
+                disabled={offline}
+                onSubmit={post}
+              />
             </Card>
             <Stack gap={3}>
               {loading && posts.length === 0 ? (

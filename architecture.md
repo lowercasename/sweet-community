@@ -128,7 +128,7 @@ A message uses part of the same schema and passes the same policy. Chat history 
 - A reply quotes the original and stays in the flat list. Threads were rejected, because they would make a chat into a second feed.
 - The author or the group's staff may delete a message. Nobody can edit a sent message.
 - The chat shows a line when someone joins the community or is added to a room (Raphael, 2026-11-08). A line is stored as a message, so it keeps its order. Notifying a whole room of each addition was rejected, because a room of twenty would get twenty notifications.
-- There is no offline posting. When the device is offline, the app shows a notice and disables sending. A failed send keeps its text.
+- There is no offline posting. When the device is offline, the bar at the top of the view shows an Offline badge and sending is disabled. Connecting and reconnecting show nothing (Raphael, 2026-11-09). A failed send keeps its text.
 
 ## Images
 
@@ -284,7 +284,7 @@ One cache in the web app holds all server data. Events are its write path, and a
 
 ## Interface
 
-**One shape per concept.** A topic is always the same pill. A place is a tile or a picture. A feature is a line icon. A person is a profile picture. A notice is always the same alert box.
+**One shape per concept.** A topic is always the same pill. A place is a tile or a picture. A feature is a line icon. A person is a profile picture. A notice is always the same alert box. Being offline is a red badge in the bar.
 
 ### Buttons
 
@@ -413,6 +413,7 @@ These decisions came from a security audit (2026-11-08).
 - **Copy.** Copy that described the software became copy that explains Sweet's terms (Raphael, 2026-11-07).
 - **Primary colour.** Pink with white text failed the contrast guideline, so the primary is red (Raphael, 2026-11-08).
 - **Destructive actions.** They appeared in many places. They now sit in a page's last card, so people know where to look (Raphael, 2026-11-08).
+- **Connection state.** A notice above the editors showed connecting, reconnecting and offline. It moved the editors each time the connection changed and added noise. Only offline is shown now, as a badge in the bar (Raphael, 2026-11-09).
 
 ### Considered and rejected
 
@@ -421,7 +422,7 @@ These decisions came from a security audit (2026-11-08).
 - **Markdown bodies.** Mentions by id, image ids and alt text have no Markdown syntax.
 - **JWTs** (raised twice). Revoking a session needs a server lookup anyway.
 - **WebSockets.** SSE is plain HTTP and reconnects on its own.
-- **An offline send queue.** Safari and Firefox lack background sync. An offline notice serves users better.
+- **An offline send queue.** Safari and Firefox lack background sync. Showing that the device is offline serves users better.
 - **Threads in chat or comments.** Quoted replies cover the need.
 - **GPL-3.0, MIT or Apache-2.0.** None of them stops a closed hosted fork.
 - **Source-available licences.** They are not open source, and Debian and Fedora do not package them.

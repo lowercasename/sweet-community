@@ -35,6 +35,7 @@ import {
   Trash2,
   User,
   Users,
+  WifiOff,
   X,
   type LucideIcon,
 } from 'lucide-react'
@@ -77,6 +78,7 @@ export type IconName =
   | 'flag'
   | 'shield'
   | 'heart'
+  | 'offline'
 
 const ICONS: Record<IconName, LucideIcon> = {
   heart: Heart,
@@ -116,6 +118,7 @@ const ICONS: Record<IconName, LucideIcon> = {
   rules: ScrollText,
   flag: Flag,
   shield: Shield,
+  offline: WifiOff,
 }
 
 interface IconProps {
