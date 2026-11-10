@@ -136,3 +136,23 @@ func TestTrimsEmptyParagraphsAtTheEdges(t *testing.T) {
 		}
 	}
 }
+
+// Bios, the rules and the welcome message keep text, formatting, links, mentions and emoji. Images and the mark that
+// makes a link a preview card are removed, so a link on its own line stays a link.
+func TestWithoutMedia(t *testing.T) {
+	const id = "0190a0b0-0000-7000-8000-000000000001"
+	link := `<a target="_blank" rel="noopener noreferrer nofollow" href="https://example.com">https://example.com</a>`
+	in := `<p data-embed="">` + link + `</p>` +
+		`<p><strong>Hi</strong> <em>there</em> <span data-type="mention" data-mention-id="` + id + `">@kit</span> 🧶</p>` +
+		`<img src="/img/` + id + `" alt="a scarf" width="10" height="10" data-image-id="` + id + `">` +
+		`<p><a data-plain-link="" target="_blank" rel="noopener noreferrer nofollow" href="https://example.org">https://example.org</a></p>`
+	want := `<p>` + link + `</p>` +
+		`<p><strong>Hi</strong> <em>there</em> <span data-type="mention" data-mention-id="` + id + `">@kit</span> 🧶</p>` +
+		`<p><a target="_blank" rel="noopener noreferrer nofollow" href="https://example.org">https://example.org</a></p>`
+	if got := WithoutMedia(in); got != want {
+		t.Fatalf("got\n%s\nwant\n%s", got, want)
+	}
+	if got := WithoutMedia(want); got != want {
+		t.Fatalf("not a fixed point:\n%s", got)
+	}
+}

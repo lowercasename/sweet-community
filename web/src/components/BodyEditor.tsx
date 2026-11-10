@@ -102,6 +102,8 @@ export function BodyEditor({
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [attached, setAttached] = useState<Attachment[]>([])
+  // A bio or a community text has no image node, so it takes no images.
+  const takesImages = images === 'attached' || extensions.some((e) => e.name === 'image')
 
   // TipTap creates the keydown handler once, so the handler reads the latest callbacks through refs.
   const submitRef = useRef<() => void>(() => {})
@@ -149,19 +151,20 @@ export function BodyEditor({
         }
         return false
       },
-      // Pasted or dropped image files are uploaded, not inlined as data: urls.
+      // Pasted or dropped image files are uploaded, not inlined as data: urls. An editor that takes no images ignores
+      // them, so a dropped file does not open in the tab.
       handlePaste(_view, event) {
         const files = imageFiles(event.clipboardData)
         if (files.length === 0) return false
         event.preventDefault()
-        addImagesRef.current(files)
+        if (takesImages) addImagesRef.current(files)
         return true
       },
       handleDrop(_view, event) {
         const files = imageFiles(event.dataTransfer)
         if (files.length === 0) return false
         event.preventDefault()
-        addImagesRef.current(files)
+        if (takesImages) addImagesRef.current(files)
         return true
       },
     },
@@ -292,7 +295,7 @@ export function BodyEditor({
             <Row shrink={false}>
               <EditorToolbar
                 editor={editor}
-                onImage={(files) => addImagesRef.current(files)}
+                onImage={takesImages ? (files) => addImagesRef.current(files) : undefined}
                 linkOpen={linkOpen}
                 onLinkOpenChange={setLinkOpen}
               />

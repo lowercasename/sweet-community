@@ -71,3 +71,40 @@ func TestProfiles(t *testing.T) {
 	owner.mustStatus(204, "DELETE", "/api/users/"+moID, nil)
 	kit.mustStatus(404, "GET", "/api/users/mo", nil)
 }
+
+// A bio, the rules and the welcome message hold no images and no preview cards. They are removed when the text is
+// saved, and when a text saved before this rule is read.
+func TestBiosAndCommunityTextsHoldNoImagesOrCards(t *testing.T) {
+	ts, owner, srv := newTestServerWith(t)
+	kit, _ := registerMember(t, ts, owner, "kit")
+	status, img := kit.upload(testPNG(20, 20))
+	if status != 201 {
+		t.Fatalf("upload: %d", status)
+	}
+	id, url := img["id"].(string), img["url"].(string)
+	link := `<a target="_blank" rel="noopener noreferrer nofollow" href="https://example.com">https://example.com</a>`
+	body := `<p>I knit</p><img src="` + url + `" alt="" width="20" height="20" data-image-id="` + id + `"><p data-embed="">` + link + `</p>`
+	want := `<p>I knit</p><p>` + link + `</p>`
+
+	if set := kit.mustStatus(200, "PUT", "/api/me/bio", map[string]string{"body_html": body}); set["bio_html"] != want {
+		t.Fatalf("bio: %v", set["bio_html"])
+	}
+	for _, path := range []string{"/api/rules", "/api/welcome"} {
+		if set := owner.mustStatus(200, "PUT", path, map[string]string{"body_html": body}); set["body_html"] != want {
+			t.Fatalf("%s: %v", path, set["body_html"])
+		}
+	}
+	// Texts saved before the rule are cleaned when they are read.
+	if _, err := srv.DB.Exec(`UPDATE users SET bio_html = ? WHERE username = 'kit'`, body); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := srv.DB.Exec(`UPDATE settings SET value = ? WHERE key = 'rules_html'`, body); err != nil {
+		t.Fatal(err)
+	}
+	if got := owner.mustStatus(200, "GET", "/api/users/kit", nil)["bio_html"]; got != want {
+		t.Fatalf("an old bio as read: %v", got)
+	}
+	if got := kit.mustStatus(200, "GET", "/api/rules", nil)["body_html"]; got != want {
+		t.Fatalf("old rules as read: %v", got)
+	}
+}

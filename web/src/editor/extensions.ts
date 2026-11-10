@@ -128,23 +128,25 @@ export const chatExtensions = [
   placeholder,
 ]
 
+const commentKit = StarterKit.configure({
+  heading: false,
+  bulletList: false,
+  orderedList: false,
+  listItem: false,
+  link: false,
+  underline: false,
+  code: false,
+  codeBlock: false,
+  horizontalRule: false,
+  trailingNode: false,
+  dropcursor,
+})
+
 /** The comment schema. The chat schema plus blockquote, which is used for a quote-reply. */
-export const commentExtensions = [
-  StarterKit.configure({
-    heading: false,
-    bulletList: false,
-    orderedList: false,
-    listItem: false,
-    link: false,
-    underline: false,
-    code: false,
-    codeBlock: false,
-    horizontalRule: false,
-    trailingNode: false,
-    dropcursor,
-  }),
-  link,
-  Embed,
-  placeholder,
-  SweetImage,
-]
+export const commentExtensions = [commentKit, link, Embed, placeholder, SweetImage]
+
+/**
+ * The schema of a bio, the rules and the welcome message: the comment schema without images and preview cards, so a
+ * link on its own line stays a link. The server's policy for these texts is the same.
+ */
+export const textExtensions = [commentKit, link, placeholder]

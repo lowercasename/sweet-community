@@ -58,7 +58,7 @@ func (s *Server) setBio(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusBadRequest, "Bad request")
 		return
 	}
-	clean := sanitize.Body(in.BodyHTML)
+	clean := sanitize.WithoutMedia(in.BodyHTML)
 	if sanitize.IsEmpty(clean) {
 		clean = ""
 	}

@@ -144,6 +144,8 @@ function embedOnEnter(editor: Editor): boolean {
 export function embedLinks(editor: Editor, which: 'last' | 'all'): boolean {
   const { state } = editor
   const { paragraph, embed, hardBreak } = state.schema.nodes
+  // A bio or a community text has no preview cards.
+  if (!embed) return false
   let lastFilled = -1
   state.doc.forEach((node, offset) => {
     if (node.type.name !== 'paragraph' || node.content.size > 0) lastFilled = offset

@@ -1,6 +1,35 @@
 import { article, expect, member, open, test, uniq, writePost } from './helpers'
 
 test.describe('profiles', () => {
+  test('a bio holds text and links, with no image button, and a link on its own line stays a link', async ({
+    browser,
+  }, testInfo) => {
+    const kit = await member(browser, testInfo, 'kit')
+    // Any preview the page asks for exists, so a card would show if the bio made one.
+    await kit.page.route('**/api/previews?*', (route) =>
+      route.fulfill({
+        json: { url: 'https://plots.example/', title: 'Weald Stray Allotments', description: '', image: null },
+      }),
+    )
+    await open(kit.page, `/u/${kit.username}`)
+    await kit.page.getByRole('button', { name: 'Write a bio' }).click()
+    const form = kit.page.locator('form').filter({ has: kit.page.locator('.editor-line .ProseMirror >> visible=true') })
+    await expect(form.getByRole('button', { name: 'Bold' })).toBeVisible()
+    await expect(form.getByRole('button', { name: 'Add images' })).toHaveCount(0)
+    await form.locator('.ProseMirror').click()
+    await kit.page.keyboard.type('Find my plot at')
+    await kit.page.keyboard.press('Enter')
+    await kit.page.keyboard.type('https://plots.example/ ')
+    await kit.page.keyboard.press('Enter')
+    await form.getByRole('button', { name: 'Save' }).click()
+    await expect(kit.page.getByRole('button', { name: 'Edit bio' })).toBeVisible()
+    // The feed and chat stay mounted behind the page, so the check is scoped to the bio.
+    const bio = kit.page.locator('.content').filter({ hasText: 'Find my plot at' })
+    await expect(bio.getByRole('link', { name: 'https://plots.example/' })).toBeVisible()
+    await expect(bio.locator('.link-preview')).toHaveCount(0)
+    await kit.context.close()
+  })
+
   test("a user's page has a bio edited by that user, posts from shared rooms only, and a Message button, and my own page opens from the account row", async ({
     browser,
   }, testInfo) => {

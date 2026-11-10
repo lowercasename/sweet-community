@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { ROOT_ID } from '../data/keys'
 import { type TextKind, useCommunityText, useSetCommunityText, useSettings } from '../data/hooks'
-import { commentExtensions } from '../editor/extensions'
+import { textExtensions } from '../editor/extensions'
 import { Alert, Button, Card, Heading, Row, shieldText, Stack, Text } from '../ui'
 import { Body } from './Body'
 import { BodyEditor } from './BodyEditor'
@@ -76,7 +76,7 @@ export function CommunityTextCard({ kind, editing: startEditing = false }: Commu
         {editing ? (
           <BodyEditor
             groupId={ROOT_ID}
-            extensions={commentExtensions}
+            extensions={textExtensions}
             size="post"
             placeholder={words.placeholder}
             submitLabel="Save"
