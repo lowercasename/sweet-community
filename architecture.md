@@ -138,6 +138,7 @@ A message uses part of the same schema and passes the same policy. Chat history 
 - An image's address is a path on the instance, so storage can move without changing posts.
 - The server accepts JPEG, PNG, WebP and GIF, detected from the content. HEIC is not decoded, because Go would need C libraries. The upload control asks for JPEG first, so iPhones convert HEIC photos.
 - Uploads are turned upright and stripped of metadata. Smaller sizes are JPEG or PNG, because Go cannot encode WebP.
+- The server processes one image at a time, with a resizer that keeps 4 bytes a pixel, and sets its memory limit from its container's (2026-11-10). A server may run with little memory, and resizing one 12-megapixel phone photo once needed about 260 MB, so the kernel killed the server and the upload failed.
 - An image is served only to its uploader or to someone who can see content that uses it. No image leaves the app, so there are no signed URLs.
 - A profile picture or a room picture must be an image that the person setting it uploaded (Raphael, 2026-11-10). Every signed-in user can see a profile picture, so any other image would let a member show an image from a private room or a conversation to the whole community.
 - Images that nothing has used for a day are deleted.

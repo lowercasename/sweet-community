@@ -27,6 +27,10 @@ import (
 	"sweet/internal/push"
 	"sweet/internal/version"
 	"sweet/internal/web"
+
+	// Sets Go's memory limit to 90% of the container's memory limit, so the garbage collector frees memory before
+	// the kernel kills the server. A community may run in a 128 MB container.
+	_ "github.com/KimMachineGun/automemlimit"
 )
 
 // imageStore returns an S3 store when SWEET_S3_ENDPOINT and SWEET_S3_BUCKET

@@ -3,7 +3,9 @@ module sweet
 go 1.26.4
 
 require (
+	code.dny.dev/ssrf v0.3.0
 	github.com/SherClockHolmes/webpush-go v1.4.0
+	github.com/disintegration/imaging v1.6.2
 	github.com/google/uuid v1.6.0
 	github.com/microcosm-cc/bluemonday v1.0.27
 	github.com/minio/minio-go/v7 v7.4.1
@@ -16,8 +18,8 @@ require (
 
 require (
 	cel.dev/expr v0.25.1 // indirect
-	code.dny.dev/ssrf v0.3.0 // indirect
 	filippo.io/edwards25519 v1.1.1 // indirect
+	github.com/KimMachineGun/automemlimit v1.0.1 // indirect
 	github.com/antlr4-go/antlr/v4 v4.13.1 // indirect
 	github.com/aymerick/douceur v0.2.0 // indirect
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
@@ -45,6 +47,7 @@ require (
 	github.com/ncruces/go-sqlite3 v0.32.0 // indirect
 	github.com/ncruces/go-strftime v1.1.0 // indirect
 	github.com/ncruces/julianday v1.0.0 // indirect
+	github.com/pbnjay/memory v0.0.0-20210728143218-7b4eea64cf58 // indirect
 	github.com/pganalyze/pg_query_go/v6 v6.2.2 // indirect
 	github.com/philhofer/fwd v1.2.0 // indirect
 	github.com/pingcap/errors v0.11.5-0.20250523034308-74f78ae071ee // indirect

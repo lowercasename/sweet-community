@@ -4,14 +4,13 @@ import (
 	"bytes"
 	"errors"
 	"image"
-	"image/draw"
 	"image/gif"
 	"image/jpeg"
 	"image/png"
 	"io"
 	"net/http"
 
-	xdraw "golang.org/x/image/draw"
+	"github.com/disintegration/imaging"
 	_ "golang.org/x/image/webp" // decode only, since Go cannot encode WebP
 )
 
@@ -29,10 +28,9 @@ const (
 	jpegQuality        = 85
 )
 
-// slots limits how many images are decoded at once. Decoding a 40-megapixel
-// image takes about 160 MB, so two at a time bound the memory that uploads
-// can use.
-var slots = make(chan struct{}, 2)
+// slots limits how many images are processed at once. A community may run in
+// a 128 MB container, so images are processed one at a time.
+var slots = make(chan struct{}, 1)
 
 var (
 	ErrNotImage = errors.New("That is not a JPEG, PNG, WebP or GIF")
@@ -124,9 +122,9 @@ func Process(r io.Reader) (Processed, error) {
 		if h < 1 {
 			h = 1
 		}
-		dst := image.NewNRGBA(image.Rect(0, 0, w, h))
-		xdraw.CatmullRom.Scale(dst, dst.Bounds(), src, b, draw.Over, nil)
-		src = dst
+		// imaging resizes in two passes through an intermediate image of 4 bytes a pixel. x/image/draw's kernel
+		// scaler kept 32 bytes a pixel, about 194 MB for a 12-megapixel phone photo, and the server was killed.
+		src = imaging.Resize(src, w, h, imaging.CatmullRom)
 	}
 
 	var buf bytes.Buffer

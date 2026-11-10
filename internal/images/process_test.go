@@ -5,7 +5,9 @@ import (
 	"image"
 	"image/color"
 	"image/gif"
+	"image/jpeg"
 	"image/png"
+	"runtime"
 	"strings"
 	"testing"
 )
@@ -99,5 +101,35 @@ func TestAnimatedGIFIsLimitedByItsFramesBeforeDecoding(t *testing.T) {
 	}
 	if _, _, err := gifFrames([]byte("GIF89a\x01")); err == nil {
 		t.Fatal("a truncated GIF was accepted")
+	}
+}
+
+// A phone photo is about 12 megapixels. Processing one must fit in a small container: a community runs in 128 MB.
+// The resize once used a temporary buffer of 32 bytes per pixel, about 194 MB for this photo, and the kernel killed
+// the server. The test counts every byte that Process allocates.
+func TestProcessAPhonePhotoFitsInASmallContainer(t *testing.T) {
+	img := image.NewYCbCr(image.Rect(0, 0, 4032, 3024), image.YCbCrSubsampleRatio420)
+	for i := range img.Y {
+		img.Y[i] = uint8(i * 7)
+	}
+	var buf bytes.Buffer
+	if err := jpeg.Encode(&buf, img, &jpeg.Options{Quality: 90}); err != nil {
+		t.Fatal(err)
+	}
+	data := buf.Bytes()
+	runtime.GC()
+	var before, after runtime.MemStats
+	runtime.ReadMemStats(&before)
+	p, err := Process(bytes.NewReader(data))
+	runtime.ReadMemStats(&after)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if p.Width != MaxSide {
+		t.Fatalf("width %d, want %d", p.Width, MaxSide)
+	}
+	const limit = 96 << 20
+	if got := after.TotalAlloc - before.TotalAlloc; got > limit {
+		t.Fatalf("processing a 12-megapixel photo allocated %d MB, more than %d MB", got>>20, limit>>20)
 	}
 }
