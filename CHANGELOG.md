@@ -1,5 +1,10 @@
 # Changelog
 
+## v1.3.1 (2026-11-10)
+
+- Shorten the colophon to one line and pin it to the bottom of a short feed
+- Record what makes a release minor or patch
+
 ## v1.3.0 (2026-11-10)
 
 - Close the name card when the location changes
