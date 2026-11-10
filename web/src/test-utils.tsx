@@ -209,3 +209,7 @@ export const report = (kind: Report['kind'], id: string, extra: Partial<Report> 
   can: { open: true },
   ...extra,
 })
+
+/** A link preview card's paragraph, as the server stores it. */
+export const embedParagraph = (url: string) =>
+  `<p data-embed=""><a href="${url}" rel="noreferrer noopener" target="_blank">${url}</a></p>`

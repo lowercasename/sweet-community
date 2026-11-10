@@ -777,3 +777,24 @@ export async function uploadImage(file: File): Promise<UploadedImage> {
 export function setPicture(imageId: string | null): Promise<User> {
   return request<User>('/api/me/picture', json('PUT', { image_id: imageId }))
 }
+
+/**
+ * A link's preview card, as the server keeps it. `image` is the address of Sweet's copy of the page's picture. The
+ * card shows the page's domain, read from `url`.
+ */
+export interface LinkPreview {
+  url: string
+  title: string
+  description: string
+  image: string | null
+}
+
+/** The preview of a link, or null when the page gives none. The server fetches the page the first time it is asked. */
+export async function getLinkPreview(url: string): Promise<LinkPreview | null> {
+  try {
+    return await request<LinkPreview>(`/api/previews?url=${encodeURIComponent(url)}`)
+  } catch (e) {
+    if (e instanceof ApiError && e.status === 404) return null
+    throw e
+  }
+}

@@ -1,15 +1,15 @@
 import StarterKit from '@tiptap/starter-kit'
-import Link from '@tiptap/extension-link'
 import { Placeholder } from '@tiptap/extensions'
 import type { Extensions } from '@tiptap/react'
 import Image from '@tiptap/extension-image'
 import { ReactNodeViewRenderer } from '@tiptap/react'
 import { EditorImage } from '../ui'
+import { Embed, SweetLink } from './embed'
 
 // The drop indicator line shown between blocks while dragging an image card.
 const dropcursor = { color: '#ed5e5e', width: 2 }
 
-const link = Link.configure({ openOnClick: false, autolink: true, defaultProtocol: 'https' })
+const link = SweetLink
 
 /**
  * An uploaded image. Only our own /img/<id> urls survive the server's
@@ -49,7 +49,7 @@ export function withPlaceholder(extensions: Extensions, text: string | (() => st
 
 /**
  * The post schema, used by BodyEditor for posts and by the round-trip test.
- * Paragraph, h2/h3, bold, italic, strike, link, bullet/ordered lists,
+ * Paragraph, h2/h3, bold, italic, strike, link, link preview card, bullet/ordered lists,
  * blockquote, hard break, undo/redo. Nothing else.
  */
 export const postExtensions = [
@@ -69,13 +69,14 @@ export const postExtensions = [
     dropcursor,
   }),
   link,
+  Embed,
   placeholder,
   SweetImage,
 ]
 
 /**
  * The chat schema. A strict subset of the post schema, with paragraph, bold,
- * italic, strike, link and hard break. The server policy is the same, and
+ * italic, strike, link, link preview card and hard break. The server policy is the same, and
  * the editor is smaller. There is no image node. Chat images are attached
  * above the text (BodyEditor `images="attached"`) and sent as a block of
  * <img> elements before it.
@@ -96,6 +97,7 @@ export const chatExtensions = [
     dropcursor,
   }),
   link,
+  Embed,
   placeholder,
 ]
 
@@ -115,6 +117,7 @@ export const commentExtensions = [
     dropcursor,
   }),
   link,
+  Embed,
   placeholder,
   SweetImage,
 ]

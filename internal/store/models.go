@@ -23,7 +23,6 @@ type LinkPreview struct {
 	Found       int64
 	Title       string
 	Description string
-	SiteName    string
 	ImageID     sql.NullString
 	FetchedAt   int64
 }

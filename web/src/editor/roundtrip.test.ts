@@ -28,6 +28,10 @@ const fixtures: Record<string, string> = {
   image:
     '<p>look</p><img src="/img/019a4c5e-0000-7000-8000-000000000002" alt="a cat" width="800" height="600" data-image-id="019a4c5e-0000-7000-8000-000000000002">',
   'nested marks': '<p><strong><em>both</em></strong> and <strong><s>struck bold</s></strong></p>',
+  'link preview card':
+    '<p>Look</p><p data-embed=""><a target="_blank" rel="noopener noreferrer nofollow" href="https://plots.test/open-day">https://plots.test/open-day</a></p>',
+  'link kept plain':
+    '<p><a target="_blank" rel="noopener noreferrer nofollow" href="https://plots.test/open-day" data-plain-link="">https://plots.test/open-day</a></p>',
   everything: [
     '<h2>Title</h2>',
     '<p>Intro with <strong>bold</strong>, <em>italic</em>, <s>strike</s> and ',
@@ -70,6 +74,8 @@ const chatFixtures: Record<string, string> = {
   marks: '<p>a <strong>b</strong> <em>c</em> <s>d</s></p>',
   link: '<p><a target="_blank" rel="noopener noreferrer nofollow" href="https://example.com">x</a></p>',
   'hard break': '<p>one<br>two</p>',
+  'link preview card':
+    '<p data-embed=""><a target="_blank" rel="noopener noreferrer nofollow" href="https://plots.test/open-day">https://plots.test/open-day</a></p>',
 }
 
 describe('chat HTML round-trip', () => {

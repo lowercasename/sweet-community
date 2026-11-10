@@ -33,7 +33,7 @@ func (q *Queries) DeleteUnusedLinkPreviews(ctx context.Context, before int64) (i
 }
 
 const getLinkPreview = `-- name: GetLinkPreview :one
-SELECT url, found, title, description, site_name, image_id, fetched_at FROM link_previews WHERE url = ?1
+SELECT url, found, title, description, image_id, fetched_at FROM link_previews WHERE url = ?1
 `
 
 func (q *Queries) GetLinkPreview(ctx context.Context, url string) (LinkPreview, error) {
@@ -44,7 +44,6 @@ func (q *Queries) GetLinkPreview(ctx context.Context, url string) (LinkPreview, 
 		&i.Found,
 		&i.Title,
 		&i.Description,
-		&i.SiteName,
 		&i.ImageID,
 		&i.FetchedAt,
 	)
@@ -52,10 +51,10 @@ func (q *Queries) GetLinkPreview(ctx context.Context, url string) (LinkPreview, 
 }
 
 const saveLinkPreview = `-- name: SaveLinkPreview :exec
-INSERT INTO link_previews (url, found, title, description, site_name, image_id, fetched_at)
-VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)
+INSERT INTO link_previews (url, found, title, description, image_id, fetched_at)
+VALUES (?1, ?2, ?3, ?4, ?5, ?6)
 ON CONFLICT (url) DO UPDATE SET found = excluded.found, title = excluded.title, description = excluded.description,
-    site_name = excluded.site_name, image_id = excluded.image_id, fetched_at = excluded.fetched_at
+    image_id = excluded.image_id, fetched_at = excluded.fetched_at
 `
 
 type SaveLinkPreviewParams struct {
@@ -63,7 +62,6 @@ type SaveLinkPreviewParams struct {
 	Found       int64
 	Title       string
 	Description string
-	SiteName    string
 	ImageID     sql.NullString
 	FetchedAt   int64
 }
@@ -74,7 +72,6 @@ func (q *Queries) SaveLinkPreview(ctx context.Context, arg SaveLinkPreviewParams
 		arg.Found,
 		arg.Title,
 		arg.Description,
-		arg.SiteName,
 		arg.ImageID,
 		arg.FetchedAt,
 	)

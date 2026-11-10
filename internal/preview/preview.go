@@ -1,5 +1,5 @@
-// Package preview fetches a link's preview: the title, description, site name and picture that a page gives in its
-// OpenGraph tags, as messaging apps show them.
+// Package preview fetches a link's preview: the title, description and picture that a page gives in its OpenGraph
+// tags, as messaging apps show them.
 package preview
 
 import (
@@ -21,7 +21,6 @@ import (
 const (
 	maxTitle       = 200
 	maxDescription = 300
-	maxSiteName    = 100
 	// The tags are in the page's head, so at most the first megabyte of a page is read.
 	maxPageBytes = 1 << 20
 	// MaxImageBytes is the largest picture that is downloaded.
@@ -40,7 +39,6 @@ type Preview struct {
 	URL         string
 	Title       string
 	Description string
-	SiteName    string
 	ImageURL    string
 }
 
@@ -136,9 +134,8 @@ func FetchImage(ctx context.Context, c *http.Client, rawURL string) ([]byte, err
 	return data, nil
 }
 
-// parse reads the page's head. OpenGraph tags come first. Twitter's tags, the <title> and the meta description fill
-// gaps. The site name falls back to the host without www. Reading stops at the end of the head or the start of the
-// body.
+// parse reads the page's head. OpenGraph tags come first. Twitter's tags, the <title>, the meta description and a
+// schema.org image fill gaps. Reading stops at the end of the head or the start of the body.
 func parse(r io.Reader, base string) (Preview, error) {
 	z := html.NewTokenizer(r)
 	meta := map[string]string{}
@@ -164,6 +161,11 @@ read:
 					case "property", "name":
 						if key == "" {
 							key = strings.ToLower(strings.TrimSpace(string(v)))
+						}
+					case "itemprop":
+						// A schema.org property, such as the image that Google's homepage gives in place of OpenGraph.
+						if key == "" {
+							key = "itemprop:" + strings.ToLower(strings.TrimSpace(string(v)))
 						}
 					case "content":
 						content = string(v)
@@ -208,11 +210,7 @@ read:
 	if err != nil {
 		return Preview{}, ErrNoPreview
 	}
-	p.SiteName = cut(pick("og:site_name"), maxSiteName)
-	if p.SiteName == "" {
-		p.SiteName = strings.TrimPrefix(baseURL.Hostname(), "www.")
-	}
-	if img := pick("og:image", "og:image:url", "og:image:secure_url", "twitter:image", "twitter:image:src"); img != "" {
+	if img := pick("og:image", "og:image:url", "og:image:secure_url", "twitter:image", "twitter:image:src", "itemprop:image"); img != "" {
 		if ref, err := url.Parse(img); err == nil {
 			if abs := baseURL.ResolveReference(ref); abs.Scheme == "http" || abs.Scheme == "https" {
 				p.ImageURL = abs.String()

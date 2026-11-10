@@ -1,11 +1,11 @@
 -- name: GetLinkPreview :one
-SELECT url, found, title, description, site_name, image_id, fetched_at FROM link_previews WHERE url = sqlc.arg(url);
+SELECT url, found, title, description, image_id, fetched_at FROM link_previews WHERE url = sqlc.arg(url);
 
 -- name: SaveLinkPreview :exec
-INSERT INTO link_previews (url, found, title, description, site_name, image_id, fetched_at)
-VALUES (sqlc.arg(url), sqlc.arg(found), sqlc.arg(title), sqlc.arg(description), sqlc.arg(site_name), sqlc.arg(image_id), sqlc.arg(fetched_at))
+INSERT INTO link_previews (url, found, title, description, image_id, fetched_at)
+VALUES (sqlc.arg(url), sqlc.arg(found), sqlc.arg(title), sqlc.arg(description), sqlc.arg(image_id), sqlc.arg(fetched_at))
 ON CONFLICT (url) DO UPDATE SET found = excluded.found, title = excluded.title, description = excluded.description,
-    site_name = excluded.site_name, image_id = excluded.image_id, fetched_at = excluded.fetched_at;
+    image_id = excluded.image_id, fetched_at = excluded.fetched_at;
 
 -- name: DeleteUnusedLinkPreviews :execrows
 -- Deletes the previews fetched before `before` that no live post, comment or message links to. A body stores & in an

@@ -107,6 +107,7 @@ A post is long-form text with inline images. Comments are a flat list, oldest fi
 - Every post has its own address, which notifications link to.
 - Drafts are kept in the browser. Safari clears them after seven days without a visit unless the app is installed, and this is accepted.
 - The @ list offers only the members of the current group (Raphael, 2026-11-08).
+- Links are added and edited in a small panel from the editor's Link button or Cmd+K, in place of the browser's prompt box (Raphael, 2026-11-10). Like the emoji picker, the panel never covers the text being written. An address without https:// gets it.
 - On a device with a mouse or trackpad, every composer has an emoji picker. Phones have none, because their keyboards have emoji (Raphael, 2026-11-10). The picker shows the device's own emoji, so it loads nothing from another site.
 
 ### Body format
@@ -146,7 +147,7 @@ A storage quota per instance is planned.
 
 ### Embeds
 
-A link on its own line becomes a preview card, as in WhatsApp and Signal (Raphael, 2026-11-10). The card shows the page's picture, title, description and site, taken from the page's OpenGraph tags. Clicking it opens the page in a new tab. The card's shape follows old Sweet's link preview, which Raphael chose: a picture on the left, then the title, a short description and the site, at a fixed height.
+A link on its own line becomes a preview card, as in WhatsApp and Signal (Raphael, 2026-11-10). The card shows the page's picture, title and description, taken from the page's OpenGraph tags, and the page's domain. The domain is shown instead of a name the page gives itself, so a card shows where its link really goes (Raphael, 2026-11-10). Clicking it opens the page in a new tab. The card's shape follows old Sweet's link preview, which Raphael chose: a picture on the left, then the title, a short description and the domain, at a fixed height.
 
 - Previews appear in posts, comments and chat. There is no button for them.
 - In a post or a comment, pressing Enter after a link on its own line turns it into a card. A link on the last line is turned into a card when the post is saved, without the author seeing it happen. The editor shows "Embedded link" above a card, with "Turn back into regular link", and a link turned back stays a link when the post is saved again.

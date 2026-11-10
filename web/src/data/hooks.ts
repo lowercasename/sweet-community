@@ -2,6 +2,7 @@ import { useInfiniteQuery, useQuery, useQueryClient } from '@tanstack/react-quer
 import {
   ApiError,
   addMember,
+  getLinkPreview,
   changeEmail,
   getAccount,
   getVersion,
@@ -594,4 +595,17 @@ export function useCloseReport() {
     await closeReport(kind, id, action)
     applyEvent(qc, 'report_delete', { kind, id })
   }
+}
+
+/**
+ * A link's preview card. The server keeps a preview once it has fetched it, so the answer is kept for the page's
+ * lifetime. null means the page gives no preview.
+ */
+export function useLinkPreview(url: string) {
+  return useQuery({
+    queryKey: keys.preview(url),
+    queryFn: () => getLinkPreview(url),
+    staleTime: Infinity,
+    retry: false,
+  })
 }

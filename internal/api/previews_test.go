@@ -49,7 +49,7 @@ func TestLinkPreviews(t *testing.T) {
 	ask := func(u string) string { return "/api/previews?url=" + url.QueryEscape(u) }
 
 	p := owner.mustStatus(200, "GET", ask(site.URL+"/open-day"), nil)
-	if p["url"] != site.URL+"/open-day" || p["title"] != "Open day" || p["description"] != "Bring a trowel." || p["site_name"] != "127.0.0.1" {
+	if _, named := p["site_name"]; named || p["url"] != site.URL+"/open-day" || p["title"] != "Open day" || p["description"] != "Bring a trowel." {
 		t.Fatalf("preview: %v", p)
 	}
 	pic, _ := p["image"].(string)

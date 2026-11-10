@@ -9,13 +9,15 @@ import (
 	"testing"
 )
 
-// A page's preview comes from its OpenGraph tags. Twitter's tags, the <title> and the meta description fill gaps,
-// and the site name falls back to the host without www. A relative picture address is resolved against the page.
+// A page's preview comes from its OpenGraph tags. Twitter's tags, the <title> and the meta description fill gaps. A
+// relative picture address is resolved against the page. The card shows the page's domain, not a name the page
+// chooses, so no site name is read.
 func TestParse(t *testing.T) {
 	page := `<!doctype html><html><head>
 		<title>Fallback title</title>
 		<meta name="description" content="Fallback description">
 		<meta property="og:title" content="  The allotment open day  ">
+		<meta property="og:site_name" content="Not used">
 		<meta property="og:image" content="/images/beans.jpg">
 		<meta name="twitter:description" content="Bring a trowel.">
 		</head><body><meta property="og:title" content="Not in the head"></body></html>`
@@ -27,7 +29,6 @@ func TestParse(t *testing.T) {
 		URL:         "https://www.example.org/news/open-day",
 		Title:       "The allotment open day",
 		Description: "Bring a trowel.",
-		SiteName:    "example.org",
 		ImageURL:    "https://www.example.org/images/beans.jpg",
 	}
 	if p != want {
@@ -35,7 +36,7 @@ func TestParse(t *testing.T) {
 	}
 
 	p, err = parse(strings.NewReader(`<head><title>Only a title</title></head>`), "https://plots.test/")
-	if err != nil || p.Title != "Only a title" || p.SiteName != "plots.test" || p.ImageURL != "" {
+	if err != nil || p.Title != "Only a title" || p.ImageURL != "" {
 		t.Fatalf("title only: %+v %v", p, err)
 	}
 
@@ -43,6 +44,12 @@ func TestParse(t *testing.T) {
 	p, _ = parse(strings.NewReader(`<meta property="og:title" content="`+long+`"><meta property="og:description" content="`+long+`">`), "https://plots.test/")
 	if len([]rune(p.Title)) != maxTitle || len([]rune(p.Description)) != maxDescription {
 		t.Fatalf("caps: title %d, description %d", len([]rune(p.Title)), len([]rune(p.Description)))
+	}
+
+	// A page with no OpenGraph or Twitter picture, such as Google's homepage, may give a schema.org image.
+	p, _ = parse(strings.NewReader(`<head><title>Google</title><meta content="/images/g.png" itemprop="image"></head>`), "https://www.google.com/")
+	if p.ImageURL != "https://www.google.com/images/g.png" {
+		t.Fatalf("schema.org image: %+v", p)
 	}
 
 	if _, err := parse(strings.NewReader(`<meta property="og:description" content="No title">`), "https://plots.test/"); !errors.Is(err, ErrNoPreview) {

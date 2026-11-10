@@ -4,6 +4,8 @@ export const ROOT_ID = '00000000-0000-7000-8000-000000000000'
 
 export const keys = {
   me: ['me'] as const,
+  /** A link's preview card, by address. */
+  preview: (url: string) => ['preview', url] as const,
   users: ['users'] as const,
   groups: ['groups'] as const,
   members: (groupId: string) => ['members', groupId] as const,

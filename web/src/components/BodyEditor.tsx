@@ -6,7 +6,8 @@ import { useMembers } from '../data/hooks'
 import type { Topic } from '../api'
 import { Alert, Button, EditorSurface, Form, ImageCard, Row, Stack } from '../ui'
 import { imageFiles, imagesHtml, insertImages, uploadImages, type AttachedImage } from '../editor/images'
-import { EditorToolbar, promptLink } from './EditorToolbar'
+import { EditorToolbar } from './EditorToolbar'
+import { embedLinks } from '../editor/embed'
 import { TopicMenu } from './TopicMenu'
 
 interface BodyEditorProps {
@@ -86,6 +87,9 @@ export function BodyEditor({
 
   // TipTap creates the keydown handler once, so the handler reads the latest callbacks through refs.
   const submitRef = useRef<() => void>(() => {})
+  // The link panel. Mod+K opens it from the editor, whose keydown handler is created once, so it is reached by a ref.
+  const [linkOpen, setLinkOpen] = useState(false)
+  const openLinkRef = useRef(() => setLinkOpen(true))
   const cancelRef = useRef<(() => void) | undefined>(onCancel ?? onEscape)
   cancelRef.current = onCancel ?? onEscape
 
@@ -117,7 +121,7 @@ export function BodyEditor({
         }
         if (modKey && (event.key === 'k' || event.key === 'K')) {
           event.preventDefault()
-          if (editor) promptLink(editor)
+          openLinkRef.current()
           return true
         }
         if (event.key === 'Escape' && cancelRef.current) {
@@ -176,6 +180,9 @@ export function BodyEditor({
 
   const submit = async () => {
     if (!editor || !canSubmit) return
+    // A link on its own line becomes a card: in chat every such line, in a post or a comment the last one, which the
+    // author saved without pressing Enter after it.
+    embedLinks(editor, enterSubmits ? 'all' : 'last')
     setBusy(true)
     setError(null)
     try {
@@ -218,7 +225,12 @@ export function BodyEditor({
         <Row justify="between" align="center">
           <Row gap={2} align="center" wrap="never">
             <Row shrink={false}>
-              <EditorToolbar editor={editor} onImage={(files) => addImagesRef.current(files)} />
+              <EditorToolbar
+                editor={editor}
+                onImage={(files) => addImagesRef.current(files)}
+                linkOpen={linkOpen}
+                onLinkOpenChange={setLinkOpen}
+              />
             </Row>
             {topic && topic.topics.length > 0 && (
               <TopicMenu

@@ -1,5 +1,5 @@
 import { useEditorState, type Editor } from '@tiptap/react'
-import { Button, EmojiButton, FilePicker, Row } from '../ui'
+import { Button, EmojiButton, FilePicker, LinkPopover, Row } from '../ui'
 import { useMediaQuery } from '../hooks/useLayout'
 import { IMAGE_ACCEPT } from '../editor/images'
 
@@ -7,16 +7,28 @@ interface EditorToolbarProps {
   editor: Editor | null
   /** When set, an image button is shown and passes the chosen files to this callback. */
   onImage?: (files: File[]) => void
+  /** Whether the link panel is open. The editor opens it on Mod+K too. */
+  linkOpen: boolean
+  onLinkOpenChange: (open: boolean) => void
 }
 
-/** Called by Mod+K or the Link button. Prompts for a URL and sets or unsets the link mark on the selection. */
-export function promptLink(editor: Editor) {
-  const previous = (editor.getAttributes('link').href as string | undefined) ?? ''
-  const href = window.prompt('Link URL', previous)
-  if (href === null) return
-  const chain = editor.chain().focus().extendMarkRange('link')
-  if (href.trim() === '') chain.unsetLink().run()
-  else chain.setLink({ href: href.trim() }).run()
+/**
+ * Sets a link from the link panel. With text selected, or the cursor in a link, the link is set on it. Otherwise the
+ * address is inserted as linked text, and typing after it is not part of the link. An address with no scheme, such
+ * as example.com, gets https://.
+ */
+export function saveLink(editor: Editor, address: string) {
+  const href = /^[a-z][a-z0-9+.-]*:/i.test(address) ? address : `https://${address}`
+  if (editor.state.selection.empty && !editor.isActive('link')) {
+    editor
+      .chain()
+      .focus()
+      .insertContent({ type: 'text', text: href, marks: [{ type: 'link', attrs: { href } }] })
+      .unsetMark('link')
+      .run()
+  } else {
+    editor.chain().focus().extendMarkRange('link').setLink({ href }).run()
+  }
 }
 
 /**
@@ -24,7 +36,7 @@ export function promptLink(editor: Editor) {
  * key, so the formatting buttons are always shown. The emoji button is shown only on a device with a mouse or
  * trackpad, because a phone's keyboard has emoji (Raphael, 2026-11-10).
  */
-export function EditorToolbar({ editor, onImage }: EditorToolbarProps) {
+export function EditorToolbar({ editor, onImage, linkOpen, onLinkOpenChange }: EditorToolbarProps) {
   const pointer = useMediaQuery('(pointer: fine)')
   const active = useEditorState({
     editor,
@@ -32,6 +44,7 @@ export function EditorToolbar({ editor, onImage }: EditorToolbarProps) {
       bold: editor?.isActive('bold') ?? false,
       italic: editor?.isActive('italic') ?? false,
       link: editor?.isActive('link') ?? false,
+      href: (editor?.getAttributes('link').href as string | undefined) ?? '',
     }),
   })
   if (!editor) return null
@@ -51,7 +64,23 @@ export function EditorToolbar({ editor, onImage }: EditorToolbarProps) {
         pressed={!!active?.italic}
         onClick={() => editor.chain().focus().toggleItalic().run()}
       />
-      <Button variant="ghost" icon="link" label="Link" pressed={!!active?.link} onClick={() => promptLink(editor)} />
+      <LinkPopover
+        open={linkOpen}
+        onOpenChange={(open) => {
+          onLinkOpenChange(open)
+          if (!open) editor.commands.focus()
+        }}
+        active={!!active?.link}
+        url={active?.href ?? ''}
+        onSave={(address) => {
+          saveLink(editor, address)
+          onLinkOpenChange(false)
+        }}
+        onRemove={() => {
+          editor.chain().focus().extendMarkRange('link').unsetLink().run()
+          onLinkOpenChange(false)
+        }}
+      />
       {onImage && <FilePicker accept={IMAGE_ACCEPT} icon="image" label="Add images" multiple onPick={onImage} />}
       {pointer && <EmojiButton onPick={(emoji) => editor.chain().focus().insertContent(emoji).run()} />}
     </Row>

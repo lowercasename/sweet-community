@@ -218,15 +218,14 @@ func wireReports(rows []store.ListOpenReportsRow) []Report {
 }
 
 // LinkPreview is a link's preview card: what the page gives in its OpenGraph tags, and the address of Sweet's copy
-// of its picture, or nil.
+// of its picture, or nil. The card shows the page's domain, which the client reads from the address.
 type LinkPreview struct {
 	URL         string  `json:"url"`
 	Title       string  `json:"title"`
 	Description string  `json:"description"`
-	SiteName    string  `json:"site_name"`
 	Image       *string `json:"image"`
 }
 
 func wireLinkPreview(row store.LinkPreview) LinkPreview {
-	return LinkPreview{URL: row.Url, Title: row.Title, Description: row.Description, SiteName: row.SiteName, Image: pictureURL(row.ImageID)}
+	return LinkPreview{URL: row.Url, Title: row.Title, Description: row.Description, Image: pictureURL(row.ImageID)}
 }

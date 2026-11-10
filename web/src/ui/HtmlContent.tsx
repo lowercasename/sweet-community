@@ -1,4 +1,5 @@
-import { useMemo, type MouseEvent } from 'react'
+import { useLayoutEffect, useMemo, useRef, useState, type MouseEvent, type ReactNode } from 'react'
+import { createPortal } from 'react-dom'
 import { wrapGalleries } from '../content/galleries'
 
 interface HtmlContentProps {
@@ -8,6 +9,11 @@ interface HtmlContentProps {
   size?: 'body' | 'small'
   /** Called on a click anywhere in the body. Body uses it to route the mention anchors it created without a page load. */
   onClick?: (e: MouseEvent<HTMLDivElement>) => void
+  /**
+   * Draws the card for each link preview in the body, a <p data-embed> holding one link. The card is drawn inside the
+   * paragraph, and the link stays as the fallback when no card is drawn.
+   */
+  embed?: (url: string) => ReactNode
 }
 
 /**
@@ -19,13 +25,36 @@ interface HtmlContentProps {
  * before storage. Nothing client-generated may be passed here unsanitised.
  * `pnpm check:atomic` fails if dangerouslySetInnerHTML appears anywhere else.
  */
-export function HtmlContent({ html, size = 'body', onClick }: HtmlContentProps) {
+export function HtmlContent({ html, size = 'body', onClick, embed }: HtmlContentProps) {
   const rendered = useMemo(() => wrapGalleries(html), [html])
+  const ref = useRef<HTMLDivElement>(null)
+  // The renderer is read through a ref, so a new function on every render does not find the paragraphs again.
+  const embedRef = useRef(embed)
+  embedRef.current = embed
+  const drawCards = embed !== undefined
+  const [slots, setSlots] = useState<{ el: Element; url: string }[]>([])
+  useLayoutEffect(() => {
+    const root = ref.current
+    if (!drawCards || !root) {
+      setSlots([])
+      return
+    }
+    setSlots(
+      [...root.querySelectorAll('p[data-embed]')].flatMap((el) => {
+        const url = el.querySelector('a')?.getAttribute('href')
+        return url ? [{ el, url }] : []
+      }),
+    )
+  }, [rendered, drawCards])
   return (
-    <div
-      className={size === 'small' ? 'content text-[15px]' : 'content'}
-      onClick={onClick}
-      dangerouslySetInnerHTML={{ __html: rendered }}
-    />
+    <>
+      <div
+        ref={ref}
+        className={size === 'small' ? 'content text-[15px]' : 'content'}
+        onClick={onClick}
+        dangerouslySetInnerHTML={{ __html: rendered }}
+      />
+      {slots.map((s, i) => createPortal(embedRef.current?.(s.url), s.el, `${i}:${s.url}`))}
+    </>
   )
 }

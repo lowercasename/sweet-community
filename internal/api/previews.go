@@ -69,7 +69,7 @@ func (s *Server) fetchPreview(ctx context.Context, raw, uploader string) (store.
 	}
 	save := store.SaveLinkPreviewParams{Url: raw, FetchedAt: db.Now()}
 	if p, err := preview.Fetch(ctx, c, raw); err == nil {
-		save.Found, save.Title, save.Description, save.SiteName = 1, p.Title, p.Description, p.SiteName
+		save.Found, save.Title, save.Description = 1, p.Title, p.Description
 		if p.ImageURL != "" && s.Images != nil {
 			if data, err := preview.FetchImage(ctx, c, p.ImageURL); err == nil {
 				if processed, err := images.Process(bytes.NewReader(data)); err == nil {
