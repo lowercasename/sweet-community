@@ -62,8 +62,7 @@ func envOr(key, fallback string) string {
 
 func main() {
 	// Go's memory limit is set to 90% of the container's, so the garbage collector frees memory before the kernel
-	// kills the server. A community may run in a 128 MB container. Outside a container with a limit nothing is set,
-	// and nothing is logged.
+	// kills the server. Outside a container with a limit nothing is set, and nothing is logged.
 	if limit, err := memlimit.Set(memlimit.WithProvider(memlimit.FromCgroup), memlimit.WithLogger(slog.New(slog.DiscardHandler))); err == nil && limit > 0 {
 		log.Printf("memory limit %d MB, from the container", limit>>20)
 	}

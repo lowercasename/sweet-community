@@ -19,12 +19,12 @@ const (
 	MaxUpload = 20 << 20
 	// MaxSide is the maximum length of the longer edge after processing.
 	MaxSide = 2000
-	// maxPixels is the largest image the server decodes. The app never sends a larger one. Decoding takes memory in
-	// proportion to the pixels, and the worst file of this size, a progressive CMYK JPEG, takes about 130 MB.
+	// maxPixels is the largest area the server decodes, 4 million pixels. A 2000 by 2000 image has this area, and so
+	// does a 4000 by 1000 one. The app never sends a larger area. Decoding takes memory in proportion to the pixels.
+	// The worst file of this area, a progressive CMYK JPEG, takes about 130 MB.
 	maxPixels = MaxSide * MaxSide
-	// maxAnimationPixels caps the sum of an animated GIF's frame areas. An
-	// animated GIF is stored as uploaded and the server never decodes all of
-	// its frames, so the cap protects the browsers that show it.
+	// maxAnimationPixels caps the sum of an animated GIF's frame areas. An animated GIF is stored without
+	// re-encoding, and the server decodes only its first frame, so the cap protects the browsers that show it.
 	maxAnimationPixels = 100_000_000
 	jpegQuality        = 85
 )
@@ -57,11 +57,11 @@ func Ext(contentType string) string {
 	}
 }
 
-// Process validates the image by its content rather than its file name. It refuses an image larger than maxPixels,
-// from its header, before any pixel is decoded. It caps the dimensions, turns a
-// photo upright and strips metadata by re-encoding. A transparent image becomes a PNG. An opaque JPEG stays a JPEG.
-// Any other opaque image becomes whichever of JPEG and PNG is smaller. An animated GIF is the exception. It is
-// stored without its metadata blocks but otherwise as uploaded, because re-encoding would lose the animation.
+// Process validates the image by its content rather than its file name. It reads the area from the header and
+// refuses an image of more than maxPixels before any pixel is decoded. It caps the dimensions, turns a photo upright
+// and strips metadata by re-encoding. A transparent image becomes a PNG. An opaque JPEG stays a JPEG. Any other
+// opaque image becomes whichever of JPEG and PNG is smaller. An animated GIF is not re-encoded, because re-encoding
+// would lose the animation. Only its metadata blocks are removed.
 func Process(r io.Reader) (Processed, error) {
 	processing.Lock()
 	defer processing.Unlock()

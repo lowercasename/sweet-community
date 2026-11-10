@@ -15,7 +15,7 @@ var errImageUnavailable = errors.New("One of the images is no longer available. 
 
 // recordUses records the images that a post, comment or message shows and the links it shows as cards, in place of
 // those recorded for it before. Each image must be one that its writer uploaded or can already see. Otherwise the
-// save is refused: the image may have been deleted while a draft was open, or belong to a room the writer is not in.
+// save is refused. The image may have been deleted while a draft was open, or belong to a room the writer is not in.
 // It runs in the save's transaction, so a refusal saves nothing.
 func recordUses(ctx context.Context, qtx *store.Queries, kind, id, writer, body string) (int, error) {
 	imgs := sanitize.Images(body)

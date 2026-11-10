@@ -32,9 +32,9 @@ const link = SweetLink
  * upload. In the editor the node is rendered by EditorImage, a card with the
  * alt text field. getHTML() still serialises a plain <img>, so stored HTML is
  * unchanged. An image just added shows at once from a local copy while it
- * uploads: `upload` is its key, `progress` the fraction sent, and `failed` the
- * reason its upload failed ('' when there is none to give). These three exist
- * only in the editor and are never saved.
+ * uploads. `upload` is its key. `progress` is the fraction sent. `failed` is
+ * the reason its upload failed, or '' when there is none to give. These three
+ * attributes exist only in the editor and are never saved.
  */
 export const SweetImage = Image.extend({
   // Only Sweet's own images are read from HTML. Pictures in HTML pasted from another site are left out, because the
@@ -155,7 +155,7 @@ const commentKit = StarterKit.configure(shortKit)
 export const commentExtensions = [commentKit, link, Embed, placeholder, SweetImage]
 
 /**
- * The schema of a bio, the rules and the welcome message: the comment schema without images and preview cards, so a
- * link on its own line stays a link. The server's policy for these texts is the same.
+ * The schema of a bio, the rules and the welcome message. It is the comment schema without images and preview cards,
+ * so a link on its own line stays a link. The server's policy for these texts is the same.
  */
 export const textExtensions = [commentKit, link, placeholder]

@@ -1,5 +1,4 @@
-// Package db opens the instance's SQLite database with the pragmas the
-// architecture notes require and applies embedded migrations.
+// Package db opens the instance's SQLite database with its pragmas and applies the embedded migrations.
 package db
 
 import (

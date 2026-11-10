@@ -51,7 +51,7 @@ func (s *Server) getText(t communityText) http.HandlerFunc {
 }
 
 // setText is `PUT /api/rules {body_html}` or `PUT /api/welcome {body_html}`, for the owner and moderators. The body
-// is sanitised like a post's. An empty body clears the text. Every signed-in user receives the text's event.
+// is sanitised like a post, without images or preview cards. An empty body clears the text. Every signed-in user receives the text's event.
 func (s *Server) setText(t communityText) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var in struct {

@@ -125,7 +125,6 @@ func TestAnimatedGIFIsLimitedByItsFramesBeforeDecoding(t *testing.T) {
 	}
 }
 
-// A phone photo is about 12 megapixels. Processing one must fit in a small container: a community runs in 128 MB.
 // withOrientation adds an EXIF block with this orientation tag to a JPEG, as a phone camera does. The camera stores
 // the pixels as the sensor read them and records how to turn them upright.
 func withOrientation(data []byte, orientation byte) []byte {

@@ -13,9 +13,8 @@ import (
 )
 
 // Profile is a user as their profile page shows them. It holds the user, their role on the instance, when they
-// joined, and their bio. The bio is a body like any other and is sanitised by
-// the same policy. Every user on the instance may see every profile. Only
-// the profile's user may edit the bio.
+// joined, and their bio. The bio is sanitised like a post, without images or preview cards. Every user on the
+// instance may see every profile. Only the profile's user may edit the bio.
 type Profile struct {
 	User
 	Role     string `json:"role"`
@@ -47,8 +46,8 @@ func (s *Server) getProfile(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, profileFor(me, wireProfile(row)))
 }
 
-// setBio sets the signed-in user's bio. It is sanitised like a body and may
-// be empty. The event carries the whole profile, so every open page redraws it.
+// setBio sets the signed-in user's bio. It is sanitised like a post, without images or preview cards, and may be
+// empty. The event carries the whole profile, so every open page redraws it.
 func (s *Server) setBio(w http.ResponseWriter, r *http.Request) {
 	var in struct {
 		BodyHTML string `json:"body_html"`

@@ -19,7 +19,7 @@ const imageOf = (target: EventTarget) => (target as HTMLElement).closest?.<HTMLI
  * profile. The app's router handles those links, so tapping a name changes
  * the route without a full page load. A link preview in the body is drawn as
  * a card with the server's preview, or stays a plain link when there is none.
- * An image opens alone, full screen, on a click or on Enter.
+ * An image opens alone, full screen, on a click, on Enter or on Space.
  */
 export function Body({ html, size }: BodyProps) {
   const { data: users } = useUsers()

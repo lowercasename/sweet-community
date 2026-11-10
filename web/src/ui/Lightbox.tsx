@@ -12,7 +12,7 @@ interface LightboxProps {
 }
 
 /**
- * One image, full screen, on a dark backdrop, with nothing else. Pinching, double-tapping or the mouse wheel zooms.
+ * One image, full screen, on a dark backdrop, with nothing else. Pinching, double-tapping, or the mouse wheel with Ctrl held, zooms.
  * Escape, the close button, a click beside the image or pulling down on a phone closes it.
  */
 export function Lightbox({ image, onClose, onClosed }: LightboxProps) {

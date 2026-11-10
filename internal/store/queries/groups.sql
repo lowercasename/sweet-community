@@ -69,7 +69,7 @@ ORDER BY role = 'moderator' DESC, joined_at ASC LIMIT 1;
 -- name: CountMembers :one
 SELECT COUNT(*) FROM memberships WHERE group_id = sqlc.arg(group_id) AND hidden_at IS NULL;
 
--- Marks a group deleted. Its picture is released, so the image sweep can remove it.
+-- Marks a group deleted and clears its picture, so the image sweep can delete that image.
 -- name: DeleteGroup :exec
 UPDATE groups SET deleted_at = sqlc.arg(deleted_at), picture_id = NULL WHERE id = sqlc.arg(id) AND deleted_at IS NULL;
 

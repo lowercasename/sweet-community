@@ -9,9 +9,8 @@ import (
 	"sweet/internal/store"
 )
 
-// Sweep deletes images uploaded before `before` that nothing references. An image is referenced when it is a
-// profile picture, a live group's picture or a link preview's picture, or when a live post, comment or message, or
-// an open report's copy, uses it. Link previews that no live body shows as a card are deleted first, so their
+// Sweep deletes images uploaded before `before` that nothing references. The image_references view lists the
+// references. Link previews that no live body shows as a card are deleted first, so their
 // pictures go in the same run. An image is stored as soon as it is uploaded, so the unreferenced images are those
 // from drafts that were never posted, images removed while editing, and images from deleted content. A failure on
 // one image does not stop the others. Sweep returns the number of images removed and every error.

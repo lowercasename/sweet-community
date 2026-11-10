@@ -77,7 +77,7 @@ type DeleteGroupParams struct {
 	ID        string
 }
 
-// Marks a group deleted. Its picture is released, so the image sweep can remove it.
+// Marks a group deleted and clears its picture, so the image sweep can delete that image.
 func (q *Queries) DeleteGroup(ctx context.Context, arg DeleteGroupParams) error {
 	_, err := q.db.ExecContext(ctx, deleteGroup, arg.DeletedAt, arg.ID)
 	return err

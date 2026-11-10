@@ -176,7 +176,7 @@ export function retryUpload(editor: Editor, tr: Transaction, key: string): boole
 
 /**
  * Gives an upload's outcome to an image node that came back without it. A node removed while it uploaded, then
- * restored by undo or redo, has its old attributes: it gets the finished upload's attributes, or the failure. A node
+ * restored by undo or redo, has its old attributes. It gets the finished upload's attributes, or the failure. A node
  * that already shows the outcome is left alone. Returns null when no node needs it.
  */
 export function restoreUploads(editor: Editor, state: EditorState): Transaction | null {

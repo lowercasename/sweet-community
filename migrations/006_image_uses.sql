@@ -26,7 +26,7 @@ CREATE VIEW live_bodies AS
         WHERE x.deleted_at IS NULL;
 
 -- The image uses that count. A use counts while its body is live, or while its report is open. group_id is the
--- group of the body. For a report it is the reported content's group.
+-- group whose members may see the image. For a report it is the group of the reported post, comment or message.
 CREATE VIEW live_image_uses AS
     SELECT u.image_id, u.kind, b.group_id FROM image_uses u
         JOIN live_bodies b ON b.kind = u.kind AND b.id = u.id
@@ -34,8 +34,8 @@ CREATE VIEW live_image_uses AS
     SELECT u.image_id, u.kind, r.group_id FROM image_uses u
         JOIN reports r ON u.kind = 'report' AND r.id = u.id AND r.closed_at IS NULL;
 
--- Every reference that keeps an image: a profile picture, a live group's picture, a link preview's picture, or a
--- live use. The sweep deletes only images that have none.
+-- Every reference that keeps an image. A reference is a profile picture, a live group's picture, a link preview's
+-- picture or a live use. The sweep deletes only images that have none.
 CREATE VIEW image_references AS
     SELECT picture_id AS image_id FROM users WHERE picture_id IS NOT NULL
     UNION ALL

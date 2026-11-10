@@ -12,9 +12,9 @@ import { embedLinks } from '../editor/embed'
 import { TopicMenu } from './TopicMenu'
 
 /**
- * An image attached to a chat message. `file` is the chosen file, kept for Try again, and `preview` the address of its
- * local copy, shown at once. `progress` is the fraction sent, `failed` the reason the upload failed ('' when there is
- * none to give), and `uploaded` the stored image once the upload has finished.
+ * An image attached to a chat message. `file` is the chosen file, kept for Try again. `preview` is the address of its
+ * local copy, shown at once. `progress` is the fraction sent. `failed` is the reason the upload failed, or '' when
+ * there is none to give. `uploaded` is the stored image, once the upload has finished.
  */
 interface Attachment {
   key: string

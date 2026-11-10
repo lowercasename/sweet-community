@@ -14,9 +14,10 @@ CREATE VIEW live_link_uses AS
     SELECT u.url FROM link_uses u
         JOIN live_bodies b ON b.kind = u.kind AND b.id = u.id;
 
--- Stored files whose images have been deleted, waiting to be deleted from storage. The image sweep deletes an image's
--- row in a short transaction and the file afterwards, so it never holds the write lock while it waits on storage. A
--- file that cannot be deleted stays here and is tried again on the next run.
+-- Stored files waiting to be deleted from storage. The image sweep deletes an image's row in a short transaction and
+-- lists its file here, then deletes the file afterwards, so it never holds the write lock while it waits on storage.
+-- An upload whose file was stored but whose row could not be written also lists its file here. A file that cannot
+-- be deleted stays here and is tried again on the next run.
 CREATE TABLE image_files_to_delete (
     key TEXT PRIMARY KEY
 );
