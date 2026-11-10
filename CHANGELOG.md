@@ -1,5 +1,20 @@
 # Changelog
 
+## v1.6.2 (2026-11-10)
+
+- Delete an upload's temporary file after reading it
+- Correct the image comments and the design document's wording
+- Move timer and undo tests to Vitest, and merge the conversion browser tests
+- Merge the image sweep tests, and test migration 006 for every kind of body
+- Use one upload function for post images and chat attachments
+- Tidy the server's image code
+- Let imaging turn, resize and encode images
+- Read uploads with Go's standard form handling
+- Send every image that is not a photo as PNG
+- Fix four small faults in uploads and previews
+- Replace the image memory estimate with a pixel limit, and show old texts as stored
+- Take the backfill out of migration 007, and never change user content
+
 ## v1.6.1 (2026-11-10)
 
 - Correct the image records after the second review
