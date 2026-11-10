@@ -7,6 +7,8 @@ import (
 	"image/gif"
 	"image/jpeg"
 	"image/png"
+	"math/rand"
+	"os"
 	"runtime"
 	"strings"
 	"testing"
@@ -27,6 +29,21 @@ func gifOf(frames int) []byte {
 	return buf.Bytes()
 }
 
+// noisyPNG is an opaque PNG with random pixels, which a photo resembles more than a flat image does.
+func noisyPNG(w, h int) []byte {
+	img := image.NewNRGBA(image.Rect(0, 0, w, h))
+	r := rand.New(rand.NewSource(1))
+	for i := range img.Pix {
+		img.Pix[i] = uint8(r.Intn(256))
+		if i%4 == 3 {
+			img.Pix[i] = 255
+		}
+	}
+	var buf bytes.Buffer
+	png.Encode(&buf, img)
+	return buf.Bytes()
+}
+
 func pngOf(w, h int, c color.Color) []byte {
 	img := image.NewNRGBA(image.Rect(0, 0, w, h))
 	for y := 0; y < h; y++ {
@@ -40,10 +57,15 @@ func pngOf(w, h int, c color.Color) []byte {
 }
 
 func TestProcess(t *testing.T) {
-	// An opaque image becomes a JPEG. A transparent image stays a PNG.
+	// An opaque image from a lossless file is stored in whichever of PNG and JPEG is smaller. A flat image, such as a
+	// screenshot, stays a PNG. A photo becomes a JPEG. A transparent image stays a PNG.
 	p, err := Process(bytes.NewReader(pngOf(10, 10, color.NRGBA{200, 30, 30, 255})))
-	if err != nil || p.ContentType != "image/jpeg" || p.Width != 10 {
-		t.Fatalf("opaque: %+v %v", p, err)
+	if err != nil || p.ContentType != "image/png" || p.Width != 10 {
+		t.Fatalf("flat opaque: %s %v", p.ContentType, err)
+	}
+	p, err = Process(bytes.NewReader(noisyPNG(200, 150)))
+	if err != nil || p.ContentType != "image/jpeg" || p.Width != 200 {
+		t.Fatalf("photo-like opaque: %s %v", p.ContentType, err)
 	}
 	p, err = Process(bytes.NewReader(pngOf(10, 10, color.NRGBA{200, 30, 30, 120})))
 	if err != nil || p.ContentType != "image/png" {
@@ -105,10 +127,11 @@ func TestAnimatedGIFIsLimitedByItsFramesBeforeDecoding(t *testing.T) {
 }
 
 // A phone photo is about 12 megapixels. Processing one must fit in a small container: a community runs in 128 MB.
-// The resize once used a temporary buffer of 32 bytes per pixel, about 194 MB for this photo, and the kernel killed
-// the server. The test counts every byte that Process allocates.
-func TestProcessAPhonePhotoFitsInASmallContainer(t *testing.T) {
-	img := image.NewYCbCr(image.Rect(0, 0, 4032, 3024), image.YCbCrSubsampleRatio420)
+// The resize once used a temporary buffer of 32 bytes per pixel, about 194 MB for a 12-megapixel photo, and the
+// kernel killed the server. The largest JPEG the server accepts, taken upright and stored on its side, is resized and
+// turned within the memory limit. The test counts every byte that Process allocates.
+func TestProcessALargePhotoFitsInASmallContainer(t *testing.T) {
+	img := image.NewYCbCr(image.Rect(0, 0, 2400, 1600), image.YCbCrSubsampleRatio420)
 	for i := range img.Y {
 		img.Y[i] = uint8(i * 7)
 	}
@@ -116,24 +139,29 @@ func TestProcessAPhonePhotoFitsInASmallContainer(t *testing.T) {
 	if err := jpeg.Encode(&buf, img, &jpeg.Options{Quality: 90}); err != nil {
 		t.Fatal(err)
 	}
-	// A photo taken upright is stored on its side with orientation 6, so it is also turned.
 	data := withOrientation(buf.Bytes(), 6)
-	runtime.GC()
-	var before, after runtime.MemStats
-	runtime.ReadMemStats(&before)
-	p, err := Process(bytes.NewReader(data))
-	runtime.ReadMemStats(&after)
+	var p Processed
+	var err error
+	got := allocated(func() { p, err = Process(bytes.NewReader(data)) })
 	if err != nil {
 		t.Fatal(err)
 	}
-	if p.Height != MaxSide {
-		t.Fatalf("height %d, want %d", p.Height, MaxSide)
+	if p.Width != 1333 || p.Height != MaxSide {
+		t.Fatalf("size %dx%d, want 1333x%d", p.Width, p.Height, MaxSide)
 	}
-	const limit = 96 << 20
-	if got := after.TotalAlloc - before.TotalAlloc; got > limit {
-		t.Fatalf("processing a 12-megapixel photo allocated %d MB, more than %d MB", got>>20, limit>>20)
-	} else {
-		t.Logf("allocated %d MB", got>>20)
+	if got > 64<<20 {
+		t.Fatalf("processing a 2400 by 1600 photo allocated %d MB, more than 64 MB", got>>20)
+	}
+}
+
+// A 12-megapixel phone photo sent straight to the server is refused, because a JPEG of that size could be
+// progressive and need about 200 MB. The app shrinks every image to 2000 pixels before uploading it.
+func TestProcessRefusesAFullSizePhonePhoto(t *testing.T) {
+	img := image.NewYCbCr(image.Rect(0, 0, 4032, 3024), image.YCbCrSubsampleRatio420)
+	var buf bytes.Buffer
+	jpeg.Encode(&buf, img, &jpeg.Options{Quality: 50})
+	if _, err := Process(bytes.NewReader(buf.Bytes())); err != ErrTooLarge {
+		t.Fatalf("got %v, want ErrTooLarge", err)
 	}
 }
 
@@ -196,5 +224,76 @@ func TestProcessTurnsAPhonePhotoUpright(t *testing.T) {
 	// The metadata is not kept.
 	if bytes.Contains(p.Data, []byte("Exif")) {
 		t.Fatal("the stored image still has its EXIF block")
+	}
+}
+
+// The files in testdata are 2000 by 2000. progressive-444-2000.jpg was written by cjpeg -progressive -sample 1x1.
+// progressive-cmyk-2000.jpg was converted to CMYK by sips and made progressive by jpegtran. alpha-2000.webp is a
+// lossy WebP with an alpha channel, written by github.com/gen2brain/webp. They are the most expensive files of their
+// formats to decode.
+func testdata(t *testing.T, name string) []byte {
+	t.Helper()
+	data, err := os.ReadFile("testdata/" + name)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return data
+}
+
+// allocated returns the bytes that fn allocates.
+func allocated(fn func()) uint64 {
+	runtime.GC()
+	var before, after runtime.MemStats
+	runtime.ReadMemStats(&before)
+	fn()
+	runtime.ReadMemStats(&after)
+	return after.TotalAlloc - before.TotalAlloc
+}
+
+func png16(w, h int) []byte {
+	img := image.NewNRGBA64(image.Rect(0, 0, w, h))
+	for i := range img.Pix {
+		img.Pix[i] = byte(i)
+	}
+	var buf bytes.Buffer
+	(&png.Encoder{CompressionLevel: png.BestSpeed}).Encode(&buf, img)
+	return buf.Bytes()
+}
+
+// A small file can need far more memory to decode than its size suggests. A 454 KB progressive JPEG once took
+// 642 MB. Such a file is refused from its header, before any pixel is decoded.
+func TestProcessRefusesBeforeDecodingAnImageThatWouldNeedTooMuchMemory(t *testing.T) {
+	for name, data := range map[string][]byte{
+		"a 2000 by 2000 progressive CMYK JPEG": testdata(t, "progressive-cmyk-2000.jpg"),
+		"a 2100 by 2000 16-bit PNG":            png16(2100, 2000),
+	} {
+		var err error
+		got := allocated(func() { _, err = Process(bytes.NewReader(data)) })
+		if err != ErrTooLarge {
+			t.Errorf("%s: got %v, want ErrTooLarge", name, err)
+		}
+		if extra := got - uint64(len(data)); extra > 1<<20 {
+			t.Errorf("%s: allocated %d KB besides the file, so it was decoded", name, extra>>10)
+		}
+	}
+}
+
+// The most expensive file of each format that is accepted stays within the budget. The budget is checked in a
+// 128 MB container separately. Here the allocations, which also count short-lived garbage, have a looser limit.
+func TestProcessTheMostExpensiveAcceptedImagesStayWithinMemory(t *testing.T) {
+	for name, data := range map[string][]byte{
+		"a 2000 by 2000 progressive JPEG with full-resolution colour": testdata(t, "progressive-444-2000.jpg"),
+		"a 2000 by 2000 16-bit PNG":                                   png16(2000, 2000),
+		"a 2000 by 2000 WebP with transparency":                       testdata(t, "alpha-2000.webp"),
+	} {
+		var p Processed
+		var err error
+		got := allocated(func() { p, err = Process(bytes.NewReader(data)) })
+		if err != nil || p.Width != 2000 {
+			t.Errorf("%s: %v %dx%d", name, err, p.Width, p.Height)
+		}
+		if got > 80<<20 {
+			t.Errorf("%s: allocated %d MB, more than 80 MB", name, got>>20)
+		}
 	}
 }

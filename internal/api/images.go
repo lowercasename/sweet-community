@@ -10,6 +10,7 @@ import (
 	"strconv"
 
 	"github.com/google/uuid"
+	"golang.org/x/sync/semaphore"
 
 	"sweet/internal/db"
 	"sweet/internal/images"
@@ -35,35 +36,84 @@ func pictureURL(id sql.NullString) *string {
 	return &u
 }
 
+// uploadBytes is the most upload data held in memory at once. A community may run in a 128 MB container, and
+// processing one image may take 64 MB more. Small uploads are read side by side. A large one waits for room.
+const uploadBytes = 24 << 20
+
+var uploads = semaphore.NewWeighted(uploadBytes)
+
 // uploadImage reads the multipart field "file", processes the image and stores it.
 func (s *Server) uploadImage(w http.ResponseWriter, r *http.Request) {
 	if s.Images == nil {
 		writeErr(w, http.StatusNotImplemented, "Image storage is not configured")
 		return
 	}
-	r.Body = http.MaxBytesReader(w, r.Body, images.MaxUpload+64<<10)
-	file, _, err := r.FormFile("file")
-	if err != nil {
-		writeErr(w, http.StatusBadRequest, "Send the image as the multipart field \"file\"")
+	const limit = images.MaxUpload + 64<<10 // the file and the form around it
+	if r.ContentLength > limit {
+		writeErr(w, http.StatusRequestEntityTooLarge, images.ErrTooLarge.Error())
 		return
 	}
-	defer file.Close()
-	p, err := images.Process(file)
+	size := r.ContentLength
+	if size <= 0 {
+		size = limit
+	}
+	if err := uploads.Acquire(r.Context(), size); err != nil {
+		return // the client has gone
+	}
+	defer uploads.Release(size)
+	r.Body = http.MaxBytesReader(w, r.Body, limit)
+	file, err := filePart(r)
+	if err == nil {
+		var p images.Processed
+		if p, err = images.Process(file); err == nil {
+			me, _ := userFrom(r.Context())
+			img, err := s.storeImage(r.Context(), p, me.ID)
+			if err != nil {
+				writeErr(w, http.StatusInternalServerError, err.Error())
+				return
+			}
+			writeJSON(w, http.StatusCreated, img)
+			return
+		}
+	}
+	var tooBig *http.MaxBytesError
 	switch {
+	case errors.As(err, &tooBig):
+		writeErr(w, http.StatusRequestEntityTooLarge, images.ErrTooLarge.Error())
+	case errors.Is(err, errNoFile):
+		writeErr(w, http.StatusBadRequest, "Choose an image to upload.")
 	case errors.Is(err, images.ErrNotImage), errors.Is(err, images.ErrTooLarge):
 		writeErr(w, http.StatusUnprocessableEntity, err.Error())
-		return
-	case err != nil:
+	default:
 		writeErr(w, http.StatusInternalServerError, err.Error())
-		return
 	}
-	me, _ := userFrom(r.Context())
-	img, err := s.storeImage(r.Context(), p, me.ID)
+}
+
+var errNoFile = errors.New("no file field")
+
+// filePart returns the reader of the form's "file" field. The form is read as a stream, so the file is held in
+// memory once, by Process.
+func filePart(r *http.Request) (io.Reader, error) {
+	mr, err := r.MultipartReader()
 	if err != nil {
-		writeErr(w, http.StatusInternalServerError, err.Error())
-		return
+		return nil, errNoFile
 	}
-	writeJSON(w, http.StatusCreated, img)
+	for {
+		part, err := mr.NextPart()
+		if errors.Is(err, io.EOF) {
+			return nil, errNoFile
+		}
+		if err != nil {
+			var tooBig *http.MaxBytesError
+			if errors.As(err, &tooBig) {
+				return nil, err
+			}
+			return nil, errNoFile
+		}
+		if part.FormName() == "file" {
+			return part, nil
+		}
+	}
 }
 
 // storeImage stores a processed image and records it with its uploader. Uploads and the pictures of link previews

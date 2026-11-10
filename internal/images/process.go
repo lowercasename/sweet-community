@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"errors"
 	"image"
+	"image/color"
 	"image/gif"
 	"image/jpeg"
 	"image/png"
@@ -20,8 +21,6 @@ const (
 	MaxUpload = 20 << 20
 	// MaxSide is the maximum length of the longer edge after processing.
 	MaxSide = 2000
-	// maxPixels guards against decompression bombs before decoding.
-	maxPixels = 40_000_000
 	// maxAnimationPixels caps the sum of an animated GIF's frame areas. An
 	// animated GIF is stored as uploaded and the server never decodes all of
 	// its frames, so the cap protects the browsers that show it.
@@ -59,11 +58,11 @@ func Ext(contentType string) string {
 	}
 }
 
-// Process validates the image by its content rather than its file name, caps
-// its dimensions, turns a photo upright, strips metadata by re-encoding it, and returns a JPEG for an
-// opaque image or a PNG for an image with transparency. An animated GIF is the
-// exception. It is stored as uploaded, because re-encoding would lose the
-// animation.
+// Process validates the image by its content rather than its file name. It refuses an image whose decoding would
+// take more than decodeBudget, judged from the header before any pixel is decoded. It caps the dimensions, turns a
+// photo upright and strips metadata by re-encoding. A transparent image becomes a PNG. An opaque JPEG stays a JPEG.
+// Any other opaque image becomes whichever of JPEG and PNG is smaller. An animated GIF is the exception. It is
+// stored as uploaded, because re-encoding would lose the animation.
 func Process(r io.Reader) (Processed, error) {
 	data, err := io.ReadAll(io.LimitReader(r, MaxUpload+1))
 	if err != nil {
@@ -79,14 +78,14 @@ func Process(r io.Reader) (Processed, error) {
 	default:
 		return Processed{}, ErrNotImage
 	}
-	cfg, _, err := image.DecodeConfig(bytes.NewReader(data))
+	cfg, format, err := image.DecodeConfig(bytes.NewReader(data))
 	if err != nil {
 		return Processed{}, ErrNotImage
 	}
-	if cfg.Width <= 0 || cfg.Height <= 0 || cfg.Width*cfg.Height > maxPixels {
+	if cfg.Width <= 0 || cfg.Height <= 0 || int64(cfg.Width)*int64(cfg.Height)*decodeCost(format, cfg.ColorModel) > decodeBudget {
 		return Processed{}, ErrTooLarge
 	}
-	if http.DetectContentType(data) == "image/gif" {
+	if format == "gif" {
 		frames, area, err := gifFrames(data)
 		if err != nil {
 			return Processed{}, ErrNotImage
@@ -95,7 +94,7 @@ func Process(r io.Reader) (Processed, error) {
 			if area > maxAnimationPixels {
 				return Processed{}, ErrTooLarge
 			}
-			// Only the first frame is decoded, to check that the file is a GIF. Its size is bounded by maxPixels.
+			// Only the first frame is decoded, to check that the file is a GIF. Its size is within the budget.
 			if _, err := gif.Decode(bytes.NewReader(data)); err != nil {
 				return Processed{}, ErrNotImage
 			}
@@ -129,26 +128,123 @@ func Process(r io.Reader) (Processed, error) {
 	}
 	// A phone stores a photo as its sensor read it and records in EXIF how to turn it upright. The image is turned
 	// after the resize, because turning it at full size takes another 4 bytes a pixel.
-	if http.DetectContentType(data) == "image/jpeg" {
+	if format == "jpeg" {
 		src = upright(src, orientation(data))
 		w, h = src.Bounds().Dx(), src.Bounds().Dy()
 	}
 
-	var buf bytes.Buffer
 	out := Processed{Width: w, Height: h}
-	if opaque(src) {
-		if err := jpeg.Encode(&buf, src, &jpeg.Options{Quality: jpegQuality}); err != nil {
-			return Processed{}, err
-		}
-		out.ContentType, out.Ext = "image/jpeg", "jpg"
-	} else {
-		if err := (&png.Encoder{CompressionLevel: png.BestCompression}).Encode(&buf, src); err != nil {
-			return Processed{}, err
-		}
+	if !opaque(src) {
+		// A transparent image is stored as PNG, which keeps the transparency.
+		out.Data, err = encodePNG(src)
 		out.ContentType, out.Ext = "image/png", "png"
+		return out, err
 	}
-	out.Data = buf.Bytes()
+	jpg, err := encodeJPEG(src)
+	if err != nil {
+		return Processed{}, err
+	}
+	out.Data, out.ContentType, out.Ext = jpg, "image/jpeg", "jpg"
+	// An opaque image from a lossless file, such as a screenshot, may be smaller as PNG, and PNG keeps text sharp. A
+	// photo is smaller as JPEG. The smaller of the two is kept. A JPEG upload stays JPEG.
+	if format != "jpeg" {
+		if p, err := encodePNG(src); err == nil && len(p) < len(jpg) {
+			out.Data, out.ContentType, out.Ext = p, "image/png", "png"
+		}
+	}
 	return out, nil
+}
+
+// The bytes for each pixel that decoding and processing take, measured on 2000 by 2000 images in a 128 MB container
+// and rounded up. Processing includes the resize, the conversion for the encoder and both encodings of an opaque
+// lossless image. See decodeCost.
+const (
+	costJPEGGray   = 6  // measured 5
+	costJPEGColour = 16 // measured 14.5, progressive with full-resolution colour
+	costJPEGCMYK   = 28 // measured 26
+	costPNGGray    = 3  // measured 2.8
+	costPNGGray16  = 9  // measured 8.3
+	costPNG8       = 5  // measured 4.3
+	costPNG16      = 16 // measured 15.5
+	costPNGPalette = 8  // measured 7
+	costGIF        = 8  // measured 7.5
+	costWebPLossy  = 7  // measured 5.8
+	costWebPAlpha  = 12 // measured 11.5
+	costWebPLoss   = 5  // measured 4, lossless
+)
+
+// decodeBudget is the most memory that decoding and processing one image may take. A community may run in a
+// 128 MB container, and the server needs the rest.
+const decodeBudget = 64 << 20
+
+// decodeCost returns the bytes for each pixel that decoding and processing an image takes, by its format and the
+// colour model in its header. The figures were measured. A JPEG is counted as progressive, its worst case: Go's
+// progressive decoder keeps 4 bytes a pixel for each colour component, besides the image itself.
+func decodeCost(format string, m color.Model) int64 {
+	switch format {
+	case "jpeg":
+		switch m {
+		case color.GrayModel:
+			return costJPEGGray
+		case color.CMYKModel:
+			return costJPEGCMYK
+		}
+		return costJPEGColour
+	case "png":
+		switch m {
+		case color.GrayModel:
+			return costPNGGray
+		case color.Gray16Model:
+			return costPNGGray16
+		case color.RGBAModel, color.NRGBAModel:
+			return costPNG8
+		case color.RGBA64Model, color.NRGBA64Model:
+			return costPNG16
+		}
+		return costPNGPalette
+	case "gif":
+		return costGIF
+	case "webp":
+		switch m {
+		case color.YCbCrModel:
+			return costWebPLossy
+		case color.NRGBAModel:
+			return costWebPLoss
+		}
+		return costWebPAlpha
+	}
+	return costJPEGCMYK
+}
+
+// encodeJPEG encodes an opaque image. Go's JPEG encoder reads *image.RGBA, *image.YCbCr and *image.Gray directly and
+// any other type one pixel at a time, which allocates for every pixel. An opaque *image.NRGBA holds the same bytes as
+// an *image.RGBA, because every alpha value is 255, so it is passed as one without copying.
+func encodeJPEG(img image.Image) ([]byte, error) {
+	switch m := img.(type) {
+	case *image.RGBA, *image.YCbCr, *image.Gray:
+	case *image.NRGBA:
+		img = &image.RGBA{Pix: m.Pix, Stride: m.Stride, Rect: m.Rect}
+	default:
+		n := imaging.Clone(img)
+		img = &image.RGBA{Pix: n.Pix, Stride: n.Stride, Rect: n.Rect}
+	}
+	var buf bytes.Buffer
+	err := jpeg.Encode(&buf, img, &jpeg.Options{Quality: jpegQuality})
+	return buf.Bytes(), err
+}
+
+// encodePNG encodes an image as PNG. Go's PNG encoder reads the common types directly. Any other type, such as a
+// WebP with transparency or a CMYK JPEG, is copied to *image.NRGBA first, because the encoder would otherwise
+// allocate for every pixel.
+func encodePNG(img image.Image) ([]byte, error) {
+	switch img.(type) {
+	case *image.NRGBA, *image.RGBA, *image.Gray, *image.Gray16, *image.RGBA64, *image.NRGBA64, *image.Paletted:
+	default:
+		img = imaging.Clone(img)
+	}
+	var buf bytes.Buffer
+	err := (&png.Encoder{CompressionLevel: png.BestCompression}).Encode(&buf, img)
+	return buf.Bytes(), err
 }
 
 // orientation returns a JPEG's EXIF orientation, from 1 to 8. It returns 1, upright, when the file has no EXIF block

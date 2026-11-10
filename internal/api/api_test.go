@@ -423,12 +423,13 @@ func TestImagesUploadServeAndPicture(t *testing.T) {
 	url := img["url"].(string)
 
 	// The image is served to members with a long private cache lifetime. It is not served to unauthenticated clients.
+	// The test image is a smooth gradient, which is smaller as PNG than as JPEG, so it is stored as PNG.
 	res, err := owner.http.Get(owner.base + url)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer res.Body.Close()
-	if res.StatusCode != 200 || res.Header.Get("Content-Type") != "image/jpeg" || !strings.Contains(res.Header.Get("Cache-Control"), "immutable") {
+	if res.StatusCode != 200 || res.Header.Get("Content-Type") != "image/png" || !strings.Contains(res.Header.Get("Cache-Control"), "immutable") {
 		t.Fatalf("serve: %d %v", res.StatusCode, res.Header)
 	}
 	if _, _, err := image.Decode(res.Body); err != nil {
@@ -1043,5 +1044,37 @@ func TestDeleteByRole(t *testing.T) {
 		if mm := m.(map[string]any); mm["id"] == dmsg["id"] && byRole(mm) {
 			t.Fatal("a conversation message is marked as deleted by role")
 		}
+	}
+}
+
+// An upload over the size limit gets the same sentence as any image that is too large. The client shows a 4xx
+// sentence to the user, so it must not describe the form encoding.
+func TestUploadOverTheSizeLimitIsTooLarge(t *testing.T) {
+	_, owner := newTestServer(t)
+	data := make([]byte, images.MaxUpload+128<<10)
+	copy(data, testPNG(8, 8))
+	status, body := owner.upload(data)
+	if status != http.StatusRequestEntityTooLarge || body["error"] != images.ErrTooLarge.Error() {
+		t.Fatalf("got %d %v, want 413 %q", status, body, images.ErrTooLarge.Error())
+	}
+}
+
+// A form without a file field is a client fault, and gets a general sentence.
+func TestUploadWithoutAFileIsABadRequest(t *testing.T) {
+	ts, owner := newTestServer(t)
+	_ = ts
+	var buf bytes.Buffer
+	mw := multipart.NewWriter(&buf)
+	mw.WriteField("other", "x")
+	mw.Close()
+	req, _ := http.NewRequest("POST", owner.base+"/api/images", &buf)
+	req.Header.Set("Content-Type", mw.FormDataContentType())
+	res, err := owner.http.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	res.Body.Close()
+	if res.StatusCode != http.StatusBadRequest {
+		t.Fatalf("got %d, want 400", res.StatusCode)
 	}
 }
