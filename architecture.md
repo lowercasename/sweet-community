@@ -33,7 +33,7 @@ The README is the install guide, written for someone who has never seen the code
 
 The server and the web app are licensed AGPL-3.0-or-later (Raphael, 2026-11-09). The AGPL stops a competitor from running a closed, changed hosted version. There is no contributor licence agreement (CLA), and contributions use a DCO sign-off. The project can therefore never be relicensed as source-available. This cost was accepted, because the project's audience reads that guarantee as a sign of a credible project.
 
-Home's feed ends with the release number and a Source code link, because the app has no page footer. The link points to the public repository by default and is configurable. It meets the AGPL's duty to offer the source to users. Someone who runs a changed version points it at their own repository.
+Home's feed ends with the release number, an About link to Sweet's website and a Source code link, because the app has no page footer (Raphael, 2026-11-10). When the feed is shorter than its pane, the line sits at the bottom of the pane. The Source code link points to the public repository by default and is configurable. It meets the AGPL's duty to offer the source to users. Someone who runs a changed version points it at their own repository.
 
 The API client is meant to move to the MIT licence, so that other clients can exist. It stays under the AGPL for now (Raphael, 2026-11-09).
 
@@ -413,6 +413,7 @@ These decisions came from a security audit (2026-11-08).
 - **Copy.** Copy that described the software became copy that explains Sweet's terms (Raphael, 2026-11-07).
 - **Primary colour.** Pink with white text failed the contrast guideline, so the primary is red (Raphael, 2026-11-08).
 - **Destructive actions.** They appeared in many places. They now sit in a page's last card, so people know where to look (Raphael, 2026-11-08).
+- **Credit line.** Home's feed also ended with a line saying who built Sweet. It was removed, because it stood out on a feed with no posts (Raphael, 2026-11-10).
 - **Connection state.** A notice above the editors showed connecting, reconnecting and offline. It moved the editors each time the connection changed and added noise. Only offline is shown now, as a badge in the bar (Raphael, 2026-11-09).
 
 ### Considered and rejected

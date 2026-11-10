@@ -1,9 +1,12 @@
 import { useRelease, useSourceUrl } from '../data/hooks'
-import { Colophon, HeartMark, Link } from '../ui'
+import { Colophon, Link } from '../ui'
+
+/** Sweet's website. */
+const ABOUT_URL = 'https://sweet.community'
 
 /**
- * The line at the bottom of Home's feed (Raphael, 2026-11-09): the release, a link to the source code, and who built
- * Sweet. It shows once the version has loaded, so it does not appear in parts.
+ * The line at the bottom of Home's feed: the release, a link to Sweet's website and a link to the source code. It
+ * shows once the version has loaded, so it does not appear in parts.
  */
 export function SweetColophon() {
   const release = useRelease()
@@ -11,14 +14,7 @@ export function SweetColophon() {
   if (!release || !source) return null
   return (
     <Colophon
-      lines={[
-        [`Sweet ${release}`, <Link href={source}>Source code</Link>],
-        [
-          <>
-            Built with <HeartMark /> by <Link href="https://raphaelkabo.com">Raphael</Link>
-          </>,
-        ],
-      ]}
+      items={[`Sweet ${release}`, <Link href={ABOUT_URL}>About</Link>, <Link href={source}>Source code</Link>]}
     />
   )
 }

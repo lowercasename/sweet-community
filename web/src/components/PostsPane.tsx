@@ -36,7 +36,10 @@ interface PostsPaneProps {
   watching: boolean
   /** The topic that the community's feed is filtered to, read from the URL. */
   topicId?: string | null
-  /** Shown after the posts, at the very end of the feed. Home's feed shows the release and the source code link. */
+  /**
+   * Shown after the posts, at the end of the feed, or at the bottom of the pane when the feed is shorter than the pane.
+   * Home's feed shows the release and the links to About and the source code.
+   */
   foot?: ReactNode
 }
 
@@ -89,7 +92,7 @@ export function PostsPane({ groupId, side = 'full', watching, topicId = null, fo
 
   return (
     <Pane side={side} tour="posts">
-      <ScrollArea>
+      <ScrollArea foot={foot}>
         <Measure>
           <Stack gap={3}>
             <Card
@@ -172,7 +175,6 @@ export function PostsPane({ groupId, side = 'full', watching, topicId = null, fo
                 </Row>
               )}
             </Stack>
-            {foot}
           </Stack>
         </Measure>
       </ScrollArea>

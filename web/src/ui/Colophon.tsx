@@ -1,22 +1,20 @@
 import { Fragment, type ReactNode } from 'react'
 
 /**
- * Small grey lines at the end of a page, centred, such as the release and the source code link at the bottom of
- * Home's feed. Each line is a list of items, shown with a middle dot between them.
+ * A small grey line at the end of a page, centred, such as the release and the links at the bottom of Home's feed.
+ * The items are shown with a middle dot between them.
  */
-export function Colophon({ lines }: { lines: ReactNode[][] }) {
+export function Colophon({ items }: { items: ReactNode[] }) {
   return (
-    <footer className="flex flex-col items-center gap-1 pt-4 pb-2 text-center text-sm text-mute">
-      {lines.map((items, i) => (
-        <p key={i} className="m-0">
-          {items.map((item, j) => (
-            <Fragment key={j}>
-              {j > 0 && <span aria-hidden> · </span>}
-              {item}
-            </Fragment>
-          ))}
-        </p>
-      ))}
+    <footer className="pt-4 pb-2 text-center text-sm text-mute">
+      <p className="m-0">
+        {items.map((item, i) => (
+          <Fragment key={i}>
+            {i > 0 && <span aria-hidden> · </span>}
+            {item}
+          </Fragment>
+        ))}
+      </p>
     </footer>
   )
 }
