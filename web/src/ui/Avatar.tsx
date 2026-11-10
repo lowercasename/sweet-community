@@ -26,6 +26,8 @@ export function Avatar({ name, picture, size = 'md', decorative = false }: Avata
       alt={decorative ? '' : name}
       aria-hidden={decorative || undefined}
       draggable={false}
+      loading="lazy"
+      decoding="async"
     />
   )
 }

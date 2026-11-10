@@ -24,6 +24,8 @@ export function Tile({ name, picture, size = 'sm' }: TileProps) {
         src={picture}
         alt=""
         draggable={false}
+        loading="lazy"
+        decoding="async"
       />
     )
   }

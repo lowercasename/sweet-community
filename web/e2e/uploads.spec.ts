@@ -218,14 +218,20 @@ test.describe('image uploads', () => {
     await kit.page.clock.install()
     await open(kit.page)
     const release = await holdUploads(kit.page)
+    const sent = kit.page.waitForRequest('**/api/images')
     await postEditor(kit.page).click()
     await posts(kit.page)
       .locator('input[type=file]')
       .setInputFiles({ name: 'plot.png', mimeType: 'image/png', buffer: png(320, 200) })
     const card = posts(kit.page).locator('.image-card')
     await expect(card.getByText('Uploading')).toBeVisible()
-    await kit.page.clock.fastForward('02:00')
-    await expect(card.getByText('Failed to upload', { exact: true })).toBeVisible()
+    // The upload's timers start when the converted image is sent, and the answer's timer when the last byte has gone.
+    // Time moves on a minute at a time until the upload gives up.
+    await sent
+    await expect(async () => {
+      await kit.page.clock.fastForward('01:01')
+      await expect(card.getByText('Failed to upload', { exact: true })).toBeVisible({ timeout: 1000 })
+    }).toPass()
     await release()
     await card.getByRole('button', { name: 'Try again' }).click()
     await expect(card.getByPlaceholder(/Describe this image/)).toBeVisible()
