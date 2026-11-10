@@ -30,14 +30,3 @@ CREATE VIEW live_link_uses AS
 CREATE TABLE image_files_to_delete (
     key TEXT PRIMARY KEY
 );
-
--- Records the cards in the bodies saved before this table existed. A body stores & in an address as &amp;.
-INSERT OR IGNORE INTO link_uses (url, kind, id)
-    SELECT lp.url, 'post', p.id FROM (SELECT id, body_html FROM posts WHERE instr(body_html, 'data-embed') > 0) p
-        JOIN link_previews lp ON instr(p.body_html, 'href="' || replace(lp.url, '&', '&amp;') || '"') > 0;
-INSERT OR IGNORE INTO link_uses (url, kind, id)
-    SELECT lp.url, 'comment', c.id FROM (SELECT id, body_html FROM comments WHERE instr(body_html, 'data-embed') > 0) c
-        JOIN link_previews lp ON instr(c.body_html, 'href="' || replace(lp.url, '&', '&amp;') || '"') > 0;
-INSERT OR IGNORE INTO link_uses (url, kind, id)
-    SELECT lp.url, 'message', x.id FROM (SELECT id, body_html FROM messages WHERE instr(body_html, 'data-embed') > 0) x
-        JOIN link_previews lp ON instr(x.body_html, 'href="' || replace(lp.url, '&', '&amp;') || '"') > 0;

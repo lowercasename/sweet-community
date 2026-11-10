@@ -376,6 +376,7 @@ There is no separate mobile app, and there must never be a second codebase. The 
 - Times are stored in UTC. The browser converts them for display.
 - Lists are paged by cursor, never by offset.
 - Content and groups are soft-deleted.
+- A migration never changes user content: posts, comments, messages, bios, the rules and the welcome message stay as their authors saved them (Raphael, 2026-11-10).
 
 ## Running an instance
 
