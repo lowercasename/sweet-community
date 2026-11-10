@@ -48,7 +48,8 @@ test.describe('profiles', () => {
 
     // The profile card links to the user's page.
     await open(mo.page)
-    await article(mo.page, shown).getByRole('button', { name: kit.username }).hover()
+    // A card opened by a click stays open until it is dismissed. One opened by hover closes when the pointer leaves.
+    await article(mo.page, shown).getByRole('button', { name: kit.username }).click()
     const card = mo.page.getByRole('dialog', { name: `About ${kit.username}` })
     // View profile and Message sit side by side, least consequential first.
     const view = await card.getByRole('button', { name: 'View profile' }).boundingBox()
@@ -56,6 +57,8 @@ test.describe('profiles', () => {
     expect(view && message && Math.abs(view.y - message.y) < 2 && view.x < message.x).toBeTruthy()
     await card.getByRole('button', { name: 'View profile' }).click()
     await expect(mo.page).toHaveURL(new RegExp(`/u/${kit.username}$`))
+    // The name stays mounted behind the profile page. Its card closes when the location changes.
+    await expect(card).toHaveCount(0)
     await open(mo.page, '/u/nobody-here')
     await expect(mo.page.getByText(/no user with that name/)).toBeVisible()
     await kit.context.close()

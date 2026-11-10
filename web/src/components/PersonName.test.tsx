@@ -53,6 +53,7 @@ describe('PersonName', () => {
     fireEvent.click(await within(card('mo')).findByRole('button', { name: 'Message' }))
     expect(openDM).toHaveBeenCalledWith('mo')
     await vi.waitFor(() => expect(window.location.pathname).toBe('/r/d1'))
+    await vi.waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
   })
 
   it('the avatar beside the name is part of the same button, so clicking it also opens the card', async () => {
@@ -75,11 +76,13 @@ describe('PersonName', () => {
     expect(within(card('kit')).queryByRole('button', { name: 'Message' })).toBeNull()
   })
 
-  it('View profile navigates to their profile', async () => {
+  it('View profile navigates to their profile and closes the card', async () => {
     const { PersonName } = await import('./PersonName')
     renderWithQuery(<PersonName user={user('mo')} />)
     fireEvent.click(await screen.findByRole('button', { name: 'mo' }))
     fireEvent.click(await screen.findByRole('button', { name: 'View profile' }))
     expect(window.location.pathname).toBe('/u/mo')
+    // The name stays mounted behind the profile page, so the card must close when the location changes.
+    await vi.waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
   })
 })

@@ -1,4 +1,5 @@
-import { useState, type ReactNode } from 'react'
+import { useLayoutEffect, useState, type ReactNode } from 'react'
+import { useLocation } from 'wouter'
 import {
   FloatingFocusManager,
   FloatingPortal,
@@ -40,14 +41,27 @@ const TRIGGER =
  * the card. It is portalled to the body so that no pane clips it and no
  * heading contains it, and autoUpdate keeps it next to the name while the
  * pane scrolls. Escape, a press outside, or leaving both the name and the
- * card closes it.
+ * card closes it. A change of location also closes it.
  */
 export function HoverCard({ name, card, children, small = false }: HoverCardProps) {
   const [open, setOpen] = useState(false)
+  // A button in the card that navigates, such as View profile, can leave the name mounted but hidden behind the new
+  // page. A card opened by a click does not close when the pointer leaves, so it would stay open at the top left of
+  // the new page. The card closes when the location changes. It first commits one render with returnFocus off, so
+  // focus does not go back to the name and reopen the card. The layout effect closes it before the browser paints.
+  const [location] = useLocation()
+  const [openedAt, setOpenedAt] = useState(location)
+  const moved = openedAt !== location
+  useLayoutEffect(() => {
+    if (moved) setOpen(false)
+  }, [moved])
   const [scrollPane, setScrollPane] = useState<Element | null>(null)
   const { refs, floatingStyles, context } = useFloating({
     open,
-    onOpenChange: setOpen,
+    onOpenChange: (next) => {
+      if (next) setOpenedAt(location)
+      setOpen(next)
+    },
     placement: 'bottom-start',
     // The card flips above the name when the name's scroll pane has no room below it. The card is portalled to
     // the body, so the pane is not one of its clipping ancestors and must be passed as the boundary.
@@ -77,7 +91,7 @@ export function HoverCard({ name, card, children, small = false }: HoverCardProp
       </button>
       {open && (
         <FloatingPortal>
-          <FloatingFocusManager context={context} modal={false} initialFocus={-1}>
+          <FloatingFocusManager context={context} modal={false} initialFocus={-1} returnFocus={!moved}>
             <div
               ref={refs.setFloating}
               style={floatingStyles}
