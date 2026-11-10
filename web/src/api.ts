@@ -319,33 +319,46 @@ export class ApiError extends Error {
   }
 }
 
-async function request<T>(path: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(path, {
-    ...init,
-    headers: { Accept: 'application/json', ...(init?.headers ?? {}) },
-  })
-  if (res.status === 204) return undefined as T
-  const isJson = (res.headers.get('content-type') ?? '').includes('application/json')
-  if (!res.ok) {
-    let message = `${res.status} ${res.statusText}`
-    let body: Record<string, unknown> = {}
-    if (isJson) {
-      try {
-        body = (await res.json()) as Record<string, unknown>
-        if (typeof body.error === 'string') message = body.error
-      } catch {
-        // Keep the status text as the message.
-      }
+/** Shown for an error that the server did not describe, such as a proxy's error page. It names no status code. */
+export const GENERIC_ERROR = 'Something went wrong. Try again in a moment.'
+/** Shown when the request could not be sent at all. */
+export const CONNECTION_ERROR = 'Could not connect. Check your connection and try again.'
+
+/**
+ * The error for a failed response. The server's own error sentence is shown as it is. Anything else, such as the
+ * page a proxy sends when the server is down, becomes GENERIC_ERROR, because a status code means nothing to the user.
+ */
+function errorFrom(status: number, contentType: string, text: string): ApiError {
+  if (contentType.includes('application/json')) {
+    try {
+      const body = JSON.parse(text) as Record<string, unknown>
+      if (typeof body.error === 'string') return new ApiError(status, body.error, body)
+      return new ApiError(status, GENERIC_ERROR, body)
+    } catch {
+      // Not JSON after all.
     }
-    throw new ApiError(res.status, message, body)
   }
+  return new ApiError(status, GENERIC_ERROR)
+}
+
+async function request<T>(path: string, init?: RequestInit): Promise<T> {
+  let res: Response
+  try {
+    res = await fetch(path, {
+      ...init,
+      headers: { Accept: 'application/json', ...(init?.headers ?? {}) },
+    })
+  } catch {
+    throw new ApiError(0, CONNECTION_ERROR)
+  }
+  if (res.status === 204) return undefined as T
+  const type = res.headers.get('content-type') ?? ''
   const text = await res.text()
+  if (!res.ok) throw errorFrom(res.status, type, text)
   // An accepted request with nothing to return (for example, when a link has been emailed) has no body.
   if (text === '') return undefined as T
-  if (!isJson) {
-    // This is usually an outdated backend responding with the app's HTML page. Report that in the error.
-    throw new ApiError(res.status, `The server sent a page instead of data for ${path}. Is the backend up to date?`)
-  }
+  // A page instead of data is usually an outdated server answering with the app's HTML.
+  if (!type.includes('application/json')) throw new ApiError(res.status, GENERIC_ERROR)
   return JSON.parse(text) as T
 }
 
@@ -768,10 +781,35 @@ export function getUserPosts(name: string, before?: number | null, limit = 20): 
   return request<PostPage>(`/api/users/${encodeURIComponent(name)}/posts?${params}`)
 }
 
-export async function uploadImage(file: File): Promise<UploadedImage> {
-  const form = new FormData()
-  form.append('file', file)
-  return request<UploadedImage>('/api/images', { method: 'POST', body: form })
+/**
+ * Uploads an image and reports the fraction sent so far. It uses XMLHttpRequest, because fetch reports no upload
+ * progress. Errors are the same as request's.
+ */
+export function uploadImage(file: Blob, onProgress?: (fraction: number) => void): Promise<UploadedImage> {
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest()
+    xhr.open('POST', '/api/images')
+    xhr.setRequestHeader('Accept', 'application/json')
+    xhr.upload.onprogress = (e) => {
+      if (e.lengthComputable) onProgress?.(e.loaded / e.total)
+    }
+    xhr.onload = () => {
+      const type = xhr.getResponseHeader('content-type') ?? ''
+      if (xhr.status < 200 || xhr.status >= 300) {
+        reject(errorFrom(xhr.status, type, xhr.responseText))
+        return
+      }
+      try {
+        resolve(JSON.parse(xhr.responseText) as UploadedImage)
+      } catch {
+        reject(new ApiError(xhr.status, GENERIC_ERROR))
+      }
+    }
+    xhr.onerror = () => reject(new ApiError(0, CONNECTION_ERROR))
+    const form = new FormData()
+    form.append('file', file, file instanceof File ? file.name : 'image')
+    xhr.send(form)
+  })
 }
 
 export function setPicture(imageId: string | null): Promise<User> {

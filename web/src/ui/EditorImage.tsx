@@ -63,6 +63,15 @@ export function EditorImage({ editor, node, getPos, selected, updateAttributes, 
         grip
         corners={corners}
         selected={selected}
+        upload={
+          node.attrs.upload
+            ? {
+                progress: node.attrs.progress as number | null,
+                failed: node.attrs.failed as string | null,
+                onRetry: () => editor.commands.retryUpload(node.attrs.upload as string),
+              }
+            : undefined
+        }
       />
     </NodeViewWrapper>
   )

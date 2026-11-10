@@ -5,6 +5,16 @@ import Image from '@tiptap/extension-image'
 import { ReactNodeViewRenderer } from '@tiptap/react'
 import { EditorImage } from '../ui'
 import { Embed, SweetLink } from './embed'
+import { retryUpload } from './images'
+
+declare module '@tiptap/core' {
+  interface Commands<ReturnType> {
+    sweetImage: {
+      /** Uploads again the image whose upload failed, by the key on its node. */
+      retryUpload: (key: string) => ReturnType
+    }
+  }
+}
 
 // The drop indicator line shown between blocks while dragging an image card.
 const dropcursor = { color: '#ed5e5e', width: 2 }
@@ -17,13 +27,30 @@ const link = SweetLink
  * reserve space before the bytes arrive, and data-image-id identifies the
  * upload. In the editor the node is rendered by EditorImage, a card with the
  * alt text field. getHTML() still serialises a plain <img>, so stored HTML is
- * unchanged.
+ * unchanged. An image just added shows at once from a local copy while it
+ * uploads: `upload` is its key, `progress` the fraction sent, and `failed` the
+ * reason its upload failed ('' when there is none to give). These three exist
+ * only in the editor and are never saved.
  */
 export const SweetImage = Image.extend({
   addAttributes() {
     return {
       ...this.parent?.(),
       'data-image-id': { default: null },
+      upload: { default: null, rendered: false },
+      progress: { default: null, rendered: false },
+      failed: { default: null, rendered: false },
+    }
+  },
+  addCommands() {
+    return {
+      ...this.parent?.(),
+      retryUpload:
+        (key: string) =>
+        ({ editor, tr, dispatch }) => {
+          if (!dispatch) return true
+          return retryUpload(editor, tr, key)
+        },
     }
   },
   addNodeView() {

@@ -26,12 +26,20 @@ interface ImageCardProps {
   /** Which corners are rounded. Adjacent cards join into one block, so only the outer corners are rounded. */
   corners?: keyof typeof CORNERS
   selected?: boolean
+  /**
+   * An image being uploaded. While `progress` is a number (the fraction sent), the card shows the upload in place of
+   * the alt text field. When `failed` is a string, it shows that the upload failed, the reason if there is one, and
+   * Try again.
+   */
+  upload?: { progress: number | null; failed: string | null; onRetry: () => void }
 }
 
 /**
  * An image with its alt text being edited. The picture is small on the left
  * and the alt text field takes the rest of the width. Used for image nodes in
- * the post editor and for the images attached to a chat message.
+ * the post editor and for the images attached to a chat message. The picture
+ * shows as soon as the image is chosen. Until its upload has finished, the
+ * upload or its failure takes the place of the alt text field.
  */
 export function ImageCard({
   src,
@@ -42,10 +50,11 @@ export function ImageCard({
   grip,
   corners = 'all',
   selected,
+  upload,
 }: ImageCardProps) {
   const ring = selected ? 'outline-2 outline-offset-2 outline-pink' : ''
   return (
-    <div className={`flex items-stretch gap-2 border border-line bg-field p-2 ${CORNERS[corners]} ${ring}`}>
+    <div className={`image-card flex items-stretch gap-2 border border-line bg-field p-2 ${CORNERS[corners]} ${ring}`}>
       {grip && (
         <span
           className="flex cursor-grab items-center text-mute hover:text-ink"
@@ -58,14 +67,43 @@ export function ImageCard({
       )}
       <img className="m-0 h-20 w-20 shrink-0 rounded-[4px] object-cover" src={src} alt={alt} draggable={false} />
       <span className="min-w-0 flex-1">
-        <Textarea
-          value={alt}
-          onChange={onAltChange}
-          placeholder={PLACEHOLDER}
-          maxLength={ALT_MAX}
-          rows={3}
-          onSubmit={onAltEnter}
-        />
+        {upload?.failed != null ? (
+          <span className="flex h-full flex-col items-start justify-center gap-2">
+            <span className="flex flex-col gap-0.5">
+              <span className="text-sm font-medium text-sweet">Failed to upload</span>
+              {upload.failed && <span className="text-sm text-mute">{upload.failed}</span>}
+            </span>
+            <Button variant="secondary" onClick={upload.onRetry}>
+              Try again
+            </Button>
+          </span>
+        ) : upload?.progress != null ? (
+          <span className="flex h-full flex-col justify-center gap-2">
+            <span className="text-sm text-mute">Uploading… {Math.round(upload.progress * 100)}%</span>
+            <span
+              role="progressbar"
+              aria-label="Upload"
+              aria-valuemin={0}
+              aria-valuemax={100}
+              aria-valuenow={Math.round(upload.progress * 100)}
+              className="block h-1.5 w-full overflow-hidden rounded-full bg-line"
+            >
+              <span
+                className="block h-full rounded-full bg-sweet transition-[width] duration-200"
+                style={{ width: `${Math.round(upload.progress * 100)}%` }}
+              />
+            </span>
+          </span>
+        ) : (
+          <Textarea
+            value={alt}
+            onChange={onAltChange}
+            placeholder={PLACEHOLDER}
+            maxLength={ALT_MAX}
+            rows={3}
+            onSubmit={onAltEnter}
+          />
+        )}
       </span>
       {onRemove && (
         <span className="self-start">

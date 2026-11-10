@@ -5,10 +5,28 @@ import { mentionSuggestionKey, withMentions } from '../editor/mentions'
 import { useMembers } from '../data/hooks'
 import type { Topic } from '../api'
 import { Alert, Button, EditorSurface, Form, ImageCard, Row, Stack } from '../ui'
-import { imageFiles, imagesHtml, insertImages, uploadImages, type AttachedImage } from '../editor/images'
+import { failedUploads, failureReason, imageFiles, imagesHtml, insertImages, shrink } from '../editor/images'
+import { uploadImage, type UploadedImage } from '../api'
 import { EditorToolbar } from './EditorToolbar'
 import { embedLinks } from '../editor/embed'
 import { TopicMenu } from './TopicMenu'
+
+/**
+ * An image attached to a chat message: its local copy, shown at once, and its upload. `progress` is the fraction
+ * sent while it uploads, `failed` the reason its upload failed ('' when there is none to give), and `uploaded` the
+ * stored image once the upload has finished.
+ */
+interface Attachment {
+  key: string
+  file: Blob
+  preview: string
+  width: number
+  height: number
+  alt: string
+  progress: number | null
+  failed: string | null
+  uploaded?: UploadedImage
+}
 
 interface BodyEditorProps {
   /**
@@ -83,7 +101,7 @@ export function BodyEditor({
   const editing = initialHtml !== undefined
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [attached, setAttached] = useState<AttachedImage[]>([])
+  const [attached, setAttached] = useState<Attachment[]>([])
 
   // TipTap creates the keydown handler once, so the handler reads the latest callbacks through refs.
   const submitRef = useRef<() => void>(() => {})
@@ -156,27 +174,60 @@ export function BodyEditor({
     if (editor && !editor.isDestroyed) editor.view.dispatch(editor.state.tr)
   }, [placeholder, editor])
 
+  // An image shows at once, from a local copy, and uploads. Its card shows the upload, and its error if it fails.
   const addImagesRef = useRef<(files: File[]) => void>(() => {})
   addImagesRef.current = (files: File[]) => {
     if (!editor) return
     setError(null)
-    const done =
-      images === 'inline'
-        ? insertImages(editor, files)
-        : uploadImages(files).then(({ images, error }) => {
-            setAttached((prev) => [...prev, ...images])
-            if (error) throw new Error(error)
-          })
-    done.catch((e: unknown) => setError(e instanceof Error ? e.message : 'Could not add the images'))
+    if (images === 'inline') {
+      void insertImages(editor, files)
+      return
+    }
+    void Promise.all(files.map(shrink)).then((shrunk) => {
+      const added = shrunk.map((s) => ({ ...s, key: crypto.randomUUID(), alt: '', progress: 0, failed: null }))
+      setAttached((prev) => [...prev, ...added])
+      for (const a of added) uploadAttachment(a.key, a.file)
+    })
   }
 
-  const setAlt = (id: string, alt: string) => setAttached((prev) => prev.map((i) => (i.id === id ? { ...i, alt } : i)))
-  const remove = (id: string) => setAttached((prev) => prev.filter((i) => i.id !== id))
+  const update = (key: string, change: Partial<Attachment>) =>
+    setAttached((prev) => prev.map((a) => (a.key === key ? { ...a, ...change } : a)))
+  const uploadAttachment = (key: string, file: Blob) => {
+    update(key, { progress: 0, failed: null })
+    uploadImage(file, (progress) => update(key, { progress }))
+      .then((uploaded) => update(key, { uploaded, progress: null }))
+      .catch((e: unknown) => update(key, { progress: null, failed: failureReason(e) }))
+  }
+  const remove = (key: string) =>
+    setAttached((prev) => {
+      const gone = prev.find((a) => a.key === key)
+      if (gone) URL.revokeObjectURL(gone.preview)
+      return prev.filter((a) => a.key !== key)
+    })
+
+  // The images in the post or comment, those still uploading, and those whose upload failed.
+  const inline = useEditorState({
+    editor,
+    selector: ({ editor }) => {
+      const counts = { total: 0, uploading: 0, failed: 0 }
+      editor?.state.doc.descendants((node) => {
+        if (node.type.name !== 'image') return
+        counts.total++
+        if (node.attrs.failed != null) counts.failed++
+        else if (node.attrs.upload) counts.uploading++
+      })
+      return counts
+    },
+  }) ?? { total: 0, uploading: 0, failed: 0 }
+  const total = inline.total + attached.length
+  const failed = inline.failed + attached.filter((a) => a.failed != null).length
+  const uploading = inline.uploading + attached.filter((a) => a.failed == null && !a.uploaded).length
 
   const isEmpty = useEditorState({ editor, selector: ({ editor }) => (editor ? editor.isEmpty : true) })
+  const ready = uploading === 0 && failed === 0
   const canSubmit = allowEmpty
-    ? !busy && !disabled
-    : !!editor && (!isEmpty || attached.length > 0) && !disabled && !busy
+    ? !busy && !disabled && ready
+    : !!editor && (!isEmpty || attached.length > 0) && !disabled && !busy && ready
 
   const submit = async () => {
     if (!editor || !canSubmit) return
@@ -186,9 +237,11 @@ export function BodyEditor({
     setBusy(true)
     setError(null)
     try {
-      await onSubmit(imagesHtml(attached) + (isEmpty ? '' : editor.getHTML()))
+      const sent = attached.flatMap((a) => (a.uploaded ? [{ ...a.uploaded, alt: a.alt }] : []))
+      await onSubmit(imagesHtml(sent) + (isEmpty ? '' : editor.getHTML()))
       if (!editing) {
         editor.commands.clearContent(true)
+        for (const a of attached) URL.revokeObjectURL(a.preview)
         setAttached([])
         if (enterSubmits) editor.commands.focus()
       }
@@ -206,16 +259,21 @@ export function BodyEditor({
         {head}
         {attached.length > 0 && (
           <Stack gap={0}>
-            {attached.map((img, i) => (
+            {attached.map((a, i) => (
               <ImageCard
-                key={img.id}
-                src={img.url}
-                alt={img.alt}
-                onAltChange={(alt) => setAlt(img.id, alt)}
+                key={a.key}
+                src={a.uploaded?.url ?? a.preview}
+                alt={a.alt}
+                onAltChange={(alt) => update(a.key, { alt })}
                 onAltEnter={() => editor?.commands.focus()}
-                onRemove={() => remove(img.id)}
+                onRemove={() => remove(a.key)}
                 corners={
                   attached.length === 1 ? 'all' : i === 0 ? 'top' : i === attached.length - 1 ? 'bottom' : 'none'
+                }
+                upload={
+                  a.uploaded
+                    ? undefined
+                    : { progress: a.progress, failed: a.failed, onRetry: () => uploadAttachment(a.key, a.file) }
                 }
               />
             ))}
@@ -255,6 +313,7 @@ export function BodyEditor({
             </Button>
           </Row>
         </Row>
+        {failed > 0 && <Alert tone="error">{failedUploads(failed, total)}</Alert>}
         {error && <Alert tone="error">{error}</Alert>}
       </Stack>
     </Form>

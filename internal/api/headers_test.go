@@ -15,7 +15,9 @@ func TestSecurityHeaders(t *testing.T) {
 	rec := httptest.NewRecorder()
 	h.ServeHTTP(rec, httptest.NewRequest("GET", "/", nil))
 	csp := rec.Header().Get("Content-Security-Policy")
-	for _, want := range []string{"default-src 'self'", "script-src 'self'", "frame-ancestors 'none'", "object-src 'none'", "base-uri 'none'"} {
+	// blob: images are the editor's local copies of images that are still uploading. Only the page's own scripts can
+	// make a blob: address.
+	for _, want := range []string{"default-src 'self'", "script-src 'self'", "img-src 'self' data: blob:", "frame-ancestors 'none'", "object-src 'none'", "base-uri 'none'"} {
 		if !strings.Contains(csp, want) {
 			t.Errorf("Content-Security-Policy %q lacks %q", csp, want)
 		}

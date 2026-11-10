@@ -17,6 +17,8 @@ Old Sweet was the first version of the product. It stored post bodies in four fo
 
 Copy is written for a person who has never used Sweet (Raphael, 2026-11-07). It explains Sweet's terms where the user first meets them and never describes how the software works. It uses no semicolons. Server error messages are capitalised sentences, because the client shows them unchanged.
 
+An error never shows a status code or a page from a proxy (Raphael, 2026-11-10). The client shows the server's own message when there is one. Otherwise it shows a general message, or a message that the connection failed.
+
 ## Stack
 
 - The server is written in Go. The database is SQLite, with no ORM. Typed Go code is generated from the SQL queries.
@@ -139,6 +141,8 @@ A message uses part of the same schema and passes the same policy. Chat history 
 - The server accepts JPEG, PNG, WebP and GIF, detected from the content. HEIC is not decoded, because Go would need C libraries. The upload control asks for JPEG first, so iPhones convert HEIC photos.
 - Uploads are turned upright and stripped of metadata. Smaller sizes are JPEG or PNG, because Go cannot encode WebP.
 - The server processes one image at a time, with a resizer that keeps 4 bytes a pixel, and sets its memory limit from its container's (2026-11-10). A server may run with little memory, and resizing one 12-megapixel phone photo once needed about 260 MB, so the kernel killed the server and the upload failed.
+- The browser shrinks an image to the server's largest size before uploading it (Raphael, 2026-11-10). A phone then uploads a much smaller file, and the server seldom has to resize. The server still checks every upload, turns it upright, strips its metadata and resizes it if it is too large, because a client can send anything.
+- An image shows in the editor as soon as it is chosen, and its card shows its upload (Raphael, 2026-11-10). If the upload fails, the card shows the failure and Try again in place of the alt text field, and a line under the editor counts the failed images. A post or message cannot be sent until every upload has finished.
 - An image is served only to its uploader or to someone who can see content that uses it. No image leaves the app, so there are no signed URLs.
 - A profile picture or a room picture must be an image that the person setting it uploaded (Raphael, 2026-11-10). Every signed-in user can see a profile picture, so any other image would let a member show an image from a private room or a conversation to the whole community.
 - Images that nothing has used for a day are deleted.

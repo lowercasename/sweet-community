@@ -162,7 +162,7 @@ func Protect(next http.Handler) http.Handler {
 // may also be inline, because the editor (TipTap) adds its own style element.
 // No page may frame Sweet, and plugins and base URLs are refused.
 const contentSecurityPolicy = "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; " +
-	"img-src 'self' data:; font-src 'self' data:; connect-src 'self'; manifest-src 'self'; worker-src 'self'; " +
+	"img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self'; manifest-src 'self'; worker-src 'self'; " +
 	"object-src 'none'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'"
 
 // SecurityHeaders sets the security headers on every response. HSTS is sent only over
