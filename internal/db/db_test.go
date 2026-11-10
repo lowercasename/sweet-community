@@ -6,6 +6,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"slices"
 	"testing"
 	"testing/fstest"
 )
@@ -167,24 +168,7 @@ func TestMigrationReleasesThePicturesOfDeletedRooms(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer d.Close()
-	all := os.DirFS("../../migrations")
-	upTo := func(last string) fstest.MapFS {
-		files := fstest.MapFS{}
-		names, err := fs.Glob(all, "*.sql")
-		if err != nil {
-			t.Fatal(err)
-		}
-		for _, name := range names {
-			if name <= last {
-				data, _ := fs.ReadFile(all, name)
-				files[name] = &fstest.MapFile{Data: data}
-			}
-		}
-		return files
-	}
-	if err := Migrate(ctx, d, upTo("004_~")); err != nil {
-		t.Fatal(err)
-	}
+	migratedTo(t, d, "004")
 	for _, q := range []string{
 		`INSERT INTO users (id, username, created_at) VALUES ('u', 'kit', 1)`,
 		`INSERT INTO images (id, uploader_id, content_type, width, height, bytes, created_at) VALUES ('a', 'u', 'image/png', 1, 1, 1, 1), ('b', 'u', 'image/png', 1, 1, 1, 1)`,
@@ -194,9 +178,7 @@ func TestMigrationReleasesThePicturesOfDeletedRooms(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	if err := Migrate(ctx, d, upTo("005_~")); err != nil {
-		t.Fatal(err)
-	}
+	migratedTo(t, d, "005")
 	pictures := map[string]sql.NullString{}
 	rows, err := d.QueryContext(ctx, `SELECT id, picture_id FROM groups WHERE id IN ('deleted', 'live')`)
 	if err != nil {
@@ -214,8 +196,8 @@ func TestMigrationReleasesThePicturesOfDeletedRooms(t *testing.T) {
 	}
 }
 
-// Migration 006 records the images that existing bodies use, from their <img> elements. An image id written as text
-// is not a use.
+// Migration 006 records the images that existing posts, comments, messages and report copies use, from their <img>
+// elements. An image id written as text is not a use.
 func TestMigrationRecordsTheImagesThatBodiesUse(t *testing.T) {
 	ctx := context.Background()
 	d, err := Open(filepath.Join(t.TempDir(), "sweet.db"))
@@ -223,37 +205,27 @@ func TestMigrationRecordsTheImagesThatBodiesUse(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer d.Close()
-	all := os.DirFS("../../migrations")
-	upTo := func(last string) fstest.MapFS {
-		files := fstest.MapFS{}
-		names, _ := fs.Glob(all, "*.sql")
-		for _, name := range names {
-			if name <= last {
-				data, _ := fs.ReadFile(all, name)
-				files[name] = &fstest.MapFile{Data: data}
-			}
-		}
-		return files
-	}
-	if err := Migrate(ctx, d, upTo("005_~")); err != nil {
-		t.Fatal(err)
-	}
-	const a, b = "0190a0b0-0000-7000-8000-00000000000a", "0190a0b0-0000-7000-8000-00000000000b"
+	migratedTo(t, d, "005")
+	const root = "00000000-0000-7000-8000-000000000000"
+	img := func(id string) string { return `<img src="/img/` + id + `" alt="">` }
+	const a, b, c, e, x = "0190a0b0-0000-7000-8000-00000000000a", "0190a0b0-0000-7000-8000-00000000000b",
+		"0190a0b0-0000-7000-8000-00000000000c", "0190a0b0-0000-7000-8000-00000000000e",
+		"0190a0b0-0000-7000-8000-0000000000ff"
 	for _, q := range []string{
-		`INSERT INTO users (id, username, created_at) VALUES ('u', 'kit', 1)`,
-		`INSERT INTO images (id, uploader_id, content_type, width, height, bytes, created_at) VALUES ('` + a + `', 'u', 'image/png', 1, 1, 1, 1), ('` + b + `', 'u', 'image/png', 1, 1, 1, 1)`,
-		`INSERT INTO posts (id, group_id, author_id, body_html, body_text, created_at) VALUES ('p', '00000000-0000-7000-8000-000000000000', 'u', '<p>x</p><img src="/img/` + a + `" alt="">', 'x', 1)`,
-		`INSERT INTO messages (id, group_id, author_id, body_html, body_text, created_at) VALUES ('m', '00000000-0000-7000-8000-000000000000', 'u', '<p>` + b + `</p>', '` + b + `', 1)`,
+		`INSERT INTO users (id, username, created_at) VALUES ('u', 'kit', 1), ('v', 'mo', 1)`,
+		`INSERT INTO images (id, uploader_id, content_type, width, height, bytes, created_at) VALUES ('` + a + `', 'u', 'image/png', 1, 1, 1, 1), ('` + b + `', 'u', 'image/png', 1, 1, 1, 1), ('` + c + `', 'u', 'image/png', 1, 1, 1, 1), ('` + e + `', 'u', 'image/png', 1, 1, 1, 1), ('` + x + `', 'u', 'image/png', 1, 1, 1, 1)`,
+		`INSERT INTO posts (id, group_id, author_id, body_html, body_text, created_at) VALUES ('p', '` + root + `', 'u', '<p>x</p>` + img(a) + `', 'x', 1)`,
+		`INSERT INTO comments (id, post_id, author_id, body_html, body_text, created_at) VALUES ('c', 'p', 'u', '` + img(b) + `', '', 1)`,
+		`INSERT INTO messages (id, group_id, author_id, body_html, body_text, created_at) VALUES ('m', '` + root + `', 'u', '` + img(c) + `', '', 1), ('t', '` + root + `', 'u', '<p>` + x + `</p>', '` + x + `', 1)`,
+		`INSERT INTO reports (id, reporter_id, kind, subject_id, group_id, author_id, body_html, reason, created_at) VALUES ('r', 'v', 'post', 'p', '` + root + `', 'u', '` + img(e) + `', '', 1)`,
 	} {
 		if _, err := d.ExecContext(ctx, q); err != nil {
 			t.Fatal(err)
 		}
 	}
-	if err := Migrate(ctx, d, upTo("006_~")); err != nil {
-		t.Fatal(err)
-	}
+	migratedTo(t, d, "006")
 	var uses []string
-	rows, err := d.QueryContext(ctx, `SELECT image_id || ' ' || kind || ' ' || id FROM image_uses ORDER BY 1`)
+	rows, err := d.QueryContext(ctx, `SELECT kind || ' ' || id || ' ' || image_id FROM image_uses ORDER BY 1`)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -263,7 +235,29 @@ func TestMigrationRecordsTheImagesThatBodiesUse(t *testing.T) {
 		uses = append(uses, s)
 	}
 	rows.Close()
-	if len(uses) != 1 || uses[0] != a+" post p" {
-		t.Fatalf("uses after the migration: %v, want only the post's image", uses)
+	want := []string{"comment c " + b, "message m " + c, "post p " + a, "report r " + e}
+	if !slices.Equal(uses, want) {
+		t.Fatalf("uses after the migration:\n%v\nwant\n%v", uses, want)
+	}
+}
+
+// migratedTo opens a new database and applies the migrations up to and including the one whose name starts with
+// prefix.
+func migratedTo(t *testing.T, d *sql.DB, prefix string) {
+	t.Helper()
+	all := os.DirFS("../../migrations")
+	names, err := fs.Glob(all, "*.sql")
+	if err != nil {
+		t.Fatal(err)
+	}
+	files := fstest.MapFS{}
+	for _, name := range names {
+		if name[:3] <= prefix {
+			data, _ := fs.ReadFile(all, name)
+			files[name] = &fstest.MapFile{Data: data}
+		}
+	}
+	if err := Migrate(context.Background(), d, files); err != nil {
+		t.Fatal(err)
 	}
 }

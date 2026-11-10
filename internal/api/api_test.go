@@ -511,48 +511,81 @@ func TestDeletePost(t *testing.T) {
 	}
 }
 
+// The sweep deletes an image once nothing uses it and it is older than the grace period. It keeps every image that
+// something uses. Each image is named for what uses it.
 func TestImageSweep(t *testing.T) {
 	ts, owner, srv := newTestServerWith(t)
-	_ = ts
-	upload := func() (string, string) {
-		status, img := owner.upload(testPNG(40, 40))
+	ctx := context.Background()
+	kit, _ := registerMember(t, ts, owner, "kit")
+	mo, moID := registerMember(t, ts, owner, "mo")
+	up := func(c *client) map[string]any {
+		t.Helper()
+		status, img := c.upload(testPNG(40, 40))
 		if status != 201 {
 			t.Fatalf("upload: %d %v", status, img)
 		}
-		return img["id"].(string), img["url"].(string)
+		return img
 	}
-	imgTag := func(id, url string) string {
-		return `<img src="` + url + `" alt="" width="40" height="40" data-image-id="` + id + `">`
+	body := func(img map[string]any) map[string]string { return map[string]string{"body_html": imgTag(img)} }
+	picture := func(c *client, img map[string]any) {
+		c.mustStatus(200, "PUT", "/api/me/picture", map[string]any{"image_id": img["id"]})
 	}
-	_, draftURL := upload()           // never used
-	postID, postURL := upload()       // in a post that is kept
-	deletedID, deletedURL := upload() // in a post that gets deleted
-	commentID, commentURL := upload() // in a comment
-	messageID, messageURL := upload() // in a chat message
-	pictureID, pictureURL := upload() // a profile picture
+	room := func(name string, img map[string]any) string {
+		gid := owner.mustStatus(201, "POST", "/api/groups", map[string]any{"kind": "group", "name": name, "mode": "both"})["id"].(string)
+		owner.mustStatus(200, "PUT", "/api/groups/"+gid+"/picture", map[string]any{"image_id": img["id"]})
+		return gid
+	}
 
-	post := owner.mustStatus(201, "POST", rootPath+"/posts", map[string]string{"body_html": imgTag(postID, postURL)})
-	owner.mustStatus(201, "POST", "/api/posts/"+post["id"].(string)+"/comments", map[string]string{"body_html": imgTag(commentID, commentURL)})
-	doomed := owner.mustStatus(201, "POST", rootPath+"/posts", map[string]string{"body_html": imgTag(deletedID, deletedURL)})
-	owner.mustStatus(200, "DELETE", "/api/posts/"+doomed["id"].(string), nil)
-	owner.mustStatus(201, "POST", rootPath+"/messages", map[string]string{"body_html": imgTag(messageID, messageURL)})
-	owner.mustStatus(200, "PUT", "/api/me/picture", map[string]string{"image_id": pictureID})
+	draft, inPost, inComment, inMessage, inDeletedPost, editedOut := up(owner), up(owner), up(owner), up(owner), up(owner), up(owner)
+	post := owner.mustStatus(201, "POST", rootPath+"/posts", body(inPost))
+	owner.mustStatus(201, "POST", "/api/posts/"+post["id"].(string)+"/comments", body(inComment))
+	owner.mustStatus(201, "POST", rootPath+"/messages", body(inMessage))
+	deleted := owner.mustStatus(201, "POST", rootPath+"/posts", body(inDeletedPost))
+	owner.mustStatus(200, "DELETE", "/api/posts/"+deleted["id"].(string), nil)
+	edited := owner.mustStatus(201, "POST", rootPath+"/posts", body(editedOut))
+	owner.mustStatus(200, "PUT", "/api/posts/"+edited["id"].(string), map[string]string{"body_html": "<p>no picture now</p>"})
+	replaced, current := up(owner), up(owner)
+	picture(owner, replaced)
+	picture(owner, current)
+	removed := up(kit)
+	picture(kit, removed)
+	kit.mustStatus(200, "PUT", "/api/me/picture", map[string]any{"image_id": nil})
+	ofRemovedUser := up(mo)
+	picture(mo, ofRemovedUser)
+	owner.mustStatus(204, "DELETE", "/api/users/"+moID, nil)
+	ofLiveRoom, ofDeletedRoom := up(owner), up(owner)
+	room("Fells", ofLiveRoom)
+	owner.mustStatus(200, "DELETE", "/api/groups/"+room("Moors", ofDeletedRoom), nil)
 
-	// The sweep removes no image younger than the grace period, even if nothing references it.
-	n, err := images.Sweep(context.Background(), srv.DB, srv.Images, db.Now()-3_600_000)
-	if err != nil || n != 0 {
-		t.Fatalf("sweep inside grace: %d %v", n, err)
+	if n, err := images.Sweep(ctx, srv.DB, srv.Images, db.Now()-3_600_000); err != nil || n != 0 {
+		t.Fatalf("a sweep inside the grace period removed %d: %v", n, err)
 	}
-	n, err = images.Sweep(context.Background(), srv.DB, srv.Images, db.Now()+1)
-	if err != nil || n != 2 {
-		t.Fatalf("sweep: want 2 removed (draft, deleted post), got %d %v", n, err)
+	if _, err := images.Sweep(ctx, srv.DB, srv.Images, db.Now()+1); err != nil {
+		t.Fatal(err)
 	}
-	for url, want := range map[string]int{draftURL: 404, deletedURL: 404, postURL: 200, commentURL: 200, messageURL: 200, pictureURL: 200} {
-		owner.mustStatus(want, "GET", url, nil)
+	for name, c := range map[string]struct {
+		img  map[string]any
+		kept bool
+	}{
+		"an unused draft image":       {draft, false},
+		"a post's image":              {inPost, true},
+		"a comment's image":           {inComment, true},
+		"a message's image":           {inMessage, true},
+		"a deleted post's image":      {inDeletedPost, false},
+		"an image an edit removed":    {editedOut, false},
+		"the current profile picture": {current, true},
+		"a replaced profile picture":  {replaced, false},
+		"a removed profile picture":   {removed, false},
+		"a removed user's picture":    {ofRemovedUser, false},
+		"a live room's picture":       {ofLiveRoom, true},
+		"a deleted room's picture":    {ofDeletedRoom, false},
+	} {
+		if _, err := srv.q().GetImage(ctx, c.img["id"].(string)); (err == nil) != c.kept {
+			t.Errorf("%s: kept %v, want %v", name, err == nil, c.kept)
+		}
 	}
-	// The sweep is idempotent.
-	if n, err = images.Sweep(context.Background(), srv.DB, srv.Images, db.Now()+1); err != nil || n != 0 {
-		t.Fatalf("second sweep: %d %v", n, err)
+	if n, err := images.Sweep(ctx, srv.DB, srv.Images, db.Now()+1); err != nil || n != 0 {
+		t.Fatalf("a second sweep removed %d: %v", n, err)
 	}
 }
 
@@ -1077,51 +1110,6 @@ func TestUploadWithoutAFileIsABadRequest(t *testing.T) {
 	res.Body.Close()
 	if res.StatusCode != http.StatusBadRequest {
 		t.Fatalf("got %d, want 400", res.StatusCode)
-	}
-}
-
-// The sweep removes a picture once nothing uses it: a profile picture that was replaced or removed, the picture of a
-// removed user and the picture of a deleted room. Current pictures stay. A deleted room once kept its picture, and
-// the failed delete of that picture stopped every later sweep.
-func TestSweepRemovesPicturesThatNothingUses(t *testing.T) {
-	ts, owner, srv := newTestServerWith(t)
-	ctx := context.Background()
-	kit, _ := registerMember(t, ts, owner, "kit")
-	mo, moID := registerMember(t, ts, owner, "mo")
-	up := func(c *client) string {
-		t.Helper()
-		status, img := c.upload(testPNG(40, 40))
-		if status != 201 {
-			t.Fatalf("upload: %d %v", status, img)
-		}
-		return img["id"].(string)
-	}
-	replaced, current := up(owner), up(owner)
-	owner.mustStatus(200, "PUT", "/api/me/picture", map[string]any{"image_id": replaced})
-	owner.mustStatus(200, "PUT", "/api/me/picture", map[string]any{"image_id": current})
-	removed := up(kit)
-	kit.mustStatus(200, "PUT", "/api/me/picture", map[string]any{"image_id": removed})
-	kit.mustStatus(200, "PUT", "/api/me/picture", map[string]any{"image_id": nil})
-	ofRemovedUser := up(mo)
-	mo.mustStatus(200, "PUT", "/api/me/picture", map[string]any{"image_id": ofRemovedUser})
-	owner.mustStatus(204, "DELETE", "/api/users/"+moID, nil)
-	room := func(name, picture string) string {
-		gid := owner.mustStatus(201, "POST", "/api/groups", map[string]any{"kind": "group", "name": name, "mode": "both"})["id"].(string)
-		owner.mustStatus(200, "PUT", "/api/groups/"+gid+"/picture", map[string]any{"image_id": picture})
-		return gid
-	}
-	ofLiveRoom, ofDeletedRoom := up(owner), up(owner)
-	room("Fells", ofLiveRoom)
-	owner.mustStatus(200, "DELETE", "/api/groups/"+room("Moors", ofDeletedRoom), nil)
-
-	n, err := images.Sweep(ctx, srv.DB, srv.Images, db.Now()+1)
-	if err != nil || n != 4 {
-		t.Fatalf("sweep: removed %d, want 4: %v", n, err)
-	}
-	for id, want := range map[string]bool{replaced: false, removed: false, ofRemovedUser: false, ofDeletedRoom: false, current: true, ofLiveRoom: true} {
-		if _, err := srv.q().GetImage(ctx, id); (err == nil) != want {
-			t.Errorf("image %s: exists %v, want %v", id, err == nil, want)
-		}
 	}
 }
 

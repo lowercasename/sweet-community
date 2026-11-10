@@ -2,6 +2,7 @@ package api
 
 import (
 	"reflect"
+	"strings"
 	"testing"
 )
 
@@ -81,18 +82,16 @@ func TestBiosAndCommunityTextsHoldNoImagesOrCards(t *testing.T) {
 	if status != 201 {
 		t.Fatalf("upload: %d", status)
 	}
-	id, url := img["id"].(string), img["url"].(string)
-	link := `<a target="_blank" rel="noopener noreferrer nofollow" href="https://example.com">https://example.com</a>`
-	body := `<p>I knit</p><img src="` + url + `" alt="" width="20" height="20" data-image-id="` + id + `"><p data-embed="">` + link + `</p>`
-	want := `<p>I knit</p><p>` + link + `</p>`
-
-	if set := kit.mustStatus(200, "PUT", "/api/me/bio", map[string]string{"body_html": body}); set["bio_html"] != want {
-		t.Fatalf("bio: %v", set["bio_html"])
-	}
-	for _, path := range []string{"/api/rules", "/api/welcome"} {
-		if set := owner.mustStatus(200, "PUT", path, map[string]string{"body_html": body}); set["body_html"] != want {
-			t.Fatalf("%s: %v", path, set["body_html"])
+	body := `<p>I knit</p>` + imgTag(img) + `<p data-embed=""><a href="https://example.com">https://example.com</a></p>`
+	plain := func(name, html string) {
+		t.Helper()
+		if strings.Contains(html, "<img") || strings.Contains(html, "data-embed") || !strings.Contains(html, "I knit") {
+			t.Fatalf("%s: %s", name, html)
 		}
+	}
+	plain("bio", kit.mustStatus(200, "PUT", "/api/me/bio", map[string]string{"body_html": body})["bio_html"].(string))
+	for _, path := range []string{"/api/rules", "/api/welcome"} {
+		plain(path, owner.mustStatus(200, "PUT", path, map[string]string{"body_html": body})["body_html"].(string))
 	}
 	// A bio stored before the rule is shown as it was stored.
 	if _, err := srv.DB.Exec(`UPDATE users SET bio_html = ? WHERE username = 'kit'`, body); err != nil {

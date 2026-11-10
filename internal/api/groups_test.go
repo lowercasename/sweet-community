@@ -6,8 +6,6 @@ import (
 	"strings"
 	"testing"
 
-	"sweet/internal/db"
-	"sweet/internal/images"
 	"sweet/internal/perm"
 	"sweet/internal/store"
 )
@@ -531,7 +529,7 @@ func TestGroupsCarryLastActivity(t *testing.T) {
 // uploaded image. The group event includes it. Only the room's members can
 // fetch the image. The sweep keeps it. A conversation has no picture.
 func TestGroupPicture(t *testing.T) {
-	ts, owner, srv := newTestServerWith(t)
+	ts, owner := newTestServer(t)
 	kit, _ := registerMember(t, ts, owner, "kit")
 	mo, moID := registerMember(t, ts, owner, "mo")
 	room := kit.mustStatus(201, "POST", "/api/groups", map[string]any{"kind": "group", "name": "Knitting", "mode": "both"})
@@ -570,10 +568,6 @@ func TestGroupPicture(t *testing.T) {
 	}
 	if st, _ := owner.do("GET", "/img/"+iid, nil); st != 404 {
 		t.Fatalf("an outsider fetching the room's picture: %d", st)
-	}
-	// The sweep keeps a room's picture.
-	if n, err := images.Sweep(context.Background(), srv.DB, srv.Images, db.Now()+1); err != nil || n != 0 {
-		t.Fatalf("sweep took the room's picture: %d %v", n, err)
 	}
 	kit.mustStatus(404, "PUT", gp+"/picture", map[string]any{"image_id": "nothing"})
 	if back := kit.mustStatus(200, "PUT", gp+"/picture", map[string]any{"image_id": nil}); back["picture"] != nil {

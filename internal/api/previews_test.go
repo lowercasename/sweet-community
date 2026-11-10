@@ -2,8 +2,6 @@ package api
 
 import (
 	"context"
-	"database/sql"
-	"errors"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -69,35 +67,8 @@ func TestLinkPreviews(t *testing.T) {
 	}
 }
 
-// The image sweep deletes a preview that no live post, comment or message links to, and then its picture. A preview
-// that a post links to stays.
-func TestSweepKeepsLinkedPreviews(t *testing.T) {
-	ts, owner, srv := newTestServerWith(t)
-	_ = ts
-	site, _ := previewSite(t)
-	srv.PreviewClient = site.Client()
-	linked, unlinked := site.URL+"/open-day", site.URL+"/swap"
-	owner.mustStatus(200, "GET", "/api/previews?url="+url.QueryEscape(linked), nil)
-	gone := owner.mustStatus(200, "GET", "/api/previews?url="+url.QueryEscape(unlinked), nil)
-	owner.mustStatus(201, "POST", rootPath+"/posts", map[string]string{
-		"body_html": `<p data-embed=""><a href="` + linked + `">` + linked + `</a></p>`,
-	})
-
-	q := store.New(srv.DB)
-	if _, err := images.Sweep(context.Background(), srv.DB, srv.Images, db.Now()+1000); err != nil {
-		t.Fatal(err)
-	}
-	if _, err := q.GetLinkPreview(context.Background(), linked); err != nil {
-		t.Fatalf("the linked preview was deleted: %v", err)
-	}
-	if _, err := q.GetLinkPreview(context.Background(), unlinked); !errors.Is(err, sql.ErrNoRows) {
-		t.Fatalf("the unlinked preview was kept: %v", err)
-	}
-	owner.mustStatus(404, "GET", gone["image"].(string), nil)
-}
-
-// A preview stays while a live post, comment or message shows its link as a card. It goes when none does: when the
-// card's post is deleted, when an edit removes the card, or when the link is plain. The server records which cards each
+// A preview stays while a live post, comment or message shows its link as a card. It goes, with its picture, when
+// none does. That is when the card's post is deleted, when an edit removes the card, or when the link is plain. The server records which cards each
 // body shows when it is saved. It once searched every body for each preview's address, while it held the database's
 // write lock.
 func TestPreviewsStayWhileABodyShowsThemAsCards(t *testing.T) {
@@ -105,8 +76,10 @@ func TestPreviewsStayWhileABodyShowsThemAsCards(t *testing.T) {
 	site, _ := previewSite(t)
 	srv.PreviewClient = site.Client()
 	link := func(n string) string { return site.URL + "/open-day?n=" + n }
+	pictures := map[string]string{}
 	for _, n := range []string{"post", "comment", "message", "deleted", "edited", "plain"} {
-		owner.mustStatus(200, "GET", "/api/previews?url="+url.QueryEscape(link(n)), nil)
+		p := owner.mustStatus(200, "GET", "/api/previews?url="+url.QueryEscape(link(n)), nil)
+		pictures[n] = p["image"].(string)
 	}
 	card := func(n string) map[string]string {
 		return map[string]string{"body_html": `<p data-embed=""><a href="` + link(n) + `">` + link(n) + `</a></p>`}
@@ -129,4 +102,6 @@ func TestPreviewsStayWhileABodyShowsThemAsCards(t *testing.T) {
 			t.Errorf("the %s preview: kept %v, want %v", n, err == nil, kept)
 		}
 	}
+	// A deleted preview's picture goes in the same sweep.
+	owner.mustStatus(404, "GET", pictures["plain"], nil)
 }

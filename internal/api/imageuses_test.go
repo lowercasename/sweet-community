@@ -86,9 +86,9 @@ func TestABodyUsesOnlyImagesItsWriterCanUse(t *testing.T) {
 	}
 }
 
-// An edit that removes an image ends the access that the post gave. The sweep then removes the image.
+// An edit that removes an image ends the access that the post gave.
 func TestRemovingAnImageFromAPostEndsItsUse(t *testing.T) {
-	ts, owner, srv := newTestServerWith(t)
+	ts, owner := newTestServer(t)
 	kit, _ := registerMember(t, ts, owner, "kit")
 	mo, _ := registerMember(t, ts, owner, "mo")
 	status, img := kit.upload(testPNG(40, 40))
@@ -100,9 +100,6 @@ func TestRemovingAnImageFromAPostEndsItsUse(t *testing.T) {
 	mo.mustStatus(200, "GET", url, nil)
 	kit.mustStatus(200, "PUT", "/api/posts/"+pid, map[string]string{"body_html": "<p>a</p>"})
 	mo.mustStatus(404, "GET", url, nil)
-	if n, err := images.Sweep(context.Background(), srv.DB, srv.Images, db.Now()+1); err != nil || n != 1 {
-		t.Fatalf("sweep: %d %v", n, err)
-	}
 }
 
 // The sweep deletes an image's row only if nothing uses the image at that moment. A post saved after the sweep listed
