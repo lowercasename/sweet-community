@@ -73,7 +73,7 @@ func TestProfiles(t *testing.T) {
 }
 
 // A bio, the rules and the welcome message hold no images and no preview cards. They are removed when the text is
-// saved, and when a text saved before this rule is read.
+// saved. A text saved before this rule is shown as it was stored, because old user content is never changed.
 func TestBiosAndCommunityTextsHoldNoImagesOrCards(t *testing.T) {
 	ts, owner, srv := newTestServerWith(t)
 	kit, _ := registerMember(t, ts, owner, "kit")
@@ -94,17 +94,11 @@ func TestBiosAndCommunityTextsHoldNoImagesOrCards(t *testing.T) {
 			t.Fatalf("%s: %v", path, set["body_html"])
 		}
 	}
-	// Texts saved before the rule are cleaned when they are read.
+	// A bio stored before the rule is shown as it was stored.
 	if _, err := srv.DB.Exec(`UPDATE users SET bio_html = ? WHERE username = 'kit'`, body); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := srv.DB.Exec(`UPDATE settings SET value = ? WHERE key = 'rules_html'`, body); err != nil {
-		t.Fatal(err)
-	}
-	if got := owner.mustStatus(200, "GET", "/api/users/kit", nil)["bio_html"]; got != want {
+	if got := owner.mustStatus(200, "GET", "/api/users/kit", nil)["bio_html"]; got != body {
 		t.Fatalf("an old bio as read: %v", got)
-	}
-	if got := kit.mustStatus(200, "GET", "/api/rules", nil)["body_html"]; got != want {
-		t.Fatalf("old rules as read: %v", got)
 	}
 }

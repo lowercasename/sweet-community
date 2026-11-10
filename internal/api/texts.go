@@ -29,14 +29,12 @@ var (
 	welcomeText = communityText{htmlKey: "welcome_html", textKey: "welcome_text", event: "welcome"}
 )
 
-// of reads a community text. A text saved before images were removed from these texts may hold some, so it is
-// cleaned as it is read as well as when it is saved.
 func (t communityText) of(ctx context.Context, q *store.Queries) (CommunityText, error) {
 	v, err := q.GetSetting(ctx, t.htmlKey)
 	if errors.Is(err, sql.ErrNoRows) {
 		return CommunityText{}, nil
 	}
-	return CommunityText{BodyHTML: sanitize.WithoutMedia(v)}, err
+	return CommunityText{BodyHTML: v}, err
 }
 
 // getText is `GET /api/rules` or `GET /api/welcome`, for signed-in users. The texts are not public. A person holding

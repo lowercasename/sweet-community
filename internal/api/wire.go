@@ -6,7 +6,6 @@ import (
 	"sort"
 
 	"sweet/internal/perm"
-	"sweet/internal/sanitize"
 	"sweet/internal/store"
 )
 
@@ -123,10 +122,8 @@ func wireMarker(row store.ListMarkersRow) Marker {
 	return Marker{UserID: row.UserID, Stream: row.Stream, ReadAt: row.ReadAt, Unread: row.Unread}
 }
 
-// wireProfile builds a profile. A bio saved before images were removed from bios may hold some, so it is cleaned as
-// it is read as well as when it is saved.
 func wireProfile(row store.GetProfileByUsernameRow) Profile {
-	return Profile{User: wireUser(row.ID, row.Username, row.PictureID), Role: row.Role, JoinedAt: row.JoinedAt, BioHTML: sanitize.WithoutMedia(row.BioHtml)}
+	return Profile{User: wireUser(row.ID, row.Username, row.PictureID), Role: row.Role, JoinedAt: row.JoinedAt, BioHTML: row.BioHtml}
 }
 
 func wireMembership(groupID string, row store.GetMemberRow) Membership {

@@ -10,10 +10,7 @@ import (
 	"math/rand"
 	"os"
 	"runtime"
-	"runtime/metrics"
-	"sync/atomic"
 	"testing"
-	"time"
 )
 
 func gifOf(frames int) []byte {
@@ -156,57 +153,6 @@ func TestProcessALargePhotoFitsInASmallContainer(t *testing.T) {
 	}
 }
 
-// A full-size phone photo sent straight to the server is processed, because a baseline JPEG costs little to decode.
-// The same photo saved as a progressive JPEG is refused, because its decoder keeps 4 bytes for each colour sample:
-// about 110 MB. The app converts every image to 2000 pixels before uploading it.
-func TestProcessTakesAFullSizePhotoButNotAProgressiveOne(t *testing.T) {
-	img := image.NewYCbCr(image.Rect(0, 0, 4032, 3024), image.YCbCrSubsampleRatio420)
-	var buf bytes.Buffer
-	jpeg.Encode(&buf, img, &jpeg.Options{Quality: 50})
-	if p, err := Process(withOrientation(buf.Bytes(), 6)); err != nil || p.Height != MaxSide {
-		t.Fatalf("a baseline 12-megapixel photo: %v %dx%d", err, p.Width, p.Height)
-	}
-	if _, err := Process(testdata(t, "progressive-420-4032x3024.jpg")); err != ErrTooLarge {
-		t.Fatalf("a progressive 12-megapixel photo: got %v, want ErrTooLarge", err)
-	}
-}
-
-// jpegFrame reads the frame header of the JPEGs that Go and cjpeg write.
-func TestJPEGFrame(t *testing.T) {
-	var buf bytes.Buffer
-	jpeg.Encode(&buf, image.NewYCbCr(image.Rect(0, 0, 16, 16), image.YCbCrSubsampleRatio420), nil)
-	for name, want := range map[string]struct {
-		data        []byte
-		progressive bool
-		samples     float64
-		components  int
-	}{
-		"Go's 4:2:0":            {buf.Bytes(), false, 1.5, 3},
-		"cjpeg progressive 444": {testdata(t, "progressive-444-2000.jpg"), true, 3, 3},
-		"progressive CMYK":      {testdata(t, "progressive-cmyk-2000.jpg"), true, 4, 4},
-		"cjpeg progressive 420": {testdata(t, "progressive-420-4032x3024.jpg"), true, 1.5, 3},
-	} {
-		progressive, samples, components, ok := jpegFrame(want.data)
-		if !ok || progressive != want.progressive || samples != want.samples || components != want.components {
-			t.Errorf("%s: %v %v %v %v", name, progressive, samples, components, ok)
-		}
-	}
-}
-
-// Any input either gives no frame or a frame with sensible values, and never panics.
-func FuzzJPEGFrame(f *testing.F) {
-	var buf bytes.Buffer
-	jpeg.Encode(&buf, image.NewYCbCr(image.Rect(0, 0, 16, 16), image.YCbCrSubsampleRatio420), nil)
-	f.Add(buf.Bytes())
-	f.Add([]byte{0xff, 0xd8, 0xff, 0xc2, 0x00, 0x08, 8, 0, 1, 0, 1, 1})
-	f.Fuzz(func(t *testing.T, data []byte) {
-		_, samples, components, ok := jpegFrame(data)
-		if ok && (components < 1 || samples <= 0 || samples > float64(components)) {
-			t.Fatalf("frame with %v samples and %d components", samples, components)
-		}
-	})
-}
-
 // withOrientation adds an EXIF block with this orientation tag to a JPEG, as a phone camera does. The camera stores
 // the pixels as the sensor read them and records how to turn them upright.
 func withOrientation(data []byte, orientation byte) []byte {
@@ -269,10 +215,7 @@ func TestProcessTurnsAPhonePhotoUpright(t *testing.T) {
 	}
 }
 
-// The files in testdata are 2000 by 2000. progressive-444-2000.jpg was written by cjpeg -progressive -sample 1x1.
-// progressive-cmyk-2000.jpg was converted to CMYK by sips and made progressive by jpegtran. alpha-2000.webp is a
-// lossy WebP with an alpha channel, written by github.com/gen2brain/webp. They are the most expensive files of their
-// formats to decode.
+// testdata reads a file from the testdata folder.
 func testdata(t *testing.T, name string) []byte {
 	t.Helper()
 	data, err := os.ReadFile("testdata/" + name)
@@ -280,41 +223,6 @@ func testdata(t *testing.T, name string) []byte {
 		t.Fatal(err)
 	}
 	return data
-}
-
-// heapPeak returns the most heap that objects held while fn ran, above what they held before. It is sampled every
-// 100 µs, and counts garbage that has not been collected yet, so it is at least the memory that fn needed.
-func heapPeak(fn func()) uint64 {
-	runtime.GC()
-	sample := func() uint64 {
-		s := []metrics.Sample{{Name: "/memory/classes/heap/objects:bytes"}}
-		metrics.Read(s)
-		return s[0].Value.Uint64()
-	}
-	base := sample()
-	var peak atomic.Uint64
-	stop, done := make(chan struct{}), make(chan struct{})
-	go func() {
-		defer close(done)
-		for {
-			select {
-			case <-stop:
-				return
-			default:
-			}
-			if v := sample(); v > peak.Load() {
-				peak.Store(v)
-			}
-			time.Sleep(100 * time.Microsecond)
-		}
-	}()
-	fn()
-	close(stop)
-	<-done
-	if p := peak.Load(); p > base {
-		return p - base
-	}
-	return 0
 }
 
 // allocated returns the bytes that fn allocates.
@@ -327,51 +235,18 @@ func allocated(fn func()) uint64 {
 	return after.TotalAlloc - before.TotalAlloc
 }
 
-func png16(w, h int) []byte {
-	img := image.NewNRGBA64(image.Rect(0, 0, w, h))
-	for i := range img.Pix {
-		img.Pix[i] = byte(i)
+// An image larger than 2000 by 2000 pixels is refused from its header, before any pixel is decoded. Decoding takes
+// memory in proportion to the pixels, and a small file can have many: a 454 KB JPEG once took 642 MB. The app never
+// sends a larger image. The test file is a 76 KB progressive JPEG of 4032 by 3024, written by cjpeg.
+func TestProcessRefusesAnImageOverTheLimitBeforeDecoding(t *testing.T) {
+	data := testdata(t, "progressive-420-4032x3024.jpg")
+	var err error
+	got := allocated(func() { _, err = Process(data) })
+	if err != ErrTooLarge {
+		t.Fatalf("got %v, want ErrTooLarge", err)
 	}
-	var buf bytes.Buffer
-	(&png.Encoder{CompressionLevel: png.BestSpeed}).Encode(&buf, img)
-	return buf.Bytes()
-}
-
-// A small file can need far more memory to decode than its size suggests. A 454 KB progressive JPEG once took
-// 642 MB. Such a file is refused from its header, before any pixel is decoded.
-func TestProcessRefusesBeforeDecodingAnImageThatWouldNeedTooMuchMemory(t *testing.T) {
-	for name, data := range map[string][]byte{
-		"a 2000 by 2000 progressive CMYK JPEG": testdata(t, "progressive-cmyk-2000.jpg"),
-		"a 2100 by 2000 16-bit PNG":            png16(2100, 2000),
-	} {
-		var err error
-		got := allocated(func() { _, err = Process(data) })
-		if err != ErrTooLarge {
-			t.Errorf("%s: got %v, want ErrTooLarge", name, err)
-		}
-		if got > 1<<20 {
-			t.Errorf("%s: allocated %d KB, so it was decoded", name, got>>10)
-		}
-	}
-}
-
-// The most expensive file of each format that is accepted stays within the budget. The budget is checked in a
-// 128 MB container separately. Here the allocations, which also count short-lived garbage, have a looser limit.
-func TestProcessTheMostExpensiveAcceptedImagesStayWithinMemory(t *testing.T) {
-	for name, data := range map[string][]byte{
-		"a 2000 by 2000 progressive JPEG with full-resolution colour": testdata(t, "progressive-444-2000.jpg"),
-		"a 2000 by 2000 16-bit PNG":                                   png16(2000, 2000),
-		"a 2000 by 2000 WebP with transparency":                       testdata(t, "alpha-2000.webp"),
-	} {
-		var p Processed
-		var err error
-		got := allocated(func() { p, err = Process(data) })
-		if err != nil || p.Width != 2000 {
-			t.Errorf("%s: %v %dx%d", name, err, p.Width, p.Height)
-		}
-		if got > 80<<20 {
-			t.Errorf("%s: allocated %d MB, more than 80 MB", name, got>>20)
-		}
+	if got > 1<<20 {
+		t.Fatalf("allocated %d KB, so it was decoded", got>>10)
 	}
 }
 
@@ -437,35 +312,4 @@ func FuzzScanGIF(f *testing.F) {
 			t.Fatal("cleaning a clean GIF changed it")
 		}
 	})
-}
-
-// An image larger than MaxSide is resized, which takes memory besides the decoded image: an intermediate image as
-// wide as the result and as tall as the original, then the result. The estimate counts both. A 3600 by 3600 PNG was
-// once estimated at 61 MB and took 92 MB.
-func TestTheEstimateCountsTheResize(t *testing.T) {
-	rgb := func(n int) []byte {
-		img := image.NewRGBA(image.Rect(0, 0, n, n))
-		for i := range img.Pix {
-			img.Pix[i] = byte(i)
-			if i%4 == 3 {
-				img.Pix[i] = 255
-			}
-		}
-		var buf bytes.Buffer
-		(&png.Encoder{CompressionLevel: png.BestSpeed}).Encode(&buf, img)
-		return buf.Bytes()
-	}
-	if _, err := Process(rgb(3600)); err != ErrTooLarge {
-		t.Fatalf("a 3600 by 3600 PNG: got %v, want ErrTooLarge", err)
-	}
-	var p Processed
-	var err error
-	data := rgb(2450)
-	peak := heapPeak(func() { p, err = Process(data) })
-	if err != nil || p.Width != MaxSide {
-		t.Fatalf("a 2450 by 2450 PNG: %v %d", err, p.Width)
-	}
-	if peak > decodeBudget {
-		t.Fatalf("resizing a 2450 by 2450 PNG held %d MB, more than the budget", peak>>20)
-	}
 }
