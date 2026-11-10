@@ -1,5 +1,14 @@
 # Changelog
 
+## v1.3.0 (2026-11-10)
+
+- Close the name card when the location changes
+- Show Offline as a badge in the page bar
+- Rewrite architecture.md as a short design document
+- Remove the pointers from code comments into architecture.md
+- Show the release and the source code link at the bottom of Home's feed
+- License Sweet under the AGPL, version 3 or later
+
 ## v1.2.1 (2026-11-09)
 
 - Say that the setup page's email address is for later sign-ins
