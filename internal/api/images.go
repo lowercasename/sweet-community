@@ -88,7 +88,7 @@ func (s *Server) storeImage(ctx context.Context, p images.Processed, uploader st
 	if err != nil {
 		return Image{}, err
 	}
-	key := id.String() + "." + p.Ext
+	key := id.String() + "." + images.Ext(p.ContentType)
 	if err := s.Images.Put(ctx, key, p.ContentType, bytesReader(p.Data), int64(len(p.Data))); err != nil {
 		return Image{}, err
 	}
