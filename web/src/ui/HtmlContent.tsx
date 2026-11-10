@@ -1,7 +1,6 @@
 import { useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent, type MouseEvent, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
-import { wrapGalleries } from '../content/galleries'
-import { prepareImages } from '../content/bodyImages'
+import { prepareImages } from '../content/galleries'
 
 interface HtmlContentProps {
   /** HTML that has ALREADY been sanitised by the server (bluemonday). */
@@ -30,7 +29,7 @@ interface HtmlContentProps {
  * `pnpm check:atomic` fails if dangerouslySetInnerHTML appears anywhere else.
  */
 export function HtmlContent({ html, size = 'body', onClick, onKeyDown, embed }: HtmlContentProps) {
-  const rendered = useMemo(() => prepareImages(wrapGalleries(html)), [html])
+  const rendered = useMemo(() => prepareImages(html), [html])
   const ref = useRef<HTMLDivElement>(null)
   // The renderer is read through a ref, so a new function on every render does not find the paragraphs again.
   const embedRef = useRef(embed)

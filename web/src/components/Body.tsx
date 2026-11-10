@@ -10,11 +10,8 @@ interface BodyProps {
   size?: 'body' | 'small'
 }
 
-/** The body image an event happened on. A link preview card's picture is part of a link, not a body image. */
-function imageOf(target: EventTarget): HTMLImageElement | null {
-  const img = (target as HTMLElement).closest?.('img')
-  return img && !img.closest('a, .link-preview') ? img : null
-}
+/** The body image an event happened on. prepareImages makes each body image that is not inside a link a button. */
+const imageOf = (target: EventTarget) => (target as HTMLElement).closest?.<HTMLImageElement>('img[role="button"]')
 
 /**
  * Renders a body. It shows the sanitised HTML, with
@@ -49,7 +46,7 @@ export function Body({ html, size }: BodyProps) {
   }
   const onKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
     const img = imageOf(e.target)
-    if (!img || e.target !== img || (e.key !== 'Enter' && e.key !== ' ')) return
+    if (!img || (e.key !== 'Enter' && e.key !== ' ')) return
     e.preventDefault()
     openImage(img)
   }

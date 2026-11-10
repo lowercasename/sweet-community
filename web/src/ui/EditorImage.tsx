@@ -37,7 +37,6 @@ function runAt(doc: Editor['state']['doc'], pos: number | undefined): Run {
  */
 export function EditorImage({ editor, node, getPos, selected, updateAttributes, deleteNode }: NodeViewProps) {
   const run = useEditorState({ editor, selector: ({ editor }) => runAt(editor.state.doc, getPos()) }) ?? ALONE
-  const corners = run.first && run.last ? 'all' : run.first ? 'top' : run.last ? 'bottom' : 'none'
 
   // Enter in the alt text field moves the cursor back into the document, just after this image.
   const leave = () => {
@@ -61,7 +60,8 @@ export function EditorImage({ editor, node, getPos, selected, updateAttributes, 
         onAltEnter={leave}
         onRemove={deleteNode}
         grip
-        corners={corners}
+        first={run.first}
+        last={run.last}
         selected={selected}
         upload={
           node.attrs.upload

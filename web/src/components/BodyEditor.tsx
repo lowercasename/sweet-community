@@ -5,31 +5,21 @@ import { mentionSuggestionKey, withMentions } from '../editor/mentions'
 import { useMembers } from '../data/hooks'
 import type { Topic } from '../api'
 import { Alert, Button, EditorSurface, Form, ImageCard, Row, Stack } from '../ui'
-import {
-  convert,
-  failedUploads,
-  failureReason,
-  imageFiles,
-  imagesHtml,
-  insertImages,
-  oneAtATime,
-} from '../editor/images'
-import { uploadImage, type UploadedImage } from '../api'
+import { convertAndUpload, failedUploads, failureReason, imageFiles, imagesHtml, insertImages } from '../editor/images'
+import type { UploadedImage } from '../api'
 import { EditorToolbar } from './EditorToolbar'
 import { embedLinks } from '../editor/embed'
 import { TopicMenu } from './TopicMenu'
 
 /**
- * An image attached to a chat message: the chosen file, its local copy shown at once, and its upload. `converted` is
- * the file to send, once made, and is kept for Try again. `progress` is the fraction sent while it uploads, `failed`
- * the reason its upload failed ('' when there is none to give), and `uploaded` the stored image once the upload has
- * finished.
+ * An image attached to a chat message. `file` is the chosen file, kept for Try again, and `preview` the address of its
+ * local copy, shown at once. `progress` is the fraction sent, `failed` the reason the upload failed ('' when there is
+ * none to give), and `uploaded` the stored image once the upload has finished.
  */
 interface Attachment {
   key: string
   file: File
   preview: string
-  converted?: Blob
   alt: string
   progress: number | null
   failed: string | null
@@ -112,6 +102,15 @@ export function BodyEditor({
   const [attached, setAttached] = useState<Attachment[]>([])
   // A bio or a community text has no image node, so it takes no images.
   const takesImages = images === 'attached' || extensions.some((e) => e.name === 'image')
+  // Image files in a paste or a drop are uploaded, not inlined as data: urls. An editor that takes no images ignores
+  // them, so a dropped file does not open in the tab.
+  const takeImages = (data: DataTransfer | null, event: Event) => {
+    const files = imageFiles(data)
+    if (files.length === 0) return false
+    event.preventDefault()
+    if (takesImages) addImagesRef.current(files)
+    return true
+  }
 
   // TipTap creates the keydown handler once, so the handler reads the latest callbacks through refs.
   const submitRef = useRef<() => void>(() => {})
@@ -159,22 +158,8 @@ export function BodyEditor({
         }
         return false
       },
-      // Pasted or dropped image files are uploaded, not inlined as data: urls. An editor that takes no images ignores
-      // them, so a dropped file does not open in the tab.
-      handlePaste(_view, event) {
-        const files = imageFiles(event.clipboardData)
-        if (files.length === 0) return false
-        event.preventDefault()
-        if (takesImages) addImagesRef.current(files)
-        return true
-      },
-      handleDrop(_view, event) {
-        const files = imageFiles(event.dataTransfer)
-        if (files.length === 0) return false
-        event.preventDefault()
-        if (takesImages) addImagesRef.current(files)
-        return true
-      },
+      handlePaste: (_view, event) => takeImages(event.clipboardData, event),
+      handleDrop: (_view, event) => takeImages(event.dataTransfer, event),
     },
   })
   useEffect(() => {
@@ -206,33 +191,24 @@ export function BodyEditor({
     for (const a of added) uploadAttachment(a)
   }
 
-  // Attached images are converted one at a time, like the images in a post.
-  const [queue] = useState(oneAtATime)
   const update = (key: string, change: Partial<Attachment>) =>
     setAttached((prev) => prev.map((a) => (a.key === key ? { ...a, ...change } : a)))
-  // Each attachment's upload can be stopped, when the image is removed or the editor goes.
+  // Each attachment's upload can be stopped, when the image is removed or the editor is unmounted.
   const stops = useRef(new Map<string, AbortController>())
-  const uploadAttachment = ({ key, file, converted }: Attachment) => {
+  const uploadAttachment = ({ key, file }: Attachment) => {
     update(key, { progress: 0, failed: null })
     const stop = new AbortController()
     stops.current.set(key, stop)
-    const ready = converted
-      ? Promise.resolve(converted)
-      : queue(() => (stop.signal.aborted ? Promise.reject(stop.signal.reason) : convert(file)))
-    ready
-      .then((blob) => {
-        update(key, { converted: blob })
-        return uploadImage(blob, (progress) => update(key, { progress }), stop.signal)
-      })
+    convertAndUpload(file, (progress) => update(key, { progress }), stop.signal)
       .then((uploaded) => {
         stops.current.delete(key)
-        update(key, { uploaded, converted: undefined, progress: null })
+        update(key, { uploaded, progress: null })
       })
       .catch((e: unknown) => {
         if (!stop.signal.aborted) update(key, { progress: null, failed: failureReason(e) })
       })
   }
-  // The uploads stop and the local copies are freed when the editor goes.
+  // The uploads stop and the local copies are freed when the editor is unmounted.
   const attachedRef = useRef(attached)
   attachedRef.current = attached
   useEffect(
@@ -317,9 +293,8 @@ export function BodyEditor({
                 onAltChange={(alt) => update(a.key, { alt })}
                 onAltEnter={() => editor?.commands.focus()}
                 onRemove={() => remove(a.key)}
-                corners={
-                  attached.length === 1 ? 'all' : i === 0 ? 'top' : i === attached.length - 1 ? 'bottom' : 'none'
-                }
+                first={i === 0}
+                last={i === attached.length - 1}
                 upload={
                   a.uploaded
                     ? undefined

@@ -125,34 +125,8 @@ export const postExtensions = [
   SweetImage,
 ]
 
-/**
- * The chat schema. A strict subset of the post schema, with paragraph, bold,
- * italic, strike, link, link preview card and hard break. The server policy is the same, and
- * the editor is smaller. There is no image node. Chat images are attached
- * above the text (BodyEditor `images="attached"`) and sent as a block of
- * <img> elements before it.
- */
-export const chatExtensions = [
-  StarterKit.configure({
-    heading: false,
-    blockquote: false,
-    bulletList: false,
-    orderedList: false,
-    listItem: false,
-    link: false,
-    underline: false,
-    code: false,
-    codeBlock: false,
-    horizontalRule: false,
-    trailingNode: false,
-    dropcursor,
-  }),
-  link,
-  Embed,
-  placeholder,
-]
-
-const commentKit = StarterKit.configure({
+/** The StarterKit options of the short editors: chat, comments, bios and community texts. */
+const shortKit = {
   heading: false,
   bulletList: false,
   orderedList: false,
@@ -164,7 +138,18 @@ const commentKit = StarterKit.configure({
   horizontalRule: false,
   trailingNode: false,
   dropcursor,
-})
+} as const
+
+/**
+ * The chat schema. A strict subset of the post schema, with paragraph, bold,
+ * italic, strike, link, link preview card and hard break. The server policy is the same, and
+ * the editor is smaller. There is no image node. Chat images are attached
+ * above the text (BodyEditor `images="attached"`) and sent as a block of
+ * <img> elements before it.
+ */
+export const chatExtensions = [StarterKit.configure({ ...shortKit, blockquote: false }), link, Embed, placeholder]
+
+const commentKit = StarterKit.configure(shortKit)
 
 /** The comment schema. The chat schema plus blockquote, which is used for a quote-reply. */
 export const commentExtensions = [commentKit, link, Embed, placeholder, SweetImage]

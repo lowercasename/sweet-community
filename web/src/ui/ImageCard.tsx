@@ -7,13 +7,6 @@ export const ALT_MAX = 1500
 
 const PLACEHOLDER = 'Describe this image for people using screen readers.'
 
-const CORNERS = {
-  all: 'rounded-[4px]',
-  top: 'rounded-t-[4px]',
-  bottom: 'rounded-b-[4px]',
-  none: '',
-}
-
 interface ImageCardProps {
   src: string
   alt: string
@@ -23,8 +16,12 @@ interface ImageCardProps {
   onRemove?: () => void
   /** Show a drag grip with TipTap's data-drag-handle attribute. For cards that are editor nodes. */
   grip?: boolean
-  /** Which corners are rounded. Adjacent cards join into one block, so only the outer corners are rounded. */
-  corners?: keyof typeof CORNERS
+  /**
+   * Whether the card is the first or the last of a block of adjacent cards, which join into one block. Only the
+   * outer corners of the block are rounded.
+   */
+  first?: boolean
+  last?: boolean
   selected?: boolean
   /**
    * An image being uploaded. While `progress` is a number (the fraction sent), the card shows the upload in place of
@@ -48,13 +45,17 @@ export function ImageCard({
   onAltEnter,
   onRemove,
   grip,
-  corners = 'all',
+  first = true,
+  last = true,
   selected,
   upload,
 }: ImageCardProps) {
   const ring = selected ? 'outline-2 outline-offset-2 outline-pink' : ''
+  const percent = Math.round((upload?.progress ?? 0) * 100)
   return (
-    <div className={`image-card flex items-stretch gap-2 border border-line bg-field p-2 ${CORNERS[corners]} ${ring}`}>
+    <div
+      className={`image-card flex items-stretch gap-2 border border-line bg-field p-2 ${first ? 'rounded-t-[4px]' : ''} ${last ? 'rounded-b-[4px]' : ''} ${ring}`}
+    >
       {grip && (
         <span
           className="flex cursor-grab items-center text-mute hover:text-ink"
@@ -79,18 +80,18 @@ export function ImageCard({
           </span>
         ) : upload?.progress != null ? (
           <span className="flex h-full flex-col justify-center gap-2">
-            <span className="text-sm text-mute">Uploading… {Math.round(upload.progress * 100)}%</span>
+            <span className="text-sm text-mute">Uploading… {percent}%</span>
             <span
               role="progressbar"
               aria-label="Upload"
               aria-valuemin={0}
               aria-valuemax={100}
-              aria-valuenow={Math.round(upload.progress * 100)}
+              aria-valuenow={percent}
               className="block h-1.5 w-full overflow-hidden rounded-full bg-line"
             >
               <span
                 className="block h-full rounded-full bg-mute transition-[width] duration-200"
-                style={{ width: `${Math.round(upload.progress * 100)}%` }}
+                style={{ width: `${percent}%` }}
               />
             </span>
           </span>

@@ -2,14 +2,17 @@
 export const GALLERY_MAX = 8
 
 /**
- * Wraps each run of adjacent top-level <img> elements in
- * <div class="gallery" data-count="N">, for the .gallery rules in global.css.
- * Stored HTML never contains gallery markup. The gallery is
- * a render-time view of plain images, so the editor and the sanitiser only
- * ever see <img>. A run of 2 or more images becomes galleries of at most
- * GALLERY_MAX images each. A single leftover image stays a plain image.
+ * Prepares the images of a sanitised body for display, in one pass over the parsed HTML.
+ *
+ * Each run of adjacent top-level images is wrapped in <div class="gallery" data-count="N">, for the .gallery rules in
+ * global.css. Stored HTML never contains gallery markup, so the editor and the sanitiser only ever see <img>. A run
+ * of 2 or more images becomes galleries of at most GALLERY_MAX images each. A single leftover image stays plain.
+ *
+ * Each image loads lazily and decodes without holding up the page. An image that is not inside a link becomes a
+ * focusable button named "Open image", which Body opens full size. Only these elements and attributes are added, so
+ * the HTML stays safe for HtmlContent.
  */
-export function wrapGalleries(html: string): string {
+export function prepareImages(html: string): string {
   if (!html.includes('<img')) return html
   const doc = new DOMParser().parseFromString(html, 'text/html')
   let run: Element[] = []
@@ -31,5 +34,14 @@ export function wrapGalleries(html: string): string {
     else flush()
   }
   flush()
+  for (const img of Array.from(doc.querySelectorAll('img'))) {
+    img.setAttribute('loading', 'lazy')
+    img.setAttribute('decoding', 'async')
+    if (img.closest('a')) continue
+    img.setAttribute('tabindex', '0')
+    img.setAttribute('role', 'button')
+    const alt = img.getAttribute('alt')
+    img.setAttribute('aria-label', alt ? `Open image: ${alt}` : 'Open image')
+  }
   return doc.body.innerHTML
 }

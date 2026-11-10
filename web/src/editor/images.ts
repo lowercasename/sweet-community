@@ -1,5 +1,4 @@
 import type { Editor } from '@tiptap/core'
-import type { Node as PMNode } from '@tiptap/pm/model'
 import type { EditorState, Transaction } from '@tiptap/pm/state'
 import { ApiError, uploadImage, type UploadedImage } from '../api'
 
@@ -7,11 +6,6 @@ export const IMAGE_ACCEPT = 'image/jpeg,image/png,image/webp,image/gif'
 
 /** The longer side the server keeps (MaxSide in package images). The browser draws a larger image at this size. */
 const MAX_SIDE = 2000
-
-/** An uploaded image with the alt text entered so far. */
-export interface AttachedImage extends UploadedImage {
-  alt: string
-}
 
 /** The line under the editor when uploads fail. It gives no reason, because each image's card shows its own. */
 export function failedUploads(failed: number, total: number): string {
@@ -65,34 +59,36 @@ export async function convert(file: File): Promise<Blob> {
   return blob ?? file
 }
 
+/** The conversion that the next one waits for. */
+let converting: Promise<unknown> = Promise.resolve()
+
 /**
- * Returns a function that runs tasks one at a time, in the order they are given. Converting decodes a whole photo,
- * so photos are converted one at a time to keep a phone's memory free.
+ * Converts an image and uploads it, reporting the fraction sent. Conversions on the page run one at a time, because
+ * each decodes a whole photo and a phone has little memory. `signal` stops the conversion or the upload.
  */
-export function oneAtATime(): <T>(task: () => Promise<T>) => Promise<T> {
-  let last: Promise<unknown> = Promise.resolve()
-  return <T>(task: () => Promise<T>) => {
-    const run = last.then(task)
-    last = run.catch(() => undefined)
-    return run
-  }
+export function convertAndUpload(
+  file: File,
+  onProgress?: (fraction: number) => void,
+  signal?: AbortSignal,
+): Promise<UploadedImage> {
+  const converted = converting.then(() => (signal?.aborted ? Promise.reject(signal.reason) : convert(file)))
+  converting = converted.catch(() => undefined)
+  return converted.then((blob) => uploadImage(blob, onProgress, signal))
 }
 
 /** Converts an image and uploads it. Used for profile and room pictures, which show no upload progress. */
-export async function uploadPicture(file: File): Promise<UploadedImage> {
-  return uploadImage(await convert(file))
+export function uploadPicture(file: File): Promise<UploadedImage> {
+  return convertAndUpload(file)
 }
 
 /**
- * An image added to a post or comment, kept by its node's upload key. `file` is the chosen file, until it is
- * converted, and `preview` the address of its local copy. `converted` is the file to send, kept for Try again.
- * `done` holds the node's attributes once the upload has finished, and `failed` the reason it failed, so a node that
- * comes back through undo or redo shows the same.
+ * An image added to a post or comment, kept by its node's upload key. `file` is the chosen file, kept for Try again,
+ * and `preview` the address of its local copy. `done` holds the node's attributes once the upload has finished, and
+ * `failed` the reason it failed, so a node that comes back through undo or redo shows the same.
  */
 interface Upload {
-  file?: File
+  file: File
   preview: string
-  converted?: Blob
   done?: Record<string, unknown>
   failed?: string
 }
@@ -103,15 +99,10 @@ interface Upload {
  */
 export interface ImageStorage {
   uploads: Map<string, Upload>
-  queue: ReturnType<typeof oneAtATime>
   stop: AbortController
 }
 
-export const newImageStorage = (): ImageStorage => ({
-  uploads: new Map(),
-  queue: oneAtATime(),
-  stop: new AbortController(),
-})
+export const newImageStorage = (): ImageStorage => ({ uploads: new Map(), stop: new AbortController() })
 
 /** Stops an editor's uploads and frees the local copies of its images, when the editor is destroyed. */
 export function releaseImages(storage: ImageStorage) {
@@ -122,19 +113,13 @@ export function releaseImages(storage: ImageStorage) {
 
 const storageOf = (editor: Editor): ImageStorage => editor.storage.image
 
-/** The position of the image node with this upload key, or null if it has been removed. */
-function imageAt(doc: PMNode, key: string): number | null {
+/** Sets attributes on the image node with this upload key in `tr`. Upload state is kept out of the undo history. */
+function setImageIn(tr: Transaction, key: string, attrs: Record<string, unknown>): boolean {
   let at: number | null = null
-  doc.descendants((node, pos) => {
+  tr.doc.descendants((node, pos) => {
     if (at === null && node.type.name === 'image' && node.attrs.upload === key) at = pos
     return at === null
   })
-  return at
-}
-
-/** Sets attributes on the image node with this upload key in `tr`. Upload state is kept out of the undo history. */
-function setImageIn(tr: Transaction, key: string, attrs: Record<string, unknown>): boolean {
-  const at = imageAt(tr.doc, key)
   const node = at === null ? null : tr.doc.nodeAt(at)
   if (at === null || !node) return false
   tr.setNodeMarkup(at, undefined, { ...node.attrs, ...attrs }).setMeta('addToHistory', false)
@@ -149,26 +134,14 @@ function setImage(editor: Editor, key: string, attrs: Record<string, unknown>) {
 }
 
 /**
- * Converts and uploads the image with this key. Its node must already show the upload. Conversions wait for each
- * other, and uploads start as soon as their image is converted. The node's card shows the progress. On success the
- * node points at the stored image. On failure its card shows the error. The callbacks run after the caller returns,
- * so each dispatches a transaction of its own.
+ * Converts and uploads the image with this key. Its node must already show the upload. The node's card shows the
+ * progress. On success the node points at the stored image. On failure its card shows the error.
  */
 function upload(editor: Editor, key: string) {
-  const { uploads, queue, stop } = storageOf(editor)
+  const { uploads, stop } = storageOf(editor)
   const u = uploads.get(key)
   if (!u) return
-  const { signal } = stop
-  const file = u.file
-  const converted = u.converted
-    ? Promise.resolve(u.converted)
-    : queue(() => (signal.aborted || !file ? Promise.reject(signal.reason) : convert(file)))
-  converted
-    .then((blob) => {
-      u.converted = blob
-      u.file = undefined
-      return uploadImage(blob, (fraction) => setImage(editor, key, { progress: fraction }), signal)
-    })
+  convertAndUpload(u.file, (fraction) => setImage(editor, key, { progress: fraction }), stop.signal)
     .then((img) => {
       u.done = {
         src: img.url,
@@ -179,12 +152,11 @@ function upload(editor: Editor, key: string) {
         progress: null,
         failed: null,
       }
-      u.converted = undefined
       URL.revokeObjectURL(u.preview)
       setImage(editor, key, u.done)
     })
     .catch((e: unknown) => {
-      if (signal.aborted) return
+      if (stop.signal.aborted) return
       u.failed = failureReason(e)
       setImage(editor, key, { progress: null, failed: u.failed })
     })
@@ -246,19 +218,16 @@ export function insertImages(editor: Editor, files: File[]) {
 }
 
 /** The <img> elements for the images attached above a message, serialised as the editor would serialise them. */
-export function imagesHtml(images: AttachedImage[]): string {
+export function imagesHtml(images: (UploadedImage & { alt: string })[]): string {
   return images
     .map((img) => {
       const el = document.createElement('img')
-      for (const [k, v] of Object.entries(imageAttrs(img))) el.setAttribute(k, String(v))
+      // The attribute order matches TipTap's serialisation and the server's fixtures.
+      const attrs = { src: img.url, alt: img.alt, width: img.width, height: img.height, 'data-image-id': img.id }
+      for (const [k, v] of Object.entries(attrs)) el.setAttribute(k, String(v))
       return el.outerHTML
     })
     .join('')
-}
-
-/** The attribute order matches TipTap's serialisation and the server's fixtures. */
-function imageAttrs(img: AttachedImage) {
-  return { src: img.url, alt: img.alt, width: img.width, height: img.height, 'data-image-id': img.id }
 }
 
 /** The image files in a paste or drop, if there are any. */

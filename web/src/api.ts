@@ -320,9 +320,9 @@ export class ApiError extends Error {
 }
 
 /** Shown for an error that the server did not describe, such as a proxy's error page. It names no status code. */
-export const GENERIC_ERROR = 'Something went wrong. Try again in a moment.'
+const GENERIC_ERROR = 'Something went wrong. Try again in a moment.'
 /** Shown when the request could not be sent at all. */
-export const CONNECTION_ERROR = 'Could not connect. Check your connection and try again.'
+const CONNECTION_ERROR = 'Could not connect. Check your connection and try again.'
 
 /**
  * The error for a failed response. The server's own error sentence is shown as it is. Anything else, such as the
@@ -808,7 +808,7 @@ export function uploadImage(
     let timer: ReturnType<typeof setTimeout> | undefined
     const giveUpAfter = (ms: number) => {
       clearTimeout(timer)
-      timer = setTimeout(() => xhr.abort(), ms)
+      timer = setTimeout(stop, ms)
     }
     xhr.open('POST', '/api/images')
     xhr.setRequestHeader('Accept', 'application/json')
@@ -817,9 +817,11 @@ export function uploadImage(
       if (e.lengthComputable) onProgress?.(e.loaded / e.total)
     }
     xhr.upload.onload = () => giveUpAfter(UPLOAD_ANSWER_MS)
-    xhr.onloadend = () => signal?.removeEventListener('abort', stop)
-    xhr.onload = () => {
+    xhr.onloadend = () => {
       clearTimeout(timer)
+      signal?.removeEventListener('abort', stop)
+    }
+    xhr.onload = () => {
       const type = xhr.getResponseHeader('content-type') ?? ''
       if (xhr.status < 200 || xhr.status >= 300) {
         reject(errorFrom(xhr.status, type, xhr.responseText))
@@ -831,10 +833,7 @@ export function uploadImage(
         reject(new ApiError(xhr.status, GENERIC_ERROR))
       }
     }
-    xhr.onerror = xhr.onabort = () => {
-      clearTimeout(timer)
-      reject(new ApiError(0, CONNECTION_ERROR))
-    }
+    xhr.onerror = xhr.onabort = () => reject(new ApiError(0, CONNECTION_ERROR))
     const form = new FormData()
     form.append('file', file, file instanceof File ? file.name : 'image')
     giveUpAfter(UPLOAD_STALL_MS)
