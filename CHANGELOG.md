@@ -1,5 +1,13 @@
 # Changelog
 
+## v1.5.0 (2026-11-10)
+
+- Let a link preview card span its column
+- Give link preview cards a wide picture
+- Show a link on its own line as a preview card, and edit links in a panel
+- Fetch and keep link previews on the server
+- Accept only your own images as pictures, and end a stream with its session
+
 ## v1.4.0 (2026-11-10)
 
 - Add an emoji picker to every composer on devices with a mouse or trackpad
