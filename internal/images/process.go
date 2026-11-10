@@ -7,7 +7,9 @@ import (
 	"image/gif"
 	"image/jpeg"
 	"image/png"
+	"io"
 	"net/http"
+	"sync"
 
 	"github.com/disintegration/imaging"
 	"github.com/rwcarlsen/goexif/exif"
@@ -29,9 +31,8 @@ const (
 	jpegQuality        = 85
 )
 
-// slots limits how many images are processed at once. A community may run in
-// a 128 MB container, so images are processed one at a time.
-var slots = make(chan struct{}, 1)
+// processing makes the server process one image at a time. Decoding one image may take about 130 MB.
+var processing sync.Mutex
 
 var (
 	ErrNotImage = errors.New("That is not a JPEG, PNG, WebP or GIF")
@@ -64,12 +65,16 @@ func Ext(contentType string) string {
 // photo upright and strips metadata by re-encoding. A transparent image becomes a PNG. An opaque JPEG stays a JPEG.
 // Any other opaque image becomes whichever of JPEG and PNG is smaller. An animated GIF is the exception. It is
 // stored without its metadata blocks but otherwise as uploaded, because re-encoding would lose the animation.
-func Process(data []byte) (Processed, error) {
+func Process(r io.Reader) (Processed, error) {
+	processing.Lock()
+	defer processing.Unlock()
+	data, err := io.ReadAll(io.LimitReader(r, MaxUpload+1))
+	if err != nil {
+		return Processed{}, err
+	}
 	if len(data) > MaxUpload {
 		return Processed{}, ErrTooLarge
 	}
-	slots <- struct{}{}
-	defer func() { <-slots }()
 	switch http.DetectContentType(data) {
 	case "image/jpeg", "image/png", "image/gif", "image/webp":
 	default:

@@ -1,6 +1,7 @@
 package api
 
 import (
+	"bytes"
 	"context"
 	"database/sql"
 	"errors"
@@ -59,23 +60,24 @@ func (s *Server) linkPreview(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, wireLinkPreview(row))
 }
 
-// previewPicture fetches, processes and stores a preview's picture, and returns its image id. The picture counts
-// against the same memory budget as an upload, for the largest picture that is fetched.
-func (s *Server) previewPicture(ctx context.Context, c *http.Client, url, uploader string) (string, bool) {
-	if uploads.Acquire(ctx, preview.MaxImageBytes) != nil {
-		return "", false
-	}
-	defer uploads.Release(preview.MaxImageBytes)
+// previewPictures makes the server fetch one preview picture at a time, so many previews at once do not hold many
+// pictures in memory.
+var previewPictures sync.Mutex
+
+// previewPicture fetches, processes and stores a preview's picture, and returns its image id.
+func (s *Server) previewPicture(ctx context.Context, c *http.Client, url, uploader string) sql.NullString {
+	previewPictures.Lock()
+	defer previewPictures.Unlock()
 	data, err := preview.FetchImage(ctx, c, url)
 	if err != nil {
-		return "", false
+		return sql.NullString{}
 	}
-	processed, err := images.Process(data)
+	processed, err := images.Process(bytes.NewReader(data))
 	if err != nil {
-		return "", false
+		return sql.NullString{}
 	}
 	img, err := s.storeImage(ctx, processed, uploader)
-	return img.ID, err == nil
+	return sql.NullString{String: img.ID, Valid: err == nil}
 }
 
 // fetchPreview fetches the page at raw and keeps the result, found or not. A picture that cannot be fetched or read
@@ -89,9 +91,7 @@ func (s *Server) fetchPreview(ctx context.Context, raw, uploader string) (store.
 	if p, err := preview.Fetch(ctx, c, raw); err == nil {
 		save.Found, save.Title, save.Description = 1, p.Title, p.Description
 		if p.ImageURL != "" && s.Images != nil {
-			if id, ok := s.previewPicture(ctx, c, p.ImageURL, uploader); ok {
-				save.ImageID = sql.NullString{String: id, Valid: true}
-			}
+			save.ImageID = s.previewPicture(ctx, c, p.ImageURL, uploader)
 		}
 	}
 	if err := s.q().SaveLinkPreview(ctx, save); err != nil {

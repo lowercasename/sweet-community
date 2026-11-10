@@ -58,38 +58,38 @@ func pngOf(w, h int, c color.Color) []byte {
 func TestProcess(t *testing.T) {
 	// An opaque image from a lossless file is stored in whichever of PNG and JPEG is smaller. A flat image, such as a
 	// screenshot, stays a PNG. A photo becomes a JPEG. A transparent image stays a PNG.
-	p, err := Process(pngOf(10, 10, color.NRGBA{200, 30, 30, 255}))
+	p, err := process(pngOf(10, 10, color.NRGBA{200, 30, 30, 255}))
 	if err != nil || p.ContentType != "image/png" || p.Width != 10 {
 		t.Fatalf("flat opaque: %s %v", p.ContentType, err)
 	}
-	p, err = Process(noisyPNG(200, 150))
+	p, err = process(noisyPNG(200, 150))
 	if err != nil || p.ContentType != "image/jpeg" || p.Width != 200 {
 		t.Fatalf("photo-like opaque: %s %v", p.ContentType, err)
 	}
-	p, err = Process(pngOf(10, 10, color.NRGBA{200, 30, 30, 120}))
+	p, err = process(pngOf(10, 10, color.NRGBA{200, 30, 30, 120}))
 	if err != nil || p.ContentType != "image/png" {
 		t.Fatalf("transparent: %+v %v", p, err)
 	}
 	// The longer side is capped at MaxSide and the aspect ratio is kept.
-	p, err = Process(pngOf(3000, 150, color.NRGBA{0, 0, 0, 255}))
+	p, err = process(pngOf(3000, 150, color.NRGBA{0, 0, 0, 255}))
 	if err != nil || p.Width != MaxSide || p.Height != 100 {
 		t.Fatalf("resize: %+v %v", p, err)
 	}
 	// An animated GIF is stored unchanged. A static GIF is re-encoded.
 	anim := gifOf(3)
-	p, err = Process(anim)
+	p, err = process(anim)
 	if err != nil || p.ContentType != "image/gif" || !bytes.Equal(p.Data, anim) || p.Width != 8 {
 		t.Fatalf("animated gif: %+v %v", p.ContentType, err)
 	}
-	p, err = Process(gifOf(1))
+	p, err = process(gifOf(1))
 	if err != nil || p.ContentType == "image/gif" {
 		t.Fatalf("static gif should be re-encoded: %+v %v", p.ContentType, err)
 	}
 	// Input that is not an image is rejected regardless of what it claims to be.
-	if _, err := Process([]byte("<svg xmlns='http://www.w3.org/2000/svg'></svg>")); err != ErrNotImage {
+	if _, err := process([]byte("<svg xmlns='http://www.w3.org/2000/svg'></svg>")); err != ErrNotImage {
 		t.Fatalf("svg: %v", err)
 	}
-	if _, err := Process([]byte("hello")); err != ErrNotImage {
+	if _, err := process([]byte("hello")); err != ErrNotImage {
 		t.Fatalf("text: %v", err)
 	}
 }
@@ -113,7 +113,7 @@ func bombGIF(frames int) []byte {
 // Before 2026-11-08 every frame was decoded, and one small file could take
 // gigabytes of memory.
 func TestAnimatedGIFIsLimitedByItsFramesBeforeDecoding(t *testing.T) {
-	if _, err := Process(bombGIF(30)); err != ErrTooLarge {
+	if _, err := process(bombGIF(30)); err != ErrTooLarge {
 		t.Fatalf("a GIF of thirty 2000 by 2000 frames: %v", err)
 	}
 	frames, area, _, err := scanGIF(gifOf(3), true)
@@ -141,7 +141,7 @@ func TestProcessALargePhotoFitsInASmallContainer(t *testing.T) {
 	data := withOrientation(buf.Bytes(), 6)
 	var p Processed
 	var err error
-	got := allocated(func() { p, err = Process(data) })
+	got := allocated(func() { p, err = process(data) })
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -188,7 +188,7 @@ func halves(w, h int) []byte {
 
 func TestProcessTurnsAPhonePhotoUpright(t *testing.T) {
 	// Orientation 6: the stored pixels must be turned 90 degrees clockwise. The left half ends up at the top.
-	p, err := Process(withOrientation(halves(40, 20), 6))
+	p, err := process(withOrientation(halves(40, 20), 6))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -241,7 +241,7 @@ func allocated(fn func()) uint64 {
 func TestProcessRefusesAnImageOverTheLimitBeforeDecoding(t *testing.T) {
 	data := testdata(t, "progressive-420-4032x3024.jpg")
 	var err error
-	got := allocated(func() { _, err = Process(data) })
+	got := allocated(func() { _, err = process(data) })
 	if err != ErrTooLarge {
 		t.Fatalf("got %v, want ErrTooLarge", err)
 	}
@@ -275,7 +275,7 @@ func TestProcessStripsMetadataFromAnAnimatedGIF(t *testing.T) {
 	if !bytes.Contains(data, []byte("camera serial")) {
 		t.Fatal("the test file has no comment")
 	}
-	p, err := Process(data)
+	p, err := process(data)
 	if err != nil || p.ContentType != "image/gif" {
 		t.Fatalf("%s %v", p.ContentType, err)
 	}
@@ -312,4 +312,9 @@ func FuzzScanGIF(f *testing.F) {
 			t.Fatal("cleaning a clean GIF changed it")
 		}
 	})
+}
+
+// process runs Process on bytes.
+func process(data []byte) (Processed, error) {
+	return Process(bytes.NewReader(data))
 }

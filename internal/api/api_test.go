@@ -1173,3 +1173,55 @@ func TestSweepKeepsGoingPastAFailure(t *testing.T) {
 		t.Fatalf("next sweep: %v, the first file is still stored: %v", err, stored(keys[0]))
 	}
 }
+
+// An image whose client has gone by the time it is stored still gets its row, so its file is not left without one.
+func TestAnImageIsKeptWhenItsClientHasGone(t *testing.T) {
+	_, _, srv := newTestServerWith(t)
+	owner, err := srv.q().GetUserByUsername(context.Background(), "raphael")
+	if err != nil {
+		t.Fatal(err)
+	}
+	p, err := images.Process(bytes.NewReader(testPNG(10, 10)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	img, err := srv.storeImage(ctx, p, owner.ID)
+	if err != nil {
+		t.Fatalf("storing after the client went: %v", err)
+	}
+	if _, err := srv.q().GetImage(context.Background(), img.ID); err != nil {
+		t.Fatalf("the image has no row: %v", err)
+	}
+}
+
+// storeThatWrites sends a message from inside Delete.
+type storeThatWrites struct {
+	images.Store
+	write func()
+}
+
+func (s storeThatWrites) Delete(ctx context.Context, key string) error {
+	s.write()
+	return s.Store.Delete(ctx, key)
+}
+
+// The sweep deletes stored files after its write transaction, so a slow bucket does not hold up writes. A message
+// sent while the sweep deleted a file once failed, because the sweep held the database's write lock.
+func TestTheSweepDeletesFilesOutsideItsTransaction(t *testing.T) {
+	_, owner, srv := newTestServerWith(t)
+	if status, _ := owner.upload(testPNG(40, 40)); status != 201 {
+		t.Fatalf("upload: %d", status)
+	}
+	status := 0
+	st := storeThatWrites{Store: srv.Images, write: func() {
+		status, _ = owner.do("POST", rootPath+"/messages", map[string]string{"body_html": "<p>hello</p>"})
+	}}
+	if _, err := images.Sweep(context.Background(), srv.DB, st, db.Now()+1); err != nil {
+		t.Fatal(err)
+	}
+	if status != 201 {
+		t.Fatalf("a message sent while the sweep deleted a file: %d", status)
+	}
+}

@@ -3,6 +3,7 @@ package api
 import (
 	"context"
 	"net/http"
+	"strings"
 	"testing"
 
 	"sweet/internal/db"
@@ -117,5 +118,24 @@ func TestTheSweepDeletesAnImageOnlyIfNothingUsesItThen(t *testing.T) {
 	n, err := srv.q().DeleteUnreferencedImage(context.Background(), img["id"].(string))
 	if err != nil || n != 0 {
 		t.Fatalf("deleted %d rows of an image in a live post: %v", n, err)
+	}
+}
+
+// A writer may keep an image in their own post when the post is what lets them see it. The edit once failed after
+// the image's uploader deleted their own post.
+func TestAnAuthorCanEditAPostThatShowsAnImageOnlyItShows(t *testing.T) {
+	ts, owner := newTestServer(t)
+	kit, _ := registerMember(t, ts, owner, "kit")
+	mo, _ := registerMember(t, ts, owner, "mo")
+	status, img := kit.upload(testPNG(40, 40))
+	if status != 201 {
+		t.Fatalf("upload: %d", status)
+	}
+	kits := kit.mustStatus(201, "POST", rootPath+"/posts", map[string]string{"body_html": imgTag(img)})
+	mos := mo.mustStatus(201, "POST", rootPath+"/posts", map[string]string{"body_html": "<p>this</p>" + imgTag(img)})
+	kit.mustStatus(200, "DELETE", "/api/posts/"+kits["id"].(string), nil)
+	got := mo.mustStatus(200, "PUT", "/api/posts/"+mos["id"].(string), map[string]string{"body_html": "<p>this one</p>" + imgTag(img)})
+	if !strings.Contains(got["body_html"].(string), img["url"].(string)) {
+		t.Fatalf("the edit lost the image: %v", got["body_html"])
 	}
 }
