@@ -803,7 +803,8 @@ export function uploadImage(
       return
     }
     const xhr = new XMLHttpRequest()
-    signal?.addEventListener('abort', () => xhr.abort())
+    const stop = () => xhr.abort()
+    signal?.addEventListener('abort', stop, { once: true })
     let timer: ReturnType<typeof setTimeout> | undefined
     const giveUpAfter = (ms: number) => {
       clearTimeout(timer)
@@ -816,6 +817,7 @@ export function uploadImage(
       if (e.lengthComputable) onProgress?.(e.loaded / e.total)
     }
     xhr.upload.onload = () => giveUpAfter(UPLOAD_ANSWER_MS)
+    xhr.onloadend = () => signal?.removeEventListener('abort', stop)
     xhr.onload = () => {
       clearTimeout(timer)
       const type = xhr.getResponseHeader('content-type') ?? ''

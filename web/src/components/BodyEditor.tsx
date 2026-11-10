@@ -224,7 +224,10 @@ export function BodyEditor({
         update(key, { converted: blob })
         return uploadImage(blob, (progress) => update(key, { progress }), stop.signal)
       })
-      .then((uploaded) => update(key, { uploaded, converted: undefined, progress: null }))
+      .then((uploaded) => {
+        stops.current.delete(key)
+        update(key, { uploaded, converted: undefined, progress: null })
+      })
       .catch((e: unknown) => {
         if (!stop.signal.aborted) update(key, { progress: null, failed: failureReason(e) })
       })

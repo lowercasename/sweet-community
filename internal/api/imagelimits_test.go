@@ -181,3 +181,77 @@ func (c *client) cookieHeader() string {
 	}
 	return strings.Join(parts, "; ")
 }
+
+// An upload that waits for room in the upload budget gets its whole read time once it has room. Its time once
+// started before the wait, and an upload that waited longer failed.
+func TestAnUploadThatWaitsForRoomGetsItsWholeReadTime(t *testing.T) {
+	_, owner, _ := newTestServerWith(t)
+	was := uploadReadTime
+	uploadReadTime = 300 * time.Millisecond
+	t.Cleanup(func() { uploadReadTime = was })
+	if err := uploads.Acquire(context.Background(), uploadBytes); err != nil {
+		t.Fatal(err)
+	}
+	go func() {
+		time.Sleep(time.Second)
+		uploads.Release(uploadBytes)
+	}()
+	// The body is larger than the server's read buffer, so it is read from the connection after the wait.
+	img := image.NewNRGBA(image.Rect(0, 0, 300, 300))
+	rand.New(rand.NewSource(1)).Read(img.Pix)
+	for i := 3; i < len(img.Pix); i += 4 {
+		img.Pix[i] = 255
+	}
+	var buf bytes.Buffer
+	png.Encode(&buf, img)
+	if status, body := owner.upload(buf.Bytes()); status != 201 {
+		t.Fatalf("an upload that waited: %d %v", status, body)
+	}
+}
+
+// An image whose client has gone by the time it is stored still gets its row, so its file is not left without one.
+func TestAnImageIsKeptWhenItsClientHasGone(t *testing.T) {
+	_, _, srv := newTestServerWith(t)
+	owner, err := srv.q().GetUserByUsername(context.Background(), "raphael")
+	if err != nil {
+		t.Fatal(err)
+	}
+	p, err := images.Process(testPNG(10, 10))
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	img, err := srv.storeImage(ctx, p, owner.ID)
+	if err != nil {
+		t.Fatalf("storing after the client went: %v", err)
+	}
+	if _, err := srv.q().GetImage(context.Background(), img.ID); err != nil {
+		t.Fatalf("the image has no row: %v", err)
+	}
+}
+
+// panicky fetches pages normally and panics when it fetches a picture.
+type panicky struct{ next http.RoundTripper }
+
+func (p panicky) RoundTrip(r *http.Request) (*http.Response, error) {
+	if strings.HasSuffix(r.URL.Path, ".png") {
+		panic("the picture could not be read")
+	}
+	return p.next.RoundTrip(r)
+}
+
+// A preview's share of the upload budget is given back even when fetching its picture fails unexpectedly.
+func TestAPreviewGivesBackItsShareOfTheBudget(t *testing.T) {
+	_, owner, srv := newTestServerWith(t)
+	site, _ := previewSite(t)
+	srv.PreviewClient = &http.Client{Transport: panicky{site.Client().Transport}}
+	// The panic ends the request without an answer.
+	if res, err := owner.http.Get(owner.base + "/api/previews?url=" + url.QueryEscape(site.URL+"/open-day")); err == nil {
+		res.Body.Close()
+	}
+	if !uploads.TryAcquire(uploadBytes) {
+		t.Fatal("part of the upload budget is still held")
+	}
+	uploads.Release(uploadBytes)
+}

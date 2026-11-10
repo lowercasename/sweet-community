@@ -63,14 +63,15 @@ func (s *Server) uploadImage(w http.ResponseWriter, r *http.Request) {
 	if size <= 0 {
 		size = limit
 	}
-	if err := http.NewResponseController(w).SetReadDeadline(time.Now().Add(uploadReadTime)); err != nil {
-		writeErr(w, http.StatusInternalServerError, err.Error())
-		return
-	}
 	if err := uploads.Acquire(r.Context(), size); err != nil {
 		return // the client has gone
 	}
 	defer uploads.Release(size)
+	// The read time starts once there is room, so the wait does not use it up.
+	if err := http.NewResponseController(w).SetReadDeadline(time.Now().Add(uploadReadTime)); err != nil {
+		writeErr(w, http.StatusInternalServerError, err.Error())
+		return
+	}
 	r.Body = http.MaxBytesReader(w, r.Body, limit)
 	file, err := filePart(r)
 	if err == nil {
@@ -141,6 +142,8 @@ func (s *Server) storeImage(ctx context.Context, p images.Processed, uploader st
 	if err := s.Images.Put(ctx, key, p.ContentType, bytesReader(p.Data), int64(len(p.Data))); err != nil {
 		return Image{}, err
 	}
+	// The file is stored, so its row is written even if the client has gone meanwhile.
+	ctx = context.WithoutCancel(ctx)
 	if err := s.q().CreateImage(ctx, store.CreateImageParams{
 		ID: id.String(), UploaderID: uploader, ContentType: p.ContentType,
 		Width: int64(p.Width), Height: int64(p.Height), Bytes: int64(len(p.Data)), CreatedAt: db.Now(),
