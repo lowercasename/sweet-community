@@ -9,20 +9,10 @@ CREATE TABLE link_uses (
 );
 CREATE INDEX link_uses_url ON link_uses(url);
 
--- The cards that count: in a live post, comment or message in a live group.
+-- The cards that count, in live bodies. See live_bodies in 006_image_uses.sql.
 CREATE VIEW live_link_uses AS
     SELECT u.url FROM link_uses u
-        JOIN posts p ON u.kind = 'post' AND p.id = u.id AND p.deleted_at IS NULL
-        JOIN groups g ON g.id = p.group_id AND g.deleted_at IS NULL
-    UNION ALL
-    SELECT u.url FROM link_uses u
-        JOIN comments c ON u.kind = 'comment' AND c.id = u.id AND c.deleted_at IS NULL
-        JOIN posts p ON p.id = c.post_id AND p.deleted_at IS NULL
-        JOIN groups g ON g.id = p.group_id AND g.deleted_at IS NULL
-    UNION ALL
-    SELECT u.url FROM link_uses u
-        JOIN messages x ON u.kind = 'message' AND x.id = u.id AND x.deleted_at IS NULL
-        JOIN groups g ON g.id = x.group_id AND g.deleted_at IS NULL;
+        JOIN live_bodies b ON b.kind = u.kind AND b.id = u.id;
 
 -- Stored files whose images have been deleted, waiting to be deleted from storage. The image sweep deletes an image's
 -- row in a short transaction and the file afterwards, so it never holds the write lock while it waits on storage. A

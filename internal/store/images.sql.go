@@ -20,32 +20,18 @@ func (q *Queries) AddFileToDelete(ctx context.Context, key string) error {
 }
 
 const addImageUse = `-- name: AddImageUse :exec
-INSERT OR IGNORE INTO image_uses (image_id, kind, id) VALUES (?1, ?2, ?3)
+INSERT OR IGNORE INTO image_uses (image_id, kind, id) SELECT i.id, ?1, ?2 FROM images i WHERE i.id = ?3
 `
 
 type AddImageUseParams struct {
-	ImageID string
 	Kind    string
 	ID      string
+	ImageID string
 }
 
+// Records that a body or a report's copy uses an image, if the image still exists.
 func (q *Queries) AddImageUse(ctx context.Context, arg AddImageUseParams) error {
-	_, err := q.db.ExecContext(ctx, addImageUse, arg.ImageID, arg.Kind, arg.ID)
-	return err
-}
-
-const addReportImageUse = `-- name: AddReportImageUse :exec
-INSERT OR IGNORE INTO image_uses (image_id, kind, id) SELECT i.id, 'report', ?1 FROM images i WHERE i.id = ?2
-`
-
-type AddReportImageUseParams struct {
-	ReportID string
-	ImageID  string
-}
-
-// Records that a report's copy uses an image, if the image still exists.
-func (q *Queries) AddReportImageUse(ctx context.Context, arg AddReportImageUseParams) error {
-	_, err := q.db.ExecContext(ctx, addReportImageUse, arg.ReportID, arg.ImageID)
+	_, err := q.db.ExecContext(ctx, addImageUse, arg.Kind, arg.ID, arg.ImageID)
 	return err
 }
 

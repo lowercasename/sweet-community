@@ -6,96 +6,79 @@ import (
 	"golang.org/x/net/html"
 )
 
-// This file extracts data from a sanitised body. It
-// walks the parsed tree for mention ids. Hashtag extraction is not written
-// until the decision between tags and topics is made.
+// distinct parses a sanitised body and returns the values that pick finds in its elements, each once, in document
+// order. pick returns "" for an element it skips.
+func distinct(sanitised string, pick func(*html.Node) string) []string {
+	root, err := html.Parse(strings.NewReader(sanitised))
+	if err != nil {
+		return nil
+	}
+	var out []string
+	seen := map[string]bool{}
+	for n := range root.Descendants() {
+		if n.Type != html.ElementNode {
+			continue
+		}
+		if v := pick(n); v != "" && !seen[v] {
+			seen[v] = true
+			out = append(out, v)
+		}
+	}
+	return out
+}
 
-// Mentions returns the ids of the users mentioned in a sanitised body, each once, in document order.
+// attr returns an element's attribute, or "" when it has none.
+func attr(n *html.Node, key string) string {
+	for _, a := range n.Attr {
+		if a.Key == key {
+			return a.Val
+		}
+	}
+	return ""
+}
+
+// Mentions returns the ids of the users mentioned in a sanitised body.
 func Mentions(sanitised string) []string {
-	root, err := html.Parse(strings.NewReader(sanitised))
-	if err != nil {
-		return nil
-	}
-	var out []string
-	seen := map[string]bool{}
-	var walk func(*html.Node)
-	walk = func(n *html.Node) {
-		if n.Type == html.ElementNode && n.Data == "span" {
-			for _, a := range n.Attr {
-				if a.Key == "data-mention-id" && a.Val != "" && !seen[a.Val] {
-					seen[a.Val] = true
-					out = append(out, a.Val)
-				}
-			}
+	return distinct(sanitised, func(n *html.Node) string {
+		if n.Data != "span" {
+			return ""
 		}
-		for c := n.FirstChild; c != nil; c = c.NextSibling {
-			walk(c)
-		}
-	}
-	walk(root)
-	return out
+		return attr(n, "data-mention-id")
+	})
 }
 
-// Images returns the ids of the images in a sanitised body, from the src="/img/<id>" of its <img> elements, without
-// repeats. An id written as text or in a link is not an image.
+// Images returns the ids of the images in a sanitised body, from the src="/img/<id>" of its <img> elements. An id
+// written as text or in a link is not an image.
 func Images(sanitised string) []string {
-	root, err := html.Parse(strings.NewReader(sanitised))
-	if err != nil {
-		return nil
-	}
-	var out []string
-	seen := map[string]bool{}
-	var walk func(*html.Node)
-	walk = func(n *html.Node) {
-		if n.Type == html.ElementNode && n.Data == "img" {
-			for _, a := range n.Attr {
-				if id, ok := strings.CutPrefix(a.Val, "/img/"); a.Key == "src" && ok && !seen[id] {
-					seen[id] = true
-					out = append(out, id)
-				}
-			}
+	return distinct(sanitised, func(n *html.Node) string {
+		if n.Data != "img" {
+			return ""
 		}
-		for c := n.FirstChild; c != nil; c = c.NextSibling {
-			walk(c)
+		id, ok := strings.CutPrefix(attr(n, "src"), "/img/")
+		if !ok {
+			return ""
 		}
-	}
-	walk(root)
-	return out
+		return id
+	})
 }
 
-// EmbedLinks returns the addresses of the links that a sanitised body shows as preview cards, without repeats. A card
-// is a paragraph marked data-embed that holds one link.
+// EmbedLinks returns the addresses of the links that a sanitised body shows as preview cards. A card is a paragraph
+// marked data-embed that holds one link.
 func EmbedLinks(sanitised string) []string {
-	if !strings.Contains(sanitised, "data-embed") {
-		return nil
-	}
-	root, err := html.Parse(strings.NewReader(sanitised))
-	if err != nil {
-		return nil
-	}
-	var out []string
-	seen := map[string]bool{}
-	var walk func(*html.Node, bool)
-	walk = func(n *html.Node, inCard bool) {
-		if n.Type == html.ElementNode && n.Data == "p" {
-			for _, a := range n.Attr {
-				if a.Key == "data-embed" {
-					inCard = true
-				}
-			}
+	return distinct(sanitised, func(n *html.Node) string {
+		if n.Data != "a" || n.Parent == nil || n.Parent.Data != "p" || !hasAttr(n.Parent, "data-embed") {
+			return ""
 		}
-		if inCard && n.Type == html.ElementNode && n.Data == "a" {
-			for _, a := range n.Attr {
-				if a.Key == "href" && a.Val != "" && !seen[a.Val] {
-					seen[a.Val] = true
-					out = append(out, a.Val)
-				}
-			}
-		}
-		for c := n.FirstChild; c != nil; c = c.NextSibling {
-			walk(c, inCard)
+		return attr(n, "href")
+	})
+}
+
+// hasAttr reports whether an element has an attribute, which may be empty.
+func hasAttr(n *html.Node, key string) bool {
+	for _, a := range n.Attr {
+		if a.Key == key {
+			return true
 		}
 	}
-	walk(root, false)
-	return out
+	return false
 }

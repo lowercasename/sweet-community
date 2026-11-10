@@ -38,13 +38,9 @@ DELETE FROM images WHERE id = sqlc.arg(id) AND NOT EXISTS (SELECT 1 FROM image_r
 -- name: DeleteImageUses :exec
 DELETE FROM image_uses WHERE kind = sqlc.arg(kind) AND id = sqlc.arg(id);
 
+-- Records that a body or a report's copy uses an image, if the image still exists.
 -- name: AddImageUse :exec
-INSERT OR IGNORE INTO image_uses (image_id, kind, id) VALUES (sqlc.arg(image_id), sqlc.arg(kind), sqlc.arg(id));
-
--- Records that a report's copy uses an image, if the image still exists.
--- name: AddReportImageUse :exec
-INSERT OR IGNORE INTO image_uses (image_id, kind, id) SELECT i.id, 'report', sqlc.arg(report_id) FROM images i WHERE i.id = sqlc.arg(image_id);
-
+INSERT OR IGNORE INTO image_uses (image_id, kind, id) SELECT i.id, sqlc.arg(kind), sqlc.arg(id) FROM images i WHERE i.id = sqlc.arg(image_id);
 
 -- name: AddFileToDelete :exec
 INSERT OR IGNORE INTO image_files_to_delete (key) VALUES (sqlc.arg(key));

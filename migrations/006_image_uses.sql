@@ -9,21 +9,27 @@ CREATE TABLE image_uses (
 );
 CREATE INDEX image_uses_image ON image_uses(image_id);
 
--- The uses that count: in a live post, comment or message in a live group, or in the copy kept by an open report.
--- group_id is the group whose members may see the image. For a report it is the reported content's group.
-CREATE VIEW live_image_uses AS
-    SELECT u.image_id, u.kind, p.group_id FROM image_uses u
-        JOIN posts p ON u.kind = 'post' AND p.id = u.id AND p.deleted_at IS NULL
+-- The posts, comments and messages that count. A body counts while it is not deleted and its group is not deleted.
+-- A comment also needs its post. group_id is the group whose members may see the body.
+CREATE VIEW live_bodies AS
+    SELECT 'post' AS kind, p.id, p.group_id FROM posts p
         JOIN groups g ON g.id = p.group_id AND g.deleted_at IS NULL
+        WHERE p.deleted_at IS NULL
     UNION ALL
-    SELECT u.image_id, u.kind, p.group_id FROM image_uses u
-        JOIN comments c ON u.kind = 'comment' AND c.id = u.id AND c.deleted_at IS NULL
+    SELECT 'comment', c.id, p.group_id FROM comments c
         JOIN posts p ON p.id = c.post_id AND p.deleted_at IS NULL
         JOIN groups g ON g.id = p.group_id AND g.deleted_at IS NULL
+        WHERE c.deleted_at IS NULL
     UNION ALL
-    SELECT u.image_id, u.kind, x.group_id FROM image_uses u
-        JOIN messages x ON u.kind = 'message' AND x.id = u.id AND x.deleted_at IS NULL
+    SELECT 'message', x.id, x.group_id FROM messages x
         JOIN groups g ON g.id = x.group_id AND g.deleted_at IS NULL
+        WHERE x.deleted_at IS NULL;
+
+-- The image uses that count. A use counts while its body is live, or while its report is open. group_id is the
+-- group of the body. For a report it is the reported content's group.
+CREATE VIEW live_image_uses AS
+    SELECT u.image_id, u.kind, b.group_id FROM image_uses u
+        JOIN live_bodies b ON b.kind = u.kind AND b.id = u.id
     UNION ALL
     SELECT u.image_id, u.kind, r.group_id FROM image_uses u
         JOIN reports r ON u.kind = 'report' AND r.id = u.id AND r.closed_at IS NULL;

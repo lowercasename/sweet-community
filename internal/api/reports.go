@@ -133,7 +133,7 @@ func (s *Server) createReport(w http.ResponseWriter, r *http.Request) {
 		}
 		// The report keeps a copy of the body, and the copy keeps its images while the report is open.
 		for _, img := range sanitize.Images(item.BodyHTML) {
-			if err := qtx.AddReportImageUse(ctx, store.AddReportImageUseParams{ReportID: id.String(), ImageID: img}); err != nil {
+			if err := qtx.AddImageUse(ctx, store.AddImageUseParams{ImageID: img, Kind: "report", ID: id.String()}); err != nil {
 				return nil, nil, http.StatusInternalServerError, err
 			}
 		}

@@ -1,6 +1,7 @@
 package api
 
 import (
+	"bytes"
 	"context"
 	"database/sql"
 	"encoding/json"
@@ -89,7 +90,7 @@ func (s *Server) storeImage(ctx context.Context, p images.Processed, uploader st
 		return Image{}, err
 	}
 	key := id.String() + "." + images.Ext(p.ContentType)
-	if err := s.Images.Put(ctx, key, p.ContentType, bytesReader(p.Data), int64(len(p.Data))); err != nil {
+	if err := s.Images.Put(ctx, key, p.ContentType, bytes.NewReader(p.Data), int64(len(p.Data))); err != nil {
 		return Image{}, err
 	}
 	// The file is stored, so its row is written even if the client has gone meanwhile.
@@ -122,16 +123,14 @@ func (s *Server) serveImage(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusInternalServerError, err.Error())
 		return
 	}
-	// The visibility rule for images. The viewer
-	// may see an image when they uploaded it, when it is a profile picture,
-	// or when a live body in one of the viewer's groups references it.
+	// ImageVisibleTo holds the visibility rule for images.
 	me, _ := userFrom(r.Context())
 	visible, err := s.q().ImageVisibleTo(r.Context(), store.ImageVisibleToParams{ImageID: id, ViewerID: me.ID})
 	if err != nil {
 		writeErr(w, http.StatusInternalServerError, err.Error())
 		return
 	}
-	if !(visible.Valid && visible.Bool) {
+	if !visible.Bool {
 		http.NotFound(w, r)
 		return
 	}
@@ -152,8 +151,6 @@ func (s *Server) serveImage(w http.ResponseWriter, r *http.Request) {
 	io.Copy(w, rc)
 }
 
-// setPicture sets the signed-in user's picture to an uploaded image. A null
-// image_id resets it to the default donut avatar.
 // pictureImage checks the image that is to become a profile picture or a room picture. A picture must be an image
 // that the person setting it uploaded. Every signed-in user can see a profile picture, so any other image would let a
 // member show an image from a private room or a conversation to the whole community, or use someone else's picture as
@@ -173,6 +170,8 @@ func pictureImage(ctx context.Context, qtx *store.Queries, id *string, setter st
 	return sql.NullString{String: *id, Valid: true}, 0, nil
 }
 
+// setPicture sets the signed-in user's picture to an uploaded image. A null image_id resets it to the default donut
+// avatar.
 func (s *Server) setPicture(w http.ResponseWriter, r *http.Request) {
 	var in struct {
 		ImageID *string `json:"image_id"`

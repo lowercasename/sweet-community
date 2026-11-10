@@ -11,10 +11,12 @@ import (
 	"github.com/microcosm-cc/bluemonday"
 )
 
+const uuid = `[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}`
+
 var (
-	uuidRe    = regexp.MustCompile(`^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$`)
+	uuidRe    = regexp.MustCompile(`^` + uuid + `$`)
 	mentionRe = regexp.MustCompile(`^mention$`)
-	imgSrcRe  = regexp.MustCompile(`^/img/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$`)
+	imgSrcRe  = regexp.MustCompile(`^/img/` + uuid + `$`)
 	// imgTag matches an <img> element in sanitised HTML. The policy escapes > inside attribute values.
 	imgTag   = regexp.MustCompile(`<img[^>]*>`)
 	targetRe = regexp.MustCompile(`^_blank$`)
