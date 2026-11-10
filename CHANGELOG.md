@@ -1,5 +1,13 @@
 # Changelog
 
+## v1.6.0 (2026-11-10)
+
+- Show upload progress in grey
+- Shrink profile and room pictures before uploading
+- Show images in the editor while they upload
+- Turn phone photos upright on the server
+- Process phone photos within a small container's memory
+
 ## v1.5.0 (2026-11-10)
 
 - Let a link preview card span its column
