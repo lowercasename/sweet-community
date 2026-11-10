@@ -12,6 +12,7 @@ import (
 	"log"
 	"net/http"
 	"strconv"
+	"time"
 
 	"github.com/google/uuid"
 
@@ -152,6 +153,9 @@ type Server struct {
 	// up. PushKey is the public VAPID key.
 	Push    *push.Pusher
 	PushKey string
+	// PreviewClient fetches the pages and pictures of link previews. Nil means the client from package preview, which
+	// refuses internal addresses. Tests set a client that can reach a local test server.
+	PreviewClient *http.Client
 
 	limiter loginLimiter
 	// mailLimiter rate-limits the endpoints that send a link to any requested address.
@@ -160,6 +164,9 @@ type Server struct {
 	// limiter, it counts only a failed attempt (a bad code), never a successful
 	// registration.
 	registerLimiter loginLimiter
+	// previewLimiter limits how many pages each user makes the server fetch for link previews. A kept preview is
+	// not fetched again and does not count.
+	previewLimiter loginLimiter
 }
 
 func (s *Server) q() *store.Queries { return store.New(s.DB) }
@@ -264,6 +271,8 @@ func (s *Server) Routes(mux *http.ServeMux) {
 	mux.HandleFunc("POST /api/groups/{gid}/messages", s.requireGroup(s.createMessage))
 	mux.HandleFunc("GET /api/posts/{id}", s.requireAuth(s.getPost))
 	mux.HandleFunc("GET /api/search", s.requireAuth(s.search))
+	s.previewLimiter.every, s.previewLimiter.burst = 2*time.Second, 30
+	mux.HandleFunc("GET /api/previews", s.requireAuth(s.linkPreview))
 	mux.HandleFunc("PUT /api/posts/{id}", s.requireAuth(s.editPost))
 	mux.HandleFunc("PUT /api/posts/{id}/topic", s.requireAuth(s.setPostTopic))
 	mux.HandleFunc("GET /api/topics", s.requireAuth(s.listTopics))

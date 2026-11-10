@@ -17,6 +17,7 @@ UPDATE users SET picture_id = ? WHERE id = ?;
 -- name: ImageVisibleTo :one
 SELECT EXISTS (SELECT 1 FROM images i WHERE i.id = sqlc.arg(image_id) AND i.uploader_id = sqlc.arg(viewer_id))
     OR EXISTS (SELECT 1 FROM users u WHERE u.picture_id = sqlc.arg(image_id))
+    OR EXISTS (SELECT 1 FROM link_previews lp WHERE lp.image_id = sqlc.arg(image_id))
     OR EXISTS (SELECT 1 FROM groups g JOIN memberships m ON m.group_id = g.id AND m.user_id = sqlc.arg(viewer_id) AND m.hidden_at IS NULL
                WHERE g.deleted_at IS NULL AND g.picture_id = sqlc.arg(image_id))
     OR EXISTS (SELECT 1 FROM posts p JOIN memberships m ON m.group_id = p.group_id AND m.user_id = sqlc.arg(viewer_id) AND m.hidden_at IS NULL
@@ -31,13 +32,14 @@ SELECT EXISTS (SELECT 1 FROM images i WHERE i.id = sqlc.arg(image_id) AND i.uplo
                WHERE r.closed_at IS NULL AND instr(r.body_html, sqlc.arg(image_id)) > 0) AS visible;
 
 -- Lists images that nothing references. Such an image is not a profile
--- picture or a live group's picture. It does not appear in a live post,
+-- picture, a live group's picture or a link preview's picture. It does not appear in a live post,
 -- comment or message in a live group, or in the copy kept by an open report.
 -- A comment counts only if its post is live.
 -- name: ListUnreferencedImages :many
 SELECT i.id, i.content_type FROM images i
 WHERE i.created_at < sqlc.arg(before)
   AND NOT EXISTS (SELECT 1 FROM users u WHERE u.picture_id = i.id)
+  AND NOT EXISTS (SELECT 1 FROM link_previews lp WHERE lp.image_id = i.id)
   AND NOT EXISTS (SELECT 1 FROM groups g WHERE g.picture_id = i.id AND g.deleted_at IS NULL)
   AND NOT EXISTS (SELECT 1 FROM posts p JOIN groups g ON g.id = p.group_id AND g.deleted_at IS NULL
                   WHERE p.deleted_at IS NULL AND instr(p.body_html, i.id) > 0)

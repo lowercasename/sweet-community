@@ -221,11 +221,14 @@ func isHTTPS(r *http.Request) bool {
 }
 
 // loginLimiter slows password guessing. Per address, it allows 5 attempts at
-// once and then one every 12 seconds. Entries are never evicted, which is
-// acceptable for one instance.
+// once and then one every 12 seconds. Other limits set every and burst, and
+// may key by something other than an address, such as a user id. Entries are
+// never evicted, which is acceptable for one instance.
 type loginLimiter struct {
-	mu sync.Mutex
-	m  map[string]*rate.Limiter
+	mu    sync.Mutex
+	m     map[string]*rate.Limiter
+	every time.Duration
+	burst int
 }
 
 func (l *loginLimiter) get(addr string) *rate.Limiter {
@@ -240,7 +243,11 @@ func (l *loginLimiter) get(addr string) *rate.Limiter {
 	}
 	lim, ok := l.m[host]
 	if !ok {
-		lim = rate.NewLimiter(rate.Every(12*time.Second), 5)
+		every, burst := 12*time.Second, 5
+		if l.every > 0 {
+			every, burst = l.every, l.burst
+		}
+		lim = rate.NewLimiter(rate.Every(every), burst)
 		l.m[host] = lim
 	}
 	return lim

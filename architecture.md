@@ -146,7 +146,15 @@ A storage quota per instance is planned.
 
 ### Embeds
 
-Embeds are planned. The server will fetch an embed's title and thumbnail. A video will load the provider's player only when clicked, so trackers stay off the page by default. The fetcher will use a library that blocks internal addresses.
+A link on its own line becomes a preview card, as in WhatsApp and Signal (Raphael, 2026-11-10). The card shows the page's picture, title, description and site, taken from the page's OpenGraph tags. Clicking it opens the page in a new tab. The card's shape follows old Sweet's link preview, which Raphael chose: a picture on the left, then the title, a short description and the site, at a fixed height.
+
+- Previews appear in posts, comments and chat. There is no button for them.
+- In a post or a comment, pressing Enter after a link on its own line turns it into a card. A link on the last line is turned into a card when the post is saved, without the author seeing it happen. The editor shows "Embedded link" above a card, with "Turn back into regular link", and a link turned back stays a link when the post is saved again.
+- In chat, a link on its own line becomes a card when the message is sent. A sent message cannot be edited, so the card stays.
+- A page that gives no title, or cannot be fetched, stays a plain link.
+- The server fetches the page and keeps a copy of its picture, so readers' browsers never contact the other site. The fetcher refuses internal addresses. A preview is fetched once for each address and kept.
+- The card data is the server's, not the body's. The body holds only the link and a mark that it is a card, so a client cannot invent a preview.
+- Videos get the same card for now. A player that loads only when clicked was planned, and was deferred by Raphael (2026-11-10).
 
 ## Accounts
 

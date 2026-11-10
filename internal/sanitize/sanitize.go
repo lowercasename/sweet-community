@@ -16,6 +16,7 @@ var (
 	mentionRe = regexp.MustCompile(`^mention$`)
 	imgSrcRe  = regexp.MustCompile(`^/img/[0-9a-fA-F-]{36}$`)
 	targetRe  = regexp.MustCompile(`^_blank$`)
+	emptyRe   = regexp.MustCompile(`^$`)
 	// relRe accepts TipTap's default rel value and the rel value this policy
 	// adds to a link that has none. The second keeps a post created via the
 	// API stable once it has been edited in TipTap.
@@ -49,6 +50,12 @@ func newBodyPolicy() *bluemonday.Policy {
 	p.RequireNoFollowOnLinks(false)
 	p.RequireNoReferrerOnLinks(true)
 	p.AddTargetBlankToFullyQualifiedLinks(true)
+
+	// A link on its own line that is shown as a preview card is <p data-embed=""><a href="...">...</a></p>. A link that
+	// its author turned back from a card has data-plain-link="", so it is not made a card again. The card's content is
+	// the server's, so the body holds only these empty marks.
+	p.AllowAttrs("data-embed").Matching(emptyRe).OnElements("p")
+	p.AllowAttrs("data-plain-link").Matching(emptyRe).OnElements("a")
 
 	// A mention is <span data-type="mention" data-mention-id="<uuid>">@name</span>.
 	p.AllowAttrs("data-type").Matching(mentionRe).OnElements("span")

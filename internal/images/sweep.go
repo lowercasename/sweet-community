@@ -9,12 +9,17 @@ import (
 )
 
 // Sweep deletes images uploaded before `before` that nothing references. An
-// image is referenced when it is a profile picture or appears in a live post,
-// comment or message. An image is stored as soon as it is uploaded, so the
+// image is referenced when it is a profile picture, a room's picture or a link
+// preview's picture, or appears in a live post, comment or message. Link
+// previews that nothing links to any more are deleted first, so their pictures
+// go in the same run. An image is stored as soon as it is uploaded, so the
 // unreferenced images are those from drafts that were never posted, images
 // removed while editing, and images from deleted posts. Sweep returns the
 // number of images removed. The database row is deleted only after the file.
 func Sweep(ctx context.Context, q *store.Queries, st Store, before int64) (int, error) {
+	if _, err := q.DeleteUnusedLinkPreviews(ctx, before); err != nil {
+		return 0, err
+	}
 	rows, err := q.ListUnreferencedImages(ctx, before)
 	if err != nil {
 		return 0, err

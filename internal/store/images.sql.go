@@ -68,6 +68,7 @@ func (q *Queries) GetImage(ctx context.Context, id string) (Image, error) {
 const imageVisibleTo = `-- name: ImageVisibleTo :one
 SELECT EXISTS (SELECT 1 FROM images i WHERE i.id = ?1 AND i.uploader_id = ?2)
     OR EXISTS (SELECT 1 FROM users u WHERE u.picture_id = ?1)
+    OR EXISTS (SELECT 1 FROM link_previews lp WHERE lp.image_id = ?1)
     OR EXISTS (SELECT 1 FROM groups g JOIN memberships m ON m.group_id = g.id AND m.user_id = ?2 AND m.hidden_at IS NULL
                WHERE g.deleted_at IS NULL AND g.picture_id = ?1)
     OR EXISTS (SELECT 1 FROM posts p JOIN memberships m ON m.group_id = p.group_id AND m.user_id = ?2 AND m.hidden_at IS NULL
@@ -105,6 +106,7 @@ const listUnreferencedImages = `-- name: ListUnreferencedImages :many
 SELECT i.id, i.content_type FROM images i
 WHERE i.created_at < ?1
   AND NOT EXISTS (SELECT 1 FROM users u WHERE u.picture_id = i.id)
+  AND NOT EXISTS (SELECT 1 FROM link_previews lp WHERE lp.image_id = i.id)
   AND NOT EXISTS (SELECT 1 FROM groups g WHERE g.picture_id = i.id AND g.deleted_at IS NULL)
   AND NOT EXISTS (SELECT 1 FROM posts p JOIN groups g ON g.id = p.group_id AND g.deleted_at IS NULL
                   WHERE p.deleted_at IS NULL AND instr(p.body_html, i.id) > 0)
@@ -122,7 +124,7 @@ type ListUnreferencedImagesRow struct {
 }
 
 // Lists images that nothing references. Such an image is not a profile
-// picture or a live group's picture. It does not appear in a live post,
+// picture, a live group's picture or a link preview's picture. It does not appear in a live post,
 // comment or message in a live group, or in the copy kept by an open report.
 // A comment counts only if its post is live.
 func (q *Queries) ListUnreferencedImages(ctx context.Context, before int64) ([]ListUnreferencedImagesRow, error) {

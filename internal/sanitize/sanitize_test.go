@@ -13,6 +13,12 @@ func TestBody(t *testing.T) {
 		wantNot []string // substrings that must be absent
 	}{
 		{
+			name:    "keeps the empty marks for a link preview card and for a link that stays plain, on their own elements only",
+			in:      `<p data-embed="" data-x="1"><a href="https://plots.test/a">https://plots.test/a</a></p><p><a href="https://plots.test/b" data-plain-link="" data-embed="">b</a></p><p data-embed="yes">c</p><div data-embed="">d</div>`,
+			want:    []string{`<p data-embed=""><a href="https://plots.test/a"`, `data-plain-link=""`, `<p>c</p>`},
+			wantNot: []string{"data-x", `data-embed="yes"`, "<div", `data-plain-link="" data-embed`},
+		},
+		{
 			name:    "strips scripts, handlers, classes, styles",
 			in:      `<h2 class="x" onclick="alert(1)" style="color:red">Hi</h2><script>alert(2)</script>`,
 			want:    []string{"<h2>Hi</h2>"},

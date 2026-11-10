@@ -4,6 +4,10 @@
 
 package store
 
+import (
+	"database/sql"
+)
+
 type Image struct {
 	ID          string
 	UploaderID  string
@@ -12,6 +16,16 @@ type Image struct {
 	Height      int64
 	Bytes       int64
 	CreatedAt   int64
+}
+
+type LinkPreview struct {
+	Url         string
+	Found       int64
+	Title       string
+	Description string
+	SiteName    string
+	ImageID     sql.NullString
+	FetchedAt   int64
 }
 
 type PushSubscription struct {

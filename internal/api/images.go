@@ -57,25 +57,33 @@ func (s *Server) uploadImage(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusInternalServerError, err.Error())
 		return
 	}
-	id, err := uuid.NewV7()
+	me, _ := userFrom(r.Context())
+	img, err := s.storeImage(r.Context(), p, me.ID)
 	if err != nil {
 		writeErr(w, http.StatusInternalServerError, err.Error())
 		return
 	}
-	key := id.String() + "." + p.Ext
-	if err := s.Images.Put(r.Context(), key, p.ContentType, bytesReader(p.Data), int64(len(p.Data))); err != nil {
-		writeErr(w, http.StatusInternalServerError, err.Error())
-		return
+	writeJSON(w, http.StatusCreated, img)
+}
+
+// storeImage stores a processed image and records it with its uploader. Uploads and the pictures of link previews
+// both use it.
+func (s *Server) storeImage(ctx context.Context, p images.Processed, uploader string) (Image, error) {
+	id, err := uuid.NewV7()
+	if err != nil {
+		return Image{}, err
 	}
-	me, _ := userFrom(r.Context())
-	if err := s.q().CreateImage(r.Context(), store.CreateImageParams{
-		ID: id.String(), UploaderID: me.ID, ContentType: p.ContentType,
+	key := id.String() + "." + p.Ext
+	if err := s.Images.Put(ctx, key, p.ContentType, bytesReader(p.Data), int64(len(p.Data))); err != nil {
+		return Image{}, err
+	}
+	if err := s.q().CreateImage(ctx, store.CreateImageParams{
+		ID: id.String(), UploaderID: uploader, ContentType: p.ContentType,
 		Width: int64(p.Width), Height: int64(p.Height), Bytes: int64(len(p.Data)), CreatedAt: db.Now(),
 	}); err != nil {
-		writeErr(w, http.StatusInternalServerError, err.Error())
-		return
+		return Image{}, err
 	}
-	writeJSON(w, http.StatusCreated, Image{ID: id.String(), URL: imageURL(id.String()), Width: int64(p.Width), Height: int64(p.Height)})
+	return Image{ID: id.String(), URL: imageURL(id.String()), Width: int64(p.Width), Height: int64(p.Height)}, nil
 }
 
 // serveImage streams a stored image to a signed-in member. Ids are never
