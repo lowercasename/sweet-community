@@ -1113,6 +1113,33 @@ func TestUploadWithoutAFileIsABadRequest(t *testing.T) {
 	}
 }
 
+// An upload of more than a megabyte is kept in a temporary file while the server reads it. The file is deleted
+// when the request ends.
+func TestUploadLeavesNoTemporaryFile(t *testing.T) {
+	_, owner := newTestServer(t)
+	dir := t.TempDir()
+	t.Setenv("TMPDIR", dir)
+	// Noise does not compress, so this PNG is about 1.4 MB.
+	img := image.NewNRGBA(image.Rect(0, 0, 600, 600))
+	n := uint32(1)
+	for i := range img.Pix {
+		n = n*1664525 + 1013904223
+		img.Pix[i] = byte(n >> 24)
+	}
+	var buf bytes.Buffer
+	png.Encode(&buf, img)
+	if buf.Len() < 1<<20 {
+		t.Fatalf("the test PNG is %d bytes, want more than a megabyte", buf.Len())
+	}
+	if status, body := owner.upload(buf.Bytes()); status != http.StatusCreated {
+		t.Fatalf("upload: %d %v", status, body)
+	}
+	left, _ := filepath.Glob(filepath.Join(dir, "multipart-*"))
+	if len(left) > 0 {
+		t.Fatalf("temporary files left after the upload: %v", left)
+	}
+}
+
 // failingStore fails to delete one key.
 type failingStore struct {
 	images.Store

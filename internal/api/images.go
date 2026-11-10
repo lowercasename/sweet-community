@@ -68,12 +68,14 @@ func (s *Server) uploadImage(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusCreated, img)
 }
 
-// readImage reads the form's "file" field and processes it. net/http keeps a file of more than a megabyte on disk
-// until the request ends, so an upload holds no memory while it arrives.
+// readImage reads the form's "file" field and processes it. A file of more than a megabyte is kept in a temporary
+// file, so an upload holds no memory while it arrives. The temporary file is deleted here. net/http deletes only the
+// files of the request it passed to the first handler, and requireAuth passes a copy.
 func readImage(r *http.Request) (images.Processed, error) {
 	if err := r.ParseMultipartForm(1 << 20); err != nil {
 		return images.Processed{}, err
 	}
+	defer r.MultipartForm.RemoveAll()
 	file, _, err := r.FormFile("file")
 	if err != nil {
 		return images.Processed{}, err
