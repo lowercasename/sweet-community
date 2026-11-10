@@ -57,32 +57,12 @@ export async function convert(file: File): Promise<Blob> {
   context.imageSmoothingQuality = 'high'
   context.drawImage(bitmap, 0, 0, canvas.width, canvas.height)
   bitmap.close()
-  const encode = (type: string) => new Promise<Blob | null>((done) => canvas.toBlob(done, type, 0.92))
-  let blob: Blob | null
-  if (PHOTO_TYPES.has(file.type)) {
-    blob = await encode('image/jpeg')
-  } else {
-    // A PNG keeps transparency. An opaque image whose JPEG is under a third of its PNG's size is a photo, such as
-    // one pasted from the clipboard, and is sent as the JPEG. Anything else, such as a screenshot of text, is sent as
-    // the PNG, which keeps it sharp, and the server keeps whichever of PNG and JPEG is smaller. The browser's PNG
-    // encoder compresses less than the server's, so the browser does not choose by size alone.
-    blob = await encode('image/png')
-    if (blob && opaque(context, canvas.width, canvas.height)) {
-      const jpeg = await encode('image/jpeg')
-      if (jpeg && jpeg.size * 3 < blob.size) blob = jpeg
-    }
-  }
+  const type = PHOTO_TYPES.has(file.type) ? 'image/jpeg' : 'image/png'
+  const blob = await new Promise<Blob | null>((done) => canvas.toBlob(done, type, 0.92))
   // Releases the canvas's memory at once. Safari on iOS keeps it until the page is closed otherwise.
   canvas.width = 0
   canvas.height = 0
   return blob ?? file
-}
-
-/** Reports whether every pixel drawn on a canvas is opaque. */
-function opaque(context: CanvasRenderingContext2D, width: number, height: number): boolean {
-  const { data } = context.getImageData(0, 0, width, height)
-  for (let i = 3; i < data.length; i += 4) if (data[i] !== 255) return false
-  return true
 }
 
 /**

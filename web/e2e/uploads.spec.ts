@@ -319,57 +319,6 @@ test.describe('image uploads', () => {
     await kit.context.close()
   })
 
-  test('an opaque PNG photo is sent as a JPEG, and a flat image stays a PNG', async ({ browser }, testInfo) => {
-    const kit = await member(browser, testInfo)
-    await open(kit.page)
-    const bodies: Buffer[] = []
-    await kit.page.route('**/api/images', async (route) => {
-      bodies.push(route.request().postDataBuffer() ?? Buffer.alloc(0))
-      await route.continue()
-    })
-    // A photo saved as PNG, whose JPEG is a fraction of its size, and a flat image, which stays a PNG.
-    const make = (noise: boolean) =>
-      kit.page.evaluate(async (noise) => {
-        const canvas = document.createElement('canvas')
-        canvas.width = 600
-        canvas.height = 400
-        const g = canvas.getContext('2d')!
-        g.fillStyle = '#f5f5f5'
-        g.fillRect(0, 0, 600, 400)
-        if (noise) {
-          const d = g.getImageData(0, 0, 600, 400)
-          for (let i = 0; i < d.data.length; i += 4) {
-            d.data[i] = Math.random() * 256
-            d.data[i + 1] = Math.random() * 256
-            d.data[i + 2] = Math.random() * 256
-          }
-          g.putImageData(d, 0, 0)
-        } else {
-          g.fillStyle = '#1a1717'
-          g.fillRect(40, 40, 300, 20)
-        }
-        const blob = await new Promise<Blob>((done) => canvas.toBlob((b) => done(b!), 'image/png'))
-        return Array.from(new Uint8Array(await blob.arrayBuffer()))
-      }, noise)
-    const photo = Buffer.from(await make(true))
-    const screenshot = Buffer.from(await make(false))
-    await postEditor(kit.page).click()
-    await posts(kit.page)
-      .locator('input[type=file]')
-      .setInputFiles([
-        { name: 'photo.png', mimeType: 'image/png', buffer: photo },
-        { name: 'screenshot.png', mimeType: 'image/png', buffer: screenshot },
-      ])
-    await expect(
-      posts(kit.page)
-        .locator('.image-card')
-        .getByPlaceholder(/Describe this image/),
-    ).toHaveCount(2)
-    expect(bodies[0].includes(Buffer.from([0xff, 0xd8, 0xff]))).toBe(true)
-    expect(bodies[1].includes(Buffer.from([0x89, 0x50, 0x4e, 0x47]))).toBe(true)
-    await kit.context.close()
-  })
-
   test('removing an attached image in chat stops its upload, and an image attached while a message sends stays', async ({
     browser,
   }, testInfo) => {
