@@ -167,6 +167,99 @@ test.describe('image uploads', () => {
     await kit.context.close()
   })
 
+  test('every image is converted before uploading: a JPEG stays a JPEG and other images become PNG', async ({
+    browser,
+  }, testInfo) => {
+    const kit = await member(browser, testInfo)
+    await open(kit.page)
+    const bodies: Buffer[] = []
+    await kit.page.route('**/api/images', async (route) => {
+      bodies.push(route.request().postDataBuffer() ?? Buffer.alloc(0))
+      await route.continue()
+    })
+    // A small photo taken upright, stored on its side with an EXIF block. A transparent WebP.
+    const photo = await sidewaysPhoto(kit.page, 400, 200)
+    const sticker = Buffer.from(
+      await kit.page.evaluate(async () => {
+        const canvas = document.createElement('canvas')
+        canvas.width = 60
+        canvas.height = 60
+        const g = canvas.getContext('2d')!
+        g.fillStyle = 'rgba(206, 23, 23, 0.5)'
+        g.fillRect(10, 10, 40, 40)
+        const blob = await new Promise<Blob>((done) => canvas.toBlob((b) => done(b!), 'image/webp', 0.9))
+        return Array.from(new Uint8Array(await blob.arrayBuffer()))
+      }),
+    )
+    await postEditor(kit.page).click()
+    await posts(kit.page)
+      .locator('input[type=file]')
+      .setInputFiles([
+        { name: 'photo.jpg', mimeType: 'image/jpeg', buffer: photo },
+        { name: 'sticker.webp', mimeType: 'image/webp', buffer: sticker },
+      ])
+    await expect(
+      posts(kit.page)
+        .locator('.image-card')
+        .getByPlaceholder(/Describe this image/),
+    ).toHaveCount(2)
+    expect(bodies).toHaveLength(2)
+    const [jpeg, png] = bodies
+    // The photo was drawn again by the browser: upright, and without its EXIF block.
+    expect(jpeg.includes(Buffer.from([0xff, 0xd8, 0xff]))).toBe(true)
+    expect(jpeg.includes(Buffer.from('Exif'))).toBe(false)
+    expect(png.includes(Buffer.from([0x89, 0x50, 0x4e, 0x47]))).toBe(true)
+    expect(pngWidth(png)).toBe(60)
+    await kit.context.close()
+  })
+
+  test('an upload that gets no answer fails after a while, and can be tried again', async ({ browser }, testInfo) => {
+    const kit = await member(browser, testInfo)
+    await kit.page.clock.install()
+    await open(kit.page)
+    const release = await holdUploads(kit.page)
+    await postEditor(kit.page).click()
+    await posts(kit.page)
+      .locator('input[type=file]')
+      .setInputFiles({ name: 'plot.png', mimeType: 'image/png', buffer: png(320, 200) })
+    const card = posts(kit.page).locator('.image-card')
+    await expect(card.getByText('Uploading')).toBeVisible()
+    await kit.page.clock.fastForward('02:00')
+    await expect(card.getByText('Failed to upload', { exact: true })).toBeVisible()
+    await release()
+    await card.getByRole('button', { name: 'Try again' }).click()
+    await expect(card.getByPlaceholder(/Describe this image/)).toBeVisible()
+    await kit.context.close()
+  })
+
+  test('an image removed while it uploads and brought back with undo shows its finished upload', async ({
+    browser,
+  }, testInfo) => {
+    const kit = await member(browser, testInfo)
+    await open(kit.page)
+    const release = await holdUploads(kit.page)
+    await postEditor(kit.page).click()
+    await kit.page.keyboard.type(uniq('Undo '))
+    await posts(kit.page)
+      .locator('input[type=file]')
+      .setInputFiles({ name: 'plot.png', mimeType: 'image/png', buffer: png(320, 200) })
+    const card = posts(kit.page).locator('.image-card')
+    await expect(card.getByText('Uploading')).toBeVisible()
+    // The undo history joins changes made within 500 ms into one step. A person removes the image later than that.
+    await kit.page.waitForTimeout(600)
+    // The new image is selected, so Backspace removes it.
+    await kit.page.keyboard.press('Backspace')
+    await expect(card).toHaveCount(0)
+    const done = kit.page.waitForResponse('**/api/images')
+    await release()
+    await done
+    await kit.page.keyboard.press('ControlOrMeta+z')
+    await expect(card.getByPlaceholder(/Describe this image/)).toBeVisible()
+    await expect(card.locator('img')).toHaveAttribute('src', /^\/img\//)
+    await expect(posts(kit.page).getByRole('button', { name: 'Post', exact: true })).toBeEnabled()
+    await kit.context.close()
+  })
+
   test('a profile picture and a room picture are shrunk before uploading', async ({ browser }, testInfo) => {
     const kit = await member(browser, testInfo)
     const name = uniq('Fells')

@@ -782,18 +782,33 @@ export function getUserPosts(name: string, before?: number | null, limit = 20): 
 }
 
 /**
+ * An upload fails when no data has been sent for UPLOAD_STALL_MS, or when the server has not answered UPLOAD_ANSWER_MS
+ * after the last byte. A phone that loses its connection would otherwise show the upload forever.
+ */
+const UPLOAD_STALL_MS = 30_000
+const UPLOAD_ANSWER_MS = 60_000
+
+/**
  * Uploads an image and reports the fraction sent so far. It uses XMLHttpRequest, because fetch reports no upload
  * progress. Errors are the same as request's.
  */
 export function uploadImage(file: Blob, onProgress?: (fraction: number) => void): Promise<UploadedImage> {
   return new Promise((resolve, reject) => {
     const xhr = new XMLHttpRequest()
+    let timer: ReturnType<typeof setTimeout> | undefined
+    const giveUpAfter = (ms: number) => {
+      clearTimeout(timer)
+      timer = setTimeout(() => xhr.abort(), ms)
+    }
     xhr.open('POST', '/api/images')
     xhr.setRequestHeader('Accept', 'application/json')
     xhr.upload.onprogress = (e) => {
+      giveUpAfter(UPLOAD_STALL_MS)
       if (e.lengthComputable) onProgress?.(e.loaded / e.total)
     }
+    xhr.upload.onload = () => giveUpAfter(UPLOAD_ANSWER_MS)
     xhr.onload = () => {
+      clearTimeout(timer)
       const type = xhr.getResponseHeader('content-type') ?? ''
       if (xhr.status < 200 || xhr.status >= 300) {
         reject(errorFrom(xhr.status, type, xhr.responseText))
@@ -805,9 +820,13 @@ export function uploadImage(file: Blob, onProgress?: (fraction: number) => void)
         reject(new ApiError(xhr.status, GENERIC_ERROR))
       }
     }
-    xhr.onerror = () => reject(new ApiError(0, CONNECTION_ERROR))
+    xhr.onerror = xhr.onabort = () => {
+      clearTimeout(timer)
+      reject(new ApiError(0, CONNECTION_ERROR))
+    }
     const form = new FormData()
     form.append('file', file, file instanceof File ? file.name : 'image')
+    giveUpAfter(UPLOAD_STALL_MS)
     xhr.send(form)
   })
 }

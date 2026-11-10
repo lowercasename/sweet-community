@@ -3,9 +3,10 @@ import { Placeholder } from '@tiptap/extensions'
 import type { Extensions } from '@tiptap/react'
 import Image from '@tiptap/extension-image'
 import { ReactNodeViewRenderer } from '@tiptap/react'
+import { Plugin } from '@tiptap/pm/state'
 import { EditorImage } from '../ui'
 import { Embed, SweetLink } from './embed'
-import { retryUpload } from './images'
+import { newImageStorage, releaseImages, restoreUploads, retryUpload, type ImageStorage } from './images'
 
 declare module '@tiptap/core' {
   interface Commands<ReturnType> {
@@ -13,6 +14,9 @@ declare module '@tiptap/core' {
       /** Uploads again the image whose upload failed, by the key on its node. */
       retryUpload: (key: string) => ReturnType
     }
+  }
+  interface Storage {
+    image: ImageStorage
   }
 }
 
@@ -52,6 +56,21 @@ export const SweetImage = Image.extend({
           return retryUpload(editor, tr, key)
         },
     }
+  },
+  addStorage() {
+    return newImageStorage()
+  },
+  onDestroy() {
+    releaseImages(this.storage)
+  },
+  addProseMirrorPlugins() {
+    const editor = this.editor
+    return [
+      ...(this.parent?.() ?? []),
+      new Plugin({
+        appendTransaction: (trs, _old, state) => (trs.some((t) => t.docChanged) ? restoreUploads(editor, state) : null),
+      }),
+    ]
   },
   addNodeView() {
     return ReactNodeViewRenderer(EditorImage)

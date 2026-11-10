@@ -5,23 +5,31 @@ import { mentionSuggestionKey, withMentions } from '../editor/mentions'
 import { useMembers } from '../data/hooks'
 import type { Topic } from '../api'
 import { Alert, Button, EditorSurface, Form, ImageCard, Row, Stack } from '../ui'
-import { failedUploads, failureReason, imageFiles, imagesHtml, insertImages, shrink } from '../editor/images'
+import {
+  convert,
+  failedUploads,
+  failureReason,
+  imageFiles,
+  imagesHtml,
+  insertImages,
+  oneAtATime,
+} from '../editor/images'
 import { uploadImage, type UploadedImage } from '../api'
 import { EditorToolbar } from './EditorToolbar'
 import { embedLinks } from '../editor/embed'
 import { TopicMenu } from './TopicMenu'
 
 /**
- * An image attached to a chat message: its local copy, shown at once, and its upload. `progress` is the fraction
- * sent while it uploads, `failed` the reason its upload failed ('' when there is none to give), and `uploaded` the
- * stored image once the upload has finished.
+ * An image attached to a chat message: the chosen file, its local copy shown at once, and its upload. `converted` is
+ * the file to send, once made, and is kept for Try again. `progress` is the fraction sent while it uploads, `failed`
+ * the reason its upload failed ('' when there is none to give), and `uploaded` the stored image once the upload has
+ * finished.
  */
 interface Attachment {
   key: string
-  file: Blob
+  file: File
   preview: string
-  width: number
-  height: number
+  converted?: Blob
   alt: string
   progress: number | null
   failed: string | null
@@ -183,31 +191,40 @@ export function BodyEditor({
     if (!editor) return
     setError(null)
     if (images === 'inline') {
-      void insertImages(editor, files)
+      insertImages(editor, files)
       return
     }
-    void Promise.all(files.map(shrink)).then((shrunk) => {
-      const added = shrunk.map((s) => ({
-        ...s,
-        key: crypto.randomUUID(),
-        preview: URL.createObjectURL(s.file),
-        alt: '',
-        progress: 0,
-        failed: null,
-      }))
-      setAttached((prev) => [...prev, ...added])
-      for (const a of added) uploadAttachment(a.key, a.file)
-    })
+    const added: Attachment[] = files.map((file) => ({
+      key: crypto.randomUUID(),
+      file,
+      preview: URL.createObjectURL(file),
+      alt: '',
+      progress: 0,
+      failed: null,
+    }))
+    setAttached((prev) => [...prev, ...added])
+    for (const a of added) uploadAttachment(a)
   }
 
+  // Attached images are converted one at a time, like the images in a post.
+  const [queue] = useState(oneAtATime)
   const update = (key: string, change: Partial<Attachment>) =>
     setAttached((prev) => prev.map((a) => (a.key === key ? { ...a, ...change } : a)))
-  const uploadAttachment = (key: string, file: Blob) => {
+  const uploadAttachment = ({ key, file, converted }: Attachment) => {
     update(key, { progress: 0, failed: null })
-    uploadImage(file, (progress) => update(key, { progress }))
-      .then((uploaded) => update(key, { uploaded, progress: null }))
+    const ready = converted ? Promise.resolve(converted) : queue(() => convert(file))
+    ready
+      .then((blob) => {
+        update(key, { converted: blob })
+        return uploadImage(blob, (progress) => update(key, { progress }))
+      })
+      .then((uploaded) => update(key, { uploaded, converted: undefined, progress: null }))
       .catch((e: unknown) => update(key, { progress: null, failed: failureReason(e) }))
   }
+  // The local copies are freed when the editor goes.
+  const attachedRef = useRef(attached)
+  attachedRef.current = attached
+  useEffect(() => () => attachedRef.current.forEach((a) => URL.revokeObjectURL(a.preview)), [])
   const remove = (key: string) =>
     setAttached((prev) => {
       const gone = prev.find((a) => a.key === key)
@@ -283,7 +300,7 @@ export function BodyEditor({
                 upload={
                   a.uploaded
                     ? undefined
-                    : { progress: a.progress, failed: a.failed, onRetry: () => uploadAttachment(a.key, a.file) }
+                    : { progress: a.progress, failed: a.failed, onRetry: () => uploadAttachment(a) }
                 }
               />
             ))}

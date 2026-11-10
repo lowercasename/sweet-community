@@ -1,28 +1,16 @@
 import type { Editor } from '@tiptap/core'
 import type { Node as PMNode } from '@tiptap/pm/model'
-import type { Transaction } from '@tiptap/pm/state'
+import type { EditorState, Transaction } from '@tiptap/pm/state'
 import { ApiError, uploadImage, type UploadedImage } from '../api'
 
 export const IMAGE_ACCEPT = 'image/jpeg,image/png,image/webp,image/gif'
 
-/**
- * The longer side the server keeps (MaxSide in package images). The browser shrinks a larger image to it before
- * uploading, so a phone sends a much smaller file and the server rarely has to resize.
- */
+/** The longer side the server keeps (MaxSide in package images). The browser draws a larger image at this size. */
 const MAX_SIDE = 2000
-/** An image within MAX_SIDE and below this size is uploaded as it is. */
-const KEEP_BYTES = 2_000_000
 
 /** An uploaded image with the alt text entered so far. */
 export interface AttachedImage extends UploadedImage {
   alt: string
-}
-
-/** An image ready to upload: the file to send and its size in pixels. */
-export interface Shrunk {
-  file: Blob
-  width: number
-  height: number
 }
 
 /** The line under the editor when uploads fail. It gives no reason, because each image's card shows its own. */
@@ -38,55 +26,90 @@ export function failureReason(e: unknown): string {
   return e instanceof ApiError && e.status >= 400 && e.status < 500 ? e.message : ''
 }
 
+/** Formats that hold photos, which become JPEG. Every other image becomes PNG, which keeps transparency. */
+const PHOTO_TYPES = new Set(['image/jpeg', 'image/heic', 'image/heif'])
+
 /**
- * Shrinks an image to MAX_SIDE on its longer side and encodes it as JPEG, or as PNG when it was a PNG, which may be
- * transparent. The browser turns a phone photo upright when it reads it. A GIF is kept as it is, because it may be
- * animated. An image the browser cannot read is sent as it is, and the server decides.
+ * Converts an image for upload. The browser decodes it, turns a phone photo upright and converts its colours to sRGB.
+ * It is drawn at no more than MAX_SIDE on its longer side, with the browser's high-quality smoothing. A photo becomes
+ * a JPEG. Any other image becomes a PNG, which keeps transparency, and the server keeps whichever of PNG and JPEG is
+ * smaller. A GIF is sent as it is, because it may be animated. An image the browser cannot read is sent as it is,
+ * and the server decides.
  */
-export async function shrink(file: File): Promise<Shrunk> {
-  const original = (width = 0, height = 0): Shrunk => ({ file, width, height })
+export async function convert(file: File): Promise<Blob> {
+  if (file.type === 'image/gif') return file
   let bitmap: ImageBitmap
   try {
     bitmap = await createImageBitmap(file)
   } catch {
-    return original()
+    return file
   }
-  const { width, height } = bitmap
-  const scale = Math.min(1, MAX_SIDE / Math.max(width, height))
-  if (file.type === 'image/gif' || (scale === 1 && file.size <= KEEP_BYTES)) {
-    bitmap.close()
-    return original(width, height)
-  }
-  const w = Math.max(1, Math.round(width * scale))
-  const h = Math.max(1, Math.round(height * scale))
+  const scale = Math.min(1, MAX_SIDE / Math.max(bitmap.width, bitmap.height))
   const canvas = document.createElement('canvas')
-  canvas.width = w
-  canvas.height = h
+  canvas.width = Math.max(1, Math.round(bitmap.width * scale))
+  canvas.height = Math.max(1, Math.round(bitmap.height * scale))
   const context = canvas.getContext('2d')
   if (!context) {
     bitmap.close()
-    return original(width, height)
+    return file
   }
-  context.drawImage(bitmap, 0, 0, w, h)
+  context.imageSmoothingEnabled = true
+  context.imageSmoothingQuality = 'high'
+  context.drawImage(bitmap, 0, 0, canvas.width, canvas.height)
   bitmap.close()
-  const type = file.type === 'image/png' ? 'image/png' : 'image/jpeg'
-  const blob = await new Promise<Blob | null>((done) => canvas.toBlob(done, type, 0.85))
-  if (!blob) return original(width, height)
-  const name = file.name.replace(/\.[^.]*$/, '') + (type === 'image/png' ? '.png' : '.jpg')
-  const shrunk = new File([blob], name, { type })
-  return { file: shrunk, width: w, height: h }
-}
-
-/** Shrinks an image and uploads it. Used for profile and room pictures, which show no upload progress. */
-export async function uploadPicture(file: File): Promise<UploadedImage> {
-  return uploadImage((await shrink(file)).file)
+  const type = PHOTO_TYPES.has(file.type) ? 'image/jpeg' : 'image/png'
+  const blob = await new Promise<Blob | null>((done) => canvas.toBlob(done, type, 0.92))
+  // Releases the canvas's memory at once. Safari on iOS keeps it until the page is closed otherwise.
+  canvas.width = 0
+  canvas.height = 0
+  return blob ?? file
 }
 
 /**
- * The images being uploaded into a post or comment, by the key on their image node: the file, kept for Try again,
- * and the address of the local copy, which is freed when the upload succeeds.
+ * Returns a function that runs tasks one at a time, in the order they are given. Converting decodes a whole photo,
+ * so photos are converted one at a time to keep a phone's memory free.
  */
-const pending = new Map<string, { file: Blob; preview: string }>()
+export function oneAtATime(): <T>(task: () => Promise<T>) => Promise<T> {
+  let last: Promise<unknown> = Promise.resolve()
+  return <T>(task: () => Promise<T>) => {
+    const run = last.then(task)
+    last = run.catch(() => undefined)
+    return run
+  }
+}
+
+/** Converts an image and uploads it. Used for profile and room pictures, which show no upload progress. */
+export async function uploadPicture(file: File): Promise<UploadedImage> {
+  return uploadImage(await convert(file))
+}
+
+/**
+ * An image added to a post or comment, kept by its node's upload key. `file` is the chosen file and `preview` the
+ * address of its local copy. `converted` is the file to send, once made, and is kept for Try again. `done` holds the
+ * node's attributes once the upload has finished, so a node that comes back through undo or redo gets them too.
+ */
+interface Upload {
+  file: File
+  preview: string
+  converted?: Blob
+  done?: Record<string, unknown>
+}
+
+/** The uploads of one editor. SweetImage keeps it as the editor's storage, so it ends with the editor. */
+export interface ImageStorage {
+  uploads: Map<string, Upload>
+  queue: ReturnType<typeof oneAtATime>
+}
+
+export const newImageStorage = (): ImageStorage => ({ uploads: new Map(), queue: oneAtATime() })
+
+/** Frees the local copies of an editor's images, when the editor is destroyed. */
+export function releaseImages(storage: ImageStorage) {
+  for (const u of storage.uploads.values()) URL.revokeObjectURL(u.preview)
+  storage.uploads.clear()
+}
+
+const storageOf = (editor: Editor): ImageStorage => editor.storage.image
 
 /** The position of the image node with this upload key, or null if it has been removed. */
 function imageAt(doc: PMNode, key: string): number | null {
@@ -115,18 +138,23 @@ function setImage(editor: Editor, key: string, attrs: Record<string, unknown>) {
 }
 
 /**
- * Uploads the file kept for this key. Its node must already show the upload. The node's card shows the progress. On
- * success the node points at the stored image. On failure its card shows the error. The callbacks run after the
- * caller returns, so each dispatches a transaction of its own.
+ * Converts and uploads the image with this key. Its node must already show the upload. Conversions wait for each
+ * other, and uploads start as soon as their image is converted. The node's card shows the progress. On success the
+ * node points at the stored image. On failure its card shows the error. The callbacks run after the caller returns,
+ * so each dispatches a transaction of its own.
  */
 function upload(editor: Editor, key: string) {
-  const image = pending.get(key)
-  if (!image) return
-  uploadImage(image.file, (fraction) => setImage(editor, key, { progress: fraction }))
+  const { uploads, queue } = storageOf(editor)
+  const u = uploads.get(key)
+  if (!u) return
+  const converted = u.converted ? Promise.resolve(u.converted) : queue(() => convert(u.file))
+  converted
+    .then((blob) => {
+      u.converted = blob
+      return uploadImage(blob, (fraction) => setImage(editor, key, { progress: fraction }))
+    })
     .then((img) => {
-      pending.delete(key)
-      URL.revokeObjectURL(image.preview)
-      setImage(editor, key, {
+      u.done = {
         src: img.url,
         width: img.width,
         height: img.height,
@@ -134,7 +162,10 @@ function upload(editor: Editor, key: string) {
         upload: null,
         progress: null,
         failed: null,
-      })
+      }
+      u.converted = undefined
+      URL.revokeObjectURL(u.preview)
+      setImage(editor, key, u.done)
     })
     .catch((e: unknown) => setImage(editor, key, { progress: null, failed: failureReason(e) }))
 }
@@ -144,31 +175,46 @@ function upload(editor: Editor, key: string) {
  * transaction of the command that calls it, and starts the upload.
  */
 export function retryUpload(editor: Editor, tr: Transaction, key: string): boolean {
-  if (!pending.has(key) || !setImageIn(tr, key, { progress: 0, failed: null })) return false
+  const u = storageOf(editor).uploads.get(key)
+  if (!u || u.done || !setImageIn(tr, key, { progress: 0, failed: null })) return false
   upload(editor, key)
   return true
 }
 
 /**
- * Inserts images at the cursor at once, each showing its own picture, and uploads them. Each card shows its upload,
- * and its error if the upload fails.
+ * Gives a finished upload's attributes to an image node that came back without them. A node removed while it
+ * uploaded, then restored by undo or redo, has its old attributes. Returns null when no node needs them.
  */
-export async function insertImages(editor: Editor, files: File[]): Promise<void> {
-  const shrunk = await Promise.all(files.map(shrink))
-  const added = shrunk.map((s) => {
+export function restoreUploads(editor: Editor, state: EditorState): Transaction | null {
+  const { uploads } = storageOf(editor)
+  let tr: Transaction | null = null
+  state.doc.descendants((node, pos) => {
+    const done = node.type.name === 'image' && node.attrs.upload ? uploads.get(node.attrs.upload)?.done : undefined
+    if (done) {
+      tr ??= state.tr.setMeta('addToHistory', false)
+      tr.setNodeMarkup(pos, undefined, { ...node.attrs, ...done })
+    }
+  })
+  return tr
+}
+
+/**
+ * Inserts images at the cursor at once, each showing the chosen file, and converts and uploads them. Each card shows
+ * its upload, and its error if the upload fails.
+ */
+export function insertImages(editor: Editor, files: File[]) {
+  const { uploads } = storageOf(editor)
+  const added = files.map((file) => {
     const key = crypto.randomUUID()
-    const preview = URL.createObjectURL(s.file)
-    pending.set(key, { file: s.file, preview })
-    return { ...s, key, preview }
+    const preview = URL.createObjectURL(file)
+    uploads.set(key, { file, preview })
+    return { key, preview }
   })
   editor
     .chain()
     .focus()
     .insertContent(
-      added.map((a) => ({
-        type: 'image',
-        attrs: { src: a.preview, alt: '', width: a.width, height: a.height, upload: a.key, progress: 0 },
-      })),
+      added.map((a) => ({ type: 'image', attrs: { src: a.preview, alt: '', upload: a.key, progress: 0 } })),
     )
     .run()
   for (const a of added) upload(editor, a.key)
