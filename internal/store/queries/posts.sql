@@ -32,7 +32,14 @@ UPDATE posts SET body_html = sqlc.arg(body_html), body_text = sqlc.arg(body_text
 WHERE id = sqlc.arg(id) AND deleted_at IS NULL;
 
 -- name: DeletePost :exec
-UPDATE posts SET deleted_at = sqlc.arg(deleted_at) WHERE id = sqlc.arg(id) AND deleted_at IS NULL;
+-- Deletes a post and empties its text. The row stays, so the rows that point at it stay valid.
+UPDATE posts SET deleted_at = sqlc.arg(deleted_at), body_html = '', body_text = ''
+WHERE id = sqlc.arg(id) AND deleted_at IS NULL;
+
+-- name: DeleteGroupPosts :exec
+-- Deletes the live posts of a group and empties their text.
+UPDATE posts SET deleted_at = sqlc.arg(deleted_at), body_html = '', body_text = ''
+WHERE group_id = sqlc.arg(group_id) AND deleted_at IS NULL;
 
 -- name: ListPostsByAuthor :many
 -- One user's posts that a viewer can see. Only posts in groups that the

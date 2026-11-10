@@ -38,8 +38,25 @@ func (q *Queries) CreatePost(ctx context.Context, arg CreatePostParams) error {
 	return err
 }
 
+const deleteGroupPosts = `-- name: DeleteGroupPosts :exec
+UPDATE posts SET deleted_at = ?1, body_html = '', body_text = ''
+WHERE group_id = ?2 AND deleted_at IS NULL
+`
+
+type DeleteGroupPostsParams struct {
+	DeletedAt sql.NullInt64
+	GroupID   string
+}
+
+// Deletes the live posts of a group and empties their text.
+func (q *Queries) DeleteGroupPosts(ctx context.Context, arg DeleteGroupPostsParams) error {
+	_, err := q.db.ExecContext(ctx, deleteGroupPosts, arg.DeletedAt, arg.GroupID)
+	return err
+}
+
 const deletePost = `-- name: DeletePost :exec
-UPDATE posts SET deleted_at = ?1 WHERE id = ?2 AND deleted_at IS NULL
+UPDATE posts SET deleted_at = ?1, body_html = '', body_text = ''
+WHERE id = ?2 AND deleted_at IS NULL
 `
 
 type DeletePostParams struct {
@@ -47,6 +64,7 @@ type DeletePostParams struct {
 	ID        string
 }
 
+// Deletes a post and empties its text. The row stays, so the rows that point at it stay valid.
 func (q *Queries) DeletePost(ctx context.Context, arg DeletePostParams) error {
 	_, err := q.db.ExecContext(ctx, deletePost, arg.DeletedAt, arg.ID)
 	return err

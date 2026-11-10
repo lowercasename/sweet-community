@@ -348,6 +348,32 @@ describe('applyEvent', () => {
     expect(qc.getQueryData(keys.posts(CLUB))).toBeUndefined()
   })
 
+  it("a deleted room's posts leave every profile's list, and its notifications leave the list", () => {
+    qc.setQueryData(keys.userPosts('mo'), {
+      pages: [{ posts: [post('p1', mo), post('p2', mo, { group_id: CLUB })], next_before: null }],
+      pageParams: [null],
+    })
+    qc.setQueryData(keys.notifications, {
+      pages: [
+        {
+          notifications: [notification('n1', 'comment', mo), notification('n2', 'added', mo, { group_id: CLUB })],
+          next_before: null,
+        },
+      ],
+      pageParams: [null],
+    })
+    qc.setQueryData(keys.markers, { markers: [marker('notifications', 5, 1)] })
+    applyEvent(qc, 'group_delete', { id: CLUB })
+    const profile = (qc.getQueryData(keys.userPosts('mo')) as { pages: PostPage[] }).pages.flatMap((p) => p.posts)
+    expect(profile.map((p) => p.id)).toEqual(['p1'])
+    const list = (qc.getQueryData(keys.notifications) as { pages: { notifications: Notification[] }[] }).pages.flatMap(
+      (p) => p.notifications,
+    )
+    expect(list.map((n) => n.id)).toEqual(['n1'])
+    // The unread count of the notifications may have changed, so the markers are fetched again.
+    expect(qc.getQueryState(keys.markers)?.isInvalidated).toBe(true)
+  })
+
   it('a settings change refetches the groups, because the root group carries the setting as a can flag', () => {
     qc.setQueryData(keys.settings, { group_creation: 'anyone' })
     applyEvent(qc, 'settings', { group_creation: 'staff' })

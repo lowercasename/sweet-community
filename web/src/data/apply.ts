@@ -490,6 +490,10 @@ function upsertGroup(qc: QueryClient, g: Group) {
 }
 
 /** Removes everything about a group from the cache, when the group is deleted or the user leaves it. */
+/**
+ * Removes a deleted group and everything in it: its lists, its posts wherever they are shown, its markers and its
+ * notifications. The server deleted the notifications, so the markers are fetched again for their unread count.
+ */
 function dropGroup(qc: QueryClient, id: string) {
   qc.setQueryData<Groups>(keys.groups, (old) => (old ? { groups: old.groups.filter((x) => x.id !== id) } : old))
   qc.removeQueries({ queryKey: keys.posts(id) })
@@ -498,8 +502,22 @@ function dropGroup(qc: QueryClient, id: string) {
   qc.removeQueries({
     predicate: (q) => q.queryKey[0] === 'post' && (q.state.data as Post | undefined)?.group_id === id,
   })
+  qc.setQueriesData<Posts>(
+    { queryKey: ['userPosts'] },
+    (old) =>
+      old && { ...old, pages: old.pages.map((p) => ({ ...p, posts: p.posts.filter((x) => x.group_id !== id) })) },
+  )
+  qc.setQueryData<Notifications>(
+    keys.notifications,
+    (old) =>
+      old && {
+        ...old,
+        pages: old.pages.map((p) => ({ ...p, notifications: p.notifications.filter((n) => n.group_id !== id) })),
+      },
+  )
   dropMarker(qc, `chat:${id}`)
   dropMarker(qc, `feed:${id}`)
+  void qc.invalidateQueries({ queryKey: keys.markers })
 }
 
 const ROOT_KIND = 'root'

@@ -37,7 +37,14 @@ SELECT m.author_id, m.group_id, m.kind FROM messages m JOIN groups g ON g.id = m
 WHERE m.id = sqlc.arg(id) AND m.deleted_at IS NULL AND g.deleted_at IS NULL;
 
 -- name: DeleteMessage :exec
-UPDATE messages SET deleted_at = sqlc.arg(deleted_at) WHERE id = sqlc.arg(id) AND deleted_at IS NULL;
+-- Deletes a message and empties its text. The row stays, so a reply to it can say that it was deleted.
+UPDATE messages SET deleted_at = sqlc.arg(deleted_at), body_html = '', body_text = ''
+WHERE id = sqlc.arg(id) AND deleted_at IS NULL;
+
+-- name: DeleteGroupMessages :exec
+-- Deletes the live messages of a group and empties their text.
+UPDATE messages SET deleted_at = sqlc.arg(deleted_at), body_html = '', body_text = ''
+WHERE group_id = sqlc.arg(group_id) AND deleted_at IS NULL;
 
 -- name: ListReplyIDs :many
 -- The live messages that reply to a message. Deleting the message logs them again, so the log no longer holds the

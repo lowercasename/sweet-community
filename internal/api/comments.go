@@ -180,7 +180,7 @@ func (s *Server) editComment(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// deleteComment soft-deletes a comment. perm.DeleteComment decides who may.
+// deleteComment deletes a comment and empties its text. perm.DeleteComment decides who may.
 // The event carries the ids so that pages can remove the comment and
 // decrement the post's comment count.
 func (s *Server) deleteComment(w http.ResponseWriter, r *http.Request) {
@@ -202,8 +202,8 @@ func (s *Server) deleteComment(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// removeComment deletes a live comment and returns its comment_delete event. The delete handler and a report's
-// Delete action both use it.
+// removeComment deletes a live comment and empties its text, and returns its comment_delete event. The delete
+// handler, a report's Delete action and the removal of a user all use it.
 func removeComment(ctx context.Context, qtx *store.Queries, id, postID, groupID string, now int64) ([]events.Entry, error) {
 	if err := qtx.DeleteComment(ctx, store.DeleteCommentParams{DeletedAt: sql.NullInt64{Int64: now, Valid: true}, ID: id}); err != nil {
 		return nil, err

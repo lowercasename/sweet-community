@@ -144,10 +144,11 @@ func (s *Server) removeUser(w http.ResponseWriter, r *http.Request) {
 					return nil, nil, http.StatusInternalServerError, err
 				}
 				if n == 0 {
-					if err := qtx.DeleteGroup(ctx, store.DeleteGroupParams{DeletedAt: sql.NullInt64{Int64: now, Valid: true}, ID: m.GroupID}); err != nil {
+					gone, err := removeGroup(ctx, qtx, m.GroupID, now)
+					if err != nil {
 						return nil, nil, http.StatusInternalServerError, err
 					}
-					entries = append(entries, events.Entry{Kind: "group_delete", Payload: map[string]string{"id": m.GroupID}})
+					entries = append(entries, gone...)
 				}
 			}
 		}
@@ -166,9 +167,9 @@ func (s *Server) removeUser(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// eraseContent deletes a removed user's posts, comments and messages and clears their text, and returns the delete
-// events. The comments of a deleted post go with it, as when a post is deleted, so their events leave the log. The
-// replies to a deleted message are logged again, so their quotes say the original is deleted.
+// eraseContent deletes a removed user's posts, comments and messages with removePost, removeComment and
+// removeMessage, and returns their delete events. It then empties the text of the user's content that was deleted
+// before.
 func eraseContent(ctx context.Context, qtx *store.Queries, uid string, now int64) ([]events.Entry, error) {
 	comments, err := qtx.ListLiveCommentsByAuthor(ctx, uid)
 	if err != nil {
@@ -182,6 +183,28 @@ func eraseContent(ctx context.Context, qtx *store.Queries, uid string, now int64
 	if err != nil {
 		return nil, err
 	}
+	var out []events.Entry
+	for _, c := range comments {
+		gone, err := removeComment(ctx, qtx, c.ID, c.PostID, c.GroupID, now)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, gone...)
+	}
+	for _, p := range posts {
+		gone, err := removePost(ctx, qtx, p.ID, p.GroupID, now)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, gone...)
+	}
+	for _, m := range messages {
+		gone, err := removeMessage(ctx, qtx, m.ID, m.GroupID, now)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, gone...)
+	}
 	at := sql.NullInt64{Int64: now, Valid: true}
 	if err := qtx.EraseAuthorPosts(ctx, store.EraseAuthorPostsParams{DeletedAt: at, AuthorID: uid}); err != nil {
 		return nil, err
@@ -191,32 +214,6 @@ func eraseContent(ctx context.Context, qtx *store.Queries, uid string, now int64
 	}
 	if err := qtx.EraseAuthorMessages(ctx, store.EraseAuthorMessagesParams{DeletedAt: at, AuthorID: uid}); err != nil {
 		return nil, err
-	}
-	var out []events.Entry
-	for _, c := range comments {
-		out = append(out, events.Entry{Kind: "comment_delete", Payload: map[string]string{"id": c.ID, "post_id": c.PostID, "group_id": c.GroupID}})
-	}
-	for _, p := range posts {
-		ids, err := qtx.ListCommentIDsOfPost(ctx, p.ID)
-		if err != nil {
-			return nil, err
-		}
-		keys := make([]string, len(ids))
-		for i, c := range ids {
-			keys[i] = "comment:" + c
-		}
-		if err := events.Forget(ctx, qtx, keys...); err != nil {
-			return nil, err
-		}
-		out = append(out, events.Entry{Kind: "post_delete", Payload: map[string]string{"id": p.ID, "group_id": p.GroupID}})
-	}
-	for _, m := range messages {
-		out = append(out, events.Entry{Kind: "message_delete", Payload: map[string]string{"id": m.ID, "group_id": m.GroupID}})
-		replies, err := replyEvents(ctx, qtx, m.ID)
-		if err != nil {
-			return nil, err
-		}
-		out = append(out, replies...)
 	}
 	return out, nil
 }

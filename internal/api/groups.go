@@ -524,10 +524,46 @@ func (s *Server) deleteGroup(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	now := db.Now()
-	s.logged(w, r, "group_delete", now, func(qtx *store.Queries) (any, int, error) {
-		err := qtx.DeleteGroup(r.Context(), store.DeleteGroupParams{DeletedAt: sql.NullInt64{Int64: now, Valid: true}, ID: g.ID})
-		return map[string]string{"id": g.ID}, http.StatusOK, err
+	s.loggedMany(w, r, now, func(qtx *store.Queries) ([]events.Entry, any, int, error) {
+		gone, err := removeGroup(r.Context(), qtx, g.ID, now)
+		if err != nil {
+			return nil, nil, http.StatusInternalServerError, err
+		}
+		return gone, gone[0].Payload, http.StatusOK, nil
 	})
+}
+
+// removeGroup deletes a room and returns its group_delete event. The room's row stays with its name emptied, so the
+// rows that point at it stay valid. Its posts, comments and messages are deleted and their text is emptied. Its
+// memberships, notifications and read markers are deleted, and their logged events are forgotten. The owner's
+// delete, a last member leaving and the removal of a room's only member all use it.
+func removeGroup(ctx context.Context, qtx *store.Queries, id string, now int64) ([]events.Entry, error) {
+	at := sql.NullInt64{Int64: now, Valid: true}
+	if err := qtx.ForgetGroupEvents(ctx, id); err != nil {
+		return nil, err
+	}
+	if err := qtx.DeleteGroupComments(ctx, store.DeleteGroupCommentsParams{DeletedAt: at, GroupID: id}); err != nil {
+		return nil, err
+	}
+	if err := qtx.DeleteGroupPosts(ctx, store.DeleteGroupPostsParams{DeletedAt: at, GroupID: id}); err != nil {
+		return nil, err
+	}
+	if err := qtx.DeleteGroupMessages(ctx, store.DeleteGroupMessagesParams{DeletedAt: at, GroupID: id}); err != nil {
+		return nil, err
+	}
+	if err := qtx.DeleteGroupNotifications(ctx, id); err != nil {
+		return nil, err
+	}
+	if err := qtx.DeleteGroupMarkers(ctx, id); err != nil {
+		return nil, err
+	}
+	if err := qtx.DeleteGroupMemberships(ctx, id); err != nil {
+		return nil, err
+	}
+	if err := qtx.DeleteGroup(ctx, store.DeleteGroupParams{DeletedAt: at, ID: id}); err != nil {
+		return nil, err
+	}
+	return []events.Entry{{Kind: "group_delete", Payload: map[string]string{"id": id}}}, nil
 }
 
 func (s *Server) listMembers(w http.ResponseWriter, r *http.Request) {
@@ -714,10 +750,11 @@ func (s *Server) removeMember(w http.ResponseWriter, r *http.Request) {
 		if n, err := qtx.CountMembers(r.Context(), g.ID); err != nil {
 			return nil, nil, http.StatusInternalServerError, err
 		} else if n == 0 {
-			if err := qtx.DeleteGroup(r.Context(), store.DeleteGroupParams{DeletedAt: sql.NullInt64{Int64: db.Now(), Valid: true}, ID: g.ID}); err != nil {
+			gone, err := removeGroup(r.Context(), qtx, g.ID, db.Now())
+			if err != nil {
 				return nil, nil, http.StatusInternalServerError, err
 			}
-			entries = append(entries, events.Entry{Kind: "group_delete", Payload: map[string]string{"id": g.ID}})
+			entries = append(entries, gone...)
 		}
 		return entries, nil, http.StatusNoContent, nil
 	})

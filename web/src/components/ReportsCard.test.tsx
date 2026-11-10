@@ -97,6 +97,19 @@ describe('ReportsCard', () => {
     expect(li.getByRole('button', { name: 'Dismiss report' })).toBeTruthy()
   })
 
+  it("names a deleted room as a deleted room, because the server empties a deleted room's name", async () => {
+    await draw([
+      report('post', 'p1', {
+        group_id: 'knit',
+        group_kind: 'group',
+        group_name: '',
+        deleted: true,
+        can: { open: false },
+      }),
+    ])
+    expect(within(entry(await shown('p1 was reported'))).getByText('Post in a deleted room')).toBeTruthy()
+  })
+
   it('dismisses the reports of an item and removes the entry', async () => {
     const { closeReport } = await import('../api')
     await draw([report('post', 'p1')])

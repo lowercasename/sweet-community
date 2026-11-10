@@ -26,11 +26,14 @@ import { PersonName } from './PersonName'
 const NOUN: Record<ReportKind, string> = { post: 'post', comment: 'comment', message: 'message' }
 const TITLE: Record<ReportKind, string> = { post: 'Post', comment: 'Comment', message: 'Message' }
 
-/** Where the item is: Home for the community's own feed and chat, a room's name, or a conversation. */
+/**
+ * Where the item is: Home for the community's own feed and chat, a room's name, or a conversation. A deleted room's
+ * name has been emptied.
+ */
 function placeOf(r: Report): string {
   if (r.group_kind === 'root') return 'Home'
   if (r.group_kind === 'dm') return 'a conversation'
-  return r.group_name
+  return r.group_name || 'a deleted room'
 }
 
 /** The path that opens the item: a post's page, the page of a comment's post, or a chat at its message. */

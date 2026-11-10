@@ -253,7 +253,7 @@ Removal has no options. A choice to keep, anonymise or delete the content was dr
 Any member can report another person's post, comment or message (Raphael, 2026-11-08).
 
 - The dialog says that the author will not learn who reported.
-- The server keeps a copy of the item, so moderators can judge it after an edit or a deletion.
+- The server keeps a copy of the item, so moderators can judge it after an edit or a deletion. Closing the report empties the copy (Raphael, 2026-11-10).
 - The owner and moderators get a notification, which is also pushed.
 - The Reports card is first on the Community page, because reports wait for action. Members cannot see reports.
 - Open never appears for a conversation, because a conversation belongs to its two people. Delete works anywhere.
@@ -375,7 +375,10 @@ There is no separate mobile app, and there must never be a second codebase. The 
 - Rows have UUIDv7 ids, so two instances could be merged without renumbering any references.
 - Times are stored in UTC. The browser converts them for display.
 - Lists are paged by cursor, never by offset.
-- Content and groups are soft-deleted.
+- A deleted post, comment, message or room keeps its row, and its text is emptied (Raphael, 2026-11-10). The row stays so that the replies, notifications and reports that point at it stay valid. The text has no use once it is deleted.
+- Deleting a post empties its comments too. Deleting a room empties its name and everything in it, and deletes its memberships, read markers and notifications.
+- SQLite and the search index overwrite deleted text, so it does not stay in the database file.
+- Content deleted before this rule keeps its text, because old content is not changed (Raphael, 2026-11-10).
 - A migration never changes user content: posts, comments, messages, bios, the rules and the welcome message stay as their authors saved them (Raphael, 2026-11-10).
 
 ## Running an instance
@@ -395,7 +398,7 @@ Every setting is an environment variable, read from one file. A TOML file was re
 Litestream runs in the binary's container and supervises the binary, so the two cannot use different database files. It streams every change to a bucket.
 
 - Restores are exact for the last few minutes and accurate to five minutes before that.
-- Hourly snapshots are kept for 30 days (Raphael, 2026-11-09).
+- Hourly snapshots are kept for 30 days (Raphael, 2026-11-09). Deleted text stays in the backups until it is older than that, and this is accepted (Raphael, 2026-11-10).
 - One bucket holds the images and the database, and configuring it turns on both.
 - The database must be on a local disk.
 
@@ -440,6 +443,7 @@ These decisions came from a security audit (2026-11-08).
 - **Primary colour.** Pink with white text failed the contrast guideline, so the primary is red (Raphael, 2026-11-08).
 - **Destructive actions.** They appeared in many places. They now sit in a page's last card, so people know where to look (Raphael, 2026-11-08).
 - **Credit line.** Home's feed also ended with a line saying who built Sweet. It was removed, because it stood out on a feed with no posts (Raphael, 2026-11-10).
+- **Deleted text.** Deleted posts, comments, messages and rooms kept their text, and no reason was recorded. Raphael asked why anything was soft-deleted. The rows are now kept only so that the rows that point at them stay valid, and the text is emptied (Raphael, 2026-11-10).
 - **Connection state.** A notice above the editors showed connecting, reconnecting and offline. It moved the editors each time the connection changed and added noise. Only offline is shown now, as a badge in the bar (Raphael, 2026-11-09).
 
 ### Considered and rejected

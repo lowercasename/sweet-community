@@ -69,9 +69,20 @@ ORDER BY role = 'moderator' DESC, joined_at ASC LIMIT 1;
 -- name: CountMembers :one
 SELECT COUNT(*) FROM memberships WHERE group_id = sqlc.arg(group_id) AND hidden_at IS NULL;
 
--- Marks a group deleted and clears its picture, so the image sweep can delete that image.
+-- Marks a group deleted and empties its name. It clears the picture, so the image sweep can delete that image.
 -- name: DeleteGroup :exec
-UPDATE groups SET deleted_at = sqlc.arg(deleted_at), picture_id = NULL WHERE id = sqlc.arg(id) AND deleted_at IS NULL;
+UPDATE groups SET deleted_at = sqlc.arg(deleted_at), name = '', picture_id = NULL
+WHERE id = sqlc.arg(id) AND deleted_at IS NULL;
+
+-- name: DeleteGroupMemberships :exec
+DELETE FROM memberships WHERE group_id = sqlc.arg(group_id);
+
+-- name: DeleteGroupNotifications :exec
+DELETE FROM notifications WHERE group_id = sqlc.arg(group_id);
+
+-- name: DeleteGroupMarkers :exec
+-- Deletes every member's read markers for the group's chat and feed.
+DELETE FROM read_markers WHERE stream IN ('chat:' || CAST(sqlc.arg(group_id) AS TEXT), 'feed:' || CAST(sqlc.arg(group_id) AS TEXT));
 
 -- name: CreateMembership :exec
 INSERT INTO memberships (group_id, user_id, role, joined_at) VALUES (sqlc.arg(group_id), sqlc.arg(user_id), sqlc.arg(role), sqlc.arg(joined_at));

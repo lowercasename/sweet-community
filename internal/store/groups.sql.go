@@ -69,7 +69,8 @@ func (q *Queries) CreateMembership(ctx context.Context, arg CreateMembershipPara
 }
 
 const deleteGroup = `-- name: DeleteGroup :exec
-UPDATE groups SET deleted_at = ?1, picture_id = NULL WHERE id = ?2 AND deleted_at IS NULL
+UPDATE groups SET deleted_at = ?1, name = '', picture_id = NULL
+WHERE id = ?2 AND deleted_at IS NULL
 `
 
 type DeleteGroupParams struct {
@@ -77,9 +78,37 @@ type DeleteGroupParams struct {
 	ID        string
 }
 
-// Marks a group deleted and clears its picture, so the image sweep can delete that image.
+// Marks a group deleted and empties its name. It clears the picture, so the image sweep can delete that image.
 func (q *Queries) DeleteGroup(ctx context.Context, arg DeleteGroupParams) error {
 	_, err := q.db.ExecContext(ctx, deleteGroup, arg.DeletedAt, arg.ID)
+	return err
+}
+
+const deleteGroupMarkers = `-- name: DeleteGroupMarkers :exec
+DELETE FROM read_markers WHERE stream IN ('chat:' || CAST(?1 AS TEXT), 'feed:' || CAST(?1 AS TEXT))
+`
+
+// Deletes every member's read markers for the group's chat and feed.
+func (q *Queries) DeleteGroupMarkers(ctx context.Context, groupID string) error {
+	_, err := q.db.ExecContext(ctx, deleteGroupMarkers, groupID)
+	return err
+}
+
+const deleteGroupMemberships = `-- name: DeleteGroupMemberships :exec
+DELETE FROM memberships WHERE group_id = ?1
+`
+
+func (q *Queries) DeleteGroupMemberships(ctx context.Context, groupID string) error {
+	_, err := q.db.ExecContext(ctx, deleteGroupMemberships, groupID)
+	return err
+}
+
+const deleteGroupNotifications = `-- name: DeleteGroupNotifications :exec
+DELETE FROM notifications WHERE group_id = ?1
+`
+
+func (q *Queries) DeleteGroupNotifications(ctx context.Context, groupID string) error {
+	_, err := q.db.ExecContext(ctx, deleteGroupNotifications, groupID)
 	return err
 }
 

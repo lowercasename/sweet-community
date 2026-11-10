@@ -31,8 +31,8 @@ WHERE r.closed_at IS NULL
 ORDER BY r.created_at, r.id;
 
 -- name: CloseReports :execrows
--- Closes every open report of one item.
-UPDATE reports SET closed_at = sqlc.arg(closed_at), closed_by = sqlc.arg(closed_by), outcome = sqlc.arg(outcome)
+-- Closes every open report of one item and empties the copies of the item that they kept.
+UPDATE reports SET closed_at = sqlc.arg(closed_at), closed_by = sqlc.arg(closed_by), outcome = sqlc.arg(outcome), body_html = ''
 WHERE kind = sqlc.arg(kind) AND subject_id = sqlc.arg(subject_id) AND closed_at IS NULL;
 
 -- name: ListUnreadReportNotifications :many

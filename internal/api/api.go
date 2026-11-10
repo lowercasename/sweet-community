@@ -644,10 +644,8 @@ func (s *Server) editPost(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// deletePost soft-deletes a post. perm.DeletePost decides who may. Its
-// comments are deleted with it, because they are reached through the post.
-// Its images are left for the sweep (images.Sweep). The event carries the
-// post's id and group id.
+// deletePost deletes a post. perm.DeletePost decides who may. removePost says what deleting does. The event carries
+// the post's id and group id.
 func (s *Server) deletePost(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
 	me, _ := userFrom(r.Context())
@@ -678,10 +676,15 @@ func (s *Server) deletePost(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// removePost deletes a live post and returns its post_delete event. The delete handler and a report's Delete action
-// both use it.
+// removePost deletes a live post and its comments and empties their text, and returns the post_delete event. The
+// rows stay, so the rows that point at them stay valid. Its images are left for the sweep (images.Sweep). The delete
+// handler, a report's Delete action and the removal of a user all use it.
 func removePost(ctx context.Context, qtx *store.Queries, id, groupID string, now int64) ([]events.Entry, error) {
-	if err := qtx.DeletePost(ctx, store.DeletePostParams{DeletedAt: sql.NullInt64{Int64: now, Valid: true}, ID: id}); err != nil {
+	at := sql.NullInt64{Int64: now, Valid: true}
+	if err := qtx.DeletePost(ctx, store.DeletePostParams{DeletedAt: at, ID: id}); err != nil {
+		return nil, err
+	}
+	if err := qtx.DeletePostComments(ctx, store.DeletePostCommentsParams{DeletedAt: at, PostID: id}); err != nil {
 		return nil, err
 	}
 	// The comments go with the post and get no delete event of their own, so their events leave the log here.

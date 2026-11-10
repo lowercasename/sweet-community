@@ -37,7 +37,8 @@ func (q *Queries) CreateComment(ctx context.Context, arg CreateCommentParams) er
 }
 
 const deleteComment = `-- name: DeleteComment :exec
-UPDATE comments SET deleted_at = ?1 WHERE id = ?2 AND deleted_at IS NULL
+UPDATE comments SET deleted_at = ?1, body_html = '', body_text = ''
+WHERE id = ?2 AND deleted_at IS NULL
 `
 
 type DeleteCommentParams struct {
@@ -45,8 +46,41 @@ type DeleteCommentParams struct {
 	ID        string
 }
 
+// Deletes a comment and empties its text. The row stays, so the rows that point at it stay valid.
 func (q *Queries) DeleteComment(ctx context.Context, arg DeleteCommentParams) error {
 	_, err := q.db.ExecContext(ctx, deleteComment, arg.DeletedAt, arg.ID)
+	return err
+}
+
+const deleteGroupComments = `-- name: DeleteGroupComments :exec
+UPDATE comments SET deleted_at = ?1, body_html = '', body_text = ''
+WHERE deleted_at IS NULL AND post_id IN (SELECT id FROM posts WHERE group_id = ?2)
+`
+
+type DeleteGroupCommentsParams struct {
+	DeletedAt sql.NullInt64
+	GroupID   string
+}
+
+// Deletes the live comments on every post of a group and empties their text.
+func (q *Queries) DeleteGroupComments(ctx context.Context, arg DeleteGroupCommentsParams) error {
+	_, err := q.db.ExecContext(ctx, deleteGroupComments, arg.DeletedAt, arg.GroupID)
+	return err
+}
+
+const deletePostComments = `-- name: DeletePostComments :exec
+UPDATE comments SET deleted_at = ?1, body_html = '', body_text = ''
+WHERE post_id = ?2 AND deleted_at IS NULL
+`
+
+type DeletePostCommentsParams struct {
+	DeletedAt sql.NullInt64
+	PostID    string
+}
+
+// Deletes the live comments of a post and empties their text.
+func (q *Queries) DeletePostComments(ctx context.Context, arg DeletePostCommentsParams) error {
+	_, err := q.db.ExecContext(ctx, deletePostComments, arg.DeletedAt, arg.PostID)
 	return err
 }
 

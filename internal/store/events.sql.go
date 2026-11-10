@@ -30,6 +30,25 @@ func (q *Queries) DeleteEventsByKey(ctx context.Context, key sql.NullString) err
 	return err
 }
 
+const forgetGroupEvents = `-- name: ForgetGroupEvents :exec
+DELETE FROM events WHERE key IN (
+    SELECT 'post:' || p.id FROM posts p WHERE p.group_id = ?1
+    UNION ALL SELECT 'comment:' || c.id FROM comments c JOIN posts p ON p.id = c.post_id WHERE p.group_id = ?1
+    UNION ALL SELECT 'message:' || m.id FROM messages m WHERE m.group_id = ?1
+    UNION ALL SELECT 'membership:' || ms.group_id || ':' || ms.user_id FROM memberships ms WHERE ms.group_id = ?1
+    UNION ALL SELECT 'marker:' || rm.user_id || ':' || rm.stream FROM read_markers rm
+        WHERE rm.stream IN ('chat:' || ?1, 'feed:' || ?1)
+    UNION ALL SELECT 'notification:' || n.id FROM notifications n WHERE n.group_id = ?1
+)
+`
+
+// Deletes the logged events of a group's posts, comments, messages, memberships, read markers and notifications.
+// Deleting the group calls it before it deletes them.
+func (q *Queries) ForgetGroupEvents(ctx context.Context, groupID string) error {
+	_, err := q.db.ExecContext(ctx, forgetGroupEvents, groupID)
+	return err
+}
+
 const insertEvent = `-- name: InsertEvent :one
 INSERT INTO events (kind, payload, key, created_at) VALUES (?, ?, ?, ?) RETURNING seq
 `

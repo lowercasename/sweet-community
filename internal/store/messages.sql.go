@@ -65,8 +65,25 @@ func (q *Queries) CreateMessage(ctx context.Context, arg CreateMessageParams) er
 	return err
 }
 
+const deleteGroupMessages = `-- name: DeleteGroupMessages :exec
+UPDATE messages SET deleted_at = ?1, body_html = '', body_text = ''
+WHERE group_id = ?2 AND deleted_at IS NULL
+`
+
+type DeleteGroupMessagesParams struct {
+	DeletedAt sql.NullInt64
+	GroupID   string
+}
+
+// Deletes the live messages of a group and empties their text.
+func (q *Queries) DeleteGroupMessages(ctx context.Context, arg DeleteGroupMessagesParams) error {
+	_, err := q.db.ExecContext(ctx, deleteGroupMessages, arg.DeletedAt, arg.GroupID)
+	return err
+}
+
 const deleteMessage = `-- name: DeleteMessage :exec
-UPDATE messages SET deleted_at = ?1 WHERE id = ?2 AND deleted_at IS NULL
+UPDATE messages SET deleted_at = ?1, body_html = '', body_text = ''
+WHERE id = ?2 AND deleted_at IS NULL
 `
 
 type DeleteMessageParams struct {
@@ -74,6 +91,7 @@ type DeleteMessageParams struct {
 	ID        string
 }
 
+// Deletes a message and empties its text. The row stays, so a reply to it can say that it was deleted.
 func (q *Queries) DeleteMessage(ctx context.Context, arg DeleteMessageParams) error {
 	_, err := q.db.ExecContext(ctx, deleteMessage, arg.DeletedAt, arg.ID)
 	return err

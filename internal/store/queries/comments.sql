@@ -28,7 +28,19 @@ UPDATE comments SET body_html = sqlc.arg(body_html), body_text = sqlc.arg(body_t
 WHERE id = sqlc.arg(id) AND deleted_at IS NULL;
 
 -- name: DeleteComment :exec
-UPDATE comments SET deleted_at = sqlc.arg(deleted_at) WHERE id = sqlc.arg(id) AND deleted_at IS NULL;
+-- Deletes a comment and empties its text. The row stays, so the rows that point at it stay valid.
+UPDATE comments SET deleted_at = sqlc.arg(deleted_at), body_html = '', body_text = ''
+WHERE id = sqlc.arg(id) AND deleted_at IS NULL;
+
+-- name: DeletePostComments :exec
+-- Deletes the live comments of a post and empties their text.
+UPDATE comments SET deleted_at = sqlc.arg(deleted_at), body_html = '', body_text = ''
+WHERE post_id = sqlc.arg(post_id) AND deleted_at IS NULL;
+
+-- name: DeleteGroupComments :exec
+-- Deletes the live comments on every post of a group and empties their text.
+UPDATE comments SET deleted_at = sqlc.arg(deleted_at), body_html = '', body_text = ''
+WHERE deleted_at IS NULL AND post_id IN (SELECT id FROM posts WHERE group_id = sqlc.arg(group_id));
 
 -- name: ListCommentIDsOfPost :many
 -- The ids of a post's comments, deleted or not. Deleting the post removes their events from the log.

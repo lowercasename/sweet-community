@@ -21,7 +21,7 @@ func (q *Queries) ClearReportCopiesByAuthor(ctx context.Context, authorID string
 }
 
 const closeReports = `-- name: CloseReports :execrows
-UPDATE reports SET closed_at = ?1, closed_by = ?2, outcome = ?3
+UPDATE reports SET closed_at = ?1, closed_by = ?2, outcome = ?3, body_html = ''
 WHERE kind = ?4 AND subject_id = ?5 AND closed_at IS NULL
 `
 
@@ -33,7 +33,7 @@ type CloseReportsParams struct {
 	SubjectID string
 }
 
-// Closes every open report of one item.
+// Closes every open report of one item and empties the copies of the item that they kept.
 func (q *Queries) CloseReports(ctx context.Context, arg CloseReportsParams) (int64, error) {
 	result, err := q.db.ExecContext(ctx, closeReports,
 		arg.ClosedAt,

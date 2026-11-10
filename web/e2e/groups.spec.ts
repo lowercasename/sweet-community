@@ -143,6 +143,46 @@ test.describe('groups', () => {
     await mo.context.close()
   })
 
+  test("deleting a room removes it, its posts and its notifications from another member's open pages at once", async ({
+    browser,
+  }, testInfo) => {
+    const kit = await member(browser, testInfo, 'kit')
+    const mo = await member(browser, testInfo, 'mo')
+    await open(kit.page, '/rooms/new')
+    const name = uniq('Going ')
+    await kit.page.getByLabel('Name').fill(name)
+    await kit.page.getByRole('button', { name: 'Create room' }).click()
+    await kit.page.getByRole('button', { name: 'Members and settings' }).click()
+    await kit.page.getByLabel('Add someone').selectOption({ label: mo.username })
+    await kit.page.getByRole('button', { name: 'Add to room', exact: true }).click()
+    await expect(kit.page.getByRole('listitem').filter({ hasText: mo.username })).toBeVisible()
+    await nav(kit.page).getByRole('button', { name }).click()
+    const text = uniq('A post in the room ')
+    await writePost(kit.page, text)
+
+    // Mo has the room in the nav and a notification of being added. In a second tab, kit's page shows the post.
+    await open(mo.page, '/notifications')
+    await expect(mo.page.getByRole('button', { name: new RegExp(`added you to ${name}`) })).toBeVisible()
+    // After the room is deleted, the notification is gone, not shown without the room's name.
+    const added = mo.page.getByRole('button', { name: new RegExp(`${kit.username} added you to`) })
+    await expect(nav(mo.page).getByRole('button', { name })).toBeVisible()
+    const profile = await mo.context.newPage()
+    await open(profile, `/u/${kit.username}`)
+    await expect(profile.getByText(text)).toBeVisible()
+
+    await nav(kit.page).getByRole('button', { name }).click()
+    await kit.page.getByRole('button', { name: 'Members and settings' }).click()
+    await kit.page.getByRole('button', { name: 'Delete room' }).click()
+    await confirm(kit.page, 'Delete room')
+    await expect(kit.page).toHaveURL(/\/$/)
+
+    await expect(added).toHaveCount(0)
+    await expect(nav(mo.page).getByRole('button', { name })).toHaveCount(0)
+    await expect(profile.getByText(text)).toHaveCount(0)
+    await kit.context.close()
+    await mo.context.close()
+  })
+
   test('after a handover the old owner is shown as a moderator at once, even when the event stream is down', async ({
     browser,
   }, testInfo) => {
