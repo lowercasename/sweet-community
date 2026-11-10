@@ -42,7 +42,7 @@ const SQUARE_ENOUGH = 1.3
  * shape of the 1200 by 630 pictures that most pages give, so their pictures show whole (Raphael, 2026-11-10). A picture
  * close to square, such as a logo, is shown whole and centred on grey. A page with no picture gets the grey area with
  * a link icon, so every card has the same shape. The whole card is one link that opens the page in a new tab. Its
- * width is capped at 480px.
+ * width is its column's, up to the 680px reading width, so the description has room.
  */
 export function LinkPreview({ url, preview, note, inert = false, selected = false }: LinkPreviewProps) {
   const border = selected ? 'border-pink' : inert ? 'border-line' : 'border-line hover:border-pink'
@@ -82,7 +82,7 @@ export function LinkPreview({ url, preview, note, inert = false, selected = fals
     </>
   )
   return (
-    <span className="@container block max-w-[480px]">
+    <span className="@container block max-w-[680px]">
       {inert ? (
         <span className={`${CARD} ${border}`}>{inner}</span>
       ) : (

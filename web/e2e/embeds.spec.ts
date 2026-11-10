@@ -75,6 +75,8 @@ test.describe('link preview cards', () => {
   }, testInfo) => {
     const kit = await member(browser, testInfo)
     await previews(kit.page)
+    // A wide window, so the posts pane beside the chat is wider than a narrow card.
+    await kit.page.setViewportSize({ width: 1800, height: 900 })
     await open(kit.page)
     const editor = postEditor(kit.page)
     await editor.click()
@@ -98,7 +100,9 @@ test.describe('link preview cards', () => {
     // The card is 100px tall, or 76px when it is narrower than 400px, as in a posts pane beside the chat.
     const box = (await posted.boundingBox())!
     expect(box.height).toBe(box.width >= 400 ? 100 : 76)
-    expect(box.width).toBeLessThanOrEqual(480)
+    // The card spans the post's text column, up to the 680px reading width, so the description has room.
+    const column = (await article(kit.page, words).locator('.content').first().boundingBox())!
+    expect(Math.abs(box.width - Math.min(column.width, 680))).toBeLessThan(1.5)
     await wide(posted)
     await expect(posted.locator('img')).toHaveCSS('object-fit', 'cover')
     await kit.page.screenshot({ path: 'test-results/embed-post.png' })
