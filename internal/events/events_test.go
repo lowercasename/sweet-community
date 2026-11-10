@@ -2,9 +2,13 @@ package events
 
 import (
 	"bufio"
+	"io"
 	"net/http"
 	"net/http/httptest"
+	"strings"
+	"sync/atomic"
 	"testing"
+	"time"
 )
 
 // The stream's first event is the binary's version, so a tab that loaded
@@ -14,7 +18,7 @@ func TestServeAnnouncesTheVersionFirst(t *testing.T) {
 	h := NewHub(nil)
 	h.Version = "abc123"
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		h.Serve(w, r, func(e Event) (Event, bool) { return e, true })
+		h.Serve(w, r, func(e Event) (Event, bool) { return e, true }, func() bool { return true })
 	}))
 	defer srv.Close()
 
@@ -35,6 +39,49 @@ func TestServeAnnouncesTheVersionFirst(t *testing.T) {
 		}
 		if got := line[:len(line)-1]; got != w {
 			t.Fatalf("line %q, want %q", got, w)
+		}
+	}
+}
+
+// A stream ends when its viewer may no longer receive events, such as after signing out. The stream checks before it
+// sends each event and at each heartbeat, so a quiet stream ends too. Its last event is signed_out.
+func TestServeEndsWhenTheViewerMayNoLongerReceive(t *testing.T) {
+	saved := Heartbeat
+	Heartbeat = 50 * time.Millisecond
+	defer func() { Heartbeat = saved }()
+
+	for _, quiet := range []bool{false, true} {
+		h := NewHub(nil)
+		var allowed atomic.Bool
+		allowed.Store(true)
+		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			h.Serve(w, r, func(e Event) (Event, bool) { return e, true }, allowed.Load)
+		}))
+		res, err := http.Get(srv.URL)
+		if err != nil {
+			t.Fatal(err)
+		}
+		// One event while allowed, then one after the viewer has signed out, unless the stream is quiet.
+		h.Broadcast(Event{Seq: 1, Kind: "message", Payload: []byte(`{}`)})
+		time.Sleep(20 * time.Millisecond)
+		allowed.Store(false)
+		if !quiet {
+			h.Broadcast(Event{Seq: 2, Kind: "message", Payload: []byte(`{}`)})
+		}
+		body, err := io.ReadAll(res.Body)
+		res.Body.Close()
+		srv.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+		var kinds []string
+		for _, line := range strings.Split(string(body), "\n") {
+			if strings.HasPrefix(line, "event: ") {
+				kinds = append(kinds, strings.TrimPrefix(line, "event: "))
+			}
+		}
+		if strings.Join(kinds, ",") != "message,signed_out" {
+			t.Fatalf("quiet %v: events %v", quiet, kinds)
 		}
 	}
 }

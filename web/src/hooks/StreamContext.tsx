@@ -1,6 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useRef, type ReactNode } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
-import { applyEvent } from '../data/apply'
+import { applyEvent, signedOut } from '../data/apply'
+import { keys } from '../data/keys'
 import { useEventStream, type StreamStatus } from './useEventStream'
 
 const StreamContext = createContext<StreamStatus>('connecting')
@@ -14,7 +15,12 @@ const StreamContext = createContext<StreamStatus>('connecting')
 export function StreamProvider({ children }: { children?: ReactNode }) {
   const qc = useQueryClient()
   const onEvent = useCallback((kind: string, data: unknown) => applyEvent(qc, kind, data), [qc])
-  const { status } = useEventStream(onEvent)
+  // A signed_out event signs the page out. When the browser gives up on the stream, the page asks who is signed in.
+  // A 401 then signs it out too, and a failure leaves the user as they were.
+  const { status } = useEventStream(onEvent, {
+    onSignedOut: () => signedOut(qc),
+    onClosed: () => void qc.invalidateQueries({ queryKey: keys.me }),
+  })
 
   const previous = useRef<StreamStatus>('connecting')
   useEffect(() => {

@@ -207,7 +207,7 @@ func (h *Hub) Since(ctx context.Context, after int64, limit int) ([]Event, error
 // Heartbeat is the interval at which the server writes a comment line. The
 // line keeps the connection alive through proxies and Cloudflare's 125 s read
 // timeout, and lets the server detect a disconnected client.
-const Heartbeat = 15 * time.Second
+var Heartbeat = 15 * time.Second
 
 // Entry is an event to log. It holds a kind and its payload.
 type Entry struct {
@@ -221,7 +221,11 @@ type Entry struct {
 // unfiltered. Each connection decides whether its viewer may receive the
 // event and adds the viewer's own view, such as can flags. A filtered-out
 // event still advances the viewer's sequence.
-func (h *Hub) Serve(w http.ResponseWriter, r *http.Request, filter func(Event) (Event, bool)) {
+//
+// allowed reports whether the viewer may still receive events, which is whether their session still exists. The
+// stream checks it before each live event and at each heartbeat. When it fails, the stream sends signed_out and ends,
+// so a page that has been signed out elsewhere receives nothing more.
+func (h *Hub) Serve(w http.ResponseWriter, r *http.Request, filter func(Event) (Event, bool), allowed func() bool) {
 	flusher, ok := w.(http.Flusher)
 	if !ok {
 		http.Error(w, "streaming unsupported", http.StatusInternalServerError)
@@ -283,6 +287,11 @@ func (h *Hub) Serve(w http.ResponseWriter, r *http.Request, filter func(Event) (
 		}
 	}
 
+	// signedOut ends the stream with an event that has no id, like the version event, so the page can sign out.
+	signedOut := func() {
+		fmt.Fprint(w, "event: signed_out\ndata: {}\n\n")
+		flusher.Flush()
+	}
 	tick := time.NewTicker(Heartbeat)
 	defer tick.Stop()
 	for {
@@ -293,10 +302,18 @@ func (h *Hub) Serve(w http.ResponseWriter, r *http.Request, filter func(Event) (
 			if e.Seq <= last {
 				continue
 			}
+			if !allowed() {
+				signedOut()
+				return
+			}
 			write(e)
 			last = e.Seq
 			flusher.Flush()
 		case <-tick.C:
+			if !allowed() {
+				signedOut()
+				return
+			}
 			if _, err := fmt.Fprint(w, ": hb\n\n"); err != nil {
 				return
 			}

@@ -562,14 +562,23 @@ export function refetchForOwnRole(qc: QueryClient, groupId: string) {
   })
 }
 
+/**
+ * Signs the page out: the user becomes nobody and every other query is removed, so the sign-in page shows and no
+ * content stays in memory. Used when the user is removed from the instance and when the server ends the event stream
+ * because the session has ended.
+ */
+export function signedOut(qc: QueryClient) {
+  qc.setQueryData<User | null>(keys.me, null)
+  qc.removeQueries({ predicate: (q) => q.queryKey[0] !== 'me' })
+}
+
 function deleteMembership(qc: QueryClient, groupId: string, userId: string) {
   const me = qc.getQueryData<User | null>(keys.me)
   const root = isRootID(groupId)
   if (me && me.id === userId) {
     if (root) {
-      // The user was removed from the instance, by staff or by themselves. Sign out and clear the cache.
-      qc.setQueryData<User | null>(keys.me, null)
-      qc.removeQueries({ predicate: (q) => q.queryKey[0] !== 'me' })
+      // The user was removed from the instance, by staff or by themselves.
+      signedOut(qc)
       return
     }
     dropGroup(qc, groupId)

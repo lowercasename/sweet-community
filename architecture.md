@@ -138,6 +138,7 @@ A message uses part of the same schema and passes the same policy. Chat history 
 - The server accepts JPEG, PNG, WebP and GIF, detected from the content. HEIC is not decoded, because Go would need C libraries. The upload control asks for JPEG first, so iPhones convert HEIC photos.
 - Uploads are turned upright and stripped of metadata. Smaller sizes are JPEG or PNG, because Go cannot encode WebP.
 - An image is served only to its uploader or to someone who can see content that uses it. No image leaves the app, so there are no signed URLs.
+- A profile picture or a room picture must be an image that the person setting it uploaded (Raphael, 2026-11-10). Every signed-in user can see a profile picture, so any other image would let a member show an image from a private room or a conversation to the whole community.
 - Images that nothing has used for a day are deleted.
 - Adjacent images are shown as a gallery. The stored HTML stays a plain run of images.
 
@@ -279,6 +280,7 @@ The server sends updates over server-sent events (SSE), and the client sends ord
 - **Each resource has two kinds of event.** One carries its current state. The other announces its deletion.
 - **Each resource has one builder.** A handler that writes reads the row back and passes it to the builder. A test checks that the response and the event equal a fresh fetch.
 - **Phones drop connections without warning.** A heartbeat detects this. The client reconnects when the page becomes visible, and it resyncs every time.
+- **A stream ends with its session** (Raphael, 2026-11-10). The stream checks the session before each event and at each heartbeat. When the session has ended, by signing out anywhere, a password change, removal or expiry, the stream tells the page and closes, and the page signs out.
 - **Open tabs reload when the server's version changes.** The web app is embedded in the binary, so only tabs that were already open can run an older version.
 
 One cache in the web app holds all server data. Events are its write path, and a reconnect refetches everything. Content refers to users by id, so a new name or picture shows everywhere at once.

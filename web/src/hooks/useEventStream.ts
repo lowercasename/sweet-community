@@ -5,6 +5,13 @@ export type StreamStatus = 'connecting' | 'live' | 'reconnecting' | 'offline'
 
 export type EventHandler = (kind: string, data: unknown, seq: number) => void
 
+interface StreamCallbacks {
+  /** The server ended the stream because the session has ended. The hook has stopped for good. */
+  onSignedOut?: () => void
+  /** The browser gave up on the stream, for example because a reconnection was refused. The hook retries. */
+  onClosed?: () => void
+}
+
 const HEALTH_INTERVAL_MS = 30_000
 const HEALTH_TIMEOUT_MS = 10_000
 
@@ -13,14 +20,20 @@ const HEALTH_TIMEOUT_MS = 10_000
  * reconnect. EventSource cannot see the server's `: hb` comment lines, so
  * liveness is checked by pinging /healthz every 30 s while the page is
  * visible. iOS kills background sockets while readyState stays OPEN, so the
- * stream is force-reopened on visibilitychange, pageshow and online.
+ * stream is force-reopened on visibilitychange, pageshow and online. A
+ * signed_out event from the server stops the hook for good.
  */
-export function useEventStream(onEvent: EventHandler): { status: StreamStatus; lastSeq: number } {
+export function useEventStream(
+  onEvent: EventHandler,
+  callbacks: StreamCallbacks = {},
+): { status: StreamStatus; lastSeq: number } {
   const [status, setStatus] = useState<StreamStatus>('connecting')
   const [lastSeq, setLastSeq] = useState(0)
 
   const handlerRef = useRef(onEvent)
   handlerRef.current = onEvent
+  const callbacksRef = useRef(callbacks)
+  callbacksRef.current = callbacks
   const lastSeqRef = useRef(0)
   const statusRef = useRef<StreamStatus>('connecting')
   const sourceRef = useRef<EventSource | null>(null)
@@ -30,6 +43,7 @@ export function useEventStream(onEvent: EventHandler): { status: StreamStatus; l
 
   useEffect(() => {
     let disposed = false
+    let stopped = false
 
     const update = (s: StreamStatus) => {
       statusRef.current = s
@@ -42,7 +56,7 @@ export function useEventStream(onEvent: EventHandler): { status: StreamStatus; l
     }
 
     const open = () => {
-      if (disposed) return
+      if (disposed || stopped) return
       close()
       if (!navigator.onLine) {
         update('offline')
@@ -61,11 +75,19 @@ export function useEventStream(onEvent: EventHandler): { status: StreamStatus; l
         // If it has given up (CLOSED), we reopen with ?since= ourselves.
         update(navigator.onLine ? 'reconnecting' : 'offline')
         if (es.readyState === EventSource.CLOSED) {
+          callbacksRef.current.onClosed?.()
           window.setTimeout(() => {
             if (sourceRef.current === es) open()
           }, 3_000)
         }
       }
+
+      // The session has ended, for example on another device. Nothing more will arrive, so the hook stops.
+      es.addEventListener('signed_out', () => {
+        stopped = true
+        close()
+        callbacksRef.current.onSignedOut?.()
+      })
 
       es.addEventListener('version', (ev: MessageEvent<string>) => {
         let v = ev.data

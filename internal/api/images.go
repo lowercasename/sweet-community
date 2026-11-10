@@ -1,6 +1,7 @@
 package api
 
 import (
+	"context"
 	"database/sql"
 	"encoding/json"
 	"errors"
@@ -126,6 +127,25 @@ func (s *Server) serveImage(w http.ResponseWriter, r *http.Request) {
 
 // setPicture sets the signed-in user's picture to an uploaded image. A null
 // image_id resets it to the default donut avatar.
+// pictureImage checks the image that is to become a profile picture or a room picture. A picture must be an image
+// that the person setting it uploaded. Every signed-in user can see a profile picture, so any other image would let a
+// member show an image from a private room or a conversation to the whole community, or use someone else's picture as
+// their own. An image that someone else uploaded gets the same 404 as one that does not exist. A nil id clears the
+// picture.
+func pictureImage(ctx context.Context, qtx *store.Queries, id *string, setter string) (sql.NullString, int, error) {
+	if id == nil {
+		return sql.NullString{}, 0, nil
+	}
+	img, err := qtx.GetImage(ctx, *id)
+	if errors.Is(err, sql.ErrNoRows) || (err == nil && img.UploaderID != setter) {
+		return sql.NullString{}, http.StatusNotFound, errors.New("No such image")
+	}
+	if err != nil {
+		return sql.NullString{}, http.StatusInternalServerError, err
+	}
+	return sql.NullString{String: *id, Valid: true}, 0, nil
+}
+
 func (s *Server) setPicture(w http.ResponseWriter, r *http.Request) {
 	var in struct {
 		ImageID *string `json:"image_id"`
@@ -139,14 +159,9 @@ func (s *Server) setPicture(w http.ResponseWriter, r *http.Request) {
 	// A "user" event carries the whole user, so every open page can redraw
 	// the user's picture wherever it appears.
 	s.logged(w, r, "user", db.Now(), func(qtx *store.Queries) (any, int, error) {
-		var pic sql.NullString
-		if in.ImageID != nil {
-			if _, err := qtx.GetImage(r.Context(), *in.ImageID); errors.Is(err, sql.ErrNoRows) {
-				return nil, http.StatusNotFound, errors.New("No such image")
-			} else if err != nil {
-				return nil, http.StatusInternalServerError, err
-			}
-			pic = sql.NullString{String: *in.ImageID, Valid: true}
+		pic, status, err := pictureImage(r.Context(), qtx, in.ImageID, me.ID)
+		if err != nil {
+			return nil, status, err
 		}
 		if err := qtx.SetUserPicture(r.Context(), store.SetUserPictureParams{PictureID: pic, ID: me.ID}); err != nil {
 			return nil, http.StatusInternalServerError, err

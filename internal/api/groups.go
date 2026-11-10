@@ -448,14 +448,9 @@ func (s *Server) setGroupPicture(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s.logged(w, r, "group", db.Now(), func(qtx *store.Queries) (any, int, error) {
-		var pic sql.NullString
-		if in.ImageID != nil {
-			if _, err := qtx.GetImage(r.Context(), *in.ImageID); errors.Is(err, sql.ErrNoRows) {
-				return nil, http.StatusNotFound, errors.New("No such image")
-			} else if err != nil {
-				return nil, http.StatusInternalServerError, err
-			}
-			pic = sql.NullString{String: *in.ImageID, Valid: true}
+		pic, status, err := pictureImage(r.Context(), qtx, in.ImageID, a.ID)
+		if err != nil {
+			return nil, status, err
 		}
 		if err := qtx.SetGroupPicture(r.Context(), store.SetGroupPictureParams{PictureID: pic, ID: g.ID}); err != nil {
 			return nil, http.StatusInternalServerError, err
@@ -750,9 +745,17 @@ func (s *Server) events(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusInternalServerError, err.Error())
 		return
 	}
+	// The session is checked again before each event and at each heartbeat, so the stream ends when the session ends:
+	// on signing out, signing out everywhere, a password change, removal or expiry. Only a session that no longer
+	// exists ends it. A database error does not.
+	sid := sessionFrom(r.Context())
+	allowed := func() bool {
+		_, err := s.sessionUser(r.Context(), sid)
+		return !errors.Is(err, sql.ErrNoRows)
+	}
 	s.Hub.Serve(w, r, func(e events.Event) (events.Event, bool) {
 		return filterEvent(viewer, roles, &st, e)
-	})
+	}, allowed)
 }
 
 // getSettings and setSettings read and write the instance's settings. Only

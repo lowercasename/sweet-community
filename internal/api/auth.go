@@ -83,15 +83,21 @@ func (s *Server) authenticate(r *http.Request) (User, string, bool) {
 		return User{}, "", false
 	}
 	id := auth.HashToken(token)
-	now := db.Now()
-	row, err := s.q().GetSessionUser(r.Context(), store.GetSessionUserParams{ID: id, Now: now})
+	row, err := s.sessionUser(r.Context(), id)
 	if err != nil {
 		return User{}, "", false
 	}
+	now := db.Now()
 	if now-row.LastSeenAt > touchAfter.Milliseconds() {
 		s.q().TouchSession(r.Context(), store.TouchSessionParams{LastSeenAt: now, ExpiresAt: now + SessionTTL.Milliseconds(), ID: id})
 	}
 	return wireUser(row.ID, row.Username, row.PictureID), id, true
+}
+
+// sessionUser reads the user of a live session: one that exists, has not expired, and belongs to an account that has
+// not been removed. It returns sql.ErrNoRows for any other session. Requests and open event streams both use it.
+func (s *Server) sessionUser(ctx context.Context, id string) (store.GetSessionUserRow, error) {
+	return s.q().GetSessionUser(ctx, store.GetSessionUserParams{ID: id, Now: db.Now()})
 }
 
 // requireAuth rejects unauthenticated requests with 401 and puts the user in the context.

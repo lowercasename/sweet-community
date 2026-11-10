@@ -4,7 +4,7 @@ import type { QueryClient } from '@tanstack/react-query'
 import { makeQueryClient } from './client'
 import { keys } from './keys'
 import { readFileSync } from 'node:fs'
-import { EVENT_KINDS, applyEvent } from './apply'
+import { EVENT_KINDS, applyEvent, signedOut } from './apply'
 import {
   ROOT,
   comment,
@@ -319,6 +319,14 @@ describe('applyEvent', () => {
       (qc.getQueryData(keys.messages(ROOT)) as { pages: { messages: { author: User }[] }[] }).pages[0].messages[0]
         .author.username,
     ).toBe('removed-abc')
+  })
+
+  it('signing out sets the user to nobody and clears every other query', () => {
+    qc.setQueryData(keys.users, { users: [member('kit')] })
+    signedOut(qc)
+    expect(qc.getQueryData(keys.me)).toBeNull()
+    expect(qc.getQueryData(keys.users)).toBeUndefined()
+    expect(qc.getQueryData(keys.posts(ROOT))).toBeUndefined()
   })
 
   it('leaving the root group is leaving the instance, so the user is removed from the users list, and the viewer is signed out with the cache cleared', () => {

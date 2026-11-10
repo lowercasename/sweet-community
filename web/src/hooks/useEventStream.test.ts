@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { act, renderHook } from '@testing-library/react'
+import { act, cleanup, renderHook } from '@testing-library/react'
 import { useEventStream } from './useEventStream'
 
 /**
@@ -40,6 +40,7 @@ beforeEach(() => {
   vi.spyOn(window.location, 'reload').mockImplementation(reload)
 })
 afterEach(() => {
+  cleanup()
   vi.unstubAllGlobals()
   vi.restoreAllMocks()
   reload.mockClear()
@@ -69,5 +70,35 @@ describe('useEventStream version', () => {
     act(() => latest().emit('version', '"one"'))
     expect(onEvent).not.toHaveBeenCalled()
     expect(result.current.lastSeq).toBe(0)
+  })
+})
+
+/**
+ * The server ends a stream whose session has ended, such as after signing out on another device, with a signed_out
+ * event. The hook then stops for good and reports it, so the page can sign out. When the browser gives up on a stream,
+ * for example because a reconnection was refused with 401, the hook reports that too, so the page can check whether it
+ * is still signed in.
+ */
+describe('useEventStream sign-out', () => {
+  it('reports signed_out and opens no new connection afterwards', () => {
+    const onSignedOut = vi.fn()
+    renderHook(() => useEventStream(vi.fn(), { onSignedOut }))
+    const source = latest()
+    act(() => source.emit('signed_out', '{}'))
+    expect(onSignedOut).toHaveBeenCalledTimes(1)
+    expect(source.readyState).toBe(FakeEventSource.CLOSED)
+    act(() => window.dispatchEvent(new Event('online')))
+    expect(FakeEventSource.instances).toHaveLength(1)
+  })
+
+  it('reports when the browser gives up on the stream', () => {
+    const onClosed = vi.fn()
+    renderHook(() => useEventStream(vi.fn(), { onClosed }))
+    const source = latest()
+    act(() => {
+      source.readyState = FakeEventSource.CLOSED
+      source.onerror?.()
+    })
+    expect(onClosed).toHaveBeenCalledTimes(1)
   })
 })
