@@ -3,8 +3,8 @@
 # entry to CHANGELOG.md made of the commit titles since that tag, commits, tags and pushes. The pushed tag makes CI
 # publish the image ghcr.io/lowercasename/sweet-community:<version>, which a server pins with SWEET_IMAGE.
 #
-#   scripts/release.sh patch     fixes and wording
-#   scripts/release.sh minor     a new feature
+#   scripts/release.sh patch     fixes, and changes that users will not notice, however large the code change
+#   scripts/release.sh minor     new behaviour or features that users will notice
 #   scripts/release.sh major     a change that needs the people running Sweet to act
 #   scripts/release.sh v1.0.0    a version by name, such as the first release
 #
