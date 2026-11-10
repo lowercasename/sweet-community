@@ -539,11 +539,11 @@ func TestImageSweep(t *testing.T) {
 	owner.mustStatus(200, "PUT", "/api/me/picture", map[string]string{"image_id": pictureID})
 
 	// The sweep removes no image younger than the grace period, even if nothing references it.
-	n, err := images.Sweep(context.Background(), srv.q(), srv.Images, db.Now()-3_600_000)
+	n, err := images.Sweep(context.Background(), srv.DB, srv.Images, db.Now()-3_600_000)
 	if err != nil || n != 0 {
 		t.Fatalf("sweep inside grace: %d %v", n, err)
 	}
-	n, err = images.Sweep(context.Background(), srv.q(), srv.Images, db.Now()+1)
+	n, err = images.Sweep(context.Background(), srv.DB, srv.Images, db.Now()+1)
 	if err != nil || n != 2 {
 		t.Fatalf("sweep: want 2 removed (draft, deleted post), got %d %v", n, err)
 	}
@@ -551,7 +551,7 @@ func TestImageSweep(t *testing.T) {
 		owner.mustStatus(want, "GET", url, nil)
 	}
 	// The sweep is idempotent.
-	if n, err = images.Sweep(context.Background(), srv.q(), srv.Images, db.Now()+1); err != nil || n != 0 {
+	if n, err = images.Sweep(context.Background(), srv.DB, srv.Images, db.Now()+1); err != nil || n != 0 {
 		t.Fatalf("second sweep: %d %v", n, err)
 	}
 }
@@ -1114,7 +1114,7 @@ func TestSweepRemovesPicturesThatNothingUses(t *testing.T) {
 	room("Fells", ofLiveRoom)
 	owner.mustStatus(200, "DELETE", "/api/groups/"+room("Moors", ofDeletedRoom), nil)
 
-	n, err := images.Sweep(ctx, srv.q(), srv.Images, db.Now()+1)
+	n, err := images.Sweep(ctx, srv.DB, srv.Images, db.Now()+1)
 	if err != nil || n != 4 {
 		t.Fatalf("sweep: removed %d, want 4: %v", n, err)
 	}
@@ -1155,14 +1155,14 @@ func TestSweepKeepsGoingPastAFailure(t *testing.T) {
 		t.Fatal(err)
 	}
 	st := failingStore{Store: srv.Images, fail: ids[0] + "." + images.Ext(first.ContentType)}
-	n, err := images.Sweep(ctx, srv.q(), st, db.Now()+1)
+	n, err := images.Sweep(ctx, srv.DB, st, db.Now()+1)
 	if err == nil || n != 1 {
 		t.Fatalf("sweep with one failure: removed %d, error %v; want 1 removed and the error", n, err)
 	}
 	if _, err := srv.q().GetImage(ctx, ids[1]); err == nil {
 		t.Fatal("the second image was not removed")
 	}
-	if n, err := images.Sweep(ctx, srv.q(), srv.Images, db.Now()+1); err != nil || n != 1 {
+	if n, err := images.Sweep(ctx, srv.DB, srv.Images, db.Now()+1); err != nil || n != 1 {
 		t.Fatalf("next sweep: removed %d, want 1: %v", n, err)
 	}
 }

@@ -213,3 +213,57 @@ func TestMigrationReleasesThePicturesOfDeletedRooms(t *testing.T) {
 		t.Fatalf("pictures after the migration: %v, want the deleted room's released and the live room's kept", pictures)
 	}
 }
+
+// Migration 006 records the images that existing bodies use, from their <img> elements. An image id written as text
+// is not a use.
+func TestMigrationRecordsTheImagesThatBodiesUse(t *testing.T) {
+	ctx := context.Background()
+	d, err := Open(filepath.Join(t.TempDir(), "sweet.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer d.Close()
+	all := os.DirFS("../../migrations")
+	upTo := func(last string) fstest.MapFS {
+		files := fstest.MapFS{}
+		names, _ := fs.Glob(all, "*.sql")
+		for _, name := range names {
+			if name <= last {
+				data, _ := fs.ReadFile(all, name)
+				files[name] = &fstest.MapFile{Data: data}
+			}
+		}
+		return files
+	}
+	if err := Migrate(ctx, d, upTo("005_~")); err != nil {
+		t.Fatal(err)
+	}
+	const a, b = "0190a0b0-0000-7000-8000-00000000000a", "0190a0b0-0000-7000-8000-00000000000b"
+	for _, q := range []string{
+		`INSERT INTO users (id, username, created_at) VALUES ('u', 'kit', 1)`,
+		`INSERT INTO images (id, uploader_id, content_type, width, height, bytes, created_at) VALUES ('` + a + `', 'u', 'image/png', 1, 1, 1, 1), ('` + b + `', 'u', 'image/png', 1, 1, 1, 1)`,
+		`INSERT INTO posts (id, group_id, author_id, body_html, body_text, created_at) VALUES ('p', '00000000-0000-7000-8000-000000000000', 'u', '<p>x</p><img src="/img/` + a + `" alt="">', 'x', 1)`,
+		`INSERT INTO messages (id, group_id, author_id, body_html, body_text, created_at) VALUES ('m', '00000000-0000-7000-8000-000000000000', 'u', '<p>` + b + `</p>', '` + b + `', 1)`,
+	} {
+		if _, err := d.ExecContext(ctx, q); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := Migrate(ctx, d, upTo("006_~")); err != nil {
+		t.Fatal(err)
+	}
+	var uses []string
+	rows, err := d.QueryContext(ctx, `SELECT image_id || ' ' || kind || ' ' || id FROM image_uses ORDER BY 1`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for rows.Next() {
+		var s string
+		rows.Scan(&s)
+		uses = append(uses, s)
+	}
+	rows.Close()
+	if len(uses) != 1 || uses[0] != a+" post p" {
+		t.Fatalf("uses after the migration: %v, want only the post's image", uses)
+	}
+}

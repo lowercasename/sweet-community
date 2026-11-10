@@ -572,7 +572,7 @@ func TestGroupPicture(t *testing.T) {
 		t.Fatalf("an outsider fetching the room's picture: %d", st)
 	}
 	// The sweep keeps a room's picture.
-	if n, err := images.Sweep(context.Background(), store.New(srv.DB), srv.Images, db.Now()+1); err != nil || n != 0 {
+	if n, err := images.Sweep(context.Background(), srv.DB, srv.Images, db.Now()+1); err != nil || n != 0 {
 		t.Fatalf("sweep took the room's picture: %d %v", n, err)
 	}
 	kit.mustStatus(404, "PUT", gp+"/picture", map[string]any{"image_id": "nothing"})

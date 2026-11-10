@@ -14,3 +14,13 @@ func TestMentions(t *testing.T) {
 		t.Fatalf("no mentions: %v", got)
 	}
 }
+
+// A body's images are the src of its <img> elements, each once. An id in text or in a link is not an image.
+func TestImages(t *testing.T) {
+	const a, b = "0190a0b0-0000-7000-8000-00000000000a", "0190a0b0-0000-7000-8000-00000000000b"
+	body := Body(`<p>` + b + ` <a href="/img/` + b + `">/img/` + b + `</a></p>` +
+		`<img src="/img/` + a + `" alt="" data-image-id="` + a + `"><img src="/img/` + a + `" alt="">`)
+	if got := Images(body); !reflect.DeepEqual(got, []string{a}) {
+		t.Fatalf("Images: %v, want only %s", got, a)
+	}
+}

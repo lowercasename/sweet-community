@@ -102,6 +102,9 @@ func (s *Server) createComment(w http.ResponseWriter, r *http.Request) {
 		}); err != nil {
 			return nil, nil, http.StatusInternalServerError, err
 		}
+		if status, err := recordImages(r.Context(), qtx, "comment", id.String(), author.ID, clean); err != nil {
+			return nil, nil, status, err
+		}
 		row, err := qtx.GetComment(r.Context(), id.String())
 		if err != nil {
 			return nil, nil, http.StatusInternalServerError, err
@@ -155,6 +158,7 @@ func (s *Server) editComment(w http.ResponseWriter, r *http.Request) {
 	}
 	now := db.Now()
 	id := r.PathValue("id")
+	writer, _ := userFrom(r.Context())
 	s.logged(w, r, "comment", now, func(qtx *store.Queries) (any, int, error) {
 		owners, a, status, err := s.commentActor(r, qtx, id)
 		if err != nil {
@@ -167,6 +171,9 @@ func (s *Server) editComment(w http.ResponseWriter, r *http.Request) {
 			BodyHtml: clean, BodyText: sanitize.Text(clean), EditedAt: sql.NullInt64{Int64: now, Valid: true}, ID: id,
 		}); err != nil {
 			return nil, http.StatusInternalServerError, err
+		}
+		if status, err := recordImages(r.Context(), qtx, "comment", id, writer.ID, clean); err != nil {
+			return nil, status, err
 		}
 		row, err := qtx.GetComment(r.Context(), id)
 		c := wireComment(row)

@@ -576,6 +576,9 @@ func (s *Server) createPost(w http.ResponseWriter, r *http.Request) {
 		if err := qtx.CreatePost(r.Context(), store.CreatePostParams{ID: id.String(), GroupID: g.ID, AuthorID: author.ID, TopicID: topic, BodyHtml: clean, BodyText: text, CreatedAt: now}); err != nil {
 			return nil, nil, http.StatusInternalServerError, err
 		}
+		if status, err := recordImages(r.Context(), qtx, "post", id.String(), author.ID, clean); err != nil {
+			return nil, nil, status, err
+		}
 		row, err := qtx.GetPost(r.Context(), id.String())
 		if err != nil {
 			return nil, nil, http.StatusInternalServerError, err
@@ -630,6 +633,9 @@ func (s *Server) editPost(w http.ResponseWriter, r *http.Request) {
 			BodyHtml: clean, BodyText: text, EditedAt: sql.NullInt64{Int64: now, Valid: true}, ID: id,
 		}); err != nil {
 			return nil, http.StatusInternalServerError, err
+		}
+		if status, err := recordImages(r.Context(), qtx, "post", id, author.ID, clean); err != nil {
+			return nil, status, err
 		}
 		// An edit does not create new mention notifications.
 		row, err := qtx.GetPost(r.Context(), id)

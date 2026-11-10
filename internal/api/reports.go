@@ -14,6 +14,7 @@ import (
 	"sweet/internal/db"
 	"sweet/internal/events"
 	"sweet/internal/perm"
+	"sweet/internal/sanitize"
 	"sweet/internal/store"
 )
 
@@ -129,6 +130,12 @@ func (s *Server) createReport(w http.ResponseWriter, r *http.Request) {
 		}
 		if n == 0 {
 			return nil, nil, http.StatusNoContent, nil
+		}
+		// The report keeps a copy of the body, and the copy keeps its images while the report is open.
+		for _, img := range sanitize.Images(item.BodyHTML) {
+			if err := qtx.AddReportImageUse(ctx, store.AddReportImageUseParams{ReportID: id.String(), ImageID: img}); err != nil {
+				return nil, nil, http.StatusInternalServerError, err
+			}
 		}
 		entries, err := notifyReport(r, qtx, id.String(), me.ID, now)
 		if err != nil {

@@ -84,7 +84,7 @@ func TestSweepKeepsLinkedPreviews(t *testing.T) {
 	})
 
 	q := store.New(srv.DB)
-	if _, err := images.Sweep(context.Background(), q, srv.Images, db.Now()+1000); err != nil {
+	if _, err := images.Sweep(context.Background(), srv.DB, srv.Images, db.Now()+1000); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := q.GetLinkPreview(context.Background(), linked); err != nil {

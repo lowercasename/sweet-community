@@ -35,3 +35,30 @@ func Mentions(sanitised string) []string {
 	walk(root)
 	return out
 }
+
+// Images returns the ids of the images in a sanitised body, from the src="/img/<id>" of its <img> elements, without
+// repeats. An id written as text or in a link is not an image.
+func Images(sanitised string) []string {
+	root, err := html.Parse(strings.NewReader(sanitised))
+	if err != nil {
+		return nil
+	}
+	var out []string
+	seen := map[string]bool{}
+	var walk func(*html.Node)
+	walk = func(n *html.Node) {
+		if n.Type == html.ElementNode && n.Data == "img" {
+			for _, a := range n.Attr {
+				if id, ok := strings.CutPrefix(a.Val, "/img/"); a.Key == "src" && ok && !seen[id] {
+					seen[id] = true
+					out = append(out, id)
+				}
+			}
+		}
+		for c := n.FirstChild; c != nil; c = c.NextSibling {
+			walk(c)
+		}
+	}
+	walk(root)
+	return out
+}

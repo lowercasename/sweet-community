@@ -248,7 +248,7 @@ func TestReportedImages(t *testing.T) {
 	mo.mustStatus(204, "POST", "/api/reports", map[string]string{"kind": "post", "id": post["id"].(string)})
 	owner.mustStatus(200, "GET", url, nil)
 	kit.mustStatus(200, "DELETE", "/api/posts/"+post["id"].(string), nil)
-	if n, err := images.Sweep(context.Background(), srv.q(), srv.Images, db.Now()+1); err != nil || n != 0 {
+	if n, err := images.Sweep(context.Background(), srv.DB, srv.Images, db.Now()+1); err != nil || n != 0 {
 		t.Fatalf("sweep while the report is open: %d %v", n, err)
 	}
 	owner.mustStatus(200, "GET", url, nil)
