@@ -147,7 +147,7 @@ A storage quota per instance is planned.
 
 ### Embeds
 
-A link on its own line becomes a preview card, as in WhatsApp and Signal (Raphael, 2026-11-10). The card shows the page's picture, title and description, taken from the page's OpenGraph tags, and the page's domain. The domain is shown instead of a name the page gives itself, so a card shows where its link really goes (Raphael, 2026-11-10). Clicking it opens the page in a new tab. The card's shape follows old Sweet's link preview, which Raphael chose: a picture on the left, then the title, a short description and the domain, at a fixed height.
+A link on its own line becomes a preview card, as in WhatsApp and Signal (Raphael, 2026-11-10). The card shows the page's picture, title and description, taken from the page's OpenGraph tags, and the page's domain. The domain is shown instead of a name the page gives itself, so a card shows where its link really goes (Raphael, 2026-11-10). Clicking it opens the page in a new tab. The card's shape follows old Sweet's link preview, which Raphael chose: a picture on the left, then the title, a short description and the domain, at a fixed height. The picture area is 1.91 times as wide as it is tall, the shape of the pictures most pages give, so those are not cropped. Old Sweet's was square (Raphael, 2026-11-10).
 
 - Previews appear in posts, comments and chat. There is no button for them.
 - In a post or a comment, pressing Enter after a link on its own line turns it into a card. A link on the last line is turned into a card when the post is saved, without the author seeing it happen. The editor shows "Embedded link" above a card, with "Turn back into regular link", and a link turned back stays a link when the post is saved again.

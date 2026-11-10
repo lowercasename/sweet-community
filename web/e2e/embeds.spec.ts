@@ -7,15 +7,25 @@ import { article, chatEditor, expect, member, open, png, postEditor, test, uniq 
  * answered with fixed previews: one with a picture, and one page that gives none.
  */
 const OPEN_DAY = 'https://plots.example/open-day'
+const LOGO = 'https://plots.example/logo'
 const NOTHING = 'https://plots.example/nothing'
 
-/** Answers the page's preview requests. The open day's picture is an image uploaded to the test server. */
-async function previews(page: Page) {
+/** Uploads a picture to the test server and returns its address. */
+async function upload(page: Page, name: string, w: number, h: number) {
   const up = await page.context().request.post('/api/images', {
-    multipart: { file: { name: 'beans.png', mimeType: 'image/png', buffer: png(400, 300, [70, 140, 70]) } },
+    multipart: { file: { name, mimeType: 'image/png', buffer: png(w, h, [70, 140, 70]) } },
   })
   expect(up.ok()).toBeTruthy()
-  const image = ((await up.json()) as { url: string }).url
+  return ((await up.json()) as { url: string }).url
+}
+
+/**
+ * Answers the page's preview requests. The open day's picture is 1200 by 630, the shape most pages give. The logo's
+ * picture is square.
+ */
+async function previews(page: Page) {
+  const image = await upload(page, 'open-day.png', 1200, 630)
+  const logo = await upload(page, 'logo.png', 300, 300)
   await page.route('**/api/previews?*', async (route) => {
     const url = new URL(route.request().url()).searchParams.get('url')
     if (url === OPEN_DAY) {
@@ -28,6 +38,8 @@ async function previews(page: Page) {
           image,
         },
       })
+    } else if (url === LOGO) {
+      await route.fulfill({ json: { url, title: 'Weald Stray Allotments', description: '', image: logo } })
     } else {
       await route.fulfill({ status: 404, json: { error: 'No preview' } })
     }
@@ -35,6 +47,18 @@ async function previews(page: Page) {
 }
 
 const card = (scope: Page | ReturnType<Page['locator']>) => scope.locator('.link-preview')
+
+/**
+ * Checks a card's picture area: 1.91 times as wide as the card is tall, the shape most pages give, so their pictures
+ * show whole.
+ */
+async function wide(posted: ReturnType<Page['locator']>) {
+  const cardBox = (await posted.boundingBox())!
+  const pic = (await posted.locator('img').boundingBox())!
+  const inside = cardBox.height - 2
+  expect(Math.abs(pic.height - inside)).toBeLessThan(1.5)
+  expect(Math.abs(pic.width - Math.round(cardBox.height * 1.91))).toBeLessThan(2)
+}
 
 /** Checks that the link panel does not cover the post composer's text, where the link being edited is. */
 async function clearOfText(page: Page) {
@@ -75,7 +99,27 @@ test.describe('link preview cards', () => {
     const box = (await posted.boundingBox())!
     expect(box.height).toBe(box.width >= 400 ? 100 : 76)
     expect(box.width).toBeLessThanOrEqual(480)
+    await wide(posted)
+    await expect(posted.locator('img')).toHaveCSS('object-fit', 'cover')
     await kit.page.screenshot({ path: 'test-results/embed-post.png' })
+    await kit.context.close()
+  })
+
+  test('a square picture, such as a logo, is shown whole in the picture area', async ({ browser }, testInfo) => {
+    const kit = await member(browser, testInfo)
+    await previews(kit.page)
+    await open(kit.page)
+    await postEditor(kit.page).click()
+    const words = uniq('Our logo ')
+    await kit.page.keyboard.type(words)
+    await kit.page.keyboard.press('Enter')
+    await kit.page.keyboard.type(LOGO)
+    await kit.page.getByRole('button', { name: 'Post', exact: true }).click()
+    const posted = card(article(kit.page, words))
+    await expect(posted).toContainText('Weald Stray Allotments')
+    await wide(posted)
+    await expect(posted.locator('img')).toHaveCSS('object-fit', 'contain')
+    await kit.page.screenshot({ path: 'test-results/embed-logo.png' })
     await kit.context.close()
   })
 
@@ -198,6 +242,7 @@ test.describe('link preview cards', () => {
     const posted = card(article(kit.page, words))
     await expect(posted).toContainText('Allotment open day')
     expect((await posted.boundingBox())!.height).toBe(76)
+    await wide(posted)
     await kit.page.screenshot({ path: 'test-results/embed-post-phone.png' })
     await kit.context.close()
   })
