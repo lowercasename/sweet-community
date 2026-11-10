@@ -57,12 +57,32 @@ export async function convert(file: File): Promise<Blob> {
   context.imageSmoothingQuality = 'high'
   context.drawImage(bitmap, 0, 0, canvas.width, canvas.height)
   bitmap.close()
-  const type = PHOTO_TYPES.has(file.type) ? 'image/jpeg' : 'image/png'
-  const blob = await new Promise<Blob | null>((done) => canvas.toBlob(done, type, 0.92))
+  const encode = (type: string) => new Promise<Blob | null>((done) => canvas.toBlob(done, type, 0.92))
+  let blob: Blob | null
+  if (PHOTO_TYPES.has(file.type)) {
+    blob = await encode('image/jpeg')
+  } else {
+    // A PNG keeps transparency. An opaque image whose JPEG is under a third of its PNG's size is a photo, such as
+    // one pasted from the clipboard, and is sent as the JPEG. Anything else, such as a screenshot of text, is sent as
+    // the PNG, which keeps it sharp, and the server keeps whichever of PNG and JPEG is smaller. The browser's PNG
+    // encoder compresses less than the server's, so the browser does not choose by size alone.
+    blob = await encode('image/png')
+    if (blob && opaque(context, canvas.width, canvas.height)) {
+      const jpeg = await encode('image/jpeg')
+      if (jpeg && jpeg.size * 3 < blob.size) blob = jpeg
+    }
+  }
   // Releases the canvas's memory at once. Safari on iOS keeps it until the page is closed otherwise.
   canvas.width = 0
   canvas.height = 0
   return blob ?? file
+}
+
+/** Reports whether every pixel drawn on a canvas is opaque. */
+function opaque(context: CanvasRenderingContext2D, width: number, height: number): boolean {
+  const { data } = context.getImageData(0, 0, width, height)
+  for (let i = 3; i < data.length; i += 4) if (data[i] !== 255) return false
+  return true
 }
 
 /**
@@ -84,27 +104,38 @@ export async function uploadPicture(file: File): Promise<UploadedImage> {
 }
 
 /**
- * An image added to a post or comment, kept by its node's upload key. `file` is the chosen file and `preview` the
- * address of its local copy. `converted` is the file to send, once made, and is kept for Try again. `done` holds the
- * node's attributes once the upload has finished, so a node that comes back through undo or redo gets them too.
+ * An image added to a post or comment, kept by its node's upload key. `file` is the chosen file, until it is
+ * converted, and `preview` the address of its local copy. `converted` is the file to send, kept for Try again.
+ * `done` holds the node's attributes once the upload has finished, and `failed` the reason it failed, so a node that
+ * comes back through undo or redo shows the same.
  */
 interface Upload {
-  file: File
+  file?: File
   preview: string
   converted?: Blob
   done?: Record<string, unknown>
+  failed?: string
 }
 
-/** The uploads of one editor. SweetImage keeps it as the editor's storage, so it ends with the editor. */
+/**
+ * The uploads of one editor. SweetImage keeps it as the editor's storage, so it ends with the editor. `stop` cancels
+ * the editor's conversions and uploads when it is destroyed.
+ */
 export interface ImageStorage {
   uploads: Map<string, Upload>
   queue: ReturnType<typeof oneAtATime>
+  stop: AbortController
 }
 
-export const newImageStorage = (): ImageStorage => ({ uploads: new Map(), queue: oneAtATime() })
+export const newImageStorage = (): ImageStorage => ({
+  uploads: new Map(),
+  queue: oneAtATime(),
+  stop: new AbortController(),
+})
 
-/** Frees the local copies of an editor's images, when the editor is destroyed. */
+/** Stops an editor's uploads and frees the local copies of its images, when the editor is destroyed. */
 export function releaseImages(storage: ImageStorage) {
+  storage.stop.abort()
   for (const u of storage.uploads.values()) URL.revokeObjectURL(u.preview)
   storage.uploads.clear()
 }
@@ -144,14 +175,19 @@ function setImage(editor: Editor, key: string, attrs: Record<string, unknown>) {
  * so each dispatches a transaction of its own.
  */
 function upload(editor: Editor, key: string) {
-  const { uploads, queue } = storageOf(editor)
+  const { uploads, queue, stop } = storageOf(editor)
   const u = uploads.get(key)
   if (!u) return
-  const converted = u.converted ? Promise.resolve(u.converted) : queue(() => convert(u.file))
+  const { signal } = stop
+  const file = u.file
+  const converted = u.converted
+    ? Promise.resolve(u.converted)
+    : queue(() => (signal.aborted || !file ? Promise.reject(signal.reason) : convert(file)))
   converted
     .then((blob) => {
       u.converted = blob
-      return uploadImage(blob, (fraction) => setImage(editor, key, { progress: fraction }))
+      u.file = undefined
+      return uploadImage(blob, (fraction) => setImage(editor, key, { progress: fraction }), signal)
     })
     .then((img) => {
       u.done = {
@@ -167,7 +203,11 @@ function upload(editor: Editor, key: string) {
       URL.revokeObjectURL(u.preview)
       setImage(editor, key, u.done)
     })
-    .catch((e: unknown) => setImage(editor, key, { progress: null, failed: failureReason(e) }))
+    .catch((e: unknown) => {
+      if (signal.aborted) return
+      u.failed = failureReason(e)
+      setImage(editor, key, { progress: null, failed: u.failed })
+    })
 }
 
 /**
@@ -177,22 +217,27 @@ function upload(editor: Editor, key: string) {
 export function retryUpload(editor: Editor, tr: Transaction, key: string): boolean {
   const u = storageOf(editor).uploads.get(key)
   if (!u || u.done || !setImageIn(tr, key, { progress: 0, failed: null })) return false
+  u.failed = undefined
   upload(editor, key)
   return true
 }
 
 /**
- * Gives a finished upload's attributes to an image node that came back without them. A node removed while it
- * uploaded, then restored by undo or redo, has its old attributes. Returns null when no node needs them.
+ * Gives an upload's outcome to an image node that came back without it. A node removed while it uploaded, then
+ * restored by undo or redo, has its old attributes: it gets the finished upload's attributes, or the failure. A node
+ * that already shows the outcome is left alone. Returns null when no node needs it.
  */
 export function restoreUploads(editor: Editor, state: EditorState): Transaction | null {
   const { uploads } = storageOf(editor)
   let tr: Transaction | null = null
   state.doc.descendants((node, pos) => {
-    const done = node.type.name === 'image' && node.attrs.upload ? uploads.get(node.attrs.upload)?.done : undefined
-    if (done) {
+    const u = node.type.name === 'image' && node.attrs.upload ? uploads.get(node.attrs.upload) : undefined
+    const outcome =
+      u?.done ??
+      (u?.failed !== undefined && node.attrs.failed !== u.failed ? { progress: null, failed: u.failed } : null)
+    if (outcome) {
       tr ??= state.tr.setMeta('addToHistory', false)
-      tr.setNodeMarkup(pos, undefined, { ...node.attrs, ...done })
+      tr.setNodeMarkup(pos, undefined, { ...node.attrs, ...outcome })
     }
   })
   return tr

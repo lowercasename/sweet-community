@@ -4,7 +4,7 @@ import { prepareImages } from './bodyImages'
 import { textThenLink } from '../test-utils'
 
 describe('prepareImages', () => {
-  it('makes every image load lazily and take focus, and leaves a body without images unchanged', () => {
+  it('makes every image load lazily and a button named for opening it, and leaves a body without images unchanged', () => {
     const body = textThenLink('Hello', 'https://example.com')
     expect(prepareImages(body)).toBe(body)
     const doc = new DOMParser().parseFromString(
@@ -22,6 +22,7 @@ describe('prepareImages', () => {
       'async',
       '0',
     ])
+    expect([img.getAttribute('role'), img.getAttribute('aria-label')]).toEqual(['button', 'Open image: A'])
     expect(img.getAttribute('src')).toBe('/img/1')
   })
 })

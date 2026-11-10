@@ -1,5 +1,5 @@
 import type { Page, Route } from '@playwright/test'
-import { chatEditor, expect, member, open, png, postEditor, test, uniq } from './helpers'
+import { article, chatEditor, expect, member, open, pick, png, postEditor, test, uniq, writePost } from './helpers'
 
 /**
  * An image shows in the editor as soon as it is chosen, with its upload on its card. Post waits until every upload
@@ -54,6 +54,15 @@ async function sidewaysPhoto(page: Page, w: number, h: number): Promise<Buffer> 
     0x01, 0x01, 0x12, 0x00, 0x03, 0x00, 0x00, 0x00, 0x01, 0x00, 0x06, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
   ]
   return Buffer.from([...bytes.slice(0, 2), ...exif, ...bytes.slice(2)])
+}
+
+/** The width of the PNG or JPEG in an upload's multipart body, from its header. */
+function uploadedWidth(body: Buffer): number {
+  const png = body.indexOf(Buffer.from([0x89, 0x50, 0x4e, 0x47]))
+  if (png >= 0) return body.readUInt32BE(png + 16)
+  // A baseline JPEG's frame header: FF C0, length, precision, height, width.
+  const sof = body.indexOf(Buffer.from([0xff, 0xc0]))
+  return sof < 0 ? -1 : body.readUInt16BE(sof + 7)
 }
 
 /** The width in a PNG's header, read from an upload's multipart body. */
@@ -151,7 +160,7 @@ test.describe('image uploads', () => {
     await open(kit.page)
     const widths: number[] = []
     await kit.page.route('**/api/images', async (route) => {
-      widths.push(pngWidth(route.request().postDataBuffer() ?? Buffer.alloc(0)))
+      widths.push(uploadedWidth(route.request().postDataBuffer() ?? Buffer.alloc(0)))
       await route.continue()
     })
     await postEditor(kit.page).click()
@@ -266,6 +275,161 @@ test.describe('image uploads', () => {
     await kit.context.close()
   })
 
+  test('pictures in pasted HTML from another site are left out of the editor', async ({ browser }, testInfo) => {
+    const kit = await member(browser, testInfo)
+    await open(kit.page)
+    await postEditor(kit.page).click()
+    await postEditor(kit.page).evaluate((el) => {
+      const data = new DataTransfer()
+      data.setData('text/html', '<p>From a recipe site</p><img src="https://example.com/cake.jpg" alt="A cake">')
+      data.setData('text/plain', 'From a recipe site')
+      el.dispatchEvent(new ClipboardEvent('paste', { clipboardData: data, bubbles: true, cancelable: true }))
+    })
+    await expect(postEditor(kit.page)).toContainText('From a recipe site')
+    await expect(posts(kit.page).locator('.image-card')).toHaveCount(0)
+    await kit.context.close()
+  })
+
+  test('an image whose upload fails after it was removed, brought back with undo, shows the failure', async ({
+    browser,
+  }, testInfo) => {
+    const kit = await member(browser, testInfo)
+    await open(kit.page)
+    const held: Route[] = []
+    await kit.page.route('**/api/images', (route) => {
+      held.push(route)
+    })
+    await postEditor(kit.page).click()
+    await kit.page.keyboard.type(uniq('Undo a failure '))
+    await posts(kit.page)
+      .locator('input[type=file]')
+      .setInputFiles({ name: 'plot.png', mimeType: 'image/png', buffer: png(320, 200) })
+    const card = posts(kit.page).locator('.image-card')
+    await expect.poll(() => held.length).toBe(1)
+    // The undo history joins changes made within 500 ms into one step. A person removes the image later than that.
+    await kit.page.waitForTimeout(600)
+    await kit.page.keyboard.press('Backspace')
+    await expect(card).toHaveCount(0)
+    const failed = kit.page.waitForResponse('**/api/images')
+    await held[0].fulfill({ status: 502, contentType: 'text/html', body: '<html>502</html>' })
+    await failed
+    await kit.page.keyboard.press('ControlOrMeta+z')
+    await expect(card.getByText('Failed to upload', { exact: true })).toBeVisible()
+    await expect(card.getByRole('button', { name: 'Try again' })).toBeVisible()
+    await kit.context.close()
+  })
+
+  test('an opaque PNG photo is sent as a JPEG, and a flat image stays a PNG', async ({ browser }, testInfo) => {
+    const kit = await member(browser, testInfo)
+    await open(kit.page)
+    const bodies: Buffer[] = []
+    await kit.page.route('**/api/images', async (route) => {
+      bodies.push(route.request().postDataBuffer() ?? Buffer.alloc(0))
+      await route.continue()
+    })
+    // A photo saved as PNG, whose JPEG is a fraction of its size, and a flat image, which stays a PNG.
+    const make = (noise: boolean) =>
+      kit.page.evaluate(async (noise) => {
+        const canvas = document.createElement('canvas')
+        canvas.width = 600
+        canvas.height = 400
+        const g = canvas.getContext('2d')!
+        g.fillStyle = '#f5f5f5'
+        g.fillRect(0, 0, 600, 400)
+        if (noise) {
+          const d = g.getImageData(0, 0, 600, 400)
+          for (let i = 0; i < d.data.length; i += 4) {
+            d.data[i] = Math.random() * 256
+            d.data[i + 1] = Math.random() * 256
+            d.data[i + 2] = Math.random() * 256
+          }
+          g.putImageData(d, 0, 0)
+        } else {
+          g.fillStyle = '#1a1717'
+          g.fillRect(40, 40, 300, 20)
+        }
+        const blob = await new Promise<Blob>((done) => canvas.toBlob((b) => done(b!), 'image/png'))
+        return Array.from(new Uint8Array(await blob.arrayBuffer()))
+      }, noise)
+    const photo = Buffer.from(await make(true))
+    const screenshot = Buffer.from(await make(false))
+    await postEditor(kit.page).click()
+    await posts(kit.page)
+      .locator('input[type=file]')
+      .setInputFiles([
+        { name: 'photo.png', mimeType: 'image/png', buffer: photo },
+        { name: 'screenshot.png', mimeType: 'image/png', buffer: screenshot },
+      ])
+    await expect(
+      posts(kit.page)
+        .locator('.image-card')
+        .getByPlaceholder(/Describe this image/),
+    ).toHaveCount(2)
+    expect(bodies[0].includes(Buffer.from([0xff, 0xd8, 0xff]))).toBe(true)
+    expect(bodies[1].includes(Buffer.from([0x89, 0x50, 0x4e, 0x47]))).toBe(true)
+    await kit.context.close()
+  })
+
+  test('removing an attached image in chat stops its upload, and an image attached while a message sends stays', async ({
+    browser,
+  }, testInfo) => {
+    const kit = await member(browser, testInfo)
+    await open(kit.page)
+    const release = await holdUploads(kit.page)
+    const stopped = kit.page.waitForEvent('requestfailed', (r) => r.url().endsWith('/api/images'))
+    await chatEditor(kit.page).click()
+    await chat(kit.page)
+      .locator('input[type=file]')
+      .setInputFiles({ name: 'a.png', mimeType: 'image/png', buffer: png(320, 200) })
+    const card = chat(kit.page).locator('.image-card')
+    await expect(card.getByText('Uploading')).toBeVisible()
+    await kit.page.waitForRequest('**/api/images')
+    await card.getByRole('button', { name: 'Remove image' }).click()
+    await stopped
+    await release()
+
+    // The message is held while it sends, and another image is attached meanwhile.
+    const held: Route[] = []
+    await kit.page.route('**/api/groups/*/messages', (route) => {
+      if (route.request().method() === 'POST') held.push(route)
+      else route.continue()
+    })
+    await chatEditor(kit.page).click()
+    await kit.page.keyboard.type(uniq('Sent '))
+    await kit.page.keyboard.press('Enter')
+    await expect.poll(() => held.length).toBe(1)
+    await chat(kit.page)
+      .locator('input[type=file]')
+      .setInputFiles({ name: 'b.png', mimeType: 'image/png', buffer: png(200, 320, [42, 143, 203]) })
+    await expect(card.getByPlaceholder(/Describe this image/)).toBeVisible()
+    await held[0].continue()
+    await kit.page.unroute('**/api/groups/*/messages')
+    await expect(chatEditor(kit.page)).toHaveText('')
+    await expect(card).toHaveCount(1)
+    await kit.context.close()
+  })
+
+  test('closing an editor stops the uploads of the images in it', async ({ browser }, testInfo) => {
+    const kit = await member(browser, testInfo)
+    await open(kit.page)
+    const text = uniq('Edit with a picture ')
+    await writePost(kit.page, text)
+    await pick(kit.page, article(kit.page, text), 'Post options', 'Edit')
+    const form = kit.page.locator('form').filter({ has: kit.page.getByRole('button', { name: 'Cancel' }) })
+    const release = await holdUploads(kit.page)
+    const stopped = kit.page.waitForEvent('requestfailed', (r) => r.url().endsWith('/api/images'))
+    await form.locator('.ProseMirror').click()
+    await form
+      .locator('input[type=file]')
+      .setInputFiles({ name: 'plot.png', mimeType: 'image/png', buffer: png(320, 200) })
+    await expect(form.locator('.image-card').getByText('Uploading')).toBeVisible()
+    await kit.page.waitForRequest('**/api/images')
+    await form.getByRole('button', { name: 'Cancel' }).click()
+    await stopped
+    await release()
+    await kit.context.close()
+  })
+
   test('a profile picture and a room picture are shrunk before uploading', async ({ browser }, testInfo) => {
     const kit = await member(browser, testInfo)
     const name = uniq('Fells')
@@ -273,7 +437,7 @@ test.describe('image uploads', () => {
     const gid = ((await room.json()) as { id: string }).id
     const widths: number[] = []
     await kit.page.route('**/api/images', async (route) => {
-      widths.push(pngWidth(route.request().postDataBuffer() ?? Buffer.alloc(0)))
+      widths.push(uploadedWidth(route.request().postDataBuffer() ?? Buffer.alloc(0)))
       await route.continue()
     })
     const nav = kit.page.getByRole('navigation', { name: 'Main' })

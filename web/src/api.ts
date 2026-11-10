@@ -790,11 +790,20 @@ const UPLOAD_ANSWER_MS = 60_000
 
 /**
  * Uploads an image and reports the fraction sent so far. It uses XMLHttpRequest, because fetch reports no upload
- * progress. Errors are the same as request's.
+ * progress. Errors are the same as request's. `signal` stops the upload, such as when its editor is closed.
  */
-export function uploadImage(file: Blob, onProgress?: (fraction: number) => void): Promise<UploadedImage> {
+export function uploadImage(
+  file: Blob,
+  onProgress?: (fraction: number) => void,
+  signal?: AbortSignal,
+): Promise<UploadedImage> {
   return new Promise((resolve, reject) => {
+    if (signal?.aborted) {
+      reject(new ApiError(0, CONNECTION_ERROR))
+      return
+    }
     const xhr = new XMLHttpRequest()
+    signal?.addEventListener('abort', () => xhr.abort())
     let timer: ReturnType<typeof setTimeout> | undefined
     const giveUpAfter = (ms: number) => {
       clearTimeout(timer)

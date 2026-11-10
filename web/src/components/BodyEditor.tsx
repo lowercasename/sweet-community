@@ -210,27 +210,44 @@ export function BodyEditor({
   const [queue] = useState(oneAtATime)
   const update = (key: string, change: Partial<Attachment>) =>
     setAttached((prev) => prev.map((a) => (a.key === key ? { ...a, ...change } : a)))
+  // Each attachment's upload can be stopped, when the image is removed or the editor goes.
+  const stops = useRef(new Map<string, AbortController>())
   const uploadAttachment = ({ key, file, converted }: Attachment) => {
     update(key, { progress: 0, failed: null })
-    const ready = converted ? Promise.resolve(converted) : queue(() => convert(file))
+    const stop = new AbortController()
+    stops.current.set(key, stop)
+    const ready = converted
+      ? Promise.resolve(converted)
+      : queue(() => (stop.signal.aborted ? Promise.reject(stop.signal.reason) : convert(file)))
     ready
       .then((blob) => {
         update(key, { converted: blob })
-        return uploadImage(blob, (progress) => update(key, { progress }))
+        return uploadImage(blob, (progress) => update(key, { progress }), stop.signal)
       })
       .then((uploaded) => update(key, { uploaded, converted: undefined, progress: null }))
-      .catch((e: unknown) => update(key, { progress: null, failed: failureReason(e) }))
+      .catch((e: unknown) => {
+        if (!stop.signal.aborted) update(key, { progress: null, failed: failureReason(e) })
+      })
   }
-  // The local copies are freed when the editor goes.
+  // The uploads stop and the local copies are freed when the editor goes.
   const attachedRef = useRef(attached)
   attachedRef.current = attached
-  useEffect(() => () => attachedRef.current.forEach((a) => URL.revokeObjectURL(a.preview)), [])
-  const remove = (key: string) =>
+  useEffect(
+    () => () => {
+      for (const stop of stops.current.values()) stop.abort()
+      attachedRef.current.forEach((a) => URL.revokeObjectURL(a.preview))
+    },
+    [],
+  )
+  const remove = (key: string) => {
+    stops.current.get(key)?.abort()
+    stops.current.delete(key)
     setAttached((prev) => {
       const gone = prev.find((a) => a.key === key)
       if (gone) URL.revokeObjectURL(gone.preview)
       return prev.filter((a) => a.key !== key)
     })
+  }
 
   // The images in the post or comment, those still uploading, and those whose upload failed.
   const inline = useEditorState({
@@ -264,12 +281,15 @@ export function BodyEditor({
     setBusy(true)
     setError(null)
     try {
-      const sent = attached.flatMap((a) => (a.uploaded ? [{ ...a.uploaded, alt: a.alt }] : []))
+      const sending = attached
+      const sent = sending.flatMap((a) => (a.uploaded ? [{ ...a.uploaded, alt: a.alt }] : []))
       await onSubmit(imagesHtml(sent) + (isEmpty ? '' : editor.getHTML()))
       if (!editing) {
         editor.commands.clearContent(true)
-        for (const a of attached) URL.revokeObjectURL(a.preview)
-        setAttached([])
+        // Images attached while the message was sending stay for the next one.
+        const done = new Set(sending.map((a) => a.key))
+        for (const a of sending) URL.revokeObjectURL(a.preview)
+        setAttached((prev) => prev.filter((a) => !done.has(a.key)))
         if (enterSubmits) editor.commands.focus()
       }
     } catch (e) {

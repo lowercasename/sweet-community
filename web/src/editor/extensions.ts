@@ -37,6 +37,11 @@ const link = SweetLink
  * only in the editor and are never saved.
  */
 export const SweetImage = Image.extend({
+  // Only Sweet's own images are read from HTML. Pictures in HTML pasted from another site are left out, because the
+  // server would remove them, and a copied card of an image still uploading has no upload to finish.
+  parseHTML() {
+    return [{ tag: 'img[src]', getAttrs: (el) => (el.getAttribute('src')?.startsWith('/img/') ? null : false) }]
+  },
   addAttributes() {
     return {
       ...this.parent?.(),
