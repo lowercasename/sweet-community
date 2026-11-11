@@ -1,7 +1,7 @@
 import { expect, member, open, owner, ROOT, test, uniq } from './helpers'
 
 for (const suffix of ['', ' @phone']) {
-  test(`reports hide identities and exclude their authors${suffix}`, async ({ browser }, info) => {
+  test(`reports hide identities and exclude their authors${suffix} @release`, async ({ browser }, info) => {
     const o = await owner(browser, info)
     const mod = await member(browser, info, 'moderatorlongnamelongxxx')
     const reporter = await member(browser, info, 'reporterlongnamelong')

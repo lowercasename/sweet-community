@@ -33,6 +33,21 @@ jobs:
         with:
           go-version-file: go.mod
       - run: make cmd/sweet/migrations && go vet ./... && go test ./...
+      - name: Install Chromium
+        run: pnpm exec playwright install --with-deps chromium
+        working-directory: web
+      - name: Check sign-in and privacy in the browser
+        run: pnpm e2e:release
+        working-directory: web
+        timeout-minutes: 10
+      - name: Save browser failure details
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: browser-failures
+          path: web/test-results/
+          if-no-files-found: ignore
+          retention-days: 7
 
   image:
     needs: test

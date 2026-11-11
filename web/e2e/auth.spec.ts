@@ -117,7 +117,7 @@ test.describe('signing in and joining', () => {
       await ctx.close()
     })
 
-  test('a user signs in with a sign-in email asked for by their email address, typing the code', async ({
+  test('a user signs in with a sign-in email asked for by their email address, typing the code @release', async ({
     browser,
   }, testInfo) => {
     const m = await member(browser, testInfo)
@@ -134,7 +134,7 @@ test.describe('signing in and joining', () => {
     await ctx.close()
   })
 
-  test('the link in a sign-in email opens a page whose button signs in, in another browser @phone', async ({
+  test('the link in a sign-in email opens a page whose button signs in, in another browser @phone @release', async ({
     browser,
   }, testInfo) => {
     // The email sent on joining is a sign-in email. Asking for another would spend the server's allowance of five at

@@ -1,7 +1,9 @@
 import { expect, member, open, owner, ROOT, test, uniq } from './helpers'
 
 for (const suffix of ['', ' @phone']) {
-  test(`room removal stops private events and deletion clears the room${suffix}`, async ({ browser }, info) => {
+  test(`room removal stops private events and deletion clears the room${suffix} @release`, async ({
+    browser,
+  }, info) => {
     const o = await owner(browser, info)
     const m = await member(browser, info)
     const uid = ((await (await m.context.request.get('/api/me')).json()) as { id: string }).id

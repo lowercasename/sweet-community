@@ -15,7 +15,10 @@ pnpm check:atomic   # fails if raw HTML tags, className or style appear outside 
 pnpm format:check   # Prettier: two spaces, single quotes, no semicolons
 pnpm test           # Vitest with happy-dom and Testing Library
 pnpm e2e            # Playwright, against the built binary and the dev server (run make e2e from the root)
+pnpm e2e:release    # Selected sign-in and privacy checks on desktop, phone and the dev server
 ```
+
+The image workflow runs `e2e:release` before publishing. It selects existing tests marked `@release`. A failure blocks publication and saves browser traces and screenshots for seven days. Use this command locally when changing these flows. Other changes can run the tests they affect.
 
 Run the backend from the repository root with `make dev-backend` alongside `pnpm dev`. The dev proxy passes `/api/events` through unbuffered, so the server-sent event stream works on the same origin.
 
