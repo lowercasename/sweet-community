@@ -109,13 +109,13 @@ func Migrate(ctx context.Context, db *sql.DB, migrations fs.FS) error {
 			pending = append(pending, name)
 		}
 	}
-	if applied > 0 && len(pending) > 0 {
+	if len(pending) == 0 {
+		return nil
+	}
+	if applied > 0 {
 		if err := backup(ctx, d, BackupSuffix); err != nil {
 			return fmt.Errorf("copy before upgrade: %w", err)
 		}
-	}
-	if len(pending) == 0 {
-		return nil
 	}
 	tx, err := d.BeginTx(ctx, nil)
 	if err != nil {
