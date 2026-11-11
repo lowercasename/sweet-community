@@ -1,7 +1,8 @@
 // @vitest-environment happy-dom
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { act, cleanup, fireEvent, screen } from '@testing-library/react'
-import { post, renderWithQuery, ROOT, user } from '../test-utils'
+import { marker, post, renderWithQuery, ROOT, user } from '../test-utils'
+import type { Marker } from '../api'
 import { keys } from './keys'
 import { applyEvent } from './apply'
 
@@ -14,9 +15,43 @@ vi.mock('../api', () => ({
   getMe: vi.fn(() => Promise.resolve(user('kit'))),
   logout: vi.fn(() => Promise.resolve()),
   getPost: vi.fn(),
+  setMarker: vi.fn(),
 }))
 
 afterEach(cleanup)
+
+it.each([true, false])('keeps the server count until a read request finishes with success=%s', async (success) => {
+  const { setMarker } = await import('../api')
+  const { useMarkRead } = await import('./hooks')
+  let resolve!: (value: Marker) => void
+  let reject!: (error: Error) => void
+  vi.mocked(setMarker).mockImplementationOnce(
+    () =>
+      new Promise((yes, no) => {
+        resolve = yes
+        reject = no
+      }),
+  )
+  const log = vi.spyOn(console, 'error').mockImplementation(() => {})
+  function Read() {
+    const markRead = useMarkRead()
+    return <button onClick={() => markRead(`chat:${ROOT}`, 20)}>Read</button>
+  }
+  const old = marker(`chat:${ROOT}`, 10, 3)
+  const { qc } = renderWithQuery(<Read />, (qc) => qc.setQueryData(keys.markers, { markers: [old] }))
+  try {
+    fireEvent.click(screen.getByRole('button', { name: 'Read' }))
+    expect(qc.getQueryData(keys.markers)).toEqual({ markers: [old] })
+    const newer = marker(`chat:${ROOT}`, 20, 2)
+    await act(async () => {
+      if (success) resolve(newer)
+      else reject(new Error('Offline'))
+    })
+    expect(qc.getQueryData(keys.markers)).toEqual({ markers: [success ? newer : old] })
+  } finally {
+    log.mockRestore()
+  }
+})
 
 it('does not restore a feed snapshot while a post refreshes after an identity change', async () => {
   const { getPost } = await import('../api')

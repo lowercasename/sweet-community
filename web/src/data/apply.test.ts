@@ -222,53 +222,19 @@ describe('applyEvent', () => {
     ])
   })
 
-  it("increments the unread counts for other users' new messages and notifications as they arrive, and not for the viewer's own or for old ones", () => {
-    qc.setQueryData(keys.markers, {
-      markers: [marker('notifications', 5, 0), marker(`chat:${ROOT}`, 10, 0), marker(`chat:${CLUB}`, 10, 2)],
-    })
-    const unread = (stream: string) =>
-      (qc.getQueryData(keys.markers) as { markers: Marker[] }).markers.find((m) => m.stream === stream)!.unread
-    applyEvent(qc, 'message', message('m3', mo, { created_at: 11 }))
-    applyEvent(qc, 'message', message('m4', kit, { created_at: 12 }))
-    applyEvent(qc, 'message', message('m0', mo, { created_at: 9 }))
-    applyEvent(qc, 'message', message('c1', mo, { group_id: CLUB, created_at: 30 }))
-    // A joined or added line does not make the chat unread.
-    applyEvent(qc, 'message', message('j1', mo, { created_at: 40, kind: 'joined', body_html: '', body_text: '' }))
-    expect(unread(`chat:${ROOT}`)).toBe(1)
-    expect(unread(`chat:${CLUB}`)).toBe(3)
-    // A post increments the feed's unread count the same way. An edit of a post is not new.
-    qc.setQueryData(keys.markers, {
-      markers: [...(qc.getQueryData(keys.markers) as { markers: Marker[] }).markers, marker(`feed:${CLUB}`, 10, 0)],
-    })
-    applyEvent(qc, 'post', post('p7', mo, { group_id: CLUB, created_at: 11 }))
-    applyEvent(qc, 'post', post('p7', mo, { group_id: CLUB, created_at: 11, edited_at: 12 }))
-    applyEvent(qc, 'post', post('p8', kit, { group_id: CLUB, created_at: 13 }))
-    expect(unread(`feed:${CLUB}`)).toBe(1)
-    // A notification counts as unread while unopened. Opening it (the same event with read_at set) decrements the count.
-    qc.setQueryData(keys.notifications, { pages: [{ notifications: [], next_before: null }], pageParams: [null] })
-    applyEvent(qc, 'notification', notification('n6', 'comment', mo))
-    applyEvent(qc, 'notification', notification('n4', 'comment', mo, { read_at: 8 }))
-    expect(unread('notifications')).toBe(1)
-    applyEvent(qc, 'notification', notification('n6', 'comment', mo, { read_at: 9 }))
-    expect(unread('notifications')).toBe(0)
-    // Leaving a room, or hiding a conversation, removes its marker.
+  it('removes the read marker when the viewer leaves a room', () => {
+    qc.setQueryData(keys.markers, { markers: [marker(`chat:${ROOT}`, 10, 0), marker(`chat:${CLUB}`, 10, 2)] })
     applyEvent(qc, 'membership_delete', { group_id: CLUB, user_id: 'kit' })
     expect((qc.getQueryData(keys.markers) as { markers: Marker[] }).markers.map((m) => m.stream)).toEqual([
-      'notifications',
       `chat:${ROOT}`,
     ])
   })
 
-  it('keeps a post page in sync with its feed, so edits, comment counts and deletion reach the post query', () => {
+  it('keeps a post page in sync with its feed, so edits and deletion reach the post query', () => {
     qc.setQueryData(keys.post('p2'), post('p2', mo))
     const page = () => qc.getQueryData(keys.post('p2')) as Post | undefined
     applyEvent(qc, 'post', post('p2', mo, { body_html: '<p>new</p>', edited_at: 5 }))
     expect(page()!.body_html).toBe('<p>new</p>')
-    applyEvent(qc, 'comment', comment('c2', 'p2', kit))
-    expect(page()!.comment_count).toBe(1)
-    expect(posts().find((p) => p.id === 'p2')!.comment_count).toBe(1)
-    applyEvent(qc, 'comment_delete', { id: 'c2', post_id: 'p2', group_id: ROOT })
-    expect(page()!.comment_count).toBe(0)
     // A post page query that is not loaded is not created by a post event.
     applyEvent(qc, 'post', post('p9', mo))
     expect(qc.getQueryData(keys.post('p9'))).toBeUndefined()
@@ -313,16 +279,13 @@ describe('applyEvent', () => {
     expect(posts()).toHaveLength(2)
   })
 
-  it('adds a new comment to its thread and increments the post comment count, and an edit replaces the comment without incrementing', () => {
+  it('adds a new comment to its thread and replaces an edited comment', () => {
     applyEvent(qc, 'comment', comment('c2', 'p2', mo))
     expect(thread('p2')).toHaveLength(2)
-    expect(posts().find((p) => p.id === 'p2')?.comment_count).toBe(1)
     applyEvent(qc, 'comment', comment('c2', 'p2', mo, { body_html: '<p>edited</p>', edited_at: 9 }))
     expect(thread('p2')).toHaveLength(2)
-    expect(posts().find((p) => p.id === 'p2')?.comment_count).toBe(1)
     applyEvent(qc, 'comment', comment('c3', 'p3', mo))
     expect(qc.getQueryData(keys.comments('p3'))).toBeUndefined()
-    expect(posts().find((p) => p.id === 'p3')?.comment_count).toBe(1)
   })
 
   it('adds a new comment to the newest page of a thread whose earlier pages are loaded too', () => {
@@ -348,7 +311,7 @@ describe('applyEvent', () => {
     expect(profile.map((p) => p.id)).toEqual(['p9'])
   })
 
-  it('in a thread with earlier pages not loaded, a deleted earlier comment lowers the count, and an edited one is not added', () => {
+  it('keeps earlier edited comments outside the loaded pages and refreshes counts after deletion', () => {
     qc.setQueryData(keys.comments('p2'), {
       pages: [{ comments: [comment('c9', 'p2', mo)], next_before: '9' }],
       pageParams: [null],
@@ -357,13 +320,12 @@ describe('applyEvent', () => {
     applyEvent(qc, 'comment', comment('c5', 'p2', mo, { body_html: '<p>edited</p>', edited_at: 99 }))
     expect(thread('p2').map((c) => c.id)).toEqual(['c9'])
     applyEvent(qc, 'comment_delete', { id: 'c5', post_id: 'p2', group_id: ROOT })
-    expect((qc.getQueryData(keys.post('p2')) as Post).comment_count).toBe(8)
+    expect(qc.getQueryState(keys.post('p2'))?.isInvalidated).toBe(true)
   })
 
-  it('removes a deleted comment and decrements the comment count', () => {
+  it('removes a deleted comment from the thread', () => {
     applyEvent(qc, 'comment_delete', { id: 'c1', post_id: 'p2', group_id: ROOT })
     expect(thread('p2')).toHaveLength(0)
-    expect(posts().find((p) => p.id === 'p2')?.comment_count).toBe(0)
   })
 
   it('appends a new message to its room, replaces a known one, removes a deleted one', () => {

@@ -238,10 +238,7 @@ function upsertUserPost(qc: QueryClient, post: Post) {
 
 function upsertPost(qc: QueryClient, post: Post) {
   upsertUserPost(qc, post)
-  // A new post by another user that the viewer has not read counts as unread on the group's feed. An edit is not new.
-  const me = qc.getQueryData<User | null>(keys.me)
-  if (post.edited_at == null && (!me || me.id !== post.author.id))
-    bumpMarker(qc, `feed:${post.group_id}`, post.created_at)
+  void qc.invalidateQueries({ queryKey: keys.markers })
   // The post's page query, if loaded, gets the same post.
   qc.setQueryData<Post>(keys.post(post.id), (old) => (old ? post : old))
   // Update the group's feed and each loaded topic view of it. The post goes
@@ -256,6 +253,7 @@ function upsertPost(qc: QueryClient, post: Post) {
 }
 
 function deletePost(qc: QueryClient, id: string, groupId: string) {
+  void qc.invalidateQueries({ queryKey: keys.markers })
   const without = (old: Posts | undefined) => eachPage(old, 'posts', (ps) => ps.filter((x) => x.id !== id))
   qc.setQueriesData<Posts>({ queryKey: keys.posts(groupId) }, without)
   qc.removeQueries({ queryKey: keys.comments(id) })
@@ -263,37 +261,27 @@ function deletePost(qc: QueryClient, id: string, groupId: string) {
   qc.setQueriesData<Posts>({ queryKey: ['userPosts'] }, without)
 }
 
-function countComments(qc: QueryClient, postId: string, groupId: string, by: number) {
-  const counted = (x: Post) => ({ ...x, comment_count: Math.max(0, x.comment_count + by) })
-  qc.setQueryData<Post>(keys.post(postId), (old) => (old ? counted(old) : old))
-  const recount = (old: Posts | undefined) =>
-    eachPage(old, 'posts', (ps) => ps.map((x) => (x.id === postId ? counted(x) : x)))
-  qc.setQueriesData<Posts>({ queryKey: ['userPosts'] }, recount)
-  qc.setQueriesData<Posts>({ queryKey: keys.posts(groupId) }, recount)
+/** Refetches the server's comment count everywhere the post is shown. */
+function refreshCommentCount(qc: QueryClient, postId: string, groupId: string) {
+  void qc.invalidateQueries({ queryKey: keys.post(postId) })
+  void qc.invalidateQueries({ queryKey: keys.posts(groupId) })
+  void qc.invalidateQueries({ queryKey: ['userPosts'] })
 }
 
 function upsertComment(qc: QueryClient, c: Comment) {
-  const known = holds(qc.getQueryData<Thread>(keys.comments(c.post_id)), 'comments', c.id)
   qc.setQueryData<Thread>(keys.comments(c.post_id), (old) => upsertInPages(old, 'comments', c))
-  // A new comment increments its post's comment count. An edit or a replay does not.
-  if (!known && c.edited_at == null) countComments(qc, c.post_id, c.group_id, 1)
+  refreshCommentCount(qc, c.post_id, c.group_id)
 }
 
 function deleteComment(qc: QueryClient, id: string, postId: string, groupId: string) {
-  const thread = qc.getQueryData<Thread>(keys.comments(postId))
-  // A comment that is not in the loaded pages may be on a page that is not loaded yet, so it still counts.
-  const known = !thread || holds(thread, 'comments', id) || thread.pages[thread.pages.length - 1]?.next_before != null
   qc.setQueryData<Thread>(keys.comments(postId), (old) =>
     eachPage(old, 'comments', (cs) => cs.filter((x) => x.id !== id)),
   )
-  if (known) countComments(qc, postId, groupId, -1)
+  refreshCommentCount(qc, postId, groupId)
 }
 
 function upsertMessage(qc: QueryClient, m: Message) {
-  // A message by another user that the viewer has not read counts as unread on the group.
-  // A joined or added line does not, and it does not move the group's newest message time.
-  const me = qc.getQueryData<User | null>(keys.me)
-  if (m.kind === 'message' && (!me || me.id !== m.author.id)) bumpMarker(qc, `chat:${m.group_id}`, m.created_at)
+  if (m.kind === 'message') void qc.invalidateQueries({ queryKey: keys.markers })
   // The group's newest message time orders the Conversations page. A replay never moves it backwards.
   if (m.kind === 'message')
     qc.setQueryData<Groups>(keys.groups, (old) =>
@@ -311,6 +299,7 @@ function upsertMessage(qc: QueryClient, m: Message) {
 }
 
 function deleteMessage(qc: QueryClient, id: string, groupId: string) {
+  void qc.invalidateQueries({ queryKey: keys.markers })
   // The message goes, and each reply to it shows only that it replied to a deleted message, as the server's
   // snippet does once the original is deleted.
   const gone = (m: Message): Message =>
@@ -348,45 +337,10 @@ function upsertUser(qc: QueryClient, u: User) {
   refreshIdentities(qc)
 }
 
-/** Adjusts a stream's unread count by the number of notifications opened or received. */
-function countUnread(qc: QueryClient, stream: string, by: number) {
-  qc.setQueryData<Markers>(keys.markers, (old) =>
-    old
-      ? { markers: old.markers.map((x) => (x.stream === stream ? { ...x, unread: Math.max(0, x.unread + by) } : x)) }
-      : old,
-  )
-}
-
-/**
- * Increments a stream's unread count for a new item newer than the read marker. A replay after a reconnect refetches
- * the markers anyway.
- */
-function bumpMarker(qc: QueryClient, stream: string, at: number) {
-  qc.setQueryData<Markers>(keys.markers, (old) => {
-    if (!old) return old
-    const known = old.markers.some((x) => x.stream === stream)
-    if (!known) return { markers: [...old.markers, { user_id: '', stream, read_at: 0, unread: 1 }] }
-    return {
-      markers: old.markers.map((x) => (x.stream === stream && at > x.read_at ? { ...x, unread: x.unread + 1 } : x)),
-    }
-  })
-}
-
-/**
- * Upserts a notification. A new one goes to the top of the list once, and
- * increments the notifications stream's unread count while it is unopened.
- * When it is opened (the same event with read_at set), the count is
- * decremented. The count is computed from the loaded list. When the list is
- * not loaded, a new unopened notification increments the count, and a
- * reconnect refetches it.
- */
+/** Upserts the notification and refreshes the server's unread count. */
 function upsertNotification(qc: QueryClient, n: Notification) {
-  const list = qc.getQueryData<Notifications>(keys.notifications)
-  const was = list?.pages.flatMap((p) => p.notifications).find((x) => x.id === n.id)
-  const unread = (x: Notification | undefined) => x !== undefined && x.read_at == null
-  const by = (unread(n) ? 1 : 0) - (was ? (unread(was) ? 1 : 0) : 0)
-  if (by !== 0) countUnread(qc, 'notifications', by)
   qc.setQueryData<Notifications>(keys.notifications, (old) => upsertInPages(old, 'notifications', n))
+  void qc.invalidateQueries({ queryKey: keys.markers })
 }
 
 /** Removes the opened notifications created before a time. Unopened notifications stay. */

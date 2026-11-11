@@ -315,6 +315,8 @@ The server sends updates over server-sent events (SSE), and the client sends ord
 
 One cache in the web app holds all server data. Events are its write path, and a reconnect refetches everything. The server supplies current names and pictures with content. When a user changes or is removed, the client clears cached identity data and fetches current data for open views (Raphael, 2026-11-11). Other views fetch when opened. Outdated identities do not remain visible if a refresh fails.
 
+Comment and unread counts come from the server (Raphael, 2026-11-11). The client refreshes them when content changes. It waits for confirmation before showing an item as read. Repeated updates must not change a count.
+
 ## Interface
 
 **One shape per concept.** A topic is always the same pill. A place is a tile or a picture. A feature is a line icon. A person is a profile picture. A notice is always the same alert box. Being offline is a red badge in the bar.
@@ -440,6 +442,8 @@ These decisions came from a security audit (2026-11-08).
 ## Record
 
 ### Reversed
+
+- **Counts in the browser.** The client no longer adds or subtracts comment and unread counts locally (Raphael, 2026-11-11). Repeated updates and partially loaded lists made those counts incorrect. Read requests no longer clear unread indicators before the server confirms them.
 
 - **Identity updates in the browser.** The client now clears and refetches data after a user changes or is removed (Raphael, 2026-11-11). Manual updates missed some copies of names and pictures. The earlier description of identity references did not match the code.
 

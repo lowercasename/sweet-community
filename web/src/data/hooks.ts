@@ -358,12 +358,11 @@ export function useNotifications() {
   return { notifications: items, ...rest }
 }
 
-/** Marks a notification read when it is opened. The cache is updated at once, and the server's reply is applied through the same path. */
+/** Marks a notification read when it is opened and applies the server's reply. */
 export function useReadNotification() {
   const qc = useQueryClient()
   return (n: Notification) => {
     if (n.read_at != null) return
-    applyEvent(qc, 'notification', { ...n, read_at: Date.now() })
     readNotification(n.id).then(
       (read) => applyEvent(qc, 'notification', read),
       (e: unknown) => console.error('could not mark as read', e),
@@ -401,15 +400,12 @@ export function useUnreadPlaces(): Map<string, UnreadPlace> {
 const pendingMarks = new Map<string, ReturnType<typeof setTimeout>>()
 
 /**
- * Marks a stream read up to a time. The cache is updated at once, and the
- * server's reply is applied through the same path. A chat marks with a
+ * Marks a stream read up to a time and applies the server's reply. A chat marks with a
  * debounce, so a busy room sends one PUT, not one per message.
  */
 export function useMarkRead() {
   const qc = useQueryClient()
   return (stream: string, readAt: number, debounceMs = 0) => {
-    const me = qc.getQueryData<User | null>(keys.me)
-    applyEvent(qc, 'marker', { user_id: me?.id ?? '', stream, read_at: readAt, unread: 0 })
     const send = () => {
       pendingMarks.delete(stream)
       setMarker(stream, readAt).then(
