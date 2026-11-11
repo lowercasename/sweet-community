@@ -77,8 +77,8 @@ func reportedItem(ctx context.Context, qtx *store.Queries, kind, id string) (rep
 }
 
 // createReport is `POST /api/reports {kind, id, reason}`. Any member who can see the item, except its author, reports
-// it. The report keeps a copy of the body. The owner and each moderator except the reporter get a report
-// notification, and the owner and moderators get a report event. A second report of the same item by the same user
+// it. The report keeps a copy of the body. Eligible staff except the reporter get a report notification.
+// The author receives nothing about the report. A second report of the same item by the same user
 // changes nothing. The response is 204 in both cases, so the reporter sees the same result.
 func (s *Server) createReport(w http.ResponseWriter, r *http.Request) {
 	var in struct {
@@ -137,7 +137,7 @@ func (s *Server) createReport(w http.ResponseWriter, r *http.Request) {
 				return nil, nil, http.StatusInternalServerError, err
 			}
 		}
-		entries, err := notifyReport(r, qtx, id.String(), me.ID, now)
+		entries, err := notifyReport(r, qtx, id.String(), me.ID, item.AuthorID, now)
 		if err != nil {
 			return nil, nil, http.StatusInternalServerError, err
 		}
@@ -149,15 +149,15 @@ func (s *Server) createReport(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// notifyReport writes a report notification for the owner and each moderator except the reporter.
-func notifyReport(r *http.Request, qtx *store.Queries, reportID, reporter string, now int64) ([]events.Entry, error) {
+// notifyReport writes notifications for eligible staff. The reporter is not notified of their own action.
+func notifyReport(r *http.Request, qtx *store.Queries, reportID, reporter, author string, now int64) ([]events.Entry, error) {
 	members, err := qtx.ListMembers(r.Context(), perm.Root)
 	if err != nil {
 		return nil, err
 	}
 	var told []events.Entry
 	for _, m := range members {
-		if !perm.HandleReports(perm.Actor{ID: m.ID, Role: m.Role}) {
+		if !perm.HandleReport(perm.Actor{ID: m.ID, Role: m.Role}, author) {
 			continue
 		}
 		e, err := insertNotification(r, qtx, store.CreateNotificationParams{
@@ -193,6 +193,11 @@ func (s *Server) listReports(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	me, _ := userFrom(ctx)
 	q := s.q()
+	root, err := actorIn(ctx, q, me, perm.Root)
+	if err != nil {
+		writeErr(w, http.StatusInternalServerError, err.Error())
+		return
+	}
 	rows, err := q.ListOpenReports(ctx, store.ListOpenReportsParams{})
 	if err != nil {
 		writeErr(w, http.StatusInternalServerError, err.Error())
@@ -201,6 +206,9 @@ func (s *Server) listReports(w http.ResponseWriter, r *http.Request) {
 	list := wireReports(rows)
 	out := make([]any, 0, len(list))
 	for i := range list {
+		if !perm.HandleReport(root, list[i].Author.ID) {
+			continue
+		}
 		a, err := actorIn(ctx, q, me, list[i].GroupID)
 		if err != nil {
 			writeErr(w, http.StatusInternalServerError, err.Error())
@@ -224,10 +232,18 @@ func (s *Server) closeReport(w http.ResponseWriter, r *http.Request) {
 	now := db.Now()
 	s.loggedMany(w, r, now, func(qtx *store.Queries) ([]events.Entry, any, int, error) {
 		ctx := r.Context()
-		if _, err := reportOf(ctx, qtx, kind, id); errors.Is(err, sql.ErrNoRows) {
+		report, err := reportOf(ctx, qtx, kind, id)
+		if errors.Is(err, sql.ErrNoRows) {
 			return nil, nil, http.StatusNotFound, errors.New("No such report")
 		} else if err != nil {
 			return nil, nil, http.StatusInternalServerError, err
+		}
+		root, err := actorIn(ctx, qtx, me, perm.Root)
+		if err != nil {
+			return nil, nil, http.StatusInternalServerError, err
+		}
+		if !perm.HandleReport(root, report.Author.ID) {
+			return nil, nil, http.StatusNotFound, errors.New("No such report")
 		}
 		var entries []events.Entry
 		outcome := outcomeDismissed
@@ -277,15 +293,13 @@ func removeReported(ctx context.Context, qtx *store.Queries, kind, id string, no
 	}
 }
 
-// ReportClosed is the payload of a report_delete event. The item no longer has open reports.
-type ReportClosed struct {
-	Kind string `json:"kind"`
-	ID   string `json:"id"`
-}
-
 // closeReports closes the open reports of one item. It marks their unread notifications read, and returns those
 // notification events, each recipient's new unread count, and a report_delete event.
 func closeReports(ctx context.Context, qtx *store.Queries, kind, id, by, outcome string, now int64) ([]events.Entry, error) {
+	report, err := reportOf(ctx, qtx, kind, id)
+	if err != nil {
+		return nil, err
+	}
 	unread, err := qtx.ListUnreadReportNotifications(ctx, store.ListUnreadReportNotificationsParams{Kind: kind, SubjectID: id})
 	if err != nil {
 		return nil, err
@@ -322,7 +336,7 @@ func closeReports(ctx context.Context, qtx *store.Queries, kind, id, by, outcome
 		b := wireMarker(store.ListMarkersRow(bell))
 		out = append(out, events.Entry{Kind: "marker", Payload: &b})
 	}
-	return append(out, events.Entry{Kind: "report_delete", Payload: ReportClosed{Kind: kind, ID: id}}), nil
+	return append(out, events.Entry{Kind: "report_delete", Payload: ReportClosed{Kind: kind, ID: id, AuthorID: report.Author.ID}}), nil
 }
 
 // closeReportsAbout closes the open reports of a removed user's content and clears the copies that reports kept of

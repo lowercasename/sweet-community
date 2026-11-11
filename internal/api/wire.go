@@ -98,6 +98,11 @@ func excerpt(s string, n int) string {
 }
 
 func wireNotification(row store.GetNotificationRow) Notification {
+	var actor *User
+	if row.Kind != NotifyReport {
+		u := wireUser(row.ActorID, row.ActorUsername, row.ActorPictureID)
+		actor = &u
+	}
 	var pid *string
 	if row.PostID.Valid {
 		p := row.PostID.String
@@ -107,7 +112,7 @@ func wireNotification(row store.GetNotificationRow) Notification {
 		ID:         row.ID,
 		UserID:     row.UserID,
 		Kind:       row.Kind,
-		Actor:      wireUser(row.ActorID, row.ActorUsername, row.ActorPictureID),
+		Actor:      actor,
 		GroupID:    row.GroupID,
 		PostID:     pid,
 		TopicID:    nullStr(row.TopicID),
@@ -179,9 +184,16 @@ type Report struct {
 
 // ReportBy is one member's report of an item.
 type ReportBy struct {
-	Reporter  User   `json:"reporter"`
+	ID        string `json:"id"`
 	Reason    string `json:"reason"`
 	CreatedAt int64  `json:"created_at"`
+}
+
+// ReportClosed announces a resolved report. AuthorID excludes its author from delivery.
+type ReportClosed struct {
+	Kind     string `json:"kind"`
+	ID       string `json:"id"`
+	AuthorID string `json:"author_id"`
 }
 
 // ReportCan says whether the viewer can open the reported item where it is.
@@ -207,7 +219,7 @@ func wireReports(rows []store.ListOpenReportsRow) []Report {
 			})
 		}
 		out[i].Reports = append(out[i].Reports, ReportBy{
-			Reporter:  wireUser(row.ReporterID, row.ReporterUsername, row.ReporterPictureID),
+			ID:        row.ID,
 			Reason:    row.Reason,
 			CreatedAt: row.CreatedAt,
 		})

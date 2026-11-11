@@ -9,7 +9,7 @@ UPDATE users SET picture_id = ? WHERE id = ?;
 
 -- Reports whether a viewer can see an image. The viewer can see it if they uploaded it, if it is any user's profile
 -- picture or a link preview's picture, if it is the picture of a group they are in, or if a live post, comment or
--- message in a group they are in uses it. The root group's owner and moderators also see an image in the copy kept
+-- message in a group they are in uses it. Staff other than the reported author also see an image in the copy kept
 -- by an open report, so they can judge the report. Seeing an image means it exists, because every reference to an
 -- image is a foreign key.
 -- name: ImageVisibleTo :one
@@ -20,8 +20,9 @@ SELECT EXISTS (SELECT 1 FROM images i WHERE i.id = sqlc.arg(image_id) AND i.uplo
                WHERE g.deleted_at IS NULL AND g.picture_id = sqlc.arg(image_id))
     OR EXISTS (SELECT 1 FROM live_image_uses u JOIN memberships m ON m.group_id = u.group_id AND m.user_id = sqlc.arg(viewer_id) AND m.hidden_at IS NULL
                WHERE u.image_id = sqlc.arg(image_id) AND u.kind != 'report')
-    OR EXISTS (SELECT 1 FROM live_image_uses u JOIN groups g ON g.kind = 'root'
+    OR EXISTS (SELECT 1 FROM image_uses u JOIN groups g ON g.kind = 'root'
                JOIN memberships m ON m.group_id = g.id AND m.user_id = sqlc.arg(viewer_id) AND m.role IN ('owner', 'moderator')
+               JOIN reports r ON r.id = u.id AND r.closed_at IS NULL AND r.author_id != sqlc.arg(viewer_id)
                WHERE u.image_id = sqlc.arg(image_id) AND u.kind = 'report') AS visible;
 
 -- Lists images uploaded before a time that nothing references.

@@ -1,18 +1,17 @@
 // @vitest-environment happy-dom
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, screen, waitFor, within } from '@testing-library/react'
-import { renderWithQuery, report, user } from '../test-utils'
+import { renderWithQuery, report } from '../test-utils'
 
 /**
  * The Reports card on the Community page. The owner and moderators see one entry per
- * reported item: its author and place, the copy of its body, and who reported it and why. Open, Message, Dismiss
+ * reported item: its author and place, the copy of its body, and the reasons without reporter identities. Open, Message, Dismiss
  * report and Delete act on the entry.
  */
 vi.mock('../api', () => ({
   listReports: vi.fn(),
   closeReport: vi.fn(() => Promise.resolve()),
   openDM: vi.fn(() => Promise.resolve({ id: 'dm1' })),
-  getMe: vi.fn(() => Promise.resolve({ id: 'raphael', username: 'raphael', picture: null })),
   listUsers: vi.fn(() => Promise.resolve({ users: [] })),
   listMembers: vi.fn(() => Promise.resolve({ members: [] })),
 }))
@@ -40,29 +39,26 @@ describe('ReportsCard', () => {
     expect(await screen.findByText('Nothing has been reported.')).toBeTruthy()
   })
 
-  it('shows the author, the place, the copy, each reporter and reason, and the actions in order', async () => {
+  it('shows the author, the place, the copy, each reason without reporter identities, and the actions in order', async () => {
     await draw([
       report('post', 'p1', {
         reports: [
-          { reporter: user('mo'), reason: 'Spam link', created_at: 1 },
-          { reporter: user('jo'), reason: '', created_at: 2 },
+          { id: 'r1', reason: 'Spam link', created_at: 1 },
+          { id: 'r2', reason: '', created_at: 2 },
         ],
       }),
     ])
     const li = within(entry(await shown('p1 was reported')))
-    // The Message button shows once the signed-in user is known, which is how it knows the author is someone else.
-    await li.findByRole('button', { name: 'Message author' })
     expect(li.getByText('Post in Home')).toBeTruthy()
     expect(li.getByText('Spam link')).toBeTruthy()
-    expect(li.getAllByText(/^Reported by/).map((e) => e.textContent?.replace(/ ·.*/, ''))).toEqual([
-      'Reported by mo',
-      'Reported by jo',
-    ])
+    expect(li.queryByText(/Reported by/)).toBeNull()
+    expect(li.queryByText('mo')).toBeNull()
+    expect(li.queryByText('jo')).toBeNull()
     expect(
       li
         .getAllByRole('button')
         .map((b) => b.textContent)
-        .filter((t) => t && !['kit', 'mo', 'jo'].includes(t)),
+        .filter((t) => t && t !== 'kit'),
     ).toEqual(['Open', 'Message author', 'Dismiss report', 'Delete post'])
   })
 
@@ -131,12 +127,11 @@ describe('ReportsCard', () => {
     await waitFor(() => expect(screen.queryByText('c1 was reported')).toBeNull())
   })
 
-  it('opens a conversation with the author, and offers none when the author is the viewer', async () => {
+  it('opens a conversation with the author', async () => {
     const { openDM } = await import('../api')
-    await draw([report('post', 'p1'), report('post', 'p2', { author: user('raphael') })])
+    await draw([report('post', 'p1')])
     fireEvent.click(await screen.findByRole('button', { name: 'Message author' }))
     expect(openDM).toHaveBeenCalledWith('kit')
     await waitFor(() => expect(window.location.pathname).toBe('/r/dm1'))
-    expect(within(entry('p2 was reported')).queryByRole('button', { name: 'Message author' })).toBeNull()
   })
 })

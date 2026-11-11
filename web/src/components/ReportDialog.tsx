@@ -61,9 +61,7 @@ export function ReportDialog({ kind, id, author, conversation = false, open, onC
       onConfirm={() => void send()}
       onClose={close}
     >
-      {sent ? (
-        <Text variant="secondary">Thank you. The moderators will look at it.</Text>
-      ) : (
+      {!sent && (
         <Stack gap={3}>
           <Text variant="secondary">
             {conversation

@@ -140,7 +140,7 @@ export const notification = (
   id,
   user_id: 'raphael',
   kind,
-  actor,
+  actor: kind === 'report' ? null : actor,
   group_id: ROOT,
   post_id: kind === 'comment' ? `p-${id}` : null,
   created_at: Number.parseInt(id.replace(/\D/g, ''), 10) || 1,
@@ -194,7 +194,7 @@ export class FakeEventSource {
   }
 }
 
-/** A reported item with one report by mo, as the owner or a moderator receives it. */
+/** A reported item with one report, as the owner or a moderator receives it. */
 export const report = (kind: Report['kind'], id: string, extra: Partial<Report> = {}): Report => ({
   kind,
   id,
@@ -205,7 +205,7 @@ export const report = (kind: Report['kind'], id: string, extra: Partial<Report> 
   author: user('kit'),
   body_html: `<p>${id} was reported</p>`,
   deleted: false,
-  reports: [{ reporter: user('mo'), reason: 'Spam link', created_at: 1 }],
+  reports: [{ id: 'r1', reason: 'Spam link', created_at: 1 }],
   can: { open: true },
   ...extra,
 })

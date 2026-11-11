@@ -70,6 +70,16 @@ func (s *Server) unsubscribePush(w http.ResponseWriter, r *http.Request) {
 // A message is tagged by conversation so that a device shows one
 // notification per conversation.
 func pushWords(n Notification) (body, path, tag string, ok bool) {
+	if n.Kind == NotifyReport {
+		if n.ReportKind == nil {
+			return "", "", "", false
+		}
+		body, ok = map[string]string{"post": "Post reported", "comment": "Comment reported", "message": "Message reported"}[*n.ReportKind]
+		return body, "/community", "", ok
+	}
+	if n.Actor == nil {
+		return "", "", "", false
+	}
 	switch n.Kind {
 	case NotifyComment:
 		body = n.Actor.Username + " commented on your post"
@@ -79,11 +89,6 @@ func pushWords(n Notification) (body, path, tag string, ok bool) {
 		body = n.Actor.Username + " replied to your message"
 	case NotifyMessage:
 		return n.Actor.Username + " messaged you", "/r/" + n.GroupID, streamChatPrefix + n.GroupID, true
-	case NotifyReport:
-		if n.ReportKind == nil {
-			return "", "", "", false
-		}
-		return n.Actor.Username + " reported a " + *n.ReportKind, "/community", "", true
 	default:
 		return "", "", "", false
 	}

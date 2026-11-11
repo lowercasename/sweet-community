@@ -625,7 +625,12 @@ function isReport(data: unknown): data is Report {
 }
 function isNotification(data: unknown): data is Notification {
   const n = data as Notification
-  return hasId(data) && typeof n.kind === 'string' && typeof n.group_id === 'string' && isUser(n.actor)
+  return (
+    hasId(data) &&
+    typeof n.kind === 'string' &&
+    typeof n.group_id === 'string' &&
+    (n.kind === 'report' ? n.actor === null : isUser(n.actor))
+  )
 }
 function isCleared(data: unknown): data is { before: number } {
   return typeof data === 'object' && data !== null && typeof (data as { before?: unknown }).before === 'number'

@@ -218,7 +218,7 @@ The tour is a series of cards that point at parts of the page. Each card appears
 
 ## Visibility rules
 
-The rule is membership and nothing else. A signed-in user who has not been removed sees a thing if they belong to its group. Staff see nothing extra. This is the promise the product makes.
+A signed-in user who has not been removed sees content if they belong to its group. Staff get no extra access to groups. An eligible staff member can see the copy kept with a report without joining its group. This gives no access to other content in that group.
 
 - A non-member gets "not found" for anything in a group, never "forbidden".
 - The event stream follows the same rule, including for deletion events (2026-11-08).
@@ -255,8 +255,10 @@ Removal has no options. A choice to keep, anonymise or delete the content was dr
 Any member can report another person's post, comment or message (Raphael, 2026-11-08).
 
 - The dialog says that the author will not learn who reported.
+- Reporter identities are hidden from all staff in Sweet (Raphael, 2026-11-11). Staff judge the content and the reasons without receiving the reporter's identity. The server keeps the account reference to prevent duplicate reports. This does not hide identities from someone with database access or prevent a report's text or context from identifying its writer.
+- The reported author receives no report details or notifications and cannot resolve the report, even if they are staff (Raphael, 2026-11-11). If no other staff member can act, the report stays pending until another moderator is appointed.
 - The server keeps a copy of the item, so moderators can judge it after an edit or a deletion. Closing the report empties the copy (Raphael, 2026-11-10).
-- The owner and moderators get a notification, which is also pushed.
+- Eligible staff get a notification, which is also pushed. Neither identifies the reporter.
 - The Reports card is first on the Community page, because reports wait for action. Members cannot see reports.
 - Open never appears for a conversation, because a conversation belongs to its two people. Delete works anywhere.
 - Dismissing or deleting closes the item's reports for every moderator.
@@ -267,7 +269,7 @@ Three details were decided while building and remain open to change. They are on
 
 A notification records one action done to one person. The server writes it with the action, and nobody is notified of their own actions. Every delivery channel reads from the one list.
 
-A user is notified of a comment on their post, a mention, being added to a room, a conversation message, a reply to their chat message, and a post in a subscribed topic. The owner and moderators are also notified of new members and reports. A mention notifies only members of the group, because only they can see it.
+A user is notified of a comment on their post, a mention, being added to a room, a conversation message, a reply to their chat message, and a post in a subscribed topic. The owner and moderators are also notified of new members. Staff are notified of reports they may handle. A mention notifies only members of the group, because only they can see it.
 
 - New posts and messages in rooms show as unread dots. A notification for every room message would duplicate what the room already shows.
 - A notification is read when the user opens it, not when they view the list (Raphael, 2026-11-06).
@@ -436,6 +438,8 @@ These decisions came from a security audit (2026-11-08).
 ## Record
 
 ### Reversed
+
+- **Reporter identities.** Reports and report notifications no longer identify the reporter to staff. Reported authors cannot see or resolve reports about their content (Raphael, 2026-11-11). The previous behaviour exposed reporters to staff authors despite the confidentiality promise.
 
 - **Stream permissions.** Streams no longer keep their own copy of memberships and roles. They read current permissions before each event (Raphael, 2026-11-11). A missed removal or demotion could otherwise disclose private content.
 

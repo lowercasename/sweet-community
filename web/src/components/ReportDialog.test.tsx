@@ -29,7 +29,7 @@ describe('ReportDialog', () => {
     fireEvent.click(dialog().getByRole('button', { name: 'Report post', hidden: true }))
     expect(createReport).toHaveBeenCalledWith('post', 'p1', 'Spam link')
     expect(await dialog().findByRole('heading', { name: 'Post reported', hidden: true })).toBeTruthy()
-    expect(dialog().getByText('Thank you. The moderators will look at it.')).toBeTruthy()
+    expect(dialog().queryByText('Thank you. The moderators will look at it.')).toBeNull()
     expect(dialog().queryByRole('button', { name: 'Cancel', hidden: true })).toBeNull()
     fireEvent.click(dialog().getByRole('button', { name: 'Done', hidden: true }))
     expect(onClose).toHaveBeenCalled()

@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useLocation } from 'wouter'
 import type { Report, ReportKind } from '../api'
-import { useCloseReport, useGroupActions, useMe, useReports } from '../data/hooks'
+import { useCloseReport, useGroupActions, useReports } from '../data/hooks'
 import { ROOT_ID } from '../data/keys'
 import { groupPath, postPath } from '../routes'
 import {
@@ -50,7 +50,6 @@ function pathOf(r: Report): string {
  * right on a phone.
  */
 function ReportEntry({ report, first }: { report: Report; first: boolean }) {
-  const { data: me } = useMe()
   const close = useCloseReport()
   const { openDM } = useGroupActions()
   const [, navigate] = useLocation()
@@ -94,9 +93,9 @@ function ReportEntry({ report, first }: { report: Report; first: boolean }) {
         </Stack>
         <Stack gap={2}>
           {report.reports.map((r) => (
-            <Stack key={r.reporter.id} gap={0}>
+            <Stack key={r.id} gap={0}>
               <Text variant="small">
-                Reported by <PersonName user={r.reporter} small /> · <Time at={r.created_at} />
+                <Time at={r.created_at} />
               </Text>
               {r.reason && <Text>{r.reason}</Text>}
             </Stack>
@@ -109,11 +108,9 @@ function ReportEntry({ report, first }: { report: Report; first: boolean }) {
               Open
             </Button>
           )}
-          {me && me.id !== report.author.id && (
-            <Button variant="secondary" icon="chat" busy={busy === 'message'} onClick={() => void message()}>
-              Message author
-            </Button>
-          )}
+          <Button variant="secondary" icon="chat" busy={busy === 'message'} onClick={() => void message()}>
+            Message author
+          </Button>
           <Row gap={2} align="center" push="end" shrink={false}>
             <Button
               variant="secondary"

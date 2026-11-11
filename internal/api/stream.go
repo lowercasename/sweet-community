@@ -150,16 +150,13 @@ func filterEvent(viewer User, roles map[string]string, st *Settings, e events.Ev
 		_, ok := roles[d.GroupID]
 		return e, ok
 	case "report", "report_delete":
-		// Sent to the root group's owner and moderators only. A report is personalised
-		// with the viewer's role in the reported item's group, which decides whether they can open it.
-		if !perm.HandleReports(perm.Actor{ID: viewer.ID, Role: roles[perm.Root]}) {
-			return e, false
-		}
+		root := perm.Actor{ID: viewer.ID, Role: roles[perm.Root]}
 		if e.Kind == "report_delete" {
-			return e, true
+			var closed ReportClosed
+			return e, json.Unmarshal(e.Payload, &closed) == nil && perm.HandleReport(root, closed.AuthorID)
 		}
 		var rp Report
-		if json.Unmarshal(e.Payload, &rp) != nil {
+		if json.Unmarshal(e.Payload, &rp) != nil || !perm.HandleReport(root, rp.Author.ID) {
 			return e, false
 		}
 		a, _ := inGroup(rp.GroupID)

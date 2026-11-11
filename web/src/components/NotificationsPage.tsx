@@ -124,12 +124,12 @@ interface NotificationRowProps {
 function NotificationRow({ notification: n, groups, onOpen }: NotificationRowProps) {
   const actor = useAuthor(n.actor)
   const { topics } = useTopics()
-  const sentence = `${actor.username} ${describe(n, groups, topics)}`
+  const sentence = actor ? `${actor.username} ${describe(n, groups, topics)}` : describe(n, groups, topics)
   const fresh = n.read_at == null
   return (
     <ListItem>
       <ListRow label={fresh ? `${sentence}, new` : sentence} onClick={onOpen}>
-        <Avatar name={actor.username} picture={actor.picture} size="sm" />
+        {actor && <Avatar name={actor.username} picture={actor.picture} size="sm" />}
         <Text as="span" variant="body" weight={fresh ? 'bold' : 'normal'}>
           {sentence}
         </Text>

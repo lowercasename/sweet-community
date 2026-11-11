@@ -95,7 +95,7 @@ describe('NotificationsPage', () => {
     expect(onGo).toHaveBeenCalledWith('/r/knit?message=m7')
   })
 
-  it('shows "reported a comment" for a report and opens the Community page', async () => {
+  it('shows "Comment reported" for a report and opens the Community page', async () => {
     const { listNotifications, readNotification } = await import('../api')
     vi.mocked(listNotifications).mockResolvedValue({
       notifications: [notification('n50', 'report', mo, { group_id: ROOT, report_kind: 'comment' })],
@@ -107,9 +107,9 @@ describe('NotificationsPage', () => {
     const onGo = await draw()
     // Only the owner and moderators get a report notification, so it carries the shield.
     expect(
-      (await screen.findByRole('button', { name: 'mo reported a comment, new' })).querySelector('[data-shield]'),
+      (await screen.findByRole('button', { name: 'Comment reported, new' })).querySelector('[data-shield]'),
     ).toBeTruthy()
-    fireEvent.click(await screen.findByRole('button', { name: 'mo reported a comment, new' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Comment reported, new' }))
     expect(onGo).toHaveBeenCalledWith('/community')
   })
 

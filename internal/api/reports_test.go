@@ -68,7 +68,7 @@ func TestReports(t *testing.T) {
 	mo.mustStatus(204, "POST", "/api/reports", map[string]string{"kind": "post", "id": pid, "reason": "Again"})
 	for name, c := range map[string]*client{"owner": owner, "jo": jo} {
 		notes := reportNotes(c)
-		if len(notes) != 1 || notes[0]["report_kind"] != "post" || notes[0]["actor"].(map[string]any)["username"] != "mo" || notes[0]["read_at"] != nil {
+		if len(notes) != 1 || notes[0]["report_kind"] != "post" || notes[0]["actor"] != nil || notes[0]["read_at"] != nil {
 			t.Fatalf("%s's report notifications: %v", name, notes)
 		}
 	}
@@ -99,7 +99,7 @@ func TestReports(t *testing.T) {
 	first := reports[0].(map[string]any)
 	if r["kind"] != "post" || r["id"] != pid || r["body_html"] != "<p>Buy my stuff</p>" || r["deleted"] != false ||
 		r["author"].(map[string]any)["username"] != "kit" || r["group_kind"] != "root" || !groupCan(r, "open") ||
-		len(reports) != 2 || first["reporter"].(map[string]any)["username"] != "mo" || first["reason"] != "Spam link" {
+		len(reports) != 2 || first["reporter"] != nil || first["reason"] != "Spam link" {
 		t.Fatalf("report entry: %v", r)
 	}
 
@@ -269,7 +269,7 @@ func TestPushForReports(t *testing.T) {
 	post := kit.mustStatus(201, "POST", rootPath+"/posts", map[string]string{"body_html": "<p>hello</p>"})
 	mo.mustStatus(204, "POST", "/api/reports", map[string]string{"kind": "post", "id": post["id"].(string)})
 	got := waitPushes(t, fake, 1)
-	if want := "https://fcm.googleapis.com/fcm/send/owner-phone Thursday Group mo reported a post http://sweet.test/community"; got[0] != want {
+	if want := "https://fcm.googleapis.com/fcm/send/owner-phone Thursday Group Post reported http://sweet.test/community"; got[0] != want {
 		t.Fatalf("push:\n got %q\nwant %q", got[0], want)
 	}
 }

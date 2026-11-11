@@ -118,6 +118,11 @@ func Report(a Actor, authorID string) bool { return a.member() && a.ID != author
 // because a member's report brings the item to the moderators.
 func HandleReports(root Actor) bool { return root.staff() }
 
+// HandleReport excludes the reported author, even when they are staff.
+func HandleReport(root Actor, authorID string) bool {
+	return HandleReports(root) && authorID != "" && root.ID != authorID
+}
+
 // OpenReported allows a moderator to open a reported item in place when they can see it. An item in a conversation
 // is never opened, because a conversation belongs to its two people (Raphael, 2026-11-08).
 func OpenReported(a Actor, g Group) bool { return a.member() && g.Kind != KindDM }

@@ -24,7 +24,7 @@ type Notification struct {
 	ID     string `json:"id"`
 	UserID string `json:"user_id"`
 	Kind   string `json:"kind"`
-	Actor  User   `json:"actor"`
+	Actor  *User  `json:"actor"` // Report notifications do not identify the reporter.
 	// GroupID is the group the action happened in. PostID is the post, for a comment.
 	GroupID string  `json:"group_id"`
 	PostID  *string `json:"post_id"`

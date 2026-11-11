@@ -448,3 +448,40 @@ func TestSecureDeleteIsOn(t *testing.T) {
 		t.Fatalf("the search index's secure-delete = %d %v, want 1", search, err)
 	}
 }
+
+func TestReportPrivacyUpgrade(t *testing.T) {
+	d, err := Open(filepath.Join(t.TempDir(), "sweet.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer d.Close()
+	migratedTo(t, d, "011")
+	if _, err := d.Exec(`
+		INSERT INTO users(id, username, created_at) VALUES ('author', 'author', 1), ('reporter', 'reporter', 1), ('mod', 'mod', 1);
+		INSERT INTO groups(id, kind, name, mode, created_at) VALUES ('root', 'root', 'Home', 'both', 1);
+		INSERT INTO reports(id, reporter_id, kind, subject_id, group_id, author_id, body_html, created_at)
+		VALUES ('r', 'reporter', 'message', 'm', 'root', 'author', '<p>kept</p>', 1);
+		INSERT INTO notifications(id, user_id, kind, actor_id, group_id, report_id, created_at)
+		VALUES ('own', 'author', 'report', 'reporter', 'root', 'r', 1), ('eligible', 'mod', 'report', 'reporter', 'root', 'r', 1);
+		INSERT INTO events(kind, payload, created_at) VALUES
+		('report', '{"reports":[{"reporter":{"id":"reporter"}}]}', 1),
+		('report_delete', '{"id":"m","kind":"message"}', 1),
+		('notification', '{"kind":"report","actor":{"id":"reporter"}}', 1),
+		('marker', '{"stream":"notifications","unread":1}', 1),
+		('post', '{"id":"p"}', 1);
+	`); err != nil {
+		t.Fatal(err)
+	}
+	migratedTo(t, d, "012")
+	var own, eligible, events, reports int
+	if err := d.QueryRow(`SELECT
+		(SELECT COUNT(*) FROM notifications WHERE user_id='author'),
+		(SELECT COUNT(*) FROM notifications WHERE user_id='mod'),
+		(SELECT COUNT(*) FROM events),
+		(SELECT COUNT(*) FROM reports WHERE reporter_id='reporter' AND body_html='<p>kept</p>')`).Scan(&own, &eligible, &events, &reports); err != nil {
+		t.Fatal(err)
+	}
+	if own != 0 || eligible != 1 || events != 1 || reports != 1 {
+		t.Fatalf("after upgrade: author notifications %d, eligible %d, events %d, reports %d", own, eligible, events, reports)
+	}
+}

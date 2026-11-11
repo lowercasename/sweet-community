@@ -69,8 +69,8 @@ type CreateReportParams struct {
 	CreatedAt  int64
 }
 
-// Reports. Only the root group's owner and moderators read them. The handlers check
-// perm.HandleReports before running any of these queries except CreateReport.
+// Reports retain the reporter reference to prevent duplicates. Returned reports omit reporter identities.
+// The handlers check whether the viewer may handle each reported item.
 // A second report of the same item by the same user changes nothing.
 func (q *Queries) CreateReport(ctx context.Context, arg CreateReportParams) (int64, error) {
 	result, err := q.db.ExecContext(ctx, createReport,
@@ -126,7 +126,6 @@ func (q *Queries) ListOpenReportItemsByAuthor(ctx context.Context, authorID stri
 
 const listOpenReports = `-- name: ListOpenReports :many
 SELECT r.id, r.kind, r.subject_id, r.group_id, r.post_id, r.body_html, r.reason, r.created_at,
-       ru.id AS reporter_id, ru.username AS reporter_username, ru.picture_id AS reporter_picture_id,
        au.id AS author_id, au.username AS author_username, au.picture_id AS author_picture_id,
        g.kind AS group_kind, g.name AS group_name,
        CAST(CASE
@@ -137,7 +136,6 @@ SELECT r.id, r.kind, r.subject_id, r.group_id, r.post_id, r.body_html, r.reason,
          ELSE NOT EXISTS (SELECT 1 FROM messages m WHERE m.id = r.subject_id AND m.deleted_at IS NULL)
        END AS INTEGER) AS deleted
 FROM reports r
-JOIN users ru ON ru.id = r.reporter_id
 JOIN users au ON au.id = r.author_id
 JOIN groups g ON g.id = r.group_id
 WHERE r.closed_at IS NULL
@@ -151,26 +149,23 @@ type ListOpenReportsParams struct {
 }
 
 type ListOpenReportsRow struct {
-	ID                string
-	Kind              string
-	SubjectID         string
-	GroupID           string
-	PostID            sql.NullString
-	BodyHtml          string
-	Reason            string
-	CreatedAt         int64
-	ReporterID        string
-	ReporterUsername  string
-	ReporterPictureID sql.NullString
-	AuthorID          string
-	AuthorUsername    string
-	AuthorPictureID   sql.NullString
-	GroupKind         string
-	GroupName         string
-	Deleted           int64
+	ID              string
+	Kind            string
+	SubjectID       string
+	GroupID         string
+	PostID          sql.NullString
+	BodyHtml        string
+	Reason          string
+	CreatedAt       int64
+	AuthorID        string
+	AuthorUsername  string
+	AuthorPictureID sql.NullString
+	GroupKind       string
+	GroupName       string
+	Deleted         int64
 }
 
-// The open reports, oldest first, with each reporter, the item's author and group, and whether the item has been
+// The open reports, oldest first, with the item's author and group, and whether the item has been
 // deleted since. With a kind and subject_id, only the reports of that item. The handler groups the rows by item.
 func (q *Queries) ListOpenReports(ctx context.Context, arg ListOpenReportsParams) ([]ListOpenReportsRow, error) {
 	rows, err := q.db.QueryContext(ctx, listOpenReports, arg.SubjectID, arg.Kind)
@@ -190,9 +185,6 @@ func (q *Queries) ListOpenReports(ctx context.Context, arg ListOpenReportsParams
 			&i.BodyHtml,
 			&i.Reason,
 			&i.CreatedAt,
-			&i.ReporterID,
-			&i.ReporterUsername,
-			&i.ReporterPictureID,
 			&i.AuthorID,
 			&i.AuthorUsername,
 			&i.AuthorPictureID,

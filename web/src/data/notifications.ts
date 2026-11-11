@@ -62,7 +62,9 @@ export function describe(n: Notification, groups: Group[], topics: Topic[] = [])
       return `replied to your message in ${room ? (room.kind === 'root' ? 'the chat' : room.name) : 'a room'}`
     }
     case 'report':
-      return `reported a ${n.report_kind ?? 'post'}`
+      return { post: 'Post reported', comment: 'Comment reported', message: 'Message reported' }[
+        n.report_kind ?? 'post'
+      ]
   }
 }
 
@@ -73,7 +75,7 @@ export function describe(n: Notification, groups: Group[], topics: Topic[] = [])
 export function targetOf(n: Notification, rootId?: string): string {
   if (n.kind === 'report') return COMMUNITY
   if (n.post_id) return postPath(n.post_id)
-  if (n.kind === 'joined') return profilePath(n.actor.username)
+  if (n.kind === 'joined' && n.actor) return profilePath(n.actor.username)
   // A mention or reply in chat opens the chat at its message.
   if (n.message_id) return `${groupPath(n.group_id, rootId)}?message=${encodeURIComponent(n.message_id)}`
   return groupPath(n.group_id, rootId)

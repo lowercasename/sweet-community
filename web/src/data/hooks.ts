@@ -130,9 +130,11 @@ export function useUsers() {
 }
 
 /** The current state of a user. Reads the users cache first, and falls back to the author snapshot that came with the content. */
-export function useAuthor(author: User): User {
+export function useAuthor(author: User): User
+export function useAuthor(author: User | null): User | null
+export function useAuthor(author: User | null): User | null {
   const { data: users } = useUsers()
-  return users?.get(author.id) ?? author
+  return author ? (users?.get(author.id) ?? author) : null
 }
 
 /** The groups the user is in, with the root group first. */

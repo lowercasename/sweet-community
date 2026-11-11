@@ -32,23 +32,25 @@ test.describe('reports', () => {
     await mo.page.screenshot({ path: `test-results/reports-${info.project.name}-dialog.png` })
     await dialog.getByRole('button', { name: 'Report post' }).click()
     await expect(dialog.getByRole('heading', { name: 'Post reported' })).toBeVisible()
+    await mo.page.screenshot({ path: `test-results/reports-${info.project.name}-sent.png`, animations: 'disabled' })
     await dialog.getByRole('button', { name: 'Done' }).click()
     await expect(dialog).toHaveCount(0)
 
     // The entry appears on the open page without a reload.
-    await expect(o.page.getByRole('listitem').filter({ hasText: text })).toContainText(`Reported by ${mo.username}`)
+    await expect(o.page.getByRole('listitem').filter({ hasText: text })).toContainText('Spam link')
     // The owner's notification opens the Community page, where the Reports card comes first.
     await o.page
       .getByRole('navigation', { name: 'Main' })
       .getByRole('button', { name: /^Notifications/ })
       .click()
-    await o.page.getByRole('button', { name: new RegExp(`^${mo.username} reported a post`) }).click()
+    // Report notifications have no names. Open the newest unread report.
+    await o.page.getByRole('button', { name: 'Post reported, new', exact: true }).first().click()
     await expect(o.page).toHaveURL(/\/community$/)
     const top = async (name: string) => (await o.page.getByRole('heading', { name, exact: true }).boundingBox())!.y
     expect(await top('Reports')).toBeLessThan(await top('About this community'))
     const entry = o.page.getByRole('listitem').filter({ hasText: text })
     await expect(entry).toContainText('Post in Home')
-    await expect(entry).toContainText(`Reported by ${mo.username}`)
+    await expect(entry).not.toContainText(mo.username)
     await expect(entry).toContainText('Spam link')
     await entry.scrollIntoViewIfNeeded()
     await o.page.screenshot({ path: `test-results/reports-${info.project.name}-card.png` })
@@ -140,14 +142,17 @@ test.describe('reports', () => {
       await anyView(mo.page, 'Posts').click()
       await pick(mo.page, article(mo.page, text), 'Post options', 'Report')
       await mo.page.screenshot({ path: 'test-results/reports-phone-dialog.png' })
-      await mo.page.getByRole('dialog').getByRole('button', { name: 'Cancel' }).click()
+      await mo.page.getByRole('dialog').getByRole('button', { name: 'Report post' }).click()
+      await expect(mo.page.getByRole('heading', { name: 'Post reported' })).toBeVisible()
+      await mo.page.screenshot({ path: 'test-results/reports-phone-sent.png', animations: 'disabled' })
+      await mo.page.getByRole('dialog').getByRole('button', { name: 'Done' }).click()
 
       // The owner reaches the card from the menu.
       await open(o.page, '/menu')
       await o.page.getByRole('button', { name: 'Community' }).click()
       const entry = o.page.getByRole('listitem').filter({ hasText: text })
       await expect(entry).toContainText(reason)
-      await expect(entry).toContainText(`Reported by ${jo.username}`)
+      await expect(entry).not.toContainText(jo.username)
       const deleted = o.page.getByRole('listitem').filter({ hasText: gone })
       await expect(deleted).toContainText('The comment has since been deleted.')
       await expect(deleted.getByRole('button', { name: 'Delete comment' })).toHaveCount(0)

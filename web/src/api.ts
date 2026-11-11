@@ -219,7 +219,8 @@ export interface Notification {
   id: string
   user_id: string
   kind: 'comment' | 'added' | 'mention' | 'joined' | 'topic_post' | 'message' | 'reply' | 'report'
-  actor: User
+  /** Report notifications do not identify the reporter. */
+  actor: User | null
   group_id: string
   post_id: string | null
   /** The topic, for a post in a topic I follow. */
@@ -238,7 +239,7 @@ export type ReportKind = 'post' | 'comment' | 'message'
 
 /** One member's report of an item. */
 export interface ReportBy {
-  reporter: User
+  id: string
   reason: string
   created_at: number
 }
