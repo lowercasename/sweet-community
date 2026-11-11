@@ -11,9 +11,9 @@ Sweet runs as one container, with Caddy in a second one for HTTPS. Everything it
 ### What you need
 
 - A Linux server with Docker and Docker Compose (`docker compose version` prints v2 or later).
-- A domain name with an A record pointing at the server. Set the record before you start, since Caddy fetches the certificate when the first visitor arrives.
+- A domain name with an A record pointing at the server. Set the record before you start.
 - An SMTP account, for the sign-in emails. Members sign in with a link and a code sent by email, so it is needed before anyone joins. Any provider works.
-- Optional: a Cloudflare R2 bucket, or any S3 bucket. Images are kept in it and the database is backed up to it continuously. Without one, images stay on the server's disk and nothing is backed up.
+- Optional: an S3-compatible storage bucket. Images are kept in it and the database is backed up to it continuously. Without one, images stay on the server's disk and nothing is backed up.
 
 ### Install
 
@@ -40,36 +40,26 @@ docker compose -f compose.proxied.yml pull
 docker compose -f compose.proxied.yml up -d
 ```
 
-Configure your proxy to forward requests for the domain to that port. The proxy must set `X-Forwarded-For` and `X-Forwarded-Proto`. Caddy, nginx and Traefik set both by default. In a Caddyfile:
-
-```
-sweet.example.org {
-	reverse_proxy 127.0.0.1:8080
-}
-```
-
-If your proxy is itself a container, it cannot reach `127.0.0.1`. Set `SWEET_BIND` in `.env` to the docker bridge address (`ip -4 addr show docker0`, usually `172.17.0.1`) and point the proxy at `host.docker.internal:8080`. That name resolves to the bridge address when the proxy's container has `extra_hosts: ["host.docker.internal:host-gateway"]` in its compose file.
+Configure your proxy to serve HTTPS and forward requests to `127.0.0.1:8080`. It must set `X-Forwarded-For` and `X-Forwarded-Proto`. If the proxy runs in another container, use `SWEET_BIND` and `SWEET_PORT` to make Sweet reachable from it.
 
 ### Email
 
-Fill in the `SWEET_SMTP_` settings and `SWEET_MAIL_FROM` in `.env`, then `docker compose up -d`. For Mailgun: host `smtp.mailgun.org` (`smtp.eu.mailgun.org` for an EU domain), port `587`, and the user and password from the domain's SMTP credentials. The from-address must be on a domain the provider lets you send from.
+Fill in the `SWEET_SMTP_` settings in `.env` with your email provider's SMTP host, port, username and password. Set `SWEET_MAIL_FROM` to an address the provider allows you to send from. Run `docker compose up -d` to apply the settings.
 
 Without SMTP settings, Sweet writes each email to a file in the data volume instead of sending it. `docker compose exec sweet ls /data/mail` lists them and `docker compose exec sweet cat /data/mail/<file>` shows one.
 
 ### The bucket: images and backups
 
-On Cloudflare, make an R2 bucket for this instance, then an API token for it: R2 → Manage API tokens → Create, permission Object Read & Write, scoped to that bucket. Put in `.env`:
+Create a private bucket with an S3-compatible storage provider. Create credentials with read and write access to that bucket. Add the provider's connection details to `.env`:
 
 ```
-SWEET_S3_ENDPOINT=<your account id>.r2.cloudflarestorage.com
-SWEET_S3_BUCKET=<the bucket's name>
-SWEET_S3_ACCESS_KEY=<the token's access key id>
-SWEET_S3_SECRET_KEY=<the token's secret access key>
+SWEET_S3_ENDPOINT=<endpoint hostname, without https://>
+SWEET_S3_BUCKET=<bucket name>
+SWEET_S3_ACCESS_KEY=<access key id>
+SWEET_S3_SECRET_KEY=<secret access key>
 ```
 
-Then `docker compose up -d`. Images are stored in the bucket under `images/` and the database is replicated to it under `db/`, a second or so behind. The bucket keeps 30 days of history, with a full copy every hour (see Restoring). The bucket and your `.env` together are the whole backup, so keep a copy of `.env` somewhere safe.
-
-Any S3 service works in place of R2. Set `SWEET_S3_REGION` to its region.
+Set `SWEET_S3_REGION` if your provider requires a region. Run `docker compose up -d` to apply the settings. Images are stored in the bucket under `images/` and the database is replicated to it under `db/`, a second or so behind. The bucket keeps 30 days of history, with a full copy every hour (see Restoring). The bucket and your `.env` together are the whole backup, so keep a copy of `.env` somewhere safe.
 
 Several instances can share one bucket if each has its own folder in it. `SWEET_S3_FOLDER=<name>` puts that instance's images under `<name>/images` and its database under `<name>/db`.
 
@@ -111,7 +101,7 @@ Keep Sweet and Litestream stopped throughout a restore. Start Sweet only after t
 
 ### Without Docker
 
-`make build` produces `bin/sweet`, one file with the frontend and the migrations inside it. It takes the same settings from the environment, and `./bin/sweet -help` lists its flags. Put a reverse proxy in front of it and set `SWEET_TRUST_PROXY` to the number of proxies in front of Sweet, usually `1`. Sweet uses that number to find the visitor's address in `X-Forwarded-For` for its rate limits. It counts that many entries from the right, because each proxy adds the address it saw to the right and a visitor can write only the entries on the left. Caddy, by default, replaces the header from a client it does not trust, so a proxy in front of Caddy counts only if Caddy lists it in `trusted_proxies`. If you run Litestream yourself, start Sweet with `SWEET_LITESTREAM=1` so it leaves checkpointing to Litestream.
+`make build` produces `bin/sweet`, one file with the frontend and the migrations inside it. It takes the same settings from the environment, and `./bin/sweet -help` lists its flags. Put a reverse proxy in front of it and set `SWEET_TRUST_PROXY` to the number of proxies in front of Sweet, usually `1`. Sweet uses that number to find the visitor's address in `X-Forwarded-For` for its rate limits. If you run Litestream yourself, start Sweet with `SWEET_LITESTREAM=1` so it leaves checkpointing to Litestream.
 
 ## Develop
 
