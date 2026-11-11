@@ -3,7 +3,7 @@ import { expect, member, open, owner, ROOT, test, uniq } from './helpers'
 for (const suffix of ['', ' @phone']) {
   test(`reports hide identities and exclude their authors${suffix}`, async ({ browser }, info) => {
     const o = await owner(browser, info)
-    const mod = await member(browser, info, 'moderatorlongnamelongxxxxx')
+    const mod = await member(browser, info, 'moderatorlongnamelongxxx')
     const reporter = await member(browser, info, 'reporterlongnamelong')
     const modID = ((await (await mod.context.request.get('/api/me')).json()) as { id: string }).id
     const reporterID = ((await (await reporter.context.request.get('/api/me')).json()) as { id: string }).id
