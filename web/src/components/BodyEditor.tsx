@@ -199,12 +199,15 @@ export function BodyEditor({
     if (focus) editor?.commands.focus('end')
   }, [focus, editor])
   // Another editor in this tab with the same draft, such as a post's thread on Home and on the post's page, shows
-  // each change made in this one.
+  // each change made in this one. When the draft is deleted, a new post, comment or message is empty again, and an
+  // edit shows the stored text again.
   const user = me?.id
   useEffect(() => {
     if (!editor || !draft || !user) return
-    return watchDraft(user, draft, editor, (html) => editor.commands.setContent(html ?? '', { emitUpdate: false }))
-  }, [editor, draft, user])
+    return watchDraft(user, draft, editor, (html) =>
+      editor.commands.setContent(html ?? initialHtml ?? '', { emitUpdate: false }),
+    )
+  }, [editor, draft, user, initialHtml])
   // An empty transaction makes the editor draw its decorations again, which reads the new placeholder.
   useEffect(() => {
     if (editor && !editor.isDestroyed) editor.view.dispatch(editor.state.tr)

@@ -1,7 +1,7 @@
--- A search entry is found by its kind and id, which the index cannot look up, so each removal reads the whole index.
--- Deleting a room, or a post with its comments, updated every row in it and read the index once for each. These
--- triggers remove a deleted room's entries in one statement, and the row triggers skip the rows of a deleted room and
--- the comments of a deleted post, whose entries are already gone.
+-- A search entry is found by its kind and id. The index cannot look these up, so each removal reads the whole index.
+-- Deleting a room or a post updated each row in it, and each update read the index once. The first trigger removes a
+-- deleted room's entries in one statement. The row triggers skip the rows of a deleted room and the comments of a
+-- deleted post, because their entries are already gone.
 CREATE TRIGGER groups_search_delete AFTER UPDATE OF deleted_at ON groups
 WHEN OLD.deleted_at IS NULL AND NEW.deleted_at IS NOT NULL
 BEGIN

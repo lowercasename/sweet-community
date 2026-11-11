@@ -28,8 +28,8 @@ function read(name: string): Saved | null {
 }
 
 /**
- * Tells the other editors in this tab that show the same draft that it has changed. A post's thread can be open on
- * Home and on the post's own page at once.
+ * Sends each change of a draft to the other editors in this tab that show the same draft. A post's thread can be open
+ * on Home and on the post's own page at once.
  */
 const changes = new EventTarget()
 
@@ -41,7 +41,7 @@ export function loadDraft(user: string, key: string): string | null {
   return read(entry(user, key))?.html ?? null
 }
 
-/** Saves a draft. `from` is the editor that saved it, which is not told of its own change. */
+/** Saves a draft. `from` is the editor that saved it, which does not receive its own change. */
 export function saveDraft(user: string, key: string, html: string, from?: object) {
   store(entry(user, key), JSON.stringify({ html, at: Date.now() }))
   changed(entry(user, key), html, from)

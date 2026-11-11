@@ -42,7 +42,6 @@ WHERE post_id = sqlc.arg(post_id) AND deleted_at IS NULL;
 UPDATE comments SET deleted_at = sqlc.arg(deleted_at), body_html = '', body_text = ''
 WHERE deleted_at IS NULL AND post_id IN (SELECT id FROM posts WHERE group_id = sqlc.arg(group_id));
 
-
 -- name: ListLiveCommentsByAuthor :many
 -- A user's comments that are not deleted and are on posts that are not deleted, for the delete events when the user
 -- is removed.
