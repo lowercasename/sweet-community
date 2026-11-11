@@ -128,6 +128,11 @@ func (s *Server) register(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusInternalServerError, err.Error())
 		return
 	}
+	proof, proofHash, err := auth.NewToken()
+	if err != nil {
+		writeErr(w, http.StatusInternalServerError, err.Error())
+		return
+	}
 	u := User{ID: id.String(), Username: in.Username}
 	now := db.Now()
 
@@ -138,10 +143,6 @@ func (s *Server) register(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	defer tx.Rollback()
-	// The UPDATE's WHERE clause makes a link single-use even under two
-	// simultaneous registrations. BEGIN IMMEDIATE serialises them, so the
-	// second sees used_at set and rolls back, which also discards the user it
-	// inserted.
 	qtx := store.New(tx)
 	// Check the invite before anything else. A bad code returns 404 before any username or email is
 	// looked up, so the endpoint reveals nothing about existing accounts. The transaction rolls back
@@ -165,11 +166,18 @@ func (s *Server) register(w http.ResponseWriter, r *http.Request) {
 			writeErr(w, http.StatusInternalServerError, err.Error())
 			return
 		}
+		// An unbound cookie keeps the response indistinguishable from a new registration.
+		setRegistrationCookie(w, r, proof)
+		if _, err := signinRequest(w, r); err != nil {
+			writeErr(w, http.StatusInternalServerError, err.Error())
+			return
+		}
 		writeJSON(w, http.StatusAccepted, map[string]any{"email": in.Email})
 		return
 	}
 	if err := qtx.CreateUserWithEmail(ctx, store.CreateUserWithEmailParams{
 		ID: u.ID, Username: u.Username, Email: sql.NullString{String: in.Email, Valid: true}, CreatedAt: now,
+		RegistrationHash: sql.NullString{String: proofHash, Valid: true}, RegistrationExpiresAt: sql.NullInt64{Int64: now + registrationTTL.Milliseconds(), Valid: true},
 	}); err != nil {
 		if db.IsUniqueViolation(err) {
 			writeErr(w, http.StatusConflict, "That username is taken")
@@ -237,6 +245,7 @@ func (s *Server) register(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusInternalServerError, err.Error())
 		return
 	}
+	setRegistrationCookie(w, r, proof)
 	s.Hub.Broadcast(ev)
 	s.Hub.Broadcast(lineEv)
 	for _, t := range told {

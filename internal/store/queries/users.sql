@@ -11,7 +11,7 @@ SELECT id, username, picture_id, removed_at FROM users WHERE id = ?;
 -- Anonymises a user. The username becomes
 -- removed-<id prefix>, and the password, picture and bio are cleared. The row
 -- and the id stay so that the user's content keeps its author.
-UPDATE users SET username = sqlc.arg(username), password_hash = NULL, picture_id = NULL, bio_html = '', bio_text = '', removed_at = sqlc.arg(removed_at)
+UPDATE users SET username = sqlc.arg(username), password_hash = NULL, picture_id = NULL, bio_html = '', bio_text = '', registration_hash = NULL, registration_expires_at = NULL, removed_at = sqlc.arg(removed_at)
 WHERE id = sqlc.arg(id);
 
 -- name: CreateUser :exec
@@ -43,10 +43,11 @@ SELECT id, username, password_hash, picture_id, email, email_verified_at, remove
 SELECT id, username, password_hash, email, email_verified_at, pending_email, removed_at FROM users WHERE id = sqlc.arg(id);
 
 -- name: CreateUserWithEmail :exec
-INSERT INTO users (id, username, password_hash, email, created_at) VALUES (sqlc.arg(id), sqlc.arg(username), sqlc.arg(password_hash), sqlc.arg(email), sqlc.arg(created_at));
+INSERT INTO users (id, username, password_hash, email, created_at, registration_hash, registration_expires_at)
+VALUES (sqlc.arg(id), sqlc.arg(username), sqlc.arg(password_hash), sqlc.arg(email), sqlc.arg(created_at), sqlc.arg(registration_hash), sqlc.arg(registration_expires_at));
 
 -- name: SetUserEmailVerified :exec
-UPDATE users SET email = sqlc.arg(email), email_verified_at = sqlc.arg(verified_at), pending_email = NULL WHERE id = sqlc.arg(id);
+UPDATE users SET email = sqlc.arg(email), email_verified_at = sqlc.arg(verified_at), pending_email = NULL, registration_hash = NULL, registration_expires_at = NULL WHERE id = sqlc.arg(id);
 
 -- name: SetUserPendingEmail :exec
 UPDATE users SET pending_email = sqlc.arg(pending_email) WHERE id = sqlc.arg(id);
@@ -62,12 +63,10 @@ SELECT hash, user_id, email, code_hash FROM email_tokens
 WHERE kind = 'signin' AND request_hash = sqlc.arg(request_hash) AND used_at IS NULL AND expires_at > sqlc.arg(now)
 ORDER BY created_at DESC;
 
--- name: GetRequestUser :one
--- The account of the newest sign-in token that one browser asked for, used or not. Changing the address after joining
--- uses it, so the browser that joined is the one that can change it.
-SELECT u.id, u.email_verified_at, u.removed_at FROM email_tokens t JOIN users u ON u.id = t.user_id
-WHERE t.kind = 'signin' AND t.request_hash = sqlc.arg(request_hash) AND t.expires_at > sqlc.arg(now)
-ORDER BY t.created_at DESC LIMIT 1;
+-- name: GetRegistrationUser :one
+SELECT id FROM users
+WHERE registration_hash = sqlc.arg(hash) AND registration_expires_at > sqlc.arg(now)
+  AND email_verified_at IS NULL AND removed_at IS NULL;
 
 -- name: AddWrongCode :exec
 -- Counts a wrong code against a token. The fifth wrong code voids it.
@@ -106,4 +105,4 @@ DELETE FROM email_tokens WHERE user_id = sqlc.arg(user_id);
 
 -- name: SetUserEmailVerifiedAt :exec
 -- Marks the account's current address verified. Completing a sign-in by email does this.
-UPDATE users SET email_verified_at = sqlc.arg(verified_at) WHERE id = sqlc.arg(id) AND email_verified_at IS NULL;
+UPDATE users SET email_verified_at = sqlc.arg(verified_at), registration_hash = NULL, registration_expires_at = NULL WHERE id = sqlc.arg(id) AND email_verified_at IS NULL;

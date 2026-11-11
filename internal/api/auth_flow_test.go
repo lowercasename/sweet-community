@@ -1,6 +1,7 @@
 package api
 
 import (
+	"context"
 	"fmt"
 	"net/http/httptest"
 	"regexp"
@@ -309,4 +310,111 @@ func TestSignInEmailsAreRationed(t *testing.T) {
 	if n := mailCount(ts, "kit@example.test"); n != 5 {
 		t.Fatalf("sign-in mails to kit, including the one on joining: %d", n)
 	}
+}
+
+func TestSigninRequestCannotAuthoriseAddressCorrection(t *testing.T) {
+	for _, login := range []string{"pending", "pending@example.test"} {
+		t.Run(login, func(t *testing.T) {
+			ts, owner := newTestServer(t)
+			joined := newClient(t, ts)
+			joined.mustStatus(202, "POST", "/api/register", map[string]string{"code": invite(t, owner), "username": "pending", "email": "pending@example.test"})
+			stranger := newClient(t, ts)
+			stranger.mustStatus(202, "POST", "/api/signin/email", map[string]string{"login": login})
+			stranger.mustStatus(403, "POST", "/api/signin/address", map[string]string{"email": "stranger@example.test"})
+			joined.mustStatus(202, "POST", "/api/signin/address", map[string]string{"email": "correct@example.test"})
+			_, code := signinMail(t, ts, "correct@example.test")
+			joined.mustStatus(200, "POST", "/api/signin/code", map[string]string{"code": code})
+		})
+	}
+}
+
+func TestRegistrationAuthorityDoesNotFollowSigninRequests(t *testing.T) {
+	ts, owner := newTestServer(t)
+	first := newClient(t, ts)
+	first.mustStatus(202, "POST", "/api/register", map[string]string{"code": invite(t, owner), "username": "first", "email": "first@example.test"})
+	second := newClient(t, ts)
+	second.mustStatus(202, "POST", "/api/register", map[string]string{"code": invite(t, owner), "username": "second", "email": "second@example.test"})
+	first.mustStatus(202, "POST", "/api/signin/email", map[string]string{"login": "second"})
+	first.mustStatus(202, "POST", "/api/signin/address", map[string]string{"email": "correct@example.test"})
+	token, _ := signinMail(t, ts, "correct@example.test")
+	result := first.mustStatus(200, "POST", "/api/signin/link", map[string]string{"token": token})
+	if result["user"].(map[string]any)["username"] != "first" {
+		t.Fatal("address correction changed a different account")
+	}
+}
+
+func TestRegistrationAuthorityExpiresWithoutRenewal(t *testing.T) {
+	ts, owner, srv := newTestServerWith(t)
+	joined := newClient(t, ts)
+	joined.mustStatus(202, "POST", "/api/register", map[string]string{"code": invite(t, owner), "username": "pending", "email": "pending@example.test"})
+	if _, err := srv.DB.Exec("UPDATE users SET registration_expires_at = ? WHERE username = 'pending'", db.Now()-1); err != nil {
+		t.Fatal(err)
+	}
+	joined.mustStatus(202, "POST", "/api/signin/email", map[string]string{"login": "pending"})
+	joined.mustStatus(403, "POST", "/api/signin/address", map[string]string{"email": "changed@example.test"})
+	// Expiring correction authority does not expire the separately issued sign-in email.
+	_, code := signinMail(t, ts, "pending@example.test")
+	joined.mustStatus(200, "POST", "/api/signin/code", map[string]string{"code": code})
+}
+
+func TestDuplicateRegistrationDoesNotGrantCorrectionAuthority(t *testing.T) {
+	ts, owner := newTestServer(t)
+	joined := newClient(t, ts)
+	code := invite(t, owner)
+	joined.mustStatus(202, "POST", "/api/register", map[string]string{"code": code, "username": "pending", "email": "pending@example.test"})
+	stranger := newClient(t, ts)
+	stranger.mustStatus(202, "POST", "/api/register", map[string]string{"code": code, "username": "different", "email": "pending@example.test"})
+	stranger.mustStatus(403, "POST", "/api/signin/address", map[string]string{"email": "changed@example.test"})
+	joined.mustStatus(202, "POST", "/api/signin/address", map[string]string{"email": "right@example.test"})
+}
+
+func TestAddressCorrectionRollsBackIfOldLinksCannotBeRevoked(t *testing.T) {
+	ts, owner, srv := newTestServerWith(t)
+	joined := newClient(t, ts)
+	joined.mustStatus(202, "POST", "/api/register", map[string]string{"code": invite(t, owner), "username": "pending", "email": "pending@example.test"})
+	if _, err := srv.DB.Exec("CREATE TRIGGER fail_token_update BEFORE UPDATE ON email_tokens BEGIN SELECT RAISE(ABORT, 'test failure'); END"); err != nil {
+		t.Fatal(err)
+	}
+	joined.mustStatus(500, "POST", "/api/signin/address", map[string]string{"email": "changed@example.test"})
+	var unchanged bool
+	if err := srv.DB.QueryRow("SELECT email = 'pending@example.test' FROM users WHERE username = 'pending'").Scan(&unchanged); err != nil {
+		t.Fatal(err)
+	}
+	if !unchanged || mailCount(ts, "changed@example.test") != 0 {
+		t.Fatal("failed correction changed the account or sent a new email")
+	}
+	if _, err := srv.DB.Exec("DROP TRIGGER fail_token_update"); err != nil {
+		t.Fatal(err)
+	}
+	token, _ := signinMail(t, ts, "pending@example.test")
+	joined.mustStatus(200, "POST", "/api/signin/link", map[string]string{"token": token})
+}
+
+func TestRegistrationAuthorityEndsWhenVerifiedElsewhere(t *testing.T) {
+	ts, owner := newTestServer(t)
+	joined := newClient(t, ts)
+	joined.mustStatus(202, "POST", "/api/register", map[string]string{"code": invite(t, owner), "username": "pending", "email": "pending@example.test"})
+	token, _ := signinMail(t, ts, "pending@example.test")
+	newClient(t, ts).mustStatus(200, "POST", "/api/signin/link", map[string]string{"token": token})
+	// The registering browser still has its cookie. Verification elsewhere must revoke it on the server.
+	joined.mustStatus(403, "POST", "/api/signin/address", map[string]string{"email": "changed@example.test"})
+}
+
+func TestDelayedSigninEmailCannotUseAnAddressThatWasCorrected(t *testing.T) {
+	ts, owner, srv := newTestServerWith(t)
+	joined := newClient(t, ts)
+	joined.mustStatus(202, "POST", "/api/register", map[string]string{"code": invite(t, owner), "username": "pending", "email": "typo@example.test"})
+	joined.mustStatus(202, "POST", "/api/signin/address", map[string]string{"email": "right@example.test"})
+	u, err := srv.q().GetUserByUsername(context.Background(), "pending")
+	if err != nil {
+		t.Fatal(err)
+	}
+	// A request that read the old address before correction may send its email after the transaction commits.
+	if err := srv.sendSignin(context.Background(), srv.q(), u.ID, "typo@example.test", "", false); err != nil {
+		t.Fatal(err)
+	}
+	token, _ := signinMail(t, ts, "typo@example.test")
+	newClient(t, ts).mustStatus(404, "POST", "/api/signin/link", map[string]string{"token": token})
+	_, code := signinMail(t, ts, "right@example.test")
+	joined.mustStatus(200, "POST", "/api/signin/code", map[string]string{"code": code})
 }

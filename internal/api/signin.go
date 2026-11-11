@@ -26,7 +26,9 @@ import (
 // browser. Using either one uses the token.
 
 const (
-	signinCookie = "sweet_signin"
+	signinCookie       = "sweet_signin"
+	registrationCookie = "sweet_registration"
+	registrationTTL    = 15 * time.Minute
 	// maxWrongCodes voids a token after that many wrong codes.
 	maxWrongCodes = 5
 	// maxWrongCodesPerDay refuses every code of a user, even a right one, after that many wrong codes in a day across
@@ -77,6 +79,25 @@ func requestHash(r *http.Request) string {
 // clearSigninCookie deletes the browser's sign-in cookie once it has signed in.
 func clearSigninCookie(w http.ResponseWriter, r *http.Request) {
 	http.SetCookie(w, &http.Cookie{Name: signinCookie, Value: "", Path: "/api/signin", MaxAge: -1, HttpOnly: true, Secure: isHTTPS(r), SameSite: http.SameSiteStrictMode})
+}
+
+// registrationProof reads the registration credential. Sign-in requests never create it.
+func registrationProof(r *http.Request) string {
+	if c, err := r.Cookie(registrationCookie); err == nil {
+		return c.Value
+	}
+	return ""
+}
+
+func setRegistrationCookie(w http.ResponseWriter, r *http.Request, token string) {
+	age := int(registrationTTL.Seconds())
+	if token == "" {
+		age = -1
+	}
+	http.SetCookie(w, &http.Cookie{
+		Name: registrationCookie, Value: token, Path: "/api/signin", MaxAge: age,
+		HttpOnly: true, Secure: isHTTPS(r), SameSite: http.SameSiteStrictMode,
+	})
 }
 
 // codeHash binds a code to its token, so the same code in two tokens has two hashes.
@@ -287,15 +308,13 @@ func (s *Server) completeSignin(w http.ResponseWriter, r *http.Request, tx *sql.
 		writeErr(w, http.StatusInternalServerError, err.Error())
 		return
 	}
-	if acct.RemovedAt.Valid {
+	if acct.RemovedAt.Valid || !acct.Email.Valid || !strings.EqualFold(acct.Email.String, email) {
 		refused()
 		return
 	}
-	if acct.Email.Valid && strings.EqualFold(acct.Email.String, email) {
-		if err := qtx.SetUserEmailVerifiedAt(ctx, store.SetUserEmailVerifiedAtParams{VerifiedAt: sql.NullInt64{Int64: db.Now(), Valid: true}, ID: userID}); err != nil {
-			writeErr(w, http.StatusInternalServerError, err.Error())
-			return
-		}
+	if err := qtx.SetUserEmailVerifiedAt(ctx, store.SetUserEmailVerifiedAtParams{VerifiedAt: sql.NullInt64{Int64: db.Now(), Valid: true}, ID: userID}); err != nil {
+		writeErr(w, http.StatusInternalServerError, err.Error())
+		return
 	}
 	u, err := qtx.GetUser(ctx, userID)
 	if err != nil {
@@ -307,6 +326,7 @@ func (s *Server) completeSignin(w http.ResponseWriter, r *http.Request, tx *sql.
 		return
 	}
 	clearSigninCookie(w, r)
+	setRegistrationCookie(w, r, "")
 	token, err := s.issueSession(w, r, userID)
 	if err != nil {
 		writeErr(w, http.StatusInternalServerError, err.Error())
@@ -342,14 +362,21 @@ func (s *Server) signinAddress(w http.ResponseWriter, r *http.Request) {
 	notHere := func() {
 		writeErr(w, http.StatusForbidden, "The address can be changed here only from the browser you joined from, before you first sign in")
 	}
-	request := requestHash(r)
-	if request == "" {
+	proof := registrationProof(r)
+	if proof == "" {
 		notHere()
 		return
 	}
 	ctx := r.Context()
-	u, err := s.q().GetRequestUser(ctx, store.GetRequestUserParams{RequestHash: sql.NullString{String: request, Valid: true}, Now: db.Now()})
-	if errors.Is(err, sql.ErrNoRows) || (err == nil && (u.EmailVerifiedAt.Valid || u.RemovedAt.Valid)) {
+	tx, err := s.DB.BeginTx(ctx, nil)
+	if err != nil {
+		writeErr(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	defer tx.Rollback()
+	qtx := store.New(tx)
+	userID, err := qtx.GetRegistrationUser(ctx, store.GetRegistrationUserParams{Hash: sql.NullString{String: auth.HashToken(proof), Valid: true}, Now: sql.NullInt64{Int64: db.Now(), Valid: true}})
+	if errors.Is(err, sql.ErrNoRows) {
 		notHere()
 		return
 	}
@@ -357,8 +384,9 @@ func (s *Server) signinAddress(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusInternalServerError, err.Error())
 		return
 	}
-	n, err := s.q().SetUnverifiedEmail(ctx, store.SetUnverifiedEmailParams{Email: sql.NullString{String: email, Valid: true}, ID: u.ID})
+	n, err := qtx.SetUnverifiedEmail(ctx, store.SetUnverifiedEmailParams{Email: sql.NullString{String: email, Valid: true}, ID: userID})
 	if db.IsUniqueViolation(err) {
+		tx.Rollback()
 		if err := s.tellAddressTaken(ctx, email); err != nil {
 			writeErr(w, http.StatusInternalServerError, err.Error())
 			return
@@ -374,11 +402,20 @@ func (s *Server) signinAddress(w http.ResponseWriter, r *http.Request) {
 		notHere()
 		return
 	}
-	if err := s.q().VoidUserTokensOfKind(ctx, store.VoidUserTokensOfKindParams{Now: sql.NullInt64{Int64: db.Now(), Valid: true}, UserID: u.ID, Kind: TokenSignin}); err != nil {
+	if err := qtx.VoidUserTokensOfKind(ctx, store.VoidUserTokensOfKindParams{Now: sql.NullInt64{Int64: db.Now(), Valid: true}, UserID: userID, Kind: TokenSignin}); err != nil {
 		writeErr(w, http.StatusInternalServerError, err.Error())
 		return
 	}
-	if err := s.sendSignin(ctx, s.q(), u.ID, email, request, true); err != nil {
+	if err := tx.Commit(); err != nil {
+		writeErr(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	request, err := signinRequest(w, r)
+	if err != nil {
+		writeErr(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	if err := s.sendSignin(ctx, s.q(), userID, email, request, true); err != nil {
 		writeErr(w, http.StatusInternalServerError, err.Error())
 		return
 	}

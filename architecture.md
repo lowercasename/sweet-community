@@ -200,6 +200,7 @@ Registration is by invitation only, so no bot protection is needed. An approval 
 - An invite link works for anyone for seven days (Raphael, 2026-11-06). A group of people joins together, and one link per person would not bring them.
 - The join page shows the rules, and its button reads Agree and join.
 - No session exists until the first sign-in email is used, because otherwise verification would be optional.
+- Only the browser or app that created an account may correct its email address before verification (Raphael, 2026-11-11). This permission lasts 15 minutes from registration. Requesting another sign-in email does not grant or extend it. A verification link still works in another browser. This prevents someone from claiming a pending account by requesting a sign-in email.
 
 ## New-instance lifecycle
 
@@ -434,6 +435,8 @@ These decisions came from a security audit (2026-11-08).
 ## Record
 
 ### Reversed
+
+- **Address correction after joining.** Requesting a sign-in email no longer grants permission to change an unverified address. Only the browser or app that created the account has that permission for 15 minutes (Raphael, 2026-11-11). A review showed that the earlier rule let an unrelated browser claim a pending account.
 
 - **Body format.** TipTap JSON became sanitised HTML. The JSON design assumed that Go had no good HTML sanitiser, which was false.
 - **Event kinds.** One kind per action became two per resource, because the kinds kept multiplying.

@@ -116,15 +116,18 @@ func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) error {
 }
 
 const createUserWithEmail = `-- name: CreateUserWithEmail :exec
-INSERT INTO users (id, username, password_hash, email, created_at) VALUES (?1, ?2, ?3, ?4, ?5)
+INSERT INTO users (id, username, password_hash, email, created_at, registration_hash, registration_expires_at)
+VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)
 `
 
 type CreateUserWithEmailParams struct {
-	ID           string
-	Username     string
-	PasswordHash sql.NullString
-	Email        sql.NullString
-	CreatedAt    int64
+	ID                    string
+	Username              string
+	PasswordHash          sql.NullString
+	Email                 sql.NullString
+	CreatedAt             int64
+	RegistrationHash      sql.NullString
+	RegistrationExpiresAt sql.NullInt64
 }
 
 func (q *Queries) CreateUserWithEmail(ctx context.Context, arg CreateUserWithEmailParams) error {
@@ -134,6 +137,8 @@ func (q *Queries) CreateUserWithEmail(ctx context.Context, arg CreateUserWithEma
 		arg.PasswordHash,
 		arg.Email,
 		arg.CreatedAt,
+		arg.RegistrationHash,
+		arg.RegistrationExpiresAt,
 	)
 	return err
 }
@@ -265,30 +270,22 @@ func (q *Queries) GetProfileByUsername(ctx context.Context, username string) (Ge
 	return i, err
 }
 
-const getRequestUser = `-- name: GetRequestUser :one
-SELECT u.id, u.email_verified_at, u.removed_at FROM email_tokens t JOIN users u ON u.id = t.user_id
-WHERE t.kind = 'signin' AND t.request_hash = ?1 AND t.expires_at > ?2
-ORDER BY t.created_at DESC LIMIT 1
+const getRegistrationUser = `-- name: GetRegistrationUser :one
+SELECT id FROM users
+WHERE registration_hash = ?1 AND registration_expires_at > ?2
+  AND email_verified_at IS NULL AND removed_at IS NULL
 `
 
-type GetRequestUserParams struct {
-	RequestHash sql.NullString
-	Now         int64
+type GetRegistrationUserParams struct {
+	Hash sql.NullString
+	Now  sql.NullInt64
 }
 
-type GetRequestUserRow struct {
-	ID              string
-	EmailVerifiedAt sql.NullInt64
-	RemovedAt       sql.NullInt64
-}
-
-// The account of the newest sign-in token that one browser asked for, used or not. Changing the address after joining
-// uses it, so the browser that joined is the one that can change it.
-func (q *Queries) GetRequestUser(ctx context.Context, arg GetRequestUserParams) (GetRequestUserRow, error) {
-	row := q.db.QueryRowContext(ctx, getRequestUser, arg.RequestHash, arg.Now)
-	var i GetRequestUserRow
-	err := row.Scan(&i.ID, &i.EmailVerifiedAt, &i.RemovedAt)
-	return i, err
+func (q *Queries) GetRegistrationUser(ctx context.Context, arg GetRegistrationUserParams) (string, error) {
+	row := q.db.QueryRowContext(ctx, getRegistrationUser, arg.Hash, arg.Now)
+	var id string
+	err := row.Scan(&id)
+	return id, err
 }
 
 const getUser = `-- name: GetUser :one
@@ -436,7 +433,7 @@ func (q *Queries) ListSigninTokensForRequest(ctx context.Context, arg ListSignin
 }
 
 const removeUser = `-- name: RemoveUser :exec
-UPDATE users SET username = ?1, password_hash = NULL, picture_id = NULL, bio_html = '', bio_text = '', removed_at = ?2
+UPDATE users SET username = ?1, password_hash = NULL, picture_id = NULL, bio_html = '', bio_text = '', registration_hash = NULL, registration_expires_at = NULL, removed_at = ?2
 WHERE id = ?3
 `
 
@@ -501,7 +498,7 @@ func (q *Queries) SetUserBio(ctx context.Context, arg SetUserBioParams) error {
 }
 
 const setUserEmailVerified = `-- name: SetUserEmailVerified :exec
-UPDATE users SET email = ?1, email_verified_at = ?2, pending_email = NULL WHERE id = ?3
+UPDATE users SET email = ?1, email_verified_at = ?2, pending_email = NULL, registration_hash = NULL, registration_expires_at = NULL WHERE id = ?3
 `
 
 type SetUserEmailVerifiedParams struct {
@@ -516,7 +513,7 @@ func (q *Queries) SetUserEmailVerified(ctx context.Context, arg SetUserEmailVeri
 }
 
 const setUserEmailVerifiedAt = `-- name: SetUserEmailVerifiedAt :exec
-UPDATE users SET email_verified_at = ?1 WHERE id = ?2 AND email_verified_at IS NULL
+UPDATE users SET email_verified_at = ?1, registration_hash = NULL, registration_expires_at = NULL WHERE id = ?2 AND email_verified_at IS NULL
 `
 
 type SetUserEmailVerifiedAtParams struct {
