@@ -64,17 +64,14 @@ func Open(path string, opts ...Option) (*sql.DB, error) {
 // <path>.before-upgrade.
 const BackupSuffix = ".before-upgrade"
 
-// Migrate applies every *.sql file in migrations that has not been applied
-// yet, in name order. Migrations are forward-only. Each file runs in one
-// transaction on one connection with foreign keys off, which is SQLite's
-// documented way to rebuild a table that other tables reference.
-// foreign_key_check runs after each file, so a migration that leaves a
-// dangling reference fails.
+// Migrate applies every *.sql file in migrations that has not been applied yet, in name order. Migrations are
+// forward-only. All the pending files run in one transaction, so when one fails, none of them stays and the release
+// before still accepts the database. The transaction runs on one connection with foreign keys off, which is SQLite's
+// documented way to rebuild a table that other tables reference. foreign_key_check runs after each file, so a
+// migration that leaves a dangling reference fails.
 //
-// When the database has been migrated before, the run is an upgrade. A
-// VACUUM INTO copy is taken first and replaces the previous copy, so a bad
-// migration is recoverable. A new database is not
-// copied.
+// When the database has been migrated before, the run is an upgrade. A VACUUM INTO copy is taken first and replaces
+// the previous copy, so a migration that succeeds but turns out wrong is recoverable. A new database is not copied.
 func Migrate(ctx context.Context, db *sql.DB, migrations fs.FS) error {
 	conn, err := db.Conn(ctx)
 	if err != nil {
@@ -117,37 +114,34 @@ func Migrate(ctx context.Context, db *sql.DB, migrations fs.FS) error {
 			return fmt.Errorf("copy before upgrade: %w", err)
 		}
 	}
+	if len(pending) == 0 {
+		return nil
+	}
+	tx, err := d.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
 	for _, name := range pending {
 		body, err := fs.ReadFile(migrations, name)
 		if err != nil {
 			return err
 		}
-		tx, err := d.BeginTx(ctx, nil)
-		if err != nil {
-			return err
-		}
 		if _, err := tx.ExecContext(ctx, string(body)); err != nil {
-			tx.Rollback()
 			return fmt.Errorf("migration %s: %w", name, err)
 		}
 		if _, err := tx.ExecContext(ctx, `INSERT INTO schema_migrations (name, applied_at) VALUES (?, ?)`,
 			name, time.Now().UnixMilli()); err != nil {
-			tx.Rollback()
 			return err
 		}
 		var table, rowid, parent, index any
 		if err := tx.QueryRowContext(ctx, `PRAGMA foreign_key_check`).Scan(&table, &rowid, &parent, &index); err == nil {
-			tx.Rollback()
 			return fmt.Errorf("migration %s: foreign key violation in %v (row %v) -> %v", name, table, rowid, parent)
 		} else if !errors.Is(err, sql.ErrNoRows) {
-			tx.Rollback()
-			return err
-		}
-		if err := tx.Commit(); err != nil {
 			return err
 		}
 	}
-	return nil
+	return tx.Commit()
 }
 
 // Migrations 001 to 028 were squashed into one file before v1.0.0.

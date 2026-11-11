@@ -160,6 +160,51 @@ func TestMigrateCountsASquashedDatabaseAsAtTheBaseline(t *testing.T) {
 	}
 }
 
+// An upgrade runs all of its migrations in one transaction. When one fails, none of them stays, so the release before
+// it still accepts the database, and the copy taken before the upgrade is still the database as it was before.
+func TestAFailedUpgradeChangesNothing(t *testing.T) {
+	ctx := context.Background()
+	path := filepath.Join(t.TempDir(), "sweet.db")
+	d, err := Open(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer d.Close()
+	before := fstest.MapFS{"001_a.sql": file(`CREATE TABLE a (id INTEGER PRIMARY KEY);`)}
+	if err := Migrate(ctx, d, before); err != nil {
+		t.Fatal(err)
+	}
+	failing := fstest.MapFS{
+		"001_a.sql": before["001_a.sql"],
+		"002_b.sql": file(`CREATE TABLE b (id INTEGER PRIMARY KEY); INSERT INTO a (id) VALUES (1);`),
+		"003_c.sql": file(`SELECT * FROM no_such_table;`),
+	}
+	// The upgrade is tried twice, as a restarting server tries it.
+	for range 2 {
+		if err := Migrate(ctx, d, failing); err == nil {
+			t.Fatal("an upgrade with a failing migration succeeded")
+		}
+	}
+	for _, db := range []string{path, path + BackupSuffix} {
+		c, err := Open(db)
+		if err != nil {
+			t.Fatal(err)
+		}
+		var tables, rows, migrations int
+		if err := c.QueryRowContext(ctx, `SELECT (SELECT COUNT(*) FROM sqlite_schema WHERE name = 'b'),
+			(SELECT COUNT(*) FROM a), (SELECT COUNT(*) FROM schema_migrations)`).Scan(&tables, &rows, &migrations); err != nil {
+			t.Fatal(err)
+		}
+		c.Close()
+		if tables != 0 || rows != 0 || migrations != 1 {
+			t.Fatalf("%s after the failed upgrade: table b %d, rows in a %d, migrations recorded %d", filepath.Base(db), tables, rows, migrations)
+		}
+	}
+	if err := Migrate(ctx, d, before); err != nil {
+		t.Fatalf("the release before the upgrade refuses the database: %v", err)
+	}
+}
+
 // Migration 005 releases the pictures of rooms deleted before it. A deleted room kept its picture, and the image sweep
 // failed on that picture and stopped.
 func TestMigrationReleasesThePicturesOfDeletedRooms(t *testing.T) {
