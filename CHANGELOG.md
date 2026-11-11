@@ -1,5 +1,29 @@
 # Changelog
 
+## v1.7.3 (2026-11-11)
+
+- Clarify patch releases include security and privacy fixes
+- Personalise profile permissions in stream events
+- Check current permissions inside write transactions
+- Remove personal attribution annotations from comments and docs
+- Remove cosmetic class assertions from UI tests
+- Check sign-in and privacy in browsers before publishing images
+- Preserve the current database until a restore is validated
+- Use server counts for comments and unread indicators
+- Refresh cached identities from the server after user changes
+- Use time and ID together when paging lists
+- Erase email details when removing accounts
+- Shorten generated moderator usernames in browser test
+- Void sign-in links and codes on email confirmation
+- Hide reporter identities and exclude reported authors
+- Read current permissions before delivering events
+- Restrict address correction to the registering browser
+- Leave out an old item that a list's loaded pages do not reach
+- Use one helper for each layer of paged lists
+- End the oldest event stream instead of refusing a new one
+- Count and place comments on pages that are not loaded
+- Limit event streams per account, page comments, and stop listing directories
+
 ## v1.7.2 (2026-11-11)
 
 - Simplify the failed-upgrade test and the start of an upgrade
