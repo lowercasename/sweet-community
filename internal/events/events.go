@@ -32,10 +32,33 @@ type Hub struct {
 	Version string
 	mu      sync.Mutex
 	subs    map[chan Event]struct{}
+	streams map[string]int // open streams by user id
 }
 
 func NewHub(db *sql.DB) *Hub {
-	return &Hub{db: db, subs: map[chan Event]struct{}{}}
+	return &Hub{db: db, subs: map[chan Event]struct{}{}, streams: map[string]int{}}
+}
+
+// MaxStreams is the most event streams one user may have open at once, one for each tab and device. It limits the
+// connections and memory that one account can hold on the server.
+const MaxStreams = 20
+
+// Join counts a new stream for a user. It reports false when the user already has MaxStreams open. The stream calls
+// leave when it ends.
+func (h *Hub) Join(user string) (leave func(), ok bool) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	if h.streams[user] >= MaxStreams {
+		return nil, false
+	}
+	h.streams[user]++
+	return func() {
+		h.mu.Lock()
+		defer h.mu.Unlock()
+		if h.streams[user]--; h.streams[user] == 0 {
+			delete(h.streams, user)
+		}
+	}, true
 }
 
 // Log appends an event inside the caller's write transaction. The returned

@@ -2,11 +2,13 @@
 -- membership. perm decides who can edit or delete, after GetCommentOwners.
 
 -- name: ListComments :many
+-- A page of a post's comments, the newest first, as chat messages are listed.
 SELECT c.id, c.post_id, c.body_html, c.body_text, c.created_at, c.edited_at, p.author_id AS post_author_id, p.group_id,
        u.id AS author_id, u.username AS author_username, u.picture_id AS author_picture_id
 FROM comments c JOIN users u ON u.id = c.author_id JOIN posts p ON p.id = c.post_id
-WHERE c.post_id = sqlc.arg(post_id) AND c.deleted_at IS NULL
-ORDER BY c.created_at, c.id;
+WHERE c.post_id = sqlc.arg(post_id) AND c.deleted_at IS NULL AND c.created_at < sqlc.arg(before)
+ORDER BY c.created_at DESC, c.id DESC
+LIMIT sqlc.arg(page_size);
 
 -- name: GetComment :one
 SELECT c.id, c.post_id, c.body_html, c.body_text, c.created_at, c.edited_at, p.author_id AS post_author_id, p.group_id,

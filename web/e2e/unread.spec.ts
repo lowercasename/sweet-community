@@ -1,6 +1,4 @@
-import { expect, member, open, owner, test, uniq, view } from './helpers'
-
-const ROOT = '00000000-0000-7000-8000-000000000000'
+import { expect, member, open, owner, test, uniq, view, ROOT } from './helpers'
 
 test.describe('chat unread', () => {
   test('unseen messages mark their room as unread in the nav, and the mark is cleared when the messages are viewed', async ({

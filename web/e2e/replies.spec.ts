@@ -1,6 +1,4 @@
-import { chatEditor, expect, member, open, test, uniq } from './helpers'
-
-const ROOT = '00000000-0000-7000-8000-000000000000'
+import { chatEditor, expect, member, open, test, uniq, ROOT } from './helpers'
 
 /**
  * Replies in chat. Reply on a message attaches it

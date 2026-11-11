@@ -1,5 +1,5 @@
 import type { APIRequestContext } from '@playwright/test'
-import { anyView, article, confirm, expect, member, open, owner, pick, test, uniq, writePost } from './helpers'
+import { anyView, article, confirm, expect, member, open, owner, pick, test, uniq, writePost, ROOT } from './helpers'
 
 /**
  * Reporting. A member reports a post, comment or message from its menu. The owner and
@@ -113,7 +113,7 @@ test.describe('reports', () => {
     const mo = await member(browser, info, 'mo')
     const text = uniq('A long post ')
     const body = `<p>${text} ${'about wool and needles and the weather, '.repeat(6)}</p>`
-    const made = await kit.context.request.post(`/api/groups/00000000-0000-7000-8000-000000000000/posts`, {
+    const made = await kit.context.request.post(`/api/groups/${ROOT}/posts`, {
       data: { body_html: body },
     })
     const post = (await made.json()) as { id: string }

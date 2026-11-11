@@ -1,4 +1,4 @@
-import { article, expect, member, open, owner, test, uniq, writePost } from './helpers'
+import { article, expect, member, open, owner, test, uniq, writePost, ROOT } from './helpers'
 
 test.describe('notifications', () => {
   test('a comment on my post and being added to a room create notifications, and the notifications button shows a dot until they are opened', async ({
@@ -127,7 +127,7 @@ test.describe('notifications', () => {
     await open(kit.page)
     const tabs = kit.page.locator('nav').last()
     await expect(tabs.getByRole('button', { name: 'Notifications', exact: true })).toBeVisible()
-    const root = '00000000-0000-7000-8000-000000000000'
+    const root = ROOT
     const post = await kit.context.request.post(`/api/groups/${root}/posts`, { data: { body_html: '<p>phone</p>' } })
     const pid = ((await post.json()) as { id: string }).id
     await mo.context.request.post(`/api/posts/${pid}/comments`, { data: { body_html: '<p>yes</p>' } })

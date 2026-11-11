@@ -1,6 +1,7 @@
 import type { InfiniteData, QueryClient } from '@tanstack/react-query'
 import type {
   Comment,
+  CommentPage,
   Group,
   Marker,
   Member,
@@ -195,7 +196,7 @@ type Posts = InfiniteData<PostPage>
 type Notifications = InfiniteData<NotificationPage>
 type Markers = { markers: Marker[] }
 type Messages = InfiniteData<MessagePage>
-type Thread = { comments: Comment[] }
+type Thread = InfiniteData<CommentPage>
 type Users = { users: Member[] }
 type Groups = { groups: Group[] }
 type Members = { members: Membership[] }
@@ -284,14 +285,16 @@ function countComments(qc: QueryClient, postId: string, groupId: string, by: num
   )
 }
 
+/** A new comment goes into the newest page, which is the first. The thread shows its comments oldest first. */
 function upsertComment(qc: QueryClient, c: Comment) {
   const thread = qc.getQueryData<Thread>(keys.comments(c.post_id))
-  const known = thread?.comments.some((x) => x.id === c.id) ?? false
+  const known = thread?.pages.some((p) => p.comments.some((x) => x.id === c.id)) ?? false
   if (thread) {
     qc.setQueryData<Thread>(keys.comments(c.post_id), {
-      comments: known
-        ? thread.comments.map((x) => (x.id === c.id ? c : x))
-        : [...thread.comments, c].sort((a, b) => a.created_at - b.created_at),
+      ...thread,
+      pages: known
+        ? thread.pages.map((p) => ({ ...p, comments: p.comments.map((x) => (x.id === c.id ? c : x)) }))
+        : thread.pages.map((p, i) => (i === 0 ? { ...p, comments: [c, ...p.comments] } : p)),
     })
   }
   // A new comment increments its post's comment count. An edit or a replay does not.
@@ -300,8 +303,12 @@ function upsertComment(qc: QueryClient, c: Comment) {
 
 function deleteComment(qc: QueryClient, id: string, postId: string, groupId: string) {
   const thread = qc.getQueryData<Thread>(keys.comments(postId))
-  const known = thread?.comments.some((x) => x.id === id) ?? true
-  if (thread) qc.setQueryData<Thread>(keys.comments(postId), { comments: thread.comments.filter((x) => x.id !== id) })
+  const known = thread?.pages.some((p) => p.comments.some((x) => x.id === id)) ?? true
+  if (thread)
+    qc.setQueryData<Thread>(keys.comments(postId), {
+      ...thread,
+      pages: thread.pages.map((p) => ({ ...p, comments: p.comments.filter((x) => x.id !== id) })),
+    })
   if (known) countComments(qc, postId, groupId, -1)
 }
 
@@ -377,7 +384,11 @@ function upsertUser(qc: QueryClient, u: User) {
   void qc.invalidateQueries({ queryKey: ['profile'] })
   qc.setQueriesData<Thread>(
     { queryKey: ['comments'] },
-    (old) => old && { comments: old.comments.map((c) => ({ ...c, author: as(c.author) })) },
+    (old) =>
+      old && {
+        ...old,
+        pages: old.pages.map((p) => ({ ...p, comments: p.comments.map((c) => ({ ...c, author: as(c.author) })) })),
+      },
   )
   qc.setQueriesData<Messages>(
     { queryKey: ['messages'] },

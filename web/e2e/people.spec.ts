@@ -1,4 +1,4 @@
-import { anyView, article, expect, member, open, sendMessage, test, uniq, writePost } from './helpers'
+import { anyView, article, expect, member, open, sendMessage, test, uniq, writePost, ROOT } from './helpers'
 
 test.describe('people', () => {
   test('a username opens a card about the user, the pointer can move into the card, and the card has a button to message the user', async ({
@@ -55,12 +55,12 @@ test.describe('people', () => {
     const mo = await member(browser, testInfo, 'mo')
     // The authors alternate, so each message is its own run with its own name. The last message is at the bottom.
     for (let i = 0; i < 30; i++) {
-      await (i % 2 ? kit : mo).context.request.post('/api/groups/00000000-0000-7000-8000-000000000000/messages', {
+      await (i % 2 ? kit : mo).context.request.post(`/api/groups/${ROOT}/messages`, {
         data: { body_html: `<p>filler ${i}</p>` },
       })
     }
     const last = uniq('last word ')
-    await mo.context.request.post('/api/groups/00000000-0000-7000-8000-000000000000/messages', {
+    await mo.context.request.post(`/api/groups/${ROOT}/messages`, {
       data: { body_html: `<p>${last}</p>` },
     })
     await open(kit.page)
@@ -81,7 +81,7 @@ test.describe('people', () => {
     const kit = await member(browser, testInfo, 'kit')
     const mo = await member(browser, testInfo, 'mo')
     const text = uniq('tap me ')
-    await kit.context.request.post('/api/groups/00000000-0000-7000-8000-000000000000/posts', {
+    await kit.context.request.post(`/api/groups/${ROOT}/posts`, {
       data: { body_html: `<p>${text}</p>` },
     })
     await open(mo.page)

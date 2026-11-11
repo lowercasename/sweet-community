@@ -350,9 +350,9 @@ func TestComments(t *testing.T) {
 	cid := c["id"].(string)
 	owner.mustStatus(201, "POST", "/api/posts/"+id+"/comments", map[string]string{"body_html": "<p>thanks</p>"})
 
-	// Comments are listed oldest first. The post's comment_count now includes them.
+	// Comments are listed newest first, a page at a time. The post's comment_count now includes them.
 	list := owner.mustStatus(200, "GET", "/api/posts/"+id+"/comments", nil)["comments"].([]any)
-	if len(list) != 2 || list[0].(map[string]any)["id"] != cid {
+	if len(list) != 2 || list[1].(map[string]any)["id"] != cid {
 		t.Fatalf("comment list: %v", list)
 	}
 	posts := kit.mustStatus(200, "GET", rootPath+"/posts", nil)["posts"].([]any)

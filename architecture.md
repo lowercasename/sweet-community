@@ -102,7 +102,7 @@ Hashtags are on hold. Raphael asked on 2026-11-06 whether tags are the same as t
 
 ## Posts and editor
 
-A post is long-form text with inline images. Comments are a flat list, oldest first. A reply to one comment quotes it.
+A post is long-form text with inline images. Comments are a flat list, oldest first. A reply to one comment quotes it. A long thread opens at its newest comments, with Load earlier comments above them, as a chat does (Raphael, 2026-11-11).
 
 - The author edits a post or comment as a whole, and the post is marked as edited. There is no version history.
 - Deleting a post deletes its comments and empties their text, because the author asked for the post to go.
@@ -428,6 +428,8 @@ These decisions came from a security audit (2026-11-08).
 - Behind proxies, the operator states how many proxies there are. The client address is read that many entries from the right, because a visitor can forge only the entries on the left.
 - Images that are too large are refused before decoding.
 - Push goes only to the known push services, so a member cannot make the server send requests to any host.
+- One account can have at most 20 event streams open at once, one for each tab and device (Raphael, 2026-11-11). A further stream is refused until one closes. Closing the oldest stream instead was rejected, because browsers reconnect by themselves, so more than 20 tabs would keep pushing each other out.
+- The server never lists a directory of the app's files.
 
 ## Record
 

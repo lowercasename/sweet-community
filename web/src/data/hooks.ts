@@ -207,9 +207,26 @@ export function usePostActions(groupId: string) {
   }
 }
 
+/** A post's comments, oldest first. The newest page loads first, and loadEarlier loads the page before. */
 export function useComments(postId: string) {
-  const q = useQuery({ queryKey: keys.comments(postId), queryFn: () => getComments(postId) })
-  return { comments: q.data?.comments ?? [], loading: q.isPending, error: q.error }
+  const q = useInfiniteQuery({
+    queryKey: keys.comments(postId),
+    queryFn: ({ pageParam }) => getComments(postId, pageParam),
+    initialPageParam: null as number | null,
+    getNextPageParam: (last) => last.next_before,
+  })
+  const seen = new Set<string>()
+  const comments = (q.data?.pages ?? [])
+    .flatMap((p) => p.comments)
+    .filter((c) => !seen.has(c.id) && seen.add(c.id))
+    .sort((a, b) => a.created_at - b.created_at)
+  return {
+    comments,
+    loading: q.isPending || q.isFetchingNextPage,
+    error: q.error,
+    hasEarlier: q.hasNextPage,
+    loadEarlier: () => q.fetchNextPage(),
+  }
 }
 
 export function useCommentActions(postId: string, groupId: string) {

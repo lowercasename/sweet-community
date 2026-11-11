@@ -193,9 +193,16 @@ const listComments = `-- name: ListComments :many
 SELECT c.id, c.post_id, c.body_html, c.body_text, c.created_at, c.edited_at, p.author_id AS post_author_id, p.group_id,
        u.id AS author_id, u.username AS author_username, u.picture_id AS author_picture_id
 FROM comments c JOIN users u ON u.id = c.author_id JOIN posts p ON p.id = c.post_id
-WHERE c.post_id = ?1 AND c.deleted_at IS NULL
-ORDER BY c.created_at, c.id
+WHERE c.post_id = ?1 AND c.deleted_at IS NULL AND c.created_at < ?2
+ORDER BY c.created_at DESC, c.id DESC
+LIMIT ?3
 `
+
+type ListCommentsParams struct {
+	PostID   string
+	Before   int64
+	PageSize int64
+}
 
 type ListCommentsRow struct {
 	ID              string
@@ -213,8 +220,9 @@ type ListCommentsRow struct {
 
 // A comment belongs to a group through its post. The handler checks
 // membership. perm decides who can edit or delete, after GetCommentOwners.
-func (q *Queries) ListComments(ctx context.Context, postID string) ([]ListCommentsRow, error) {
-	rows, err := q.db.QueryContext(ctx, listComments, postID)
+// A page of a post's comments, the newest first, as chat messages are listed.
+func (q *Queries) ListComments(ctx context.Context, arg ListCommentsParams) ([]ListCommentsRow, error) {
+	rows, err := q.db.QueryContext(ctx, listComments, arg.PostID, arg.Before, arg.PageSize)
 	if err != nil {
 		return nil, err
 	}

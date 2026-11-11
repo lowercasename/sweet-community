@@ -53,8 +53,8 @@ func (s *Server) postActor(r *http.Request, q *store.Queries, postID string) (st
 	return owners, a, 0, nil
 }
 
-// listComments returns every comment on a post, oldest first. Threads are
-// small, so there is no paging.
+// listComments returns a page of a post's comments, the newest first, like chat messages. The client shows them
+// oldest first. ?before= pages backwards through the thread.
 func (s *Server) listComments(w http.ResponseWriter, r *http.Request) {
 	postID := r.PathValue("id")
 	_, a, status, err := s.postActor(r, s.q(), postID)
@@ -62,7 +62,8 @@ func (s *Server) listComments(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, status, err.Error())
 		return
 	}
-	rows, err := s.q().ListComments(r.Context(), postID)
+	before, limit := pageParams(r, 50, 200)
+	rows, err := s.q().ListComments(r.Context(), store.ListCommentsParams{PostID: postID, Before: before, PageSize: int64(limit + 1)})
 	if err != nil {
 		writeErr(w, http.StatusInternalServerError, err.Error())
 		return
@@ -72,7 +73,13 @@ func (s *Server) listComments(w http.ResponseWriter, r *http.Request) {
 		c := wireComment(store.GetCommentRow(row))
 		out = append(out, *forViewer(a, &c, Settings{}).(*Comment))
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"comments": out})
+	var next *int64
+	if len(out) > limit {
+		out = out[:limit]
+		n := out[len(out)-1].CreatedAt
+		next = &n
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"comments": out, "next_before": next})
 }
 
 func (s *Server) createComment(w http.ResponseWriter, r *http.Request) {

@@ -5,6 +5,9 @@ import { expect, test as base, type Browser, type BrowserContext, type Page, typ
 
 /** Returns a name that no other call in the test run returns. */
 let counter = 0
+/** The id of the root group, which is the community itself. */
+export const ROOT = '00000000-0000-7000-8000-000000000000'
+
 export const uniq = (prefix: string) => `${prefix}${Date.now().toString(36).slice(-5)}${(counter++).toString(36)}`
 
 /** A signed-in user: their browser context, page and username. */

@@ -5,6 +5,7 @@ import { commentExtensions } from '../editor/extensions'
 import {
   Alert,
   Box,
+  Button,
   Card,
   ConfirmDialog,
   Hairline,
@@ -135,10 +136,11 @@ function CommentItem({ comment, groupId, disabled, onEdit, onDelete }: CommentIt
  * The comment thread under a post. It is a grey
  * panel with its own background. The panel contains the comments, oldest
  * first, with a hairline between each, and the reply editor at the bottom.
- * The reply editor is the only white element in the panel.
+ * The reply editor is the only white element in the panel. A long thread
+ * opens at its newest comments, with Load earlier comments above them.
  */
 export function CommentThread({ postId, groupId, replyTo, disabled }: CommentThreadProps) {
-  const { comments, loading, error } = useComments(postId)
+  const { comments, loading, error, hasEarlier, loadEarlier } = useComments(postId)
   const { create, edit, remove } = useCommentActions(postId, groupId)
 
   return (
@@ -146,7 +148,14 @@ export function CommentThread({ postId, groupId, replyTo, disabled }: CommentThr
       <Stack gap={3}>
         {(loading || error || comments.length > 0) && (
           <Stack gap={2}>
-            {loading && <Text variant="secondary">Loading comments…</Text>}
+            {hasEarlier && (
+              <Row>
+                <Button variant="secondary" busy={loading} onClick={() => void loadEarlier()}>
+                  Load earlier comments
+                </Button>
+              </Row>
+            )}
+            {loading && comments.length === 0 && <Text variant="secondary">Loading comments…</Text>}
             {error && <Alert tone="error">{error.message}</Alert>}
             {comments.map((c, i) => (
               <Box key={c.id}>

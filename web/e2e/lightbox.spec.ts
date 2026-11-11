@@ -1,11 +1,10 @@
 import type { Page } from '@playwright/test'
-import { article, expect, member, open, png, test, uniq } from './helpers'
+import { article, expect, member, open, png, test, uniq, ROOT } from './helpers'
 
 /**
  * An image in a post, comment or message opens alone, full screen, when it is clicked or chosen with Enter. Escape,
  * the close button or a click beside the image closes it. Images load only when they come near the screen.
  */
-const ROOT = '00000000-0000-7000-8000-000000000000'
 
 /** Posts a picture of this size on Home and returns the post's text and the picture's address. */
 async function postPicture(page: Page, w: number, h: number) {

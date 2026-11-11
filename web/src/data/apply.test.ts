@@ -19,7 +19,19 @@ import {
   report,
   user,
 } from '../test-utils'
-import type { Group, Marker, Member, Message, Notification, Post, PostPage, Report, User } from '../api'
+import type {
+  Comment,
+  CommentPage,
+  Group,
+  Marker,
+  Member,
+  Message,
+  Notification,
+  Post,
+  PostPage,
+  Report,
+  User,
+} from '../api'
 
 /**
  * The event stream is the cache's write path. Each resource has one upsert
@@ -33,6 +45,10 @@ const CLUB = 'club'
 let qc: QueryClient
 const posts = (gid = ROOT) => (qc.getQueryData(keys.posts(gid)) as { pages: PostPage[] }).pages.flatMap((p) => p.posts)
 const groups = () => (qc.getQueryData(keys.groups) as { groups: Group[] }).groups
+/** The comments of a post's loaded thread, from every page. */
+const thread = (postId: string) =>
+  (qc.getQueryData(keys.comments(postId)) as { pages: CommentPage[] }).pages.flatMap((p) => p.comments)
+const onePage = (...comments: Comment[]) => ({ pages: [{ comments, next_before: null }], pageParams: [null] })
 const members = (gid: string) =>
   (qc.getQueryData(keys.members(gid)) as { members: { user: User; role: string; hidden_at?: number | null }[] }).members
 
@@ -50,7 +66,7 @@ beforeEach(() => {
     pages: [{ posts: [post('c9', mo, { group_id: CLUB })], next_before: null }],
     pageParams: [null],
   })
-  qc.setQueryData(keys.comments('p2'), { comments: [comment('c1', 'p2', kit)] })
+  qc.setQueryData(keys.comments('p2'), onePage(comment('c1', 'p2', kit)))
   qc.setQueryData(keys.messages(ROOT), {
     pages: [{ messages: [message('m2', mo), message('m1', kit)], next_before: null }],
     pageParams: [null],
@@ -209,19 +225,34 @@ describe('applyEvent', () => {
 
   it('adds a new comment to its thread and increments the post comment count, and an edit replaces the comment without incrementing', () => {
     applyEvent(qc, 'comment', comment('c2', 'p2', mo))
-    expect((qc.getQueryData(keys.comments('p2')) as { comments: unknown[] }).comments).toHaveLength(2)
+    expect(thread('p2')).toHaveLength(2)
     expect(posts().find((p) => p.id === 'p2')?.comment_count).toBe(1)
     applyEvent(qc, 'comment', comment('c2', 'p2', mo, { body_html: '<p>edited</p>', edited_at: 9 }))
-    expect((qc.getQueryData(keys.comments('p2')) as { comments: unknown[] }).comments).toHaveLength(2)
+    expect(thread('p2')).toHaveLength(2)
     expect(posts().find((p) => p.id === 'p2')?.comment_count).toBe(1)
     applyEvent(qc, 'comment', comment('c3', 'p3', mo))
     expect(qc.getQueryData(keys.comments('p3'))).toBeUndefined()
     expect(posts().find((p) => p.id === 'p3')?.comment_count).toBe(1)
   })
 
+  it('adds a new comment to the newest page of a thread whose earlier pages are loaded too', () => {
+    qc.setQueryData(keys.comments('p2'), {
+      pages: [
+        { comments: [comment('c2', 'p2', mo)], next_before: 2 },
+        { comments: [comment('c1', 'p2', kit)], next_before: null },
+      ],
+      pageParams: [null, 2],
+    })
+    applyEvent(qc, 'comment', comment('c3', 'p2', mo))
+    const pages = (qc.getQueryData(keys.comments('p2')) as { pages: CommentPage[] }).pages
+    expect(pages.map((p) => p.comments.map((c) => c.id))).toEqual([['c3', 'c2'], ['c1']])
+    applyEvent(qc, 'comment_delete', { id: 'c1', post_id: 'p2', group_id: ROOT })
+    expect(thread('p2').map((c) => c.id)).toEqual(['c3', 'c2'])
+  })
+
   it('removes a deleted comment and decrements the comment count', () => {
     applyEvent(qc, 'comment_delete', { id: 'c1', post_id: 'p2', group_id: ROOT })
-    expect((qc.getQueryData(keys.comments('p2')) as { comments: unknown[] }).comments).toHaveLength(0)
+    expect(thread('p2')).toHaveLength(0)
     expect(posts().find((p) => p.id === 'p2')?.comment_count).toBe(0)
   })
 
@@ -305,16 +336,14 @@ describe('applyEvent', () => {
   })
 
   it('a user event updates the author in loaded feeds, threads and chats, whether or not the user is in the users list', () => {
-    qc.setQueryData(keys.comments('p2'), { comments: [comment('c1', 'p2', mo)] })
+    qc.setQueryData(keys.comments('p2'), onePage(comment('c1', 'p2', mo)))
     qc.setQueryData(keys.messages(ROOT), {
       pages: [{ messages: [message('m1', mo)], next_before: null }],
       pageParams: [null],
     })
     applyEvent(qc, 'user', { id: 'mo', username: 'removed-abc', picture: null })
     expect(posts().find((p) => p.id === 'p2')?.author.username).toBe('removed-abc')
-    expect((qc.getQueryData(keys.comments('p2')) as { comments: { author: User }[] }).comments[0].author.username).toBe(
-      'removed-abc',
-    )
+    expect(thread('p2')[0].author.username).toBe('removed-abc')
     expect(
       (qc.getQueryData(keys.messages(ROOT)) as { pages: { messages: { author: User }[] }[] }).pages[0].messages[0]
         .author.username,

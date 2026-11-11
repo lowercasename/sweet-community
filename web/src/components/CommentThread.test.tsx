@@ -32,6 +32,7 @@ beforeEach(async () => {
       comment('c-jo', 'p1', user('jo'), { can: nobody }),
       comment('c-bo', 'p1', user('bo'), { can: reportable }),
     ],
+    next_before: null,
   })
 })
 
@@ -75,5 +76,22 @@ describe('CommentThread', () => {
     expect(deleteComment).toHaveBeenCalledWith('c-mo')
     await vi.waitFor(() => expect(screen.queryByText('c-mo says hi')).toBeNull())
     expect(screen.getByText('c-kit says hi')).toBeTruthy()
+  })
+
+  it('shows Load earlier comments when the thread has more, and loads them above', async () => {
+    const { getComments } = await import('../api')
+    vi.mocked(getComments).mockReset()
+    vi.mocked(getComments)
+      .mockResolvedValueOnce({ comments: [comment('c-new', 'p1', mo, { created_at: 20 })], next_before: 20 })
+      .mockResolvedValueOnce({ comments: [comment('c-old', 'p1', kit, { created_at: 10 })], next_before: null })
+    const { CommentThread } = await import('./CommentThread')
+    renderWithQuery(<CommentThread postId="p1" groupId={ROOT} replyTo="kit" disabled={false} />)
+    await screen.findByText('c-new says hi')
+    fireEvent.click(screen.getByRole('button', { name: 'Load earlier comments' }))
+    await screen.findByText('c-old says hi')
+    expect(getComments).toHaveBeenLastCalledWith('p1', 20)
+    const shown = screen.getAllByText(/says hi/).map((e) => e.textContent)
+    expect(shown).toEqual(['c-old says hi', 'c-new says hi'])
+    expect(screen.queryByRole('button', { name: 'Load earlier comments' })).toBeNull()
   })
 })

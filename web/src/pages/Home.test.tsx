@@ -25,7 +25,7 @@ vi.mock('../api', async (importOriginal) => ({
   getPost: vi.fn(),
   getProfile: vi.fn(),
   getUserPosts: vi.fn(() => Promise.resolve({ posts: [], next_before: null })),
-  getComments: vi.fn(() => Promise.resolve({ comments: [] })),
+  getComments: vi.fn(() => Promise.resolve({ comments: [], next_before: null })),
   getMessages: vi.fn(() => Promise.resolve({ messages: [], next_before: null })),
   listTopics: vi.fn(() => Promise.resolve({ topics: [] })),
   listUsers: vi.fn(),

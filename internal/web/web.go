@@ -29,18 +29,19 @@ func Handler() http.Handler {
 			w.Write([]byte(placeholder))
 		})
 	}
-	files := http.FS(sub)
-	fileServer := http.FileServer(files)
+	return serve(sub)
+}
+
+// serve serves the files of the built frontend. Any path that is not a file, a directory included, gets index.html,
+// so a directory is never listed.
+func serve(sub fs.FS) http.Handler {
+	fileServer := http.FileServer(http.FS(sub))
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		p := path.Clean(r.URL.Path)
-		if p != "/" {
-			if f, err := files.Open(strings.TrimPrefix(p, "/")); err == nil {
-				f.Close()
-				fileServer.ServeHTTP(w, r)
-				return
-			}
+		p := strings.TrimPrefix(path.Clean(r.URL.Path), "/")
+		if info, err := fs.Stat(sub, p); err == nil && !info.IsDir() {
+			fileServer.ServeHTTP(w, r)
+			return
 		}
-		// Serve index.html for any path that is not a file.
 		r.URL.Path = "/"
 		fileServer.ServeHTTP(w, r)
 	})

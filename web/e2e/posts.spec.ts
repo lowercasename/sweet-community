@@ -1,4 +1,4 @@
-import { article, confirm, expect, member, open, pick, sendMessage, test, uniq, view, writePost } from './helpers'
+import { article, confirm, expect, member, open, pick, ROOT, sendMessage, test, uniq, view, writePost } from './helpers'
 
 test.describe('posts and comments', () => {
   test('write, edit, comment and delete, and another user sees each change live', async ({ browser }, testInfo) => {
@@ -7,7 +7,7 @@ test.describe('posts and comments', () => {
     // Create enough posts for the pane to scroll. A menu opened from a button that
     // had to be scrolled into view once closed itself one frame later.
     for (let i = 0; i < 14; i++) {
-      await kit.context.request.post('/api/groups/00000000-0000-7000-8000-000000000000/posts', {
+      await kit.context.request.post(`/api/groups/${ROOT}/posts`, {
         data: { body_html: `<p>filler ${i}</p>` },
       })
     }
@@ -190,4 +190,36 @@ test.describe('menus', () => {
     await expect(article(kit.page, text).getByRole('button', { name: 'Post options' })).toHaveCSS('opacity', '1')
     await kit.context.close()
   })
+})
+
+test.describe('long threads', () => {
+  for (const phone of [false, true]) {
+    test(`${phone ? '@phone ' : ''}a long thread opens at its newest comments and loads the earlier ones above`, async ({
+      browser,
+    }, testInfo) => {
+      const kit = await member(browser, testInfo, 'kit')
+      await open(kit.page)
+      const text = uniq('A post with a long thread ')
+      const post = await kit.context.request.post(`/api/groups/${ROOT}/posts`, {
+        data: { body_html: `<p>${text}</p>` },
+      })
+      const pid = ((await post.json()) as { id: string }).id
+      for (let i = 1; i <= 51; i++) {
+        await kit.context.request.post(`/api/posts/${pid}/comments`, {
+          data: { body_html: `<p>Comment number ${i}</p>` },
+        })
+      }
+      await kit.page.goto(`/p/${pid}`)
+      const shown = kit.page.locator('article:visible').filter({ hasText: text })
+      await expect(shown.getByText('Comment number 51', { exact: true })).toBeVisible()
+      await expect(shown.getByText('Comment number 1', { exact: true })).toHaveCount(0)
+      const earlier = shown.getByRole('button', { name: 'Load earlier comments' })
+      await earlier.scrollIntoViewIfNeeded()
+      await kit.page.screenshot({ path: `test-results/thread-load-earlier${phone ? '-phone' : ''}.png` })
+      await earlier.click()
+      await expect(shown.getByText('Comment number 1', { exact: true })).toBeVisible()
+      await expect(earlier).toHaveCount(0)
+      await kit.context.close()
+    })
+  }
 })

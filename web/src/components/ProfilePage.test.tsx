@@ -19,7 +19,7 @@ vi.mock('../api', async (importOriginal) => ({
   listTopics: vi.fn(() => Promise.resolve({ topics: [] })),
   listMembers: vi.fn(() => Promise.resolve({ members: [] })),
   listUsers: vi.fn(() => Promise.resolve({ users: [] })),
-  getComments: vi.fn(() => Promise.resolve({ comments: [] })),
+  getComments: vi.fn(() => Promise.resolve({ comments: [], next_before: null })),
   listMarkers: vi.fn(() => Promise.resolve({ markers: [] })),
 }))
 
