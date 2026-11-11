@@ -176,24 +176,9 @@ func actorIn(ctx context.Context, q *store.Queries, u User, groupID string) (per
 // not revealed. The group and the actor are put in the context.
 func (s *Server) requireGroup(next http.HandlerFunc) http.HandlerFunc {
 	return s.requireAuth(func(w http.ResponseWriter, r *http.Request) {
-		me, _ := userFrom(r.Context())
-		id := r.PathValue("gid")
-		row, err := s.q().GetGroup(r.Context(), id)
-		if errors.Is(err, sql.ErrNoRows) {
-			writeErr(w, http.StatusNotFound, "No such room")
-			return
-		}
+		g, a, status, err := s.groupActor(r, s.q())
 		if err != nil {
-			writeErr(w, http.StatusInternalServerError, err.Error())
-			return
-		}
-		a, err := actorIn(r.Context(), s.q(), me, id)
-		if err != nil {
-			writeErr(w, http.StatusInternalServerError, err.Error())
-			return
-		}
-		if !perm.CanSee(a) {
-			writeErr(w, http.StatusNotFound, "No such room")
+			writeErr(w, status, err.Error())
 			return
 		}
 		st, err := s.settings(r.Context())
@@ -201,13 +186,32 @@ func (s *Server) requireGroup(next http.HandlerFunc) http.HandlerFunc {
 			writeErr(w, http.StatusInternalServerError, err.Error())
 			return
 		}
-		g, err := wireGroup(r.Context(), s.q(), row)
-		if err != nil {
-			writeErr(w, http.StatusInternalServerError, err.Error())
-			return
-		}
 		next(w, r.WithContext(withGroup(r.Context(), groupFor(a, g, st), a)))
 	})
+}
+
+// groupActor reads current room access. Write handlers call it inside their transaction.
+func (s *Server) groupActor(r *http.Request, q *store.Queries) (Group, perm.Actor, int, error) {
+	me, _ := userFrom(r.Context())
+	row, err := q.GetGroup(r.Context(), r.PathValue("gid"))
+	if errors.Is(err, sql.ErrNoRows) {
+		return Group{}, perm.Actor{}, http.StatusNotFound, errors.New("No such room")
+	}
+	if err != nil {
+		return Group{}, perm.Actor{}, http.StatusInternalServerError, err
+	}
+	a, err := actorIn(r.Context(), q, me, row.ID)
+	if err != nil {
+		return Group{}, a, http.StatusInternalServerError, err
+	}
+	if !perm.CanSee(a) {
+		return Group{}, a, http.StatusNotFound, errors.New("No such room")
+	}
+	g, err := wireGroup(r.Context(), q, row)
+	if err != nil {
+		return Group{}, a, http.StatusInternalServerError, err
+	}
+	return g, a, 0, nil
 }
 
 func (s *Server) listGroups(w http.ResponseWriter, r *http.Request) {
@@ -258,20 +262,6 @@ func (s *Server) createGroup(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	me, _ := userFrom(r.Context())
-	root, err := actorIn(r.Context(), s.q(), me, perm.Root)
-	if err != nil {
-		writeErr(w, http.StatusInternalServerError, err.Error())
-		return
-	}
-	st, err := s.settings(r.Context())
-	if err != nil {
-		writeErr(w, http.StatusInternalServerError, err.Error())
-		return
-	}
-	if !perm.CreateGroup(root, st.GroupCreation) {
-		writeErr(w, http.StatusForbidden, "Not allowed")
-		return
-	}
 	now := db.Now()
 	switch in.Kind {
 	case "", perm.KindGroup:
@@ -325,6 +315,9 @@ func (s *Server) openConversation(w http.ResponseWriter, r *http.Request, me Use
 	gid := id.String()
 	ctx := r.Context()
 	s.loggedMany(w, r, now, func(qtx *store.Queries) ([]events.Entry, any, int, error) {
+		if status, err := allowGroupCreation(r, qtx); err != nil {
+			return nil, nil, status, err
+		}
 		row, err := qtx.GetDMByPeople(ctx, key)
 		if err == nil {
 			g, err := wireGroup(ctx, qtx, store.GetGroupRow(row))
@@ -395,6 +388,9 @@ func (s *Server) createGroupWith(w http.ResponseWriter, r *http.Request, kind, n
 	}
 	gid := id.String()
 	s.loggedMany(w, r, now, func(qtx *store.Queries) ([]events.Entry, any, int, error) {
+		if status, err := allowGroupCreation(r, qtx); err != nil {
+			return nil, nil, status, err
+		}
 		if err := qtx.CreateGroup(r.Context(), store.CreateGroupParams{ID: gid, Kind: kind, Name: name, Mode: mode, CreatedAt: now, PeopleKey: sql.NullString{}}); err != nil {
 			return nil, nil, http.StatusInternalServerError, err
 		}
@@ -442,12 +438,15 @@ func (s *Server) setGroupPicture(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusBadRequest, "Bad request")
 		return
 	}
-	g, a := groupFrom(r.Context())
-	if !perm.Rename(a, perm.Group{Kind: g.Kind}) {
-		writeErr(w, http.StatusForbidden, "Not allowed")
-		return
-	}
 	s.logged(w, r, "group", db.Now(), func(qtx *store.Queries) (any, int, error) {
+		g, a, status, err := s.groupActor(r, qtx)
+		if err != nil {
+			return nil, status, err
+		}
+		if !perm.Rename(a, perm.Group{Kind: g.Kind}) {
+			return nil, http.StatusForbidden, errors.New("Not allowed")
+		}
+
 		pic, status, err := pictureImage(r.Context(), qtx, in.ImageID, a.ID)
 		if err != nil {
 			return nil, status, err
@@ -475,36 +474,40 @@ func (s *Server) updateGroup(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusBadRequest, "Bad request")
 		return
 	}
-	g, a := groupFrom(r.Context())
-	pg := perm.Group{Kind: g.Kind}
 	if in.Name != nil {
 		name := strings.TrimSpace(*in.Name)
 		if name == "" || len(name) > 80 {
 			writeErr(w, http.StatusBadRequest, "A room needs a name of up to 80 characters")
 			return
 		}
-		if !perm.Rename(a, pg) {
-			writeErr(w, http.StatusForbidden, "Not allowed")
-			return
-		}
-		g.Name = name
+		in.Name = &name
 	}
-	if in.Mode != nil {
-		if !validMode(*in.Mode) {
-			writeErr(w, http.StatusBadRequest, "Mode must be posts, chat or both")
-			return
-		}
-		if g.Kind == perm.KindDM {
-			writeErr(w, http.StatusBadRequest, "A conversation is chat only")
-			return
-		}
-		if !perm.SetMode(a, pg) {
-			writeErr(w, http.StatusForbidden, "Not allowed")
-			return
-		}
-		g.Mode = *in.Mode
+	if in.Mode != nil && !validMode(*in.Mode) {
+		writeErr(w, http.StatusBadRequest, "Mode must be posts, chat or both")
+		return
 	}
 	s.logged(w, r, "group", db.Now(), func(qtx *store.Queries) (any, int, error) {
+		g, a, status, err := s.groupActor(r, qtx)
+		if err != nil {
+			return nil, status, err
+		}
+		pg := perm.Group{Kind: g.Kind}
+		if in.Name != nil {
+			if !perm.Rename(a, pg) {
+				return nil, http.StatusForbidden, errors.New("Not allowed")
+			}
+			g.Name = *in.Name
+		}
+		if in.Mode != nil {
+			if g.Kind == perm.KindDM {
+				return nil, http.StatusBadRequest, errors.New("A conversation is chat only")
+			}
+			if !perm.SetMode(a, pg) {
+				return nil, http.StatusForbidden, errors.New("Not allowed")
+			}
+			g.Mode = *in.Mode
+		}
+
 		if err := qtx.UpdateGroup(r.Context(), store.UpdateGroupParams{Name: g.Name, Mode: g.Mode, ID: g.ID}); err != nil {
 			return nil, http.StatusInternalServerError, err
 		}
@@ -518,13 +521,16 @@ func (s *Server) updateGroup(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) deleteGroup(w http.ResponseWriter, r *http.Request) {
-	g, a := groupFrom(r.Context())
-	if !perm.DeleteGroup(a, perm.Group{Kind: g.Kind}) {
-		writeErr(w, http.StatusForbidden, "Not allowed")
-		return
-	}
 	now := db.Now()
 	s.loggedMany(w, r, now, func(qtx *store.Queries) ([]events.Entry, any, int, error) {
+		g, a, status, err := s.groupActor(r, qtx)
+		if err != nil {
+			return nil, nil, status, err
+		}
+		if !perm.DeleteGroup(a, perm.Group{Kind: g.Kind}) {
+			return nil, nil, http.StatusForbidden, errors.New("Not allowed")
+		}
+
 		gone, err := removeGroup(r.Context(), qtx, g.ID, now)
 		if err != nil {
 			return nil, nil, http.StatusInternalServerError, err
@@ -603,13 +609,16 @@ func (s *Server) addMember(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusBadRequest, "Bad request")
 		return
 	}
-	g, a := groupFrom(r.Context())
-	if !perm.AddMembers(a, perm.Group{Kind: g.Kind}) || g.Kind == perm.KindRoot {
-		writeErr(w, http.StatusForbidden, "Not allowed")
-		return
-	}
 	now := db.Now()
 	s.loggedMany(w, r, now, func(qtx *store.Queries) ([]events.Entry, any, int, error) {
+		g, a, status, err := s.groupActor(r, qtx)
+		if err != nil {
+			return nil, nil, status, err
+		}
+		if !perm.AddMembers(a, perm.Group{Kind: g.Kind}) || g.Kind == perm.KindRoot {
+			return nil, nil, http.StatusForbidden, errors.New("Not allowed")
+		}
+
 		if u, err := qtx.GetUser(r.Context(), in.UserID); errors.Is(err, sql.ErrNoRows) || (err == nil && u.RemovedAt.Valid) {
 			return nil, nil, http.StatusNotFound, errors.New("No such person")
 		} else if err != nil {
@@ -658,11 +667,15 @@ func (s *Server) setMemberRole(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusBadRequest, "Role must be member, moderator or owner")
 		return
 	}
-	g, a := groupFrom(r.Context())
 	me, _ := userFrom(r.Context())
 	uid := r.PathValue("uid")
 	now := db.Now()
 	s.loggedMany(w, r, now, func(qtx *store.Queries) ([]events.Entry, any, int, error) {
+		g, a, status, err := s.groupActor(r, qtx)
+		if err != nil {
+			return nil, nil, status, err
+		}
+
 		target, err := actorIn(r.Context(), qtx, User{ID: uid}, g.ID)
 		if err != nil {
 			return nil, nil, http.StatusInternalServerError, err
@@ -714,10 +727,14 @@ func (s *Server) setMemberRole(w http.ResponseWriter, r *http.Request) {
 // member remove themselves, which is leaving. Neither applies to the root
 // group.
 func (s *Server) removeMember(w http.ResponseWriter, r *http.Request) {
-	g, a := groupFrom(r.Context())
 	uid := r.PathValue("uid")
 	me, _ := userFrom(r.Context())
 	s.loggedMany(w, r, db.Now(), func(qtx *store.Queries) ([]events.Entry, any, int, error) {
+		g, a, status, err := s.groupActor(r, qtx)
+		if err != nil {
+			return nil, nil, status, err
+		}
+
 		target, err := actorIn(r.Context(), qtx, User{ID: uid}, g.ID)
 		if err != nil {
 			return nil, nil, http.StatusInternalServerError, err
@@ -814,4 +831,21 @@ func (s *Server) setSettings(w http.ResponseWriter, r *http.Request) {
 		st, err := settingsOf(r.Context(), qtx)
 		return st, http.StatusOK, err
 	})
+}
+
+// allowGroupCreation reads the current community role and room creation policy.
+func allowGroupCreation(r *http.Request, q *store.Queries) (int, error) {
+	me, _ := userFrom(r.Context())
+	root, err := actorIn(r.Context(), q, me, perm.Root)
+	if err != nil {
+		return http.StatusInternalServerError, err
+	}
+	st, err := settingsOf(r.Context(), q)
+	if err != nil {
+		return http.StatusInternalServerError, err
+	}
+	if !perm.CreateGroup(root, st.GroupCreation) {
+		return http.StatusForbidden, errors.New("Not allowed")
+	}
+	return 0, nil
 }

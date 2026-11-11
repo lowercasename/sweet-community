@@ -460,7 +460,8 @@ func (s *Server) logged(w http.ResponseWriter, r *http.Request, kind string, now
 }
 
 // loggedMany is logged for a write that produces several events, such as a
-// new group and its memberships. The response is the given value, personalised.
+// new group and its memberships. It rechecks the session and staff rule before writing.
+// Entries may be empty for writes that have no event. The response is personalised.
 func (s *Server) loggedMany(w http.ResponseWriter, r *http.Request, now int64, fn func(qtx *store.Queries) (entries []events.Entry, response any, status int, err error)) {
 	ctx := r.Context()
 	tx, err := s.DB.BeginTx(ctx, nil) // BEGIN IMMEDIATE via _txlock
@@ -470,6 +471,10 @@ func (s *Server) loggedMany(w http.ResponseWriter, r *http.Request, now int64, f
 	}
 	defer tx.Rollback()
 	qtx := store.New(tx)
+	if status, err := s.authorizeWrite(r, qtx); err != nil {
+		writeErr(w, status, err.Error())
+		return
+	}
 	entries, response, status, err := fn(qtx)
 	if err != nil {
 		writeErr(w, status, err.Error())
@@ -494,7 +499,7 @@ func (s *Server) loggedMany(w http.ResponseWriter, r *http.Request, now int64, f
 			writeErr(w, http.StatusInternalServerError, err.Error())
 			return
 		}
-		if st, err = s.settings(ctx); err != nil {
+		if st, err = settingsOf(ctx, qtx); err != nil {
 			writeErr(w, http.StatusInternalServerError, err.Error())
 			return
 		}
@@ -503,7 +508,9 @@ func (s *Server) loggedMany(w http.ResponseWriter, r *http.Request, now int64, f
 		writeErr(w, http.StatusInternalServerError, err.Error())
 		return
 	}
-	s.Hub.Notify()
+	if len(logged) > 0 {
+		s.Hub.Notify()
+	}
 	var told []json.RawMessage
 	for _, ev := range logged {
 		if ev.Kind == "notification" {
@@ -523,22 +530,8 @@ func (s *Server) loggedMany(w http.ResponseWriter, r *http.Request, now int64, f
 var errNotFound = errors.New("Not found")
 
 func (s *Server) createPost(w http.ResponseWriter, r *http.Request) {
-	g, a := groupFrom(r.Context())
-	if !perm.Write(a) {
-		writeErr(w, http.StatusForbidden, "Not allowed")
-		return
-	}
-	if g.Mode == perm.ModeChat {
-		writeErr(w, http.StatusForbidden, "This room has no posts")
-		return
-	}
 	clean, topicID, ok := readPostBody(w, r)
 	if !ok {
-		return
-	}
-	// Only the community's feed has topics.
-	if topicID != nil && g.ID != perm.Root {
-		writeErr(w, http.StatusBadRequest, "Only posts on the community's feed have topics")
 		return
 	}
 	id, err := uuid.NewV7()
@@ -550,6 +543,21 @@ func (s *Server) createPost(w http.ResponseWriter, r *http.Request) {
 	now := db.Now()
 	// The post, a notification to each user it mentions, and a notification to each follower of its topic are written in one transaction.
 	s.loggedMany(w, r, now, func(qtx *store.Queries) ([]events.Entry, any, int, error) {
+		g, a, status, err := s.groupActor(r, qtx)
+		if err != nil {
+			return nil, nil, status, err
+		}
+		if !perm.Write(a) {
+			return nil, nil, http.StatusForbidden, errors.New("Not allowed")
+		}
+		if g.Mode == perm.ModeChat {
+			return nil, nil, http.StatusForbidden, errors.New("This room has no posts")
+		}
+		// Only the community's feed has topics.
+		if topicID != nil && g.ID != perm.Root {
+			return nil, nil, http.StatusBadRequest, errors.New("Only posts on the community's feed have topics")
+		}
+
 		if status, err := topicExists(r, qtx, topicID); err != nil {
 			return nil, nil, status, err
 		}

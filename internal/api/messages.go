@@ -66,15 +66,6 @@ func (s *Server) listMessages(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) createMessage(w http.ResponseWriter, r *http.Request) {
-	g, a := groupFrom(r.Context())
-	if !perm.Write(a) {
-		writeErr(w, http.StatusForbidden, "Not allowed")
-		return
-	}
-	if g.Mode == perm.ModePosts {
-		writeErr(w, http.StatusForbidden, "This room has no chat")
-		return
-	}
 	clean, replyTo, ok := readMessageBody(w, r)
 	if !ok {
 		return
@@ -90,6 +81,17 @@ func (s *Server) createMessage(w http.ResponseWriter, r *http.Request) {
 	// mentions, a reply notification to the author of the message it replies
 	// to, and in a conversation a notification to the other member.
 	s.loggedMany(w, r, now, func(qtx *store.Queries) ([]events.Entry, any, int, error) {
+		g, a, status, err := s.groupActor(r, qtx)
+		if err != nil {
+			return nil, nil, status, err
+		}
+		if !perm.Write(a) {
+			return nil, nil, http.StatusForbidden, errors.New("Not allowed")
+		}
+		if g.Mode == perm.ModePosts {
+			return nil, nil, http.StatusForbidden, errors.New("This room has no chat")
+		}
+
 		// A reply must point at a live message in this chat.
 		answered := "" // the author of the message replied to
 		reply := sql.NullString{}

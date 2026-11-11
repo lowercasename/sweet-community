@@ -40,11 +40,12 @@ func (s *Server) createInvite(w http.ResponseWriter, r *http.Request) {
 	}
 	now := db.Now()
 	inv := Invite{Code: code, URL: "/join/" + code, CreatedBy: u, CreatedAt: now, ExpiresAt: now + InviteTTL.Milliseconds()}
-	if err := s.q().CreateInvite(r.Context(), store.CreateInviteParams{Code: inv.Code, CreatedBy: u.ID, CreatedAt: inv.CreatedAt, ExpiresAt: inv.ExpiresAt}); err != nil {
-		writeErr(w, http.StatusInternalServerError, err.Error())
-		return
-	}
-	writeJSON(w, http.StatusCreated, inv)
+	s.loggedMany(w, r, now, func(qtx *store.Queries) ([]events.Entry, any, int, error) {
+		if err := qtx.CreateInvite(r.Context(), store.CreateInviteParams{Code: inv.Code, CreatedBy: u.ID, CreatedAt: inv.CreatedAt, ExpiresAt: inv.ExpiresAt}); err != nil {
+			return nil, nil, http.StatusInternalServerError, err
+		}
+		return nil, inv, http.StatusCreated, nil
+	})
 }
 
 // listInvites (owner) returns the links that are still valid.
@@ -66,16 +67,16 @@ func (s *Server) listInvites(w http.ResponseWriter, r *http.Request) {
 
 // deleteInvite (owner) revokes a valid link.
 func (s *Server) deleteInvite(w http.ResponseWriter, r *http.Request) {
-	n, err := s.q().DeleteOpenInvite(r.Context(), r.PathValue("code"))
-	if err != nil {
-		writeErr(w, http.StatusInternalServerError, err.Error())
-		return
-	}
-	if n == 0 {
-		writeErr(w, http.StatusNotFound, "No such invite")
-		return
-	}
-	w.WriteHeader(http.StatusNoContent)
+	s.loggedMany(w, r, db.Now(), func(qtx *store.Queries) ([]events.Entry, any, int, error) {
+		n, err := qtx.DeleteOpenInvite(r.Context(), r.PathValue("code"))
+		if err != nil {
+			return nil, nil, http.StatusInternalServerError, err
+		}
+		if n == 0 {
+			return nil, nil, http.StatusNotFound, errors.New("No such invite")
+		}
+		return nil, nil, http.StatusNoContent, nil
+	})
 }
 
 // getInvite (public) returns whether a link is valid and who created it, for the join page.

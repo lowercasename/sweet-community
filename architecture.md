@@ -232,6 +232,8 @@ One function decides visibility. List queries apply the same rule in SQL, and a 
 
 One package on the server holds every rule about who may do what. Each rule takes the actor's role in the object's group.
 
+Room and staff actions use the current permissions when the change is saved. The permission check and the change happen in one transaction. A request that started earlier keeps no permission after membership is removed or a role changes. The server reads the request body before opening the transaction, so a slow request does not block other writes.
+
 - An author edits their own posts and comments and deletes their own content. A post's author may also delete comments on it.
 - A group's owner and moderators delete anything in it and edit nothing that others wrote, except a post's topic. They add and remove members.
 - Only a group's owner sets roles, hands over ownership, renames the group, sets its mode, or deletes it.

@@ -35,6 +35,7 @@ const (
 	userKey ctxKey = iota
 	sessionKey
 	groupKey
+	rootPermissionKey
 )
 
 // userFrom returns the authenticated user when the handler is wrapped by requireAuth.
@@ -115,7 +116,7 @@ func (s *Server) requireAuth(next http.HandlerFunc) http.HandlerFunc {
 }
 
 // requireRoot is requireAuth plus a check of the user's role in the root
-// group. The instance's staff are the root group's staff.
+// group. The write transaction checks the same rule again with the current role.
 func (s *Server) requireRoot(ok func(perm.Actor) bool, next http.HandlerFunc) http.HandlerFunc {
 	return s.requireAuth(func(w http.ResponseWriter, r *http.Request) {
 		u, _ := userFrom(r.Context())
@@ -128,7 +129,7 @@ func (s *Server) requireRoot(ok func(perm.Actor) bool, next http.HandlerFunc) ht
 			writeErr(w, http.StatusForbidden, "Not allowed")
 			return
 		}
-		next(w, r)
+		next(w, r.WithContext(context.WithValue(r.Context(), rootPermissionKey, ok)))
 	})
 }
 
@@ -360,4 +361,26 @@ func (s *Server) logoutAll(w http.ResponseWriter, r *http.Request) {
 func (s *Server) me(w http.ResponseWriter, r *http.Request) {
 	u, _ := userFrom(r.Context())
 	writeJSON(w, http.StatusOK, u)
+}
+
+// authorizeWrite checks the current session and the route's staff rule inside the write transaction.
+func (s *Server) authorizeWrite(r *http.Request, q *store.Queries) (int, error) {
+	ctx := r.Context()
+	row, err := q.GetSessionUser(ctx, store.GetSessionUserParams{ID: sessionFrom(ctx), Now: db.Now()})
+	if errors.Is(err, sql.ErrNoRows) {
+		return http.StatusUnauthorized, errors.New("Sign in first")
+	}
+	if err != nil {
+		return http.StatusInternalServerError, err
+	}
+	if allowed, ok := ctx.Value(rootPermissionKey).(func(perm.Actor) bool); ok {
+		actor, err := actorIn(ctx, q, User{ID: row.ID}, perm.Root)
+		if err != nil {
+			return http.StatusInternalServerError, err
+		}
+		if !allowed(actor) {
+			return http.StatusForbidden, errors.New("Not allowed")
+		}
+	}
+	return 0, nil
 }

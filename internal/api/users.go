@@ -66,22 +66,20 @@ func (s *Server) removeUser(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	me, _ := userFrom(ctx)
 	uid := r.PathValue("id")
-	a, err := actorIn(ctx, s.q(), me, perm.Root)
-	if err != nil {
-		writeErr(w, http.StatusInternalServerError, err.Error())
-		return
-	}
-	target, err := actorIn(ctx, s.q(), User{ID: uid}, perm.Root)
-	if err != nil {
-		writeErr(w, http.StatusInternalServerError, err.Error())
-		return
-	}
-	if !perm.RemoveFromInstance(a, target) {
-		writeErr(w, http.StatusForbidden, "Not allowed")
-		return
-	}
 	now := db.Now()
 	s.loggedMany(w, r, now, func(qtx *store.Queries) ([]events.Entry, any, int, error) {
+		a, err := actorIn(ctx, qtx, me, perm.Root)
+		if err != nil {
+			return nil, nil, http.StatusInternalServerError, err
+		}
+		target, err := actorIn(ctx, qtx, User{ID: uid}, perm.Root)
+		if err != nil {
+			return nil, nil, http.StatusInternalServerError, err
+		}
+		if !perm.RemoveFromInstance(a, target) {
+			return nil, nil, http.StatusForbidden, errors.New("Not allowed")
+		}
+
 		if err := qtx.RemoveUser(ctx, store.RemoveUserParams{Username: removedName(uid), RemovedAt: sql.NullInt64{Int64: now, Valid: true}, ID: uid}); err != nil {
 			return nil, nil, http.StatusInternalServerError, err
 		}
