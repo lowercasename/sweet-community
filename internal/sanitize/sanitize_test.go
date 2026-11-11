@@ -116,7 +116,7 @@ func TestTextAndEmpty(t *testing.T) {
 }
 
 // Empty paragraphs at the start and end of a body are removed when it is
-// sent (Raphael, 2026-11-08). A paragraph that holds only spaces, a
+// sent. A paragraph that holds only spaces, a
 // non-breaking space or line breaks counts as empty. Empty paragraphs between
 // two others are kept, because the author put them there as spacing.
 func TestTrimsEmptyParagraphsAtTheEdges(t *testing.T) {

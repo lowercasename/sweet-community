@@ -30,8 +30,7 @@ interface NotificationsPageProps {
  * The user's notifications, newest first, in
  * two sections. Each notification is a sentence that opens its target when
  * clicked. New holds the unopened notifications. Opening one marks it read
- * and moves it to Earlier. Viewing the page marks nothing as read (Raphael,
- * 2026-11-06). Clear permanently deletes the notifications in Earlier.
+ * and moves it to Earlier. Viewing the page marks nothing as read. Clear permanently deletes the notifications in Earlier.
  */
 export function NotificationsPage({ groups, onGo }: NotificationsPageProps) {
   const { notifications, loading, error, hasMore, loadMore } = useNotifications()

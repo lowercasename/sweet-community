@@ -30,7 +30,7 @@ function at(location: string, path: string): boolean {
  * The third block has the community items. These are People, then Community
  * for the owner, then the user's own profile page, where Settings is reached.
  * Community is in the nav because a page about the community does not belong
- * under the owner's own page (Raphael, 2026-11-06). The top of the nav shows
+ * under the owner's own page. The top of the nav shows
  * the community's name.
  */
 export function Sidebar({ me, groups, location, expanded, onGo, onToggle }: SidebarProps) {

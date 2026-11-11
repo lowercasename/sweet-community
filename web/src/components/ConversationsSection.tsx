@@ -40,7 +40,7 @@ interface ConversationsSectionProps {
  * conversation is labelled with the other user's name and shown with their
  * avatar. An All conversations link is shown at the bottom when there are more
  * conversations than the section lists. With five or fewer, the link was a
- * row with no purpose (Raphael, 2026-11-06). A conversation is a group
+ * row with no purpose. A conversation is a group
  * without a name, so its rows are drawn the same way as room rows.
  */
 export function ConversationsSection({ groups, me, location, places, expanded, onGo }: ConversationsSectionProps) {

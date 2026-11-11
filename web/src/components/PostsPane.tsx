@@ -55,7 +55,7 @@ export function PostsPane({ groupId, side = 'full', watching, topicId = null, fo
   const { topics } = useTopics()
   const topical = groupId === ROOT_ID && topics.length > 0
   // The owner and moderators manage topics. With none yet, the feed offers them Add topics, so the setting is found
-  // where topics are used (Raphael, 2026-11-08). Members see nothing until a topic exists.
+  // where topics are used. Members see nothing until a topic exists.
   const { groups } = useGroups()
   const staff = groupId === ROOT_ID && groups.find((g) => g.id === ROOT_ID)?.can.manage_topics === true
   const topic = topical ? topics.find((t) => t.id === topicId) : undefined
@@ -73,7 +73,7 @@ export function PostsPane({ groupId, side = 'full', watching, topicId = null, fo
     }
   }
   const post = async (html: string) => {
-    // The post gets the topic the feed is currently filtered to, or no topic (Raphael, 2026-11-08).
+    // The post gets the topic the feed is currently filtered to, or no topic.
     await create(html, topical ? (topic?.id ?? null) : null)
   }
 

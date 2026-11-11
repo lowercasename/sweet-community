@@ -102,7 +102,7 @@ test.describe('roles', () => {
       await kit.page.reload()
       await expect(kit.page.getByRole('button', { name: 'Send a sign-in email' })).toBeVisible()
       await expect(kit.page.getByRole('navigation', { name: 'Main' })).toHaveCount(0)
-      // Kit's post is deleted with the account (Raphael, 2026-11-08). It leaves a page that was already open, and it is
+      // Kit's post is deleted with the account. It leaves a page that was already open, and it is
       // not there after a fresh load.
       await expect(article(mo.page, text)).toHaveCount(0)
       await open(o.page)

@@ -104,7 +104,7 @@ describe('PostsPane filtered to a topic', () => {
     expect(getPosts).toHaveBeenCalledWith(ROOT, null, 20, null)
     expect((await screen.findByRole('button', { name: 'Showing' })).textContent).toContain('Everything')
     expect(screen.queryByRole('button', { name: 'Subscribe' })).toBeNull()
-    // The composer has no topic control. A post gets the topic the feed is filtered to (Raphael, 2026-11-08).
+    // The composer has no topic control. A post gets the topic the feed is filtered to.
     expect(screen.queryByRole('button', { name: 'Topic' })).toBeNull()
   })
 })

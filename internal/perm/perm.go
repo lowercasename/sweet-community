@@ -102,15 +102,14 @@ func ManageInstance(root Actor) bool { return root.Role == Owner }
 // of topics.
 func ManageTopics(root Actor) bool { return root.staff() }
 
-// ManageRules allows the root group's owner and moderators to write the community's rules (Raphael, 2026-11-08).
+// ManageRules allows the root group's owner and moderators to write the community's rules.
 func ManageRules(root Actor) bool { return root.staff() }
 
-// ManageWelcome allows the root group's owner and moderators to write the welcome message, as they write the rules
-// (Raphael, 2026-11-09).
+// ManageWelcome allows the root group's owner and moderators to write the welcome message, as they write the rules.
 func ManageWelcome(root Actor) bool { return root.staff() }
 
 // Report allows any member of the group an item is in, except the item's author, to report it to the community's
-// owner and moderators (Raphael, 2026-11-08). Moderators may report too.
+// owner and moderators. Moderators may report too.
 func Report(a Actor, authorID string) bool { return a.member() && a.ID != authorID }
 
 // HandleReports allows the root group's owner and moderators to read reports and to close them by dismissing them or
@@ -124,7 +123,7 @@ func HandleReport(root Actor, authorID string) bool {
 }
 
 // OpenReported allows a moderator to open a reported item in place when they can see it. An item in a conversation
-// is never opened, because a conversation belongs to its two people (Raphael, 2026-11-08).
+// is never opened, because a conversation belongs to its two people.
 func OpenReported(a Actor, g Group) bool { return a.member() && g.Kind != KindDM }
 
 // ByRole reports whether an action is allowed only because of the actor's role in the group. It is allowed, and it
@@ -135,8 +134,7 @@ func ByRole(a Actor, allowed func(Actor) bool) bool {
 
 // SetTopic allows the author to set the topic of their own post, and the root
 // group's staff to set the topic of any post. It is the only change staff may
-// make to another user's post (Raphael, 2026-11-07: setting a topic is
-// moderation, not rewriting). The actor's role is their role in the root
+// make to another user's post. Setting a topic is moderation, not rewriting. The actor's role is their role in the root
 // group, because only the community's feed has topics.
 func SetTopic(root Actor, p Post) bool {
 	return root.member() && (root.ID == p.AuthorID || root.staff())

@@ -4,8 +4,8 @@ import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 
 /**
  * The setup link's page. The person holding the link sets up their account
- * with a username and an email address. There is no password, because a password is always the secondary way in
- * (Raphael, 2026-11-09). A password can be added on Settings later.
+ * with a username and an email address. There is no password, because a password is always the secondary way in.
+ * A password can be added on Settings later.
  */
 vi.mock('../api', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../api')>()),

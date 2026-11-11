@@ -67,8 +67,7 @@ export const REVEAL: Record<'post' | 'comment' | 'message', string> = {
 export const GHOST_HOVER = 'hover:bg-ink/5 hover:text-ink'
 /**
  * The same hover for a control that has its own card background, such as a collapsed pane's rail. The tint is mixed
- * into the card colour, so the control stays opaque and the dotted page does not show through it (Raphael,
- * 2026-11-09).
+ * into the card colour, so the control stays opaque and the dotted page does not show through it.
  */
 export const GHOST_HOVER_SOLID = 'hover:bg-[color-mix(in_oklab,var(--color-ink)_5%,var(--color-card))] hover:text-ink'
 export const GHOST_CURRENT = 'aria-[current=page]:bg-blush aria-[current=page]:text-sweet'

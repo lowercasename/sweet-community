@@ -18,7 +18,7 @@ interface MenuPageProps {
  * sections, with the account first and Sign out last. Search and
  * Notifications are tabs, so they are not repeated here. The menu fills the
  * whole screen with no inset and no bar above it, because a menu is not a
- * view that needs a title (Raphael, 2026-11-06).
+ * view that needs a title.
  */
 export function MenuPage({ me, groups, onGo, onLogout }: MenuPageProps) {
   const rules = useRules()
@@ -76,7 +76,7 @@ export function MenuPage({ me, groups, onGo, onLogout }: MenuPageProps) {
               onClick={() => onGo(COMMUNITY)}
             />
           )}
-          {/* On the phone the rules are here, at the end of the menu, not in Home's bar (Raphael, 2026-11-08). */}
+          {/* On the phone the rules are here, at the end of the menu, not in Home's bar. */}
           {rules && <NavItem icon="rules" label="Rules" expanded onClick={() => onGo(RULES)} />}
           <Hairline />
           <NavItem icon="logout" label="Sign out" expanded onClick={onLogout} />

@@ -8,8 +8,7 @@ import (
 	"testing"
 )
 
-// Every email uses one template (Raphael, 2026-11-07: pared down, quick to
-// read, consistent). The text names the community, states the message and
+// Every email uses one short, consistent template. The text names the community, states the message and
 // gives the link. The HTML is the same message in one column.
 func TestContentRendersTextAndHTMLAlike(t *testing.T) {
 	c := Content{

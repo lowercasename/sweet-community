@@ -3,8 +3,7 @@ import { anyView, article, expect, member, open, owner, test, uniq, writePost } 
 
 /**
  * How far the shield's centre sits below the centre of the text beside it, in pixels. The shield is centred on the
- * text and then lowered by about a pixel, because its point is narrow and a centred shield looks high. Raphael found
- * it off the text's line on 2026-11-09, when it was up to 2px high.
+ * text and then lowered by about a pixel, because its point is narrow and a centred shield looks high.
  */
 async function shieldDrop(shield: Locator, text: Locator): Promise<number> {
   const s = (await shield.locator('svg').boundingBox())!
@@ -52,8 +51,7 @@ test.describe('shields', () => {
       await expect(del).toHaveAttribute('aria-description', 'Only owners and moderators can do this')
       await expect(del.locator('[data-shield]')).toBeVisible()
       onTheLine(await shieldDrop(del.locator('[data-shield]'), del))
-      // Menu items use the buttons' 15px text. A destructive item turns blush on hover, as a danger button does
-      // (Raphael, 2026-11-09).
+      // Menu items use the buttons' 15px text. A destructive item turns blush on hover, as a danger button does.
       await expect(del).toHaveCSS('font-size', '15px')
       await del.hover()
       await expect(del).toHaveCSS('background-color', 'rgb(253, 232, 232)')

@@ -340,7 +340,7 @@ func closeReports(ctx context.Context, qtx *store.Queries, kind, id, by, outcome
 }
 
 // closeReportsAbout closes the open reports of a removed user's content and clears the copies that reports kept of
-// it (Raphael, 2026-11-08: a removed user's content goes).
+// it.
 func closeReportsAbout(ctx context.Context, qtx *store.Queries, author, by string, now int64) ([]events.Entry, error) {
 	items, err := qtx.ListOpenReportItemsByAuthor(ctx, author)
 	if err != nil {

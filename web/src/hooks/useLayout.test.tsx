@@ -37,7 +37,7 @@ describe('useLayout', () => {
   })
 
   it('starts with the nav expanded when this browser has stored nothing, and remembers a collapse', async () => {
-    // A new user, or the owner just after onboarding, sees the nav's labels (Raphael, 2026-11-09).
+    // A new user, or the owner just after onboarding, sees the nav's labels.
     localStorage.removeItem('sweet.nav')
     vi.resetModules()
     const fresh = await import('./useLayout')

@@ -22,7 +22,7 @@ import { useTooltip } from './Tooltip'
 
 /**
  * An item's colours. Items use the buttons' 15px text. An item that removes something is red and turns blush on hover,
- * as a danger button does, rather than grey (Raphael, 2026-11-09).
+ * as a danger button does, rather than grey.
  */
 const ITEM_TONE = {
   plain: 'text-ink hover:bg-field focus:bg-field',

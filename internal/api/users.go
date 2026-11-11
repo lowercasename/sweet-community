@@ -141,7 +141,7 @@ func (s *Server) removeUser(w http.ResponseWriter, r *http.Request) {
 				}
 			}
 		}
-		// Their posts, comments and messages are deleted and their text is cleared (Raphael, 2026-11-08). This runs
+		// Their posts, comments and messages are deleted and their text is cleared. This runs
 		// after the rooms they were alone in are deleted, so nothing from those rooms is logged again.
 		erased, err := eraseContent(ctx, qtx, uid, now)
 		if err != nil {

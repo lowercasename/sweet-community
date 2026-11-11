@@ -120,4 +120,4 @@ Button: Show welcome
 
 ## Decided
 
-The owner and moderators edit the welcome message, as they do the rules (Raphael, 2026-11-09).
+The owner and moderators edit the welcome message, as they do the rules.

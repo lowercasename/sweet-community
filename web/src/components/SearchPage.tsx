@@ -38,7 +38,7 @@ const QUERY_MAX = 200
  * its kind, its location, its author and its time, with the matching words
  * marked. A hit opens its post, or its group for a message. The search input
  * takes the whole width and Enter submits the search. A search input needs no
- * label and no button beside it (Raphael, 2026-11-06).
+ * label and no button beside it.
  */
 export function SearchPage({ query, groups, onGo }: SearchPageProps) {
   const [typed, setTyped] = useState(query)

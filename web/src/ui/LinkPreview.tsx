@@ -39,7 +39,7 @@ const SQUARE_ENOUGH = 1.3
  * A link preview card, the shape of old Sweet's: the page's picture on the left, then the title on one line, the
  * description on two (one when narrow), and the page's domain. It is 100px tall, and 76px when the card is narrower
  * than 400px, as on a phone. The picture area is 1.91 times as wide as it is tall (191 by 100, or 145 by 76), the
- * shape of the 1200 by 630 pictures that most pages give, so their pictures show whole (Raphael, 2026-11-10). A picture
+ * shape of the 1200 by 630 pictures that most pages give, so their pictures show whole. A picture
  * close to square, such as a logo, is shown whole and centred on grey. A page with no picture gets the grey area with
  * a link icon, so every card has the same shape. The whole card is one link that opens the page in a new tab. Its
  * width is its column's, up to the 680px reading width, so the description has room.

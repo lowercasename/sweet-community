@@ -8,9 +8,9 @@ import { TopicsCard } from './TopicsCard'
 
 /**
  * The page for the community's reports, settings, welcome message, rules and topics. It is linked from the nav, not
- * from the owner's profile page (Raphael, 2026-11-06). The reports come first, because they wait for someone to act on
- * them. A moderator sees the reports, the welcome message, the rules and the topics, and not the community's settings
- * (Raphael, 2026-11-08). The root group's flags decide which cards show. `editing` opens the welcome message in the
+ * from the owner's profile page. The reports come first, because they wait for someone to act on
+ * them. A moderator sees the reports, the welcome message, the rules and the topics, and not the community's settings.
+ * The root group's flags decide which cards show. `editing` opens the welcome message in the
  * editor, for the tour's last step for the owner.
  */
 export function CommunityPage({ root, editing }: { root: Group; editing?: 'welcome' }) {

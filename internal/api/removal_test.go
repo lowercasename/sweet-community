@@ -83,8 +83,8 @@ func TestRemoveFromInstance(t *testing.T) {
 		}
 	}
 	removed := removedName(kitID)
-	// Their posts, comments and messages are deleted, and comments by others on their posts go with the posts
-	// (Raphael, 2026-11-08). The text is cleared, so it is not kept in the database either.
+	// Their posts, comments and messages are deleted, and comments by others on their posts go with the posts.
+	// The text is cleared, so it is not kept in the database either.
 	for _, p := range owner.mustStatus(200, "GET", rootPath+"/posts?limit=50", nil)["posts"].([]any) {
 		if p.(map[string]any)["id"] == post["id"] {
 			t.Fatal("the removed person's post is still in the feed")

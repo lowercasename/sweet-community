@@ -1,6 +1,6 @@
 # Sweet: design
 
-This document records what Sweet does and why. Each decision names who made it and when, where that is known. The code shows how each part is built. Features that are designed but not built are marked as planned.
+This document records what Sweet does and why. The code shows how each part is built. Features that are designed but not built are marked as planned.
 
 ## What Sweet is
 
@@ -10,14 +10,14 @@ Old Sweet was the first version of the product. It stored post bodies in four fo
 
 ### Words in the interface
 
-- An instance is called a community (Raphael, 2026-11-06).
-- A group is called a room (Raphael, 2026-11-05). The code keeps the word group, because Home and conversations are also groups.
-- A private chat between two people is called a conversation (Raphael, 2026-11-08).
+- An instance is called a community.
+- A group is called a room. The code keeps the word group, because Home and conversations are also groups.
+- A private chat between two people is called a conversation.
 - Following a topic is called subscribing.
 
-Copy is written for a person who has never used Sweet (Raphael, 2026-11-07). It explains Sweet's terms where the user first meets them and never describes how the software works. It uses no semicolons. Server error messages are capitalised sentences, because the client shows them unchanged.
+Copy is written for a person who has never used Sweet. It explains Sweet's terms where the user first meets them and never describes how the software works. It uses no semicolons. Server error messages are capitalised sentences, because the client shows them unchanged.
 
-An error never shows a status code or a page from a proxy (Raphael, 2026-11-10). The client shows the server's own message when there is one. Otherwise it shows a general message, or a message that the connection failed.
+An error never shows a status code or a page from a proxy. The client shows the server's own message when there is one. Otherwise it shows a general message, or a message that the connection failed.
 
 ## Stack
 
@@ -26,18 +26,18 @@ An error never shows a status code or a page from a proxy (Raphael, 2026-11-10).
 - The deliverable is one small, portable binary with the web app and the migrations embedded in it.
 - The distribution is a Docker Compose stack that adds Caddy for HTTPS and Litestream for backups. Compose only packages the binary.
 - Each community runs its own copy of the binary with its own SQLite database. Each instance is one process, so it needs no message broker.
-- A single instance uses stock Caddy, because one domain needs no DNS challenge (Raphael, 2026-11-06).
+- A single instance uses stock Caddy, because one domain needs no DNS challenge.
 - When a bucket is configured, a new host with the configuration and an empty disk restores the database and starts as that instance.
 
 The README is the install guide, written for someone who has never seen the code.
 
 ## Licence
 
-The server and the web app are licensed AGPL-3.0-or-later (Raphael, 2026-11-09). The AGPL stops a competitor from running a closed, changed hosted version. There is no contributor licence agreement (CLA), and contributions use a DCO sign-off. The project can therefore never be relicensed as source-available. This cost was accepted, because the project's audience reads that guarantee as a sign of a credible project.
+The server and the web app are licensed AGPL-3.0-or-later. The AGPL stops a competitor from running a closed, changed hosted version. There is no contributor licence agreement (CLA), and contributions use a DCO sign-off. The project can therefore never be relicensed as source-available. This cost was accepted, because the project's audience reads that guarantee as a sign of a credible project.
 
-Home's feed ends with the release number, an About link to Sweet's website and a Source code link, because the app has no page footer (Raphael, 2026-11-10). When the feed is shorter than its pane, the line sits at the bottom of the pane. The Source code link points to the public repository by default and is configurable. It meets the AGPL's duty to offer the source to users. Someone who runs a changed version points it at their own repository.
+Home's feed ends with the release number, an About link to Sweet's website and a Source code link, because the app has no page footer. When the feed is shorter than its pane, the line sits at the bottom of the pane. The Source code link points to the public repository by default and is configurable. It meets the AGPL's duty to offer the source to users. Someone who runs a changed version points it at their own repository.
 
-The API client is meant to move to the MIT licence, so that other clients can exist. It stays under the AGPL for now (Raphael, 2026-11-09).
+The API client is meant to move to the MIT licence, so that other clients can exist. It stays under the AGPL for now.
 
 ## The community and Home
 
@@ -69,7 +69,7 @@ A room has a feed and a chat like Home, drawn with the same panes. The design se
 
 ### Conversations
 
-A conversation is a group of exactly two people (Raphael, 2026-11-06). A group of more people is a room.
+A conversation is a group of exactly two people. A group of more people is a room.
 
 - There is one conversation per pair. Nobody can be added.
 - A conversation has chat only, no name and no roles.
@@ -86,11 +86,11 @@ The roles are owner, moderator and member. A role belongs to a membership, so it
 
 A topic is an optional label that filters Home's feed. It is not a separate place to post, because choosing a place before writing discourages people from posting.
 
-- A post has at most one topic, and most have none (Raphael, 2026-11-07). Rooms have no topics.
+- A post has at most one topic, and most have none. Rooms have no topics.
 - The owner and moderators manage topics on the Community page. Topics are listed alphabetically, so there is no order to maintain.
-- Topics are off while none exist. While the list is empty, the owner and moderators see a control that explains topics (Raphael, 2026-11-08).
-- A new post gets the feed's current topic. The composer has no topic control, because two controls for one choice were confusing (Raphael, 2026-11-08).
-- Staff may move any post to another topic, because that is moderation and not editing (Raphael, 2026-11-07).
+- Topics are off while none exist. While the list is empty, the owner and moderators see a control that explains topics.
+- A new post gets the feed's current topic. The composer has no topic control, because two controls for one choice were confusing.
+- Staff may move any post to another topic, because that is moderation and not editing.
 - Subscribing to a topic sends its new posts as notifications and in the digest. It never changes who can see a post.
 - The selected topic is part of the page's address, so the view can be shared.
 
@@ -102,16 +102,16 @@ Hashtags are on hold. Raphael asked on 2026-11-06 whether tags are the same as t
 
 ## Posts and editor
 
-A post is long-form text with inline images. Comments are a flat list, oldest first. A reply to one comment quotes it. A long thread opens at its newest comments, with Load earlier comments above them, as a chat does (Raphael, 2026-11-11).
+A post is long-form text with inline images. Comments are a flat list, oldest first. A reply to one comment quotes it. A long thread opens at its newest comments, with Load earlier comments above them, as a chat does.
 
 - The author edits a post or comment as a whole, and the post is marked as edited. There is no version history.
 - Deleting a post deletes its comments and empties their text, because the author asked for the post to go.
 - Every post has its own address, which notifications link to.
-- Each editor keeps its unsent text in the browser, so a reload or a closed tab does not lose it (Raphael, 2026-11-10). This covers new posts, comments and messages, and edits of posts and comments. Sending, saving an edit or cancelling an edit deletes the draft. Safari will clear saved drafts after seven days without a visit unless the app is installed, and this is accepted.
+- Each editor keeps its unsent text in the browser, so a reload or a closed tab does not lose it. This covers new posts, comments and messages, and edits of posts and comments. Sending, saving an edit or cancelling an edit deletes the draft. Safari will clear saved drafts after seven days without a visit unless the app is installed, and this is accepted.
 - A draft belongs to the signed-in user. Signing out, by any means, deletes every draft in the browser, so a shared computer keeps none. A draft not changed for 30 days is deleted. A message's attached images, an image still uploading and the message being replied to are not kept. Raphael left these details to Claude (2026-11-10), and they are open to change.
-- The @ list offers only the members of the current group (Raphael, 2026-11-08).
-- Links are added and edited in a small panel from the editor's Link button or Cmd+K, in place of the browser's prompt box (Raphael, 2026-11-10). Like the emoji picker, the panel never covers the text being written. An address without https:// gets it.
-- On a device with a mouse or trackpad, every composer has an emoji picker. Phones have none, because their keyboards have emoji (Raphael, 2026-11-10). The picker shows the device's own emoji, so it loads nothing from another site.
+- The @ list offers only the members of the current group.
+- Links are added and edited in a small panel from the editor's Link button or Cmd+K, in place of the browser's prompt box. Like the emoji picker, the panel never covers the text being written. An address without https:// gets it.
+- On a device with a mouse or trackpad, every composer has an emoji picker. Phones have none, because their keyboards have emoji. The picker shows the device's own emoji, so it loads nothing from another site.
 
 ### Body format
 
@@ -119,7 +119,7 @@ The editor is TipTap. **The body is the HTML that TipTap produces.** The server 
 
 - HTML was chosen over ProseMirror JSON after two debates. The schema causes lock-in, not the storage format. HTML renders in any browser and imports into any editor. JSON means nothing without the exact editor extensions. The question should be reopened only for collaborative editing.
 - One bluemonday policy checks every body. The policy is the schema. Nothing is trusted before the policy, and everything after it is trusted.
-- Bios, the rules and the welcome message use the same policy without images and preview cards (Raphael, 2026-11-10). They hold text, bold and italic, links, mentions and emoji. Images in them were never shown to other members.
+- Bios, the rules and the welcome message use the same policy without images and preview cards. They hold text, bold and italic, links, mentions and emoji. Images in them were never shown to other members.
 - The server derives mentions and search text from the sanitised body. The client never sends them, because derived data that the client controls can disagree with the body.
 - Saving an unchanged body returns the same bytes. Editor upgrades are deliberate, and a test checks that the bytes stay the same.
 
@@ -133,47 +133,47 @@ A message uses part of the same schema and passes the same policy. Chat history 
 
 - A reply quotes the original and stays in the flat list. Threads were rejected, because they would make a chat into a second feed.
 - The author or the group's staff may delete a message. Nobody can edit a sent message.
-- The chat shows a line when someone joins the community or is added to a room (Raphael, 2026-11-08). A line is stored as a message, so it keeps its order. Notifying a whole room of each addition was rejected, because a room of twenty would get twenty notifications.
-- There is no offline posting. When the device is offline, the bar at the top of the view shows an Offline badge and sending is disabled. Connecting and reconnecting show nothing (Raphael, 2026-11-09). A failed send keeps its text.
+- The chat shows a line when someone joins the community or is added to a room. A line is stored as a message, so it keeps its order. Notifying a whole room of each addition was rejected, because a room of twenty would get twenty notifications.
+- There is no offline posting. When the device is offline, the bar at the top of the view shows an Offline badge and sending is disabled. Connecting and reconnecting show nothing. A failed send keeps its text.
 
 ## Images
 
 - Storage has two drivers. A local directory is the default, so a first install needs no bucket. An S3-compatible bucket is used when configured.
 - An image's address is a path on the instance, so storage can move without changing posts.
 - The server accepts JPEG, PNG, WebP and GIF, detected from the content. HEIC is not decoded, because Go would need C libraries. The upload control asks for JPEG first, so iPhones convert HEIC photos.
-- Only posts, comments and chat messages show images in their text (Raphael, 2026-11-10).
-- The browser converts every image before uploading it, whatever its size, except a GIF, which may be animated (Raphael, 2026-11-10). It draws the image upright, in standard colour, at no more than the server's largest size. A photo becomes a JPEG. Any other image becomes a PNG, which keeps transparency. Images are converted one at a time, so a phone does not decode every photo at once. An animated WebP or PNG becomes a still image.
-- The server still checks every upload, turns it upright and strips its metadata, animated GIFs included, because a client can send anything. A transparent image is stored as PNG. A JPEG stays a JPEG. Any other opaque image is stored as whichever of PNG and JPEG is smaller, so a screenshot keeps sharp text (Raphael, 2026-11-10). Go cannot encode WebP.
-- The server refuses an image of more than 4 million pixels, the area of a 2000 by 2000 image, read from its header before any pixel is decoded (Raphael, 2026-11-10). Decoding takes memory in proportion to the pixels, and a small file can have many: a 454 KB JPEG once took 642 MB. The browser never sends a larger image, and a link preview's larger picture is not kept. The worst file of that area takes about 130 MB to decode, so a community needs 256 MB of memory. The server processes one image at a time and fetches one preview picture at a time. An upload is kept on disk while it arrives, so a slow or large upload holds no memory (Raphael, 2026-11-10). The server sets its memory limit from its container's.
-- An image shows in the editor as soon as it is chosen, and its card shows its upload (Raphael, 2026-11-10). If the upload fails, the card shows the failure and Try again in place of the alt text field, and a line under the editor counts the failed images. A post or message cannot be sent until every upload has finished.
-- An upload fails when nothing has been sent for 30 seconds, or no answer comes a minute after the last byte (Raphael, 2026-11-10). A lost connection would otherwise block the post.
+- Only posts, comments and chat messages show images in their text.
+- The browser converts every image before uploading it, whatever its size, except a GIF, which may be animated. It draws the image upright, in standard colour, at no more than the server's largest size. A photo becomes a JPEG. Any other image becomes a PNG, which keeps transparency. Images are converted one at a time, so a phone does not decode every photo at once. An animated WebP or PNG becomes a still image.
+- The server still checks every upload, turns it upright and strips its metadata, animated GIFs included, because a client can send anything. A transparent image is stored as PNG. A JPEG stays a JPEG. Any other opaque image is stored as whichever of PNG and JPEG is smaller, so a screenshot keeps sharp text. Go cannot encode WebP.
+- The server refuses an image of more than 4 million pixels, the area of a 2000 by 2000 image, read from its header before any pixel is decoded. Decoding takes memory in proportion to the pixels, and a small file can have many: a 454 KB JPEG once took 642 MB. The browser never sends a larger image, and a link preview's larger picture is not kept. The worst file of that area takes about 130 MB to decode, so a community needs 256 MB of memory. The server processes one image at a time and fetches one preview picture at a time. An upload is kept on disk while it arrives, so a slow or large upload holds no memory. The server sets its memory limit from its container's.
+- An image shows in the editor as soon as it is chosen, and its card shows its upload. If the upload fails, the card shows the failure and Try again in place of the alt text field, and a line under the editor counts the failed images. A post or message cannot be sent until every upload has finished.
+- An upload fails when nothing has been sent for 30 seconds, or no answer comes a minute after the last byte. A lost connection would otherwise block the post.
 - An image is served only to its uploader or to someone who can see content that shows it. No image leaves the app, so there are no signed URLs.
-- The server records which images each post, comment and message shows when it is saved (Raphael, 2026-11-10). An image's id written as text gives no access. Before, any body that contained the id counted, so a member could make a private room's image visible to the whole community by posting its id.
-- A post, comment or message may show only images its writer uploaded or can already see (Raphael, 2026-11-10). Any other image, including one deleted while a draft was open, is refused with a message to remove it.
-- A profile picture or a room picture must be an image that the person setting it uploaded (Raphael, 2026-11-10). Every signed-in user can see a profile picture, so any other image would let a member show an image from a private room or a conversation to the whole community.
-- An image that nothing uses is deleted once it is a day old. The picture of a deleted room counts as unused. The cleanup never stops at a failure, and tries the image again on its next run (Raphael, 2026-11-10).
+- The server records which images each post, comment and message shows when it is saved. An image's id written as text gives no access. Before, any body that contained the id counted, so a member could make a private room's image visible to the whole community by posting its id.
+- A post, comment or message may show only images its writer uploaded or can already see. Any other image, including one deleted while a draft was open, is refused with a message to remove it.
+- A profile picture or a room picture must be an image that the person setting it uploaded. Every signed-in user can see a profile picture, so any other image would let a member show an image from a private room or a conversation to the whole community.
+- An image that nothing uses is deleted once it is a day old. The picture of a deleted room counts as unused. The cleanup never stops at a failure, and tries the image again on its next run.
 - Adjacent images are shown as a gallery. The stored HTML stays a plain run of images.
-- Clicking an image in a post, comment or message opens it alone, full screen, with nothing else (Raphael, 2026-11-10). Escape, the close button, a click beside it or pulling down on a phone closes it.
-- Images load only when they come near the screen (Raphael, 2026-11-10). Each image is stored at one size.
+- Clicking an image in a post, comment or message opens it alone, full screen, with nothing else. Escape, the close button, a click beside it or pulling down on a phone closes it.
+- Images load only when they come near the screen. Each image is stored at one size.
 
 A storage quota per instance is planned.
 
 ### Embeds
 
-A link on its own line becomes a preview card, as in WhatsApp and Signal (Raphael, 2026-11-10). The card shows the page's picture, title and description, taken from the page's OpenGraph tags, and the page's domain. The domain is shown instead of a name the page gives itself, so a card shows where its link really goes (Raphael, 2026-11-10). Clicking it opens the page in a new tab. The card's shape follows old Sweet's link preview, which Raphael chose: a picture on the left, then the title, a short description and the domain, at a fixed height. The picture area is 1.91 times as wide as it is tall, the shape of the pictures most pages give, so those are not cropped. Old Sweet's was square (Raphael, 2026-11-10).
+A link on its own line becomes a preview card, as in WhatsApp and Signal. The card shows the page's picture, title and description, taken from the page's OpenGraph tags, and the page's domain. The domain is shown instead of a name the page gives itself, so a card shows where its link really goes. Clicking it opens the page in a new tab. The card's shape follows old Sweet's link preview, which Raphael chose: a picture on the left, then the title, a short description and the domain, at a fixed height. The picture area is 1.91 times as wide as it is tall, the shape of the pictures most pages give, so those are not cropped. Old Sweet's was square.
 
 - Previews appear in posts, comments and chat, not in bios, the rules or the welcome message. There is no button for them.
 - In a post or a comment, pressing Enter after a link on its own line turns it into a card. A link on the last line is turned into a card when the post is saved, without the author seeing it happen. The editor shows "Embedded link" above a card, with "Turn back into regular link", and a link turned back stays a link when the post is saved again.
 - In chat, a link on its own line becomes a card when the message is sent. A sent message cannot be edited, so the card stays.
 - A page that gives no title, or cannot be fetched, stays a plain link.
-- The server fetches the page and keeps a copy of its picture, so readers' browsers never contact the other site. The fetcher refuses internal addresses. A preview is fetched once for each address and kept while a post, comment or message shows it as a card. The server records which cards each body shows when it is saved (Raphael, 2026-11-10).
+- The server fetches the page and keeps a copy of its picture, so readers' browsers never contact the other site. The fetcher refuses internal addresses. A preview is fetched once for each address and kept while a post, comment or message shows it as a card. The server records which cards each body shows when it is saved.
 - Every member can see a preview's picture, because it comes from a public page.
 - The card data is the server's, not the body's. The body holds only the link and a mark that it is a card, so a client cannot invent a preview.
 - Videos get the same card for now. A player that loads only when clicked was planned, and Raphael deferred it (2026-11-10).
 
 ## Accounts
 
-An account has a username and an email address. A password is optional, and the usual way to sign in is by email (Raphael, 2026-11-08).
+An account has a username and an email address. A password is optional, and the usual way to sign in is by email.
 
 - Signing in emails a link and a six-digit code. Either one works.
 - The code works only in the browser that asked for it. Otherwise a person could request a code for someone else's address and guess it.
@@ -182,7 +182,7 @@ An account has a username and an email address. A password is optional, and the 
 - There are no reset pages. A user who forgets a password signs in by email.
 - Changing a password needs no current password, because email can always sign in. Each change ends the other sessions and emails a notice.
 - A new email address is confirmed by a link sent to it (2026-11-08). The old address gets a notice.
-- Confirming a new address invalidates all outstanding sign-in links and codes for the account. Existing sessions stay signed in (Raphael, 2026-11-11). Confirmation and invalidation succeed together. Changing back to an earlier address must not make its old links usable again.
+- Confirming a new address invalidates all outstanding sign-in links and codes for the account. Existing sessions stay signed in. Confirmation and invalidation succeed together. Changing back to an earlier address must not make its old links usable again.
 - A username can change, because content refers to the user's id.
 - The server never reveals whether an address has an account. It emails the account's owner about the attempt instead.
 
@@ -190,32 +190,32 @@ Sessions are stored in the database and last 180 days, extended while used. The 
 
 ### Profiles
 
-A profile shows a user's picture, name, role and bio. Every profile is visible to every user. It lists the user's posts from the groups the viewer belongs to, and no chat messages. A name beside content opens a preview card (Raphael, 2026-11-05).
+A profile shows a user's picture, name, role and bio. Every profile is visible to every user. It lists the user's posts from the groups the viewer belongs to, and no chat messages. A name beside content opens a preview card.
 
-The account row in the nav opens the user's own profile, and Settings is reached from there (Raphael, 2026-11-06). The place to change a picture is then the place where it is shown.
+The account row in the nav opens the user's own profile, and Settings is reached from there. The place to change a picture is then the place where it is shown.
 
 ### Joining
 
 Registration is by invitation only, so no bot protection is needed. An approval mode is planned.
 
-- An invite link works for anyone for seven days (Raphael, 2026-11-06). A group of people joins together, and one link per person would not bring them.
+- An invite link works for anyone for seven days. A group of people joins together, and one link per person would not bring them.
 - The join page shows the rules, and its button reads Agree and join.
 - No session exists until the first sign-in email is used, because otherwise verification would be optional.
-- Only the browser or app that created an account may correct its email address before verification (Raphael, 2026-11-11). This permission lasts 15 minutes from registration. Requesting another sign-in email does not grant or extend it. A verification link still works in another browser. This prevents someone from claiming a pending account by requesting a sign-in email.
+- Only the browser or app that created an account may correct its email address before verification. This permission lasts 15 minutes from registration. Requesting another sign-in email does not grant or extend it. A verification link still works in another browser. This prevents someone from claiming a pending account by requesting a sign-in email.
 
 ## New-instance lifecycle
 
 1. **Provision.** A hosting tool outside the binary creates and starts the instance.
-2. **Setup.** When there is no owner, the binary prints a one-time setup link. Its page creates the owner's account without a password, because a password is always the secondary way in (Raphael, 2026-11-09). The owner's address counts as verified without an email, because the holder of the link controls the server and email may not be set up (Raphael, 2026-11-06).
+2. **Setup.** When there is no owner, the binary prints a one-time setup link. Its page creates the owner's account without a password, because a password is always the secondary way in. The owner's address counts as verified without an email, because the holder of the link controls the server and email may not be set up.
 3. **Onboarding.** The welcome page asks for the name, the purpose and who may create rooms. It then offers an invite link.
 
 Setup and onboarding are in the binary, so self-hosters get the same flow as hosted communities.
 
 ### The welcome dialog and the tour
 
-A welcome dialog opens on a user's first visit to Home (Raphael, 2026-11-09). It shows the welcome message under the owner's name and offers a tour. The server records that the user was welcomed, so other devices do not show it again.
+A welcome dialog opens on a user's first visit to Home. It shows the welcome message under the owner's name and offers a tour. The server records that the user was welcomed, so other devices do not show it again.
 
-The tour is a series of cards that point at parts of the page. Each card appears only where its subject applies to the user. The owner's tour ends with writing the welcome message. The tour uses React Joyride, because it lets the cards use Sweet's own components (Raphael, 2026-11-09). Driver.js was rejected, because it draws its own card.
+The tour is a series of cards that point at parts of the page. Each card appears only where its subject applies to the user. The owner's tour ends with writing the welcome message. The tour uses React Joyride, because it lets the cards use Sweet's own components. Driver.js was rejected, because it draws its own card.
 
 ## Visibility rules
 
@@ -246,7 +246,7 @@ Raphael decided on 2026-11-08 that "a deleted user's posts should actually just 
 
 - The account row stays under a "removed-" name, so records that name it stay valid.
 - Their password, picture, bio, sessions and push subscriptions are deleted.
-- Their current and pending email addresses, verification date and last digest date are erased (Raphael, 2026-11-11). This also applies to accounts already removed. Keeping references to an account does not require its email details. A new account may use either address with an invitation.
+- Their current and pending email addresses, verification date and last digest date are erased. This also applies to accounts already removed. Keeping references to an account does not require its email details. A new account may use either address with an invitation.
 - Rooms they owned pass to new owners by seniority.
 - Open reports about their content are closed.
 
@@ -254,12 +254,12 @@ Removal has no options. A choice to keep, anonymise or delete the content was dr
 
 ## Reports
 
-Any member can report another person's post, comment or message (Raphael, 2026-11-08).
+Any member can report another person's post, comment or message.
 
 - The dialog says that the author will not learn who reported.
-- Reporter identities are hidden from all staff in Sweet (Raphael, 2026-11-11). Staff judge the content and the reasons without receiving the reporter's identity. The server keeps the account reference to prevent duplicate reports. This does not hide identities from someone with database access or prevent a report's text or context from identifying its writer.
-- The reported author receives no report details or notifications and cannot resolve the report, even if they are staff (Raphael, 2026-11-11). If no other staff member can act, the report stays pending until another moderator is appointed.
-- The server keeps a copy of the item, so moderators can judge it after an edit or a deletion. Closing the report empties the copy (Raphael, 2026-11-10).
+- Reporter identities are hidden from all staff in Sweet. Staff judge the content and the reasons without receiving the reporter's identity. The server keeps the account reference to prevent duplicate reports. This does not hide identities from someone with database access or prevent a report's text or context from identifying its writer.
+- The reported author receives no report details or notifications and cannot resolve the report, even if they are staff. If no other staff member can act, the report stays pending until another moderator is appointed.
+- The server keeps a copy of the item, so moderators can judge it after an edit or a deletion. Closing the report empties the copy.
 - Eligible staff get a notification, which is also pushed. Neither identifies the reporter.
 - The Reports card is first on the Community page, because reports wait for action. Members cannot see reports.
 - Open never appears for a conversation, because a conversation belongs to its two people. Delete works anywhere.
@@ -274,9 +274,9 @@ A notification records one action done to one person. The server writes it with 
 A user is notified of a comment on their post, a mention, being added to a room, a conversation message, a reply to their chat message, and a post in a subscribed topic. The owner and moderators are also notified of new members. Staff are notified of reports they may handle. A mention notifies only members of the group, because only they can see it.
 
 - New posts and messages in rooms show as unread dots. A notification for every room message would duplicate what the room already shows.
-- A notification is read when the user opens it, not when they view the list (Raphael, 2026-11-06).
-- The indicator is a dot, never a count, because a count invites the user to clear it (Raphael, 2026-11-06).
-- A conversation message creates a notification, because notifications reach a user who is not in the app (Raphael, 2026-11-08). Each conversation has at most one unread message notification.
+- A notification is read when the user opens it, not when they view the list.
+- The indicator is a dot, never a count, because a count invites the user to clear it.
+- A conversation message creates a notification, because notifications reach a user who is not in the app. Each conversation has at most one unread message notification.
 - One action never notifies the same person twice.
 
 Read markers record how far a person has read each chat and feed. They are stored on the server, so they follow the person across devices. A marker only moves forward, so a stale tab cannot undo another tab's reading.
@@ -287,35 +287,35 @@ Read markers record how far a person has read each chat and feed. They are store
 
 ## Email
 
-Sweet sends sign-in links, address confirmations, security notices and the weekly digest. Email is sent over plain SMTP, so any provider works and no vendor is named in the code. Every email uses one template with the community's name, a heading, a few lines and at most one link (Raphael, 2026-11-07). Bounce tracking was rejected, because it would tie the code to a provider. The user can resend an email or correct the address instead.
+Sweet sends sign-in links, address confirmations, security notices and the weekly digest. Email is sent over plain SMTP, so any provider works and no vendor is named in the code. Every email uses one template with the community's name, a heading, a few lines and at most one link. Bounce tracking was rejected, because it would tie the code to a provider. The user can resend an email or correct the address instead.
 
 ## Search
 
 Search covers the posts, comments and chat messages that the searcher can see.
 
 - Database triggers keep the index in step with the content, so the two cannot disagree.
-- A word matches inside longer words, so "armalade" finds "marmalade" (Raphael, 2026-11-06). Raphael accepted the larger index that this needs.
+- A word matches inside longer words, so "armalade" finds "marmalade". Raphael accepted the larger index that this needs.
 - Results are ranked by relevance, not by date. At most fifty are returned, because nobody reads more.
 - The query is part of the page's address, so a search can be shared.
-- A query is at most 200 characters, which holds a pasted sentence (Raphael asked for a limit, 2026-11-11). A longer query would become thousands of search terms.
-- The search box has no button (Raphael, 2026-11-06), because a field with a button looked like a form.
+- A query is at most 200 characters, which holds a pasted sentence. A longer query would become thousands of search terms.
+- The search box has no button, because a field with a button looked like a form.
 
 ## Realtime
 
 The server sends updates over server-sent events (SSE), and the client sends ordinary HTTP requests. Both are plain HTTP, so cookies and proxies work, and the browser reconnects on its own. Each client has one stream. WebSockets should be reconsidered only for presence or typing indicators.
 
-- **Permissions are checked before each event.** Live delivery and replay use the viewer’s current membership and role (Raphael, 2026-11-11). A connection keeps no separate permission state because permissions can change while it is open. Deleting a room sends each former member their own removal notice.
-- **The database is the replay buffer.** Events carry sequence numbers in commit order. A reconnecting client sends its last number, and the server replays later events from the database. Live delivery reads from the same log in sequence. Concurrent writes and slow connections do not depend on an in-memory event queue (Raphael, 2026-11-11).
-- **The log keeps only each resource's newest event, for one day** (Raphael, 2026-11-08). A full log let members replay deleted content.
+- **Permissions are checked before each event.** Live delivery and replay use the viewer’s current membership and role. A connection keeps no separate permission state because permissions can change while it is open. Deleting a room sends each former member their own removal notice.
+- **The database is the replay buffer.** Events carry sequence numbers in commit order. A reconnecting client sends its last number, and the server replays later events from the database. Live delivery reads from the same log in sequence. Concurrent writes and slow connections do not depend on an in-memory event queue.
+- **The log keeps only each resource's newest event, for one day**. A full log let members replay deleted content.
 - **Each resource has two kinds of event.** One carries its current state. The other announces its deletion.
 - **Each resource has one builder.** A handler that writes reads the row back and passes it to the builder. A test checks that the response and the event equal a fresh fetch.
 - **Phones drop connections without warning.** A heartbeat detects this. The client reconnects when the page becomes visible, and it resyncs every time.
-- **A stream ends with its session** (Raphael, 2026-11-10). The stream checks the session before each event and at each heartbeat. When the session has ended, by signing out anywhere, a password change, removal or expiry, the stream tells the page and closes, and the page signs out.
+- **A stream ends with its session**. The stream checks the session before each event and at each heartbeat. When the session has ended, by signing out anywhere, a password change, removal or expiry, the stream tells the page and closes, and the page signs out.
 - **Open tabs reload when the server's version changes.** The web app is embedded in the binary, so only tabs that were already open can run an older version.
 
-One cache in the web app holds all server data. Events are its write path, and a reconnect refetches everything. The server supplies current names and pictures with content. When a user changes or is removed, the client clears cached identity data and fetches current data for open views (Raphael, 2026-11-11). Other views fetch when opened. Outdated identities do not remain visible if a refresh fails.
+One cache in the web app holds all server data. Events are its write path, and a reconnect refetches everything. The server supplies current names and pictures with content. When a user changes or is removed, the client clears cached identity data and fetches current data for open views. Other views fetch when opened. Outdated identities do not remain visible if a refresh fails.
 
-Comment and unread counts come from the server (Raphael, 2026-11-11). The client refreshes them when content changes. It waits for confirmation before showing an item as read. Repeated updates must not change a count.
+Comment and unread counts come from the server. The client refreshes them when content changes. It waits for confirmation before showing an item as read. Repeated updates must not change a count.
 
 ## Interface
 
@@ -330,7 +330,7 @@ There are four kinds of button (2026-11-08).
 - **Ghost** is a quiet action, such as a toggle or Cancel.
 - **Danger** removes something. It has a red border and an icon.
 
-A toggle shows its state, and hovering shows its action (Raphael, 2026-11-07). Subscribed is the state, and Unsubscribe appears on hover. A label is a verb, with an object when needed.
+A toggle shows its state, and hovering shows its action. Subscribed is the state, and Unsubscribe appears on hover. A label is a verb, with an object when needed.
 
 ### Patterns
 
@@ -340,17 +340,17 @@ A toggle shows its state, and hovering shows its action (Raphael, 2026-11-07). S
 - A list row shows its common action, and its other actions are in a menu.
 - Every removal asks for confirmation, except revoking an invite link, which is easy to replace.
 - An empty state is one sentence and one button that fills the place.
-- Text under a card's heading is small and grey (Raphael, 2026-11-08).
+- Text under a card's heading is small and grey.
 
 ### The shield
 
-A grey shield marks what a person sees or can do only as an owner or moderator (Raphael, 2026-11-09). Without it, a moderator could not tell their extra controls from everyone's. Raphael chose the shield over a role badge and over the role in the label. A room's own settings are not marked, because its creator knows the room is theirs. The server says when an action depends on a role.
+A grey shield marks what a person sees or can do only as an owner or moderator. Without it, a moderator could not tell their extra controls from everyone's. Raphael chose the shield over a role badge and over the role in the label. A room's own settings are not marked, because its creator knows the room is theirs. The server says when an action depends on a role.
 
 ### Colours and modes
 
-Sweet keeps old Sweet's red on a dotted background. Every pair of colours meets the contrast guidelines (palette chosen by Raphael, 2026-11-08). Pink is never behind text.
+Sweet keeps old Sweet's red on a dotted background. Every pair of colours meets the contrast guidelines. Pink is never behind text.
 
-Sweet follows the device's light or dark setting, unless the user chooses one (Raphael, 2026-11-09). The choice is kept per device, because a phone at night and a laptop by day can need different modes. Dark mode keeps the contrast rules.
+Sweet follows the device's light or dark setting, unless the user chooses one. The choice is kept per device, because a phone at night and a laptop by day can need different modes. Dark mode keeps the contrast rules.
 
 ## Layout
 
@@ -358,7 +358,7 @@ On a desktop the nav column is on the left. Posts and chat sit side by side with
 
 On a phone, one pane shows at a time. A tab bar at the bottom holds Home, Search, Notifications and Menu.
 
-**Every view has a top bar** that names it and holds its controls (Raphael, 2026-11-06). On a phone the switch between posts and chat is in that bar. Posts and chat are two views of one group. When they were bottom tabs, a room's chat could not be told apart from Home's chat.
+**Every view has a top bar** that names it and holds its controls. On a phone the switch between posts and chat is in that bar. Posts and chat are two views of one group. When they were bottom tabs, a room's chat could not be told apart from Home's chat.
 
 **Every page has an address**, so the back button, a reload and links all work.
 
@@ -370,13 +370,13 @@ The nav has three blocks (2026-11-05).
 2. **Tools.** This block holds Search and Notifications.
 3. **The community and the user.** This block holds People, the Community page and the account row.
 
-Conversations accumulate, so their list has a stated limit and not a hidden rule like Slack's (Raphael, 2026-11-05). A messenger layout with a column of conversations was rejected, because it would draw chat in a second way.
+Conversations accumulate, so their list has a stated limit and not a hidden rule like Slack's. A messenger layout with a column of conversations was rejected, because it would draw chat in a second way.
 
 ## Mobile
 
 There is no separate mobile app, and there must never be a second codebase. The web app is a progressive web app (PWA), and the PWA is the phone app.
 
-- iPhones allow web push only for apps on the home screen. Home therefore offers installation on touch screens (Raphael, 2026-11-08).
+- iPhones allow web push only for apps on the home screen. Home therefore offers installation on touch screens.
 - A store app may come later. It would wrap the same build with Capacitor. Bubblewrap was rejected, because it supports only Android.
 - A store app cannot use the cookie session, because iOS blocks cross-site cookies. It will send the session id in a header instead. Sessions do not depend on how the id arrives, so this needs no redesign.
 
@@ -385,11 +385,11 @@ There is no separate mobile app, and there must never be a second codebase. The 
 - Rows have UUIDv7 ids, so two instances could be merged without renumbering any references.
 - Times are stored in UTC. The browser converts them for display.
 - Lists are paged by cursor, never by offset.
-- A deleted post, comment, message or room keeps its row, and its text is emptied (Raphael, 2026-11-10). The row stays so that the replies, notifications and reports that point at it stay valid. The text has no use once it is deleted.
+- A deleted post, comment, message or room keeps its row, and its text is emptied. The row stays so that the replies, notifications and reports that point at it stay valid. The text has no use once it is deleted.
 - Deleting a room empties its name and everything in it, and deletes its memberships, read markers and notifications.
 - SQLite and the search index overwrite deleted text, so it does not stay in the database file.
-- Content deleted before this rule keeps its text, because old content is not changed (Raphael, 2026-11-10).
-- A migration never changes user content: posts, comments, messages, bios, the rules and the welcome message stay as their authors saved them (Raphael, 2026-11-10).
+- Content deleted before this rule keeps its text, because old content is not changed.
+- A migration never changes user content: posts, comments, messages, bios, the rules and the welcome message stay as their authors saved them.
 
 ## Running an instance
 
@@ -398,34 +398,34 @@ Every setting is an environment variable, read from one file. A TOML file was re
 ### Updates and releases
 
 - Migrations are embedded and run forward only at start. A copy of the database made before they run is the upgrade backup.
-- An upgrade runs all of its migrations in one transaction (Raphael, 2026-11-11). When one fails, none of them stays, so the release before still runs on the database. Before this, the migrations before the failing one stayed, the earlier release refused the database, and each restart replaced the upgrade backup with that half-upgraded state.
+- An upgrade runs all of its migrations in one transaction. When one fails, none of them stays, so the release before still runs on the database. Before this, the migrations before the failing one stayed, the earlier release refused the database, and each restart replaced the upgrade backup with that half-upgraded state.
 - The binary refuses a database from a newer release.
-- A release is a git tag vMAJOR.MINOR.PATCH (Raphael, 2026-11-08). A major release needs operators to act. A minor release adds behaviour or features that users will notice. A patch release changes nothing that users will notice, however large the code change (Raphael, 2026-11-10).
-- Each release publishes an image tagged with its exact and major versions (Raphael, 2026-11-09). Docker has no "this version or later" pin, so the major tag moves with each release. An updater pinned to 1 then gets every 1.x release and never 2.0. Within one major version every image runs all migrations in order, so this is safe.
-- An operator rolls back by pinning an earlier version. If a successful upgrade changed the database, the operator must also restore the copy made before that upgrade (Raphael, 2026-11-11). Earlier releases refuse a database they do not understand.
+- A release is a git tag vMAJOR.MINOR.PATCH. A major release needs operators to act. A minor release adds behaviour or features that users will notice. A patch release changes nothing that users will notice, however large the code change.
+- Each release publishes an image tagged with its exact and major versions. Docker has no "this version or later" pin, so the major tag moves with each release. An updater pinned to 1 then gets every 1.x release and never 2.0. Within one major version every image runs all migrations in order, so this is safe.
+- An operator rolls back by pinning an earlier version. If a successful upgrade changed the database, the operator must also restore the copy made before that upgrade. Earlier releases refuse a database they do not understand.
 
 ### Backups
 
 Litestream runs in the binary's container and supervises the binary, so the two cannot use different database files. It streams every change to a bucket.
 
 - Restores are exact for the last few minutes and accurate to five minutes before that.
-- Hourly snapshots are kept for 30 days (Raphael, 2026-11-09). Deleted text stays in the backups until it is older than that, and this is accepted (Raphael, 2026-11-10).
+- Hourly snapshots are kept for 30 days. Deleted text stays in the backups until it is older than that, and this is accepted.
 - One bucket holds the images and the database, and configuring it turns on both.
 - The database must be on a local disk.
-- A restore is checked before it replaces the current database. The server and replication must be stopped. A failed download or invalid backup leaves the current database unchanged. The previous database is kept separately after replacement (Raphael, 2026-11-11). Recovery must not discard the remaining local data before a replacement is ready.
-- Restoring the database does not recover image files already deleted from storage (Raphael, 2026-11-11).
+- A restore is checked before it replaces the current database. The server and replication must be stopped. A failed download or invalid backup leaves the current database unchanged. The previous database is kept separately after replacement. Recovery must not discard the remaining local data before a replacement is ready.
+- Restoring the database does not recover image files already deleted from storage.
 
 ### Hosting many communities
 
 Each hosted community is its own process with its own database. A hosting tool outside the binary creates and removes communities, so hosted and self-hosted communities run the same software. A planned admin API will be the tool's only access.
 
-Several communities can share one bucket, each in its own folder (Raphael, 2026-11-09). They then share one key, so each community's server can read and change the others' images and backups. A separate bucket or key for each community keeps them apart.
+Several communities can share one bucket, each in its own folder. They then share one key, so each community's server can read and change the others' images and backups. A separate bucket or key for each community keeps them apart.
 
 Data export and custom domains are also planned. Import will be built before export, because import tests the export.
 
 ## Admin tools
 
-The Community page holds what the staff manage (Raphael, 2026-11-06). A page about the community did not belong behind the owner's profile. Its cards are Reports, About this community, Welcome message, Rules and Topics. Each card shows only to those who may use it. The People page holds roles, removals and invite links.
+The Community page holds what the staff manage. A page about the community did not belong behind the owner's profile. Its cards are Reports, About this community, Welcome message, Rules and Topics. Each card shows only to those who may use it. The People page holds roles, removals and invite links.
 
 An approval queue, a pinned announcement and a list of posts with no reply are planned. Nothing more elaborate will be built until a community asks for it.
 
@@ -438,28 +438,28 @@ These decisions came from a security audit (2026-11-08).
 - Behind proxies, the operator states how many proxies there are. The client address is read that many entries from the right, because a visitor can forge only the entries on the left.
 - Images that are too large are refused before decoding.
 - Push goes only to the known push services, so a member cannot make the server send requests to any host.
-- One account can have at most 20 event streams open at once, one for each tab and device (Raphael, 2026-11-11). A new stream beyond that ends the account's oldest stream. A phone that the system stops in the background can leave its stream open on the server for many minutes, so the oldest stream is the likeliest to be dead. A live tab whose stream ends reconnects without missing events.
+- One account can have at most 20 event streams open at once, one for each tab and device. A new stream beyond that ends the account's oldest stream. A phone that the system stops in the background can leave its stream open on the server for many minutes, so the oldest stream is the likeliest to be dead. A live tab whose stream ends reconnects without missing events.
 - The server never lists a directory of the app's files.
 
 ## Record
 
 ### Reversed
 
-- **Database recovery.** A restore no longer deletes the current database before fetching its replacement (Raphael, 2026-11-11). A failed download previously removed the local recovery option. Rollback now explicitly requires the upgrade backup when the database changed.
+- **Database recovery.** A restore no longer deletes the current database before fetching its replacement. A failed download previously removed the local recovery option. Rollback now explicitly requires the upgrade backup when the database changed.
 
-- **Counts in the browser.** The client no longer adds or subtracts comment and unread counts locally (Raphael, 2026-11-11). Repeated updates and partially loaded lists made those counts incorrect. Read requests no longer clear unread indicators before the server confirms them.
+- **Counts in the browser.** The client no longer adds or subtracts comment and unread counts locally. Repeated updates and partially loaded lists made those counts incorrect. Read requests no longer clear unread indicators before the server confirms them.
 
-- **Identity updates in the browser.** The client now clears and refetches data after a user changes or is removed (Raphael, 2026-11-11). Manual updates missed some copies of names and pictures. The earlier description of identity references did not match the code.
+- **Identity updates in the browser.** The client now clears and refetches data after a user changes or is removed. Manual updates missed some copies of names and pictures. The earlier description of identity references did not match the code.
 
-- **Email details after removal.** Removed accounts no longer retain their email addresses or email metadata (Raphael, 2026-11-11). Retaining them kept removed accounts identifiable and blocked new registration with the same address. Existing removed accounts are included in the cleanup.
+- **Email details after removal.** Removed accounts no longer retain their email addresses or email metadata. Retaining them kept removed accounts identifiable and blocked new registration with the same address. Existing removed accounts are included in the cleanup.
 
-- **Sign-in links after an address change.** Address confirmation now invalidates outstanding sign-in links and codes (Raphael, 2026-11-11). Checking the current address alone allowed an old link to work again if the account changed back to that address.
+- **Sign-in links after an address change.** Address confirmation now invalidates outstanding sign-in links and codes. Checking the current address alone allowed an old link to work again if the account changed back to that address.
 
-- **Reporter identities.** Reports and report notifications no longer identify the reporter to staff. Reported authors cannot see or resolve reports about their content (Raphael, 2026-11-11). The previous behaviour exposed reporters to staff authors despite the confidentiality promise.
+- **Reporter identities.** Reports and report notifications no longer identify the reporter to staff. Reported authors cannot see or resolve reports about their content. The previous behaviour exposed reporters to staff authors despite the confidentiality promise.
 
-- **Stream permissions.** Streams no longer keep their own copy of memberships and roles. They read current permissions before each event (Raphael, 2026-11-11). A missed removal or demotion could otherwise disclose private content.
+- **Stream permissions.** Streams no longer keep their own copy of memberships and roles. They read current permissions before each event. A missed removal or demotion could otherwise disclose private content.
 
-- **Address correction after joining.** Requesting a sign-in email no longer grants permission to change an unverified address. Only the browser or app that created the account has that permission for 15 minutes (Raphael, 2026-11-11). A review showed that the earlier rule let an unrelated browser claim a pending account.
+- **Address correction after joining.** Requesting a sign-in email no longer grants permission to change an unverified address. Only the browser or app that created the account has that permission for 15 minutes. A review showed that the earlier rule let an unrelated browser claim a pending account.
 
 - **Body format.** TipTap JSON became sanitised HTML. The JSON design assumed that Go had no good HTML sanitiser, which was false.
 - **Event kinds.** One kind per action became two per resource, because the kinds kept multiplying.
@@ -468,15 +468,15 @@ These decisions came from a security audit (2026-11-08).
 - **Client permissions.** Rules copied by hand became server flags, because only the server's copy is enforced.
 - **Private spaces.** Everyone once saw everything. Private rooms now exist, because a moderation room and a private message cannot be on the main feed.
 - **Direct messages.** DMs were cut, then became two-person groups, because private groups made them the same object.
-- **Conversation members.** Changing sets of people became fixed pairs (Raphael, 2026-11-06). Changing sets turned conversations into rooms without names.
-- **Topics.** Every post first had one topic, with a default. The default put a pill on every post, so a post now has at most one topic (Raphael, 2026-11-07).
-- **Copy.** Copy that described the software became copy that explains Sweet's terms (Raphael, 2026-11-07).
-- **Primary colour.** Pink with white text failed the contrast guideline, so the primary is red (Raphael, 2026-11-08).
-- **Destructive actions.** They appeared in many places. They now sit in a page's last card, so people know where to look (Raphael, 2026-11-08).
-- **Credit line.** Home's feed also ended with a line saying who built Sweet. It was removed, because it stood out on a feed with no posts (Raphael, 2026-11-10).
-- **Deleted text.** Deleted posts, comments, messages and rooms kept their text, and no reason was recorded. Raphael asked why anything was soft-deleted. The rows are now kept only so that the rows that point at them stay valid, and the text is emptied (Raphael, 2026-11-10).
-- **Stream limit.** A stream beyond the limit was first refused. A review found that streams left open by phones in the background could fill the limit, and a refused tab showed nothing. A new stream now ends the oldest (Raphael, 2026-11-11).
-- **Connection state.** A notice above the editors showed connecting, reconnecting and offline. It moved the editors each time the connection changed and added noise. Only offline is shown now, as a badge in the bar (Raphael, 2026-11-09).
+- **Conversation members.** Changing sets of people became fixed pairs. Changing sets turned conversations into rooms without names.
+- **Topics.** Every post first had one topic, with a default. The default put a pill on every post, so a post now has at most one topic.
+- **Copy.** Copy that described the software became copy that explains Sweet's terms.
+- **Primary colour.** Pink with white text failed the contrast guideline, so the primary is red.
+- **Destructive actions.** They appeared in many places. They now sit in a page's last card, so people know where to look.
+- **Credit line.** Home's feed also ended with a line saying who built Sweet. It was removed, because it stood out on a feed with no posts.
+- **Deleted text.** Deleted posts, comments, messages and rooms kept their text, and no reason was recorded. Raphael asked why anything was soft-deleted. The rows are now kept only so that the rows that point at them stay valid, and the text is emptied.
+- **Stream limit.** A stream beyond the limit was first refused. A review found that streams left open by phones in the background could fill the limit, and a refused tab showed nothing. A new stream now ends the oldest.
+- **Connection state.** A notice above the editors showed connecting, reconnecting and offline. It moved the editors each time the connection changed and added noise. Only offline is shown now, as a badge in the bar.
 
 ### Considered and rejected
 
@@ -490,9 +490,9 @@ These decisions came from a security audit (2026-11-08).
 - **GPL-3.0, MIT or Apache-2.0.** None of them stops a closed hosted fork.
 - **Source-available licences.** They are not open source, and Debian and Fedora do not package them.
 - **A CLA.** Contributors read it as preparation for dual licensing.
-- **browser-image-compression for converting images** (Raphael, 2026-11-10). It resizes at the browser's low-quality setting. It re-compresses an image that came out larger than the original until it is smaller, and for a PNG it does so by removing colours. It was last updated in 2023. Sweet's own conversion asks the browser for high quality.
-- **Estimating each image's decoding memory from its header** (Raphael, 2026-11-10). It needed a cost for each format and colour layout, and was wrong in a new case at each review. A limit on pixels and a larger memory limit are simpler.
-- **Smaller stored sizes for avatars and room pictures** (Raphael, 2026-11-10). A community is small, so the full image is fetched once and cached.
+- **browser-image-compression for converting images**. It resizes at the browser's low-quality setting. It re-compresses an image that came out larger than the original until it is smaller, and for a PNG it does so by removing colours. It was last updated in 2023. Sweet's own conversion asks the browser for high quality.
+- **Estimating each image's decoding memory from its header**. It needed a cost for each format and colour layout, and was wrong in a new case at each review. A limit on pixels and a larger memory limit are simpler.
+- **Smaller stored sizes for avatars and room pictures**. A community is small, so the full image is fetched once and cached.
 
 ### Deferred
 

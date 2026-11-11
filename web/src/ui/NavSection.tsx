@@ -6,7 +6,7 @@ interface NavSectionProps {
   /** The section's name. Shown as a small title when expanded. Always the group's accessible name. */
   title: string
   expanded: boolean
-  /** An action for the section as a whole, such as New room. Shown in the title row. Not shown when collapsed, where it took the space of a group item (Raphael, 2026-11-06). */
+  /** An action for the section as a whole, such as New room. Shown in the title row. Not shown when collapsed, where it took the space of a group item. */
   action?: {
     icon: IconName
     label: string

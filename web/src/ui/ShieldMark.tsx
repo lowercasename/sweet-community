@@ -32,7 +32,7 @@ interface ShieldMarkProps {
 /**
  * The grey shield that marks what only owners and moderators see or can do. In a centred row it is centred on the
  * text and moved down 1px, because its point is narrow and a centred shield looks high. Inside a line of text it is
- * placed below the baseline by the same rule. Raphael found it off the text's line on 2026-11-09.
+ * placed below the baseline by the same rule.
  */
 export function ShieldMark({ label, size = 16, inline = false }: ShieldMarkProps) {
   const tip = useTooltip(label ?? '', label !== undefined)

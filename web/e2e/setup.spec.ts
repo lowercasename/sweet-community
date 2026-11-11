@@ -36,8 +36,7 @@ test.describe('a fresh instance', () => {
     await expect(page.getByText(/has not been set up yet/)).toBeVisible()
     await expect(page).toHaveTitle('Sweet')
     await page.goto(setupPath)
-    // The owner sets up their account with a username and an email address. There is no password (Raphael,
-    // 2026-11-09). Then they set up the community.
+    // The owner sets up their account with a username and an email address. There is no password. Then they set up the community.
     await expect(page.getByRole('heading', { name: 'Set up your account' })).toBeVisible()
     await expect(page.getByLabel('Password')).toHaveCount(0)
     await shoot(page, 'account')
@@ -57,7 +56,7 @@ test.describe('a fresh instance', () => {
     const url = await page.getByLabel('Invite link').inputValue()
     expect(url).toMatch(/\/join\//)
     await shoot(page, 'invite-link')
-    // The nav starts expanded for someone who has never collapsed it (Raphael, 2026-11-09). The test setup stores
+    // The nav starts expanded for someone who has never collapsed it. The test setup stores
     // expanded for every other test, so this browser forgets that first.
     await page.evaluate(() => localStorage.removeItem('sweet.nav'))
     await page.getByRole('button', { name: 'Go to Knitting Circle' }).click()

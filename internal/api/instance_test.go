@@ -112,7 +112,7 @@ func TestScriptedOwnerNeedsNoSetup(t *testing.T) {
 }
 
 // Each user who joins through an invite link creates a notification for the
-// owner and every moderator, and for nobody else (Raphael, 2026-11-08).
+// owner and every moderator, and for nobody else.
 func TestStaffHearOfEachArrival(t *testing.T) {
 	ts, owner := newTestServer(t)
 	kit, kitID := registerMember(t, ts, owner, "kit")
@@ -130,7 +130,7 @@ func TestStaffHearOfEachArrival(t *testing.T) {
 	}
 }
 
-// Setup takes no password (Raphael, 2026-11-09: passwords are always the secondary way in). The owner signs in by
+// Setup takes no password because passwords are always the secondary way in. The owner signs in by
 // email, and can add a password on Settings later. A password sent to setup is not stored.
 func TestSetupWithoutAPassword(t *testing.T) {
 	ts, link := newFreshServer(t)

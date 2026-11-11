@@ -74,7 +74,7 @@ describe('SearchPage', () => {
       'Message in Knitting by kit: the marmalade is ready',
     ])
     expect(within(rows[0]).getByText('marmalade').className).toContain('font-medium')
-    // The line above the excerpt shows the author, then the kind and location, then the time (Raphael, 2026-11-06).
+    // The line above the excerpt shows the author, then the kind and location, then the time.
     expect(rows[2].textContent).toMatch(/^kit · Message in Knitting · /)
     fireEvent.click(rows[1])
     expect(onGo).toHaveBeenCalledWith('/p/p1')

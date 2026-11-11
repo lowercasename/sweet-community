@@ -17,7 +17,7 @@ test.describe('layout', () => {
     await kit.page.getByRole('separator', { name: 'Resize panes' }).focus()
     await kit.page.keyboard.press('End')
     await expect(kit.page.getByRole('button', { name: 'Show chat' })).toBeVisible()
-    // A hovered rail keeps a solid background, so the dotted page does not show through it (Raphael, 2026-11-09).
+    // A hovered rail keeps a solid background, so the dotted page does not show through it.
     const rail = kit.page.getByRole('button', { name: 'Show chat' })
     await rail.hover()
     // The hover colour fades in over 150ms.
@@ -96,7 +96,7 @@ test.describe('layout', () => {
     await open(kit.page)
     const separator = kit.page.getByRole('separator', { name: 'Resize panes' })
     await expect(separator).toHaveAttribute('aria-valuenow', '40')
-    // On hover the divider shows a grey line, and its handle turns red (Raphael, 2026-11-09).
+    // On hover the divider shows a grey line, and its handle turns red.
     await separator.hover()
     await expect(separator.locator('span').first()).toHaveCSS('background-color', 'rgb(146, 146, 146)')
     await expect(separator.locator('span').nth(1)).toHaveCSS('background-color', 'rgb(206, 23, 23)')

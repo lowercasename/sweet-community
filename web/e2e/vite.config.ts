@@ -1,4 +1,4 @@
-// The dev server configured as Raphael runs it, with the proxy pointed at the e2e backend on port 8098.
+// The dev server with the proxy pointed at the e2e backend on port 8098.
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'

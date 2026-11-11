@@ -47,7 +47,7 @@ func NeedsSetup(ctx context.Context, d *sql.DB) (bool, error) {
 }
 
 // setup is `POST /api/setup {token, username, email}`. It creates the owner's account from the setup link and
-// signs them in. It takes no password, because a password is always the secondary way in (Raphael, 2026-11-09).
+// signs them in. It takes no password, because a password is always the secondary way in.
 // The owner signs in by email and can add a password on Settings. It works once, because the token is deleted
 // with it.
 func (s *Server) setup(w http.ResponseWriter, r *http.Request) {

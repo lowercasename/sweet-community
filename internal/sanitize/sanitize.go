@@ -95,8 +95,8 @@ var (
 )
 
 // Body sanitises TipTap HTML for storage. The result is trusted by all code
-// after this point. Empty paragraphs at the start and end are removed
-// (Raphael, 2026-11-08). Empty paragraphs between others are kept as spacing.
+// after this point. Empty paragraphs at the start and end are removed.
+// Empty paragraphs between others are kept as spacing.
 func Body(in string) string {
 	return trim(withoutBrokenImages(body.Sanitize(in)))
 }
@@ -116,7 +116,7 @@ func withoutBrokenImages(s string) string {
 }
 
 // WithoutMedia sanitises a bio, the rules or the welcome message. It is Body without images and preview cards, so a
-// link on its own line stays a link (Raphael, 2026-11-10).
+// link on its own line stays a link.
 func WithoutMedia(in string) string {
 	return trim(noMedia.Sanitize(in))
 }

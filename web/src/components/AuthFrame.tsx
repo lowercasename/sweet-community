@@ -11,10 +11,9 @@ interface AuthFrameProps {
  * The layout of every page shown to a user who is not signed in. These are
  * the sign-in, join, verify, reset and setup pages. The community's name is
  * the heading above a narrow card, because these pages are about the
- * community (Raphael, 2026-11-06). A small "Made with Sweet" wordmark is
+ * community. A small "Made with Sweet" wordmark is
  * shown under the card. The name was moved out of the card and the mark was
- * moved down to the credit, so the page shows one S and it refers to Sweet
- * (Raphael, 2026-11-08).
+ * moved down to the credit, so the page shows one S and it refers to Sweet.
  */
 export function AuthFrame({ name, children }: AuthFrameProps) {
   return (

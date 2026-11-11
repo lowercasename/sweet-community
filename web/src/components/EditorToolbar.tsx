@@ -34,7 +34,7 @@ export function saveLink(editor: Editor, address: string) {
 /**
  * The Bold, Italic and Link buttons, the image button when `onImage` is set, and the emoji button. Phones have no ⌘
  * key, so the formatting buttons are always shown. The emoji button is shown only on a device with a mouse or
- * trackpad, because a phone's keyboard has emoji (Raphael, 2026-11-10).
+ * trackpad, because a phone's keyboard has emoji.
  */
 export function EditorToolbar({ editor, onImage, linkOpen, onLinkOpenChange }: EditorToolbarProps) {
   const pointer = useMediaQuery('(pointer: fine)')

@@ -215,8 +215,7 @@ func (s *Server) register(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusInternalServerError, err.Error())
 		return
 	}
-	// The owner and every moderator are notified of each new member (Raphael, 2026-11-06, moderators added
-	// 2026-11-08).
+	// The owner and every moderator are notified of each new member.
 	staff, err := qtx.ListMembers(ctx, perm.Root)
 	if err != nil {
 		writeErr(w, http.StatusInternalServerError, err.Error())

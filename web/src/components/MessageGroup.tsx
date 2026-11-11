@@ -26,7 +26,7 @@ interface MessageGroupProps {
  * followed by the message bodies close together, each in its own block. A
  * message's menu is positioned at the top right of its own block. This
  * includes the first message, whose menu is never on the author's line. The
- * block gets the blush background while hovered (Raphael, 2026-11-06).
+ * block gets the blush background while hovered.
  */
 export function MessageGroup({
   messages,

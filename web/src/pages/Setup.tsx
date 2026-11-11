@@ -11,8 +11,7 @@ interface SetupProps {
 /**
  * The setup link's page. A fresh instance has no owner until the holder of
  * the link sets up their account here. The email address is treated as verified, because holding the link proves
- * access to the server. There is no password, because a password is always the secondary way in (Raphael,
- * 2026-11-09). One can be added on Settings later. The next step is "Set up your community".
+ * access to the server. There is no password, because a password is always the secondary way in. One can be added on Settings later. The next step is "Set up your community".
  */
 export function Setup({ token, onSetUp }: SetupProps) {
   const [username, setUsername] = useState('')
