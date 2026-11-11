@@ -402,7 +402,7 @@ Every setting is an environment variable, read from one file. A TOML file was re
 - Migrations are embedded and run forward only at start. A copy of the database made before they run is the upgrade backup.
 - An upgrade runs all of its migrations in one transaction. When one fails, none of them stays, so the release before still runs on the database. Before this, the migrations before the failing one stayed, the earlier release refused the database, and each restart replaced the upgrade backup with that half-upgraded state.
 - The binary refuses a database from a newer release.
-- A release is a git tag vMAJOR.MINOR.PATCH. A major release needs operators to act. A minor release adds behaviour or features that users will notice. A patch release changes nothing that users will notice, however large the code change.
+- A release is a git tag vMAJOR.MINOR.PATCH. A major release needs operators to act. A minor release adds behaviour or features that users will notice. A patch release fixes bugs, including security and privacy problems, or makes internal improvements. Corrective fixes may change behaviour users notice. The size of the code change does not determine the version.
 - Each release publishes an image tagged with its exact and major versions. Docker has no "this version or later" pin, so the major tag moves with each release. An updater pinned to 1 then gets every 1.x release and never 2.0. Within one major version every image runs all migrations in order, so this is safe.
 - An operator rolls back by pinning an earlier version. If a successful upgrade changed the database, the operator must also restore the copy made before that upgrade. Earlier releases refuse a database they do not understand.
 
@@ -446,6 +446,8 @@ These decisions came from a security audit (2026-11-08).
 ## Record
 
 ### Reversed
+
+- **Patch releases.** Patch releases may include noticeable corrections to security, privacy and other bugs. The earlier rule excluded all noticeable changes and would classify corrective fixes as new features.
 
 - **Database recovery.** A restore no longer deletes the current database before fetching its replacement. A failed download previously removed the local recovery option. Rollback now explicitly requires the upgrade backup when the database changed.
 
