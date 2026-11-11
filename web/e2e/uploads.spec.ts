@@ -227,13 +227,15 @@ test.describe('image uploads', () => {
     await open(kit.page)
     const release = await holdUploads(kit.page)
     const stopped = kit.page.waitForEvent('requestfailed', (r) => r.url().endsWith('/api/images'))
+    // The wait starts before the file is chosen, because the upload can be sent before the card shows it.
+    const sent = kit.page.waitForRequest('**/api/images')
     await chatEditor(kit.page).click()
     await chat(kit.page)
       .locator('input[type=file]')
       .setInputFiles({ name: 'a.png', mimeType: 'image/png', buffer: png(320, 200) })
     const card = chat(kit.page).locator('.image-card')
     await expect(card.getByText('Uploading')).toBeVisible()
-    await kit.page.waitForRequest('**/api/images')
+    await sent
     await card.getByRole('button', { name: 'Remove image' }).click()
     await stopped
     await release()
@@ -268,12 +270,14 @@ test.describe('image uploads', () => {
     const form = kit.page.locator('form').filter({ has: kit.page.getByRole('button', { name: 'Cancel' }) })
     const release = await holdUploads(kit.page)
     const stopped = kit.page.waitForEvent('requestfailed', (r) => r.url().endsWith('/api/images'))
+    // The wait starts before the file is chosen, because the upload can be sent before the card shows it.
+    const sent = kit.page.waitForRequest('**/api/images')
     await form.locator('.ProseMirror').click()
     await form
       .locator('input[type=file]')
       .setInputFiles({ name: 'plot.png', mimeType: 'image/png', buffer: png(320, 200) })
     await expect(form.locator('.image-card').getByText('Uploading')).toBeVisible()
-    await kit.page.waitForRequest('**/api/images')
+    await sent
     await form.getByRole('button', { name: 'Cancel' }).click()
     await stopped
     await release()
