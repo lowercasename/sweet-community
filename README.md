@@ -88,16 +88,26 @@ docker compose up -d
 ### Restoring
 
 - **The server is gone.** On a new one, install as above with the same `.env`. Sweet finds no database, fetches the latest from the bucket and starts. The images are already there.
-- **An upgrade went wrong.** `docker compose down`. Put the release you were on in `.env`, for example `SWEET_IMAGE=ghcr.io/lowercasename/sweet-community:1.0.0`. The nav shows the release under Collapse, and `CHANGELOG.md` lists them all. Then `docker compose run --rm sweet sh -c 'cp /data/sweet.db.before-upgrade /data/sweet.db'` and `docker compose up -d`.
+- **An upgrade went wrong.** Stop Sweet with `docker compose down`. If a migration failed, its changes were rolled back, so the earlier release can use the current database. If migrations succeeded but you need to undo the upgrade, first restore the upgrade backup using the current image:
+
+  ```
+  docker compose run --rm --no-deps --entrypoint sweet sweet -db /data/sweet.db -restore-from /data/sweet.db.before-upgrade
+  ```
+
+  This discards changes made since that backup. After a successful restore, put the release you were on in `.env`, for example `SWEET_IMAGE=ghcr.io/lowercasename/sweet-community:1.0.0`, then run `docker compose up -d`. If no restore was needed, change the version and start it directly. The nav shows the release under Collapse, and `CHANGELOG.md` lists them all.
 - **Something was deleted and you want the database as it was at a moment.** Any moment in the last 30 days can be restored. Stop Sweet, restore the database as of that moment (UTC), start it:
 
   ```
   docker compose stop sweet
-  docker compose run --rm sweet restore 2026-11-06T18:00:00Z
+  docker compose run --rm --no-deps sweet restore 2026-11-06T18:00:00Z
   docker compose up -d sweet
   ```
 
   Without a timestamp, `restore` fetches the latest.
+
+Both restore commands check the replacement before installing it. A failed download or invalid backup leaves the current database unchanged. On success, the previous database and its SQLite companion files stay in a new `/data/sweet.db.before-restore-*` directory. The command prints its location. These copies contain private community data. Remove them when recovery is complete.
+
+Keep Sweet and Litestream stopped throughout a restore. Start Sweet only after the restore command succeeds. Restoring the database does not recover images already deleted from the bucket.
 
 ### Without Docker
 

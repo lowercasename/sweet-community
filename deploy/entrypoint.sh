@@ -41,11 +41,16 @@ export SWEET_DATA=$data
 export SWEET_LITESTREAM=1
 
 if [ "$1" = restore ]; then
-  rm -f "$db" "$db-wal" "$db-shm"
+  stage=$(mktemp -d "$data/.sweet-download-XXXXXX")
+  trap 'rm -rf "$stage"' EXIT
+  trap 'exit 1' HUP INT TERM
   if [ -n "$2" ]; then
-    exec litestream restore -config /etc/litestream.yml -timestamp "$2" -o "$db" "$db"
+    litestream restore -config /etc/litestream.yml -timestamp "$2" -o "$stage/sweet.db" "$db"
+  else
+    litestream restore -config /etc/litestream.yml -o "$stage/sweet.db" "$db"
   fi
-  exec litestream restore -config /etc/litestream.yml -o "$db" "$db"
+  sweet -db "$db" -restore-from "$stage/sweet.db"
+  exit
 fi
 
 litestream restore -if-db-not-exists -if-replica-exists -config /etc/litestream.yml "$db"

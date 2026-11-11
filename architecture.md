@@ -402,7 +402,7 @@ Every setting is an environment variable, read from one file. A TOML file was re
 - The binary refuses a database from a newer release.
 - A release is a git tag vMAJOR.MINOR.PATCH (Raphael, 2026-11-08). A major release needs operators to act. A minor release adds behaviour or features that users will notice. A patch release changes nothing that users will notice, however large the code change (Raphael, 2026-11-10).
 - Each release publishes an image tagged with its exact and major versions (Raphael, 2026-11-09). Docker has no "this version or later" pin, so the major tag moves with each release. An updater pinned to 1 then gets every 1.x release and never 2.0. Within one major version every image runs all migrations in order, so this is safe.
-- An operator rolls back by pinning an earlier version.
+- An operator rolls back by pinning an earlier version. If a successful upgrade changed the database, the operator must also restore the copy made before that upgrade (Raphael, 2026-11-11). Earlier releases refuse a database they do not understand.
 
 ### Backups
 
@@ -412,6 +412,8 @@ Litestream runs in the binary's container and supervises the binary, so the two 
 - Hourly snapshots are kept for 30 days (Raphael, 2026-11-09). Deleted text stays in the backups until it is older than that, and this is accepted (Raphael, 2026-11-10).
 - One bucket holds the images and the database, and configuring it turns on both.
 - The database must be on a local disk.
+- A restore is checked before it replaces the current database. The server and replication must be stopped. A failed download or invalid backup leaves the current database unchanged. The previous database is kept separately after replacement (Raphael, 2026-11-11). Recovery must not discard the remaining local data before a replacement is ready.
+- Restoring the database does not recover image files already deleted from storage (Raphael, 2026-11-11).
 
 ### Hosting many communities
 
@@ -442,6 +444,8 @@ These decisions came from a security audit (2026-11-08).
 ## Record
 
 ### Reversed
+
+- **Database recovery.** A restore no longer deletes the current database before fetching its replacement (Raphael, 2026-11-11). A failed download previously removed the local recovery option. Rollback now explicitly requires the upgrade backup when the database changed.
 
 - **Counts in the browser.** The client no longer adds or subtracts comment and unread counts locally (Raphael, 2026-11-11). Repeated updates and partially loaded lists made those counts incorrect. Read requests no longer clear unread indicators before the server confirms them.
 

@@ -68,6 +68,7 @@ func main() {
 	}
 	addr := flag.String("addr", ":8080", "listen address")
 	dbPath := flag.String("db", "data/sweet.db", "SQLite database path")
+	restoreFrom := flag.String("restore-from", "", "restore a standalone SQLite backup and exit. Stop Sweet and Litestream first")
 	owner := flag.String("owner", "owner", "username of the instance owner, when -owner-password makes one without the setup link")
 	ownerPassword := flag.String("owner-password", os.Getenv("SWEET_OWNER_PASSWORD"),
 		"the owner's password (or SWEET_OWNER_PASSWORD) for a scripted setup; without it a fresh instance prints a setup link")
@@ -90,6 +91,17 @@ func main() {
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
+	if *restoreFrom != "" {
+		recovery, err := db.Restore(ctx, *dbPath, *restoreFrom)
+		if recovery != "" {
+			log.Printf("previous database saved in %s", recovery)
+		}
+		if err != nil {
+			log.Fatalf("restore: %v", err)
+		}
+		log.Print("database restored")
+		return
+	}
 
 	var opts []db.Option
 	if *litestream {
