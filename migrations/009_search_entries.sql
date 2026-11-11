@@ -1,6 +1,5 @@
--- The number of each search entry, by the kind and id of the post, comment or message it was made from. The search
--- index can look up an entry by its number but not by its kind and id, so before this table each trigger read the
--- whole index to find one entry. The search triggers below keep this table.
+-- The rowid of each search entry, by the kind and id of its post, comment or message. FTS5 finds a row by its rowid
+-- but not by an UNINDEXED column such as kind or id. The search triggers below keep this table.
 CREATE TABLE search_entries (
     kind TEXT NOT NULL,
     id TEXT NOT NULL,
@@ -8,8 +7,9 @@ CREATE TABLE search_entries (
     PRIMARY KEY (kind, id)
 ) WITHOUT ROWID;
 
--- The index is rebuilt from the live posts, comments and messages, with the number of each entry. A trigger from an
--- unreleased version of this migration is dropped if it exists.
+-- The index is rebuilt from the live posts, comments and messages, with the rowid of each entry. groups_search_delete
+-- came from an unreleased migration. It exists only in a database whose schema_migrations row for that migration was
+-- deleted by hand so that this release could start.
 DROP TRIGGER IF EXISTS groups_search_delete;
 DROP TRIGGER posts_search_insert;
 DROP TRIGGER posts_search_update;
@@ -42,7 +42,7 @@ INSERT INTO search (text, kind, id, group_id, post_id, author_id, created_at)
     FROM messages m JOIN live_bodies b ON b.kind = 'message' AND b.id = m.id;
 INSERT INTO search_entries (kind, id, entry) SELECT kind, id, rowid FROM search;
 
--- Each trigger removes the row's entry by its number and adds a new entry while the row is live. Deleting a post also
+-- Each trigger removes the row's entry by its rowid and adds a new entry while the row is live. Deleting a post also
 -- removes the entries of its comments.
 CREATE TRIGGER posts_search_insert AFTER INSERT ON posts BEGIN
     INSERT INTO search (text, kind, id, group_id, post_id, author_id, created_at)

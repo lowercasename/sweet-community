@@ -1,3 +1,3 @@
--- Deleting a message finds the replies to it, so their quotes can say it was deleted. Without this index each search
--- read every message, and removing a user with many messages held the write lock for seconds.
+-- Deleting a message looks up the replies to it, so their quotes can say it was deleted. This index makes that a
+-- lookup by reply_to instead of a read of every message.
 CREATE INDEX messages_reply_to ON messages(reply_to);

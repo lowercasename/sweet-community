@@ -262,9 +262,9 @@ func migratedTo(t *testing.T, d *sql.DB, prefix string) {
 	}
 }
 
-// Migration 009 rebuilds the search index with a table that holds each entry's number, so a trigger finds an entry
-// without reading the whole index. The rebuilt index holds the live posts, comments and messages only, and an edit
-// after the migration replaces the entry.
+// Migration 009 rebuilds the search index with search_entries, which holds the rowid of each entry. The rebuilt index
+// holds the live posts, comments and messages only. Each search_entries row points at its own entry, and an edit after
+// the migration replaces the entry.
 func TestMigrationRebuildsTheSearchIndex(t *testing.T) {
 	ctx := context.Background()
 	d, err := Open(filepath.Join(t.TempDir(), "sweet.db"))
@@ -281,8 +281,10 @@ func TestMigrationRebuildsTheSearchIndex(t *testing.T) {
 			('p', '` + root + `', 'u', '', 'live post', 1), ('old', '` + root + `', 'u', '', 'deleted post', 1),
 			('room', 'gone', 'u', '', 'post in a deleted room', 1)`,
 		`UPDATE posts SET deleted_at = 2 WHERE id = 'old'`,
-		`INSERT INTO comments (id, post_id, author_id, body_html, body_text, created_at) VALUES ('c', 'p', 'u', '', 'live comment', 1)`,
-		`INSERT INTO messages (id, group_id, author_id, body_html, body_text, created_at) VALUES ('m', '` + root + `', 'u', '', 'live message', 1)`,
+		`INSERT INTO comments (id, post_id, author_id, body_html, body_text, created_at) VALUES
+			('c', 'p', 'u', '', 'live comment', 1), ('under', 'old', 'u', '', 'comment on a deleted post', 1)`,
+		`INSERT INTO messages (id, group_id, author_id, body_html, body_text, created_at) VALUES
+			('m', '` + root + `', 'u', '', 'live message', 1), ('there', 'gone', 'u', '', 'message in a deleted room', 1)`,
 	} {
 		if _, err := d.ExecContext(ctx, q); err != nil {
 			t.Fatal(err)
@@ -300,14 +302,21 @@ func TestMigrationRebuildsTheSearchIndex(t *testing.T) {
 		var out []string
 		for rows.Next() {
 			var s string
-			rows.Scan(&s)
+			if err := rows.Scan(&s); err != nil {
+				t.Fatal(err)
+			}
 			out = append(out, s)
 		}
+		// Every entry has one search_entries row, and every search_entries row has its entry.
+		var entries, rowids, orphans int
+		if err := d.QueryRowContext(ctx, `SELECT (SELECT COUNT(*) FROM search), (SELECT COUNT(*) FROM search_entries),
+			(SELECT COUNT(*) FROM search_entries e LEFT JOIN search s ON s.rowid = e.entry WHERE s.rowid IS NULL)`).Scan(&entries, &rowids, &orphans); err != nil {
+			t.Fatal(err)
+		}
+		if entries != len(out) || rowids != len(out) || orphans != 0 {
+			t.Fatalf("search has %d entries and search_entries %d rows, %d without an entry, for %d matches", entries, rowids, orphans, len(out))
+		}
 		return out
-	}
-	var all int
-	if err := d.QueryRowContext(ctx, `SELECT COUNT(*) FROM search`).Scan(&all); err != nil || all != 3 {
-		t.Fatalf("search entries after the migration: %d %v, want 3", all, err)
 	}
 	want := []string{"comment c live comment", "message m live message", "post p live post"}
 	if got := entries(); !slices.Equal(got, want) {

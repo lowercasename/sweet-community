@@ -160,7 +160,7 @@ func TestLargeDeletionsAreQuick(t *testing.T) {
 		if status, body := owner.do("DELETE", d.path, nil); status >= 300 {
 			t.Fatalf("DELETE %s: %d %v", d.path, status, body)
 		}
-		if took := time.Since(start); took > 2*time.Second {
+		if took := time.Since(start); took > time.Second {
 			t.Errorf("DELETE %s took %v", d.path, took)
 		}
 	}

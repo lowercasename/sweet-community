@@ -62,7 +62,7 @@ func TestSearch(t *testing.T) {
 		t.Fatalf("prefix: %d, infix: %d, with a short word: %d", len(find(kit, "marmal")), len(find(kit, "armalade")), len(find(kit, "marmalade is")))
 	}
 	kit.mustStatus(400, "GET", "/api/search?q=ma", nil)
-	// Stems and case do not matter. Every word must match. Query operators and syntax characters are treated as plain words.
+	// Case does not matter. Every word must match. Query operators and syntax characters are treated as plain words.
 	if len(find(mo, "MARMALADE ready")) != 1 || kinds(find(mo, "MARMALADE ready")) != "post" {
 		t.Fatalf("two words: %v", find(mo, "MARMALADE ready"))
 	}
