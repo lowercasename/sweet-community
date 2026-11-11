@@ -172,24 +172,23 @@ CI runs the unit checks and selected sign-in and privacy browser tests before pu
 ## Layout
 
 ```
-cmd/sweet/          main. migrations/ is copied here by make (go:embed can't reach ../)
-deploy/             the compose stack: compose.yml (with Caddy), compose.proxied.yml, the Caddyfile,
-                    Litestream's config and the container's entrypoint. Dockerfile is at the root
-internal/api        HTTP handlers, wire shapes (wire.go) and their tests
-internal/auth       password hashing, tokens, username and email validation
-internal/db         SQLite open (WAL, busy_timeout, BEGIN IMMEDIATE) and migrations
-internal/digest     the weekly email digest
-internal/events     database event log, subscriber wakeups and SSE delivery
-internal/images     upload processing (checks magic bytes, writes bounded JPEG/PNG) and storage (local directory or S3/R2)
-internal/mail       the email template and the SMTP or file sender
-internal/perm       permission rules: who may do what
-internal/push       web push notifications
-internal/sanitize   the bluemonday policy that every body passes through, and text extraction
-internal/store      sqlc: queries/*.sql are the input, typed Go is generated (make generate, never edit the .go files)
-internal/version    the binary's version: a hash of its own bytes, sent first on the event stream
-internal/web        embeds the frontend build
-migrations/         *.sql, forward-only
-web/                React + TipTap. See web/README.md
+cmd/sweet/          application entry point
+deploy/             Docker deployment and backup configuration
+internal/api/       HTTP handlers
+internal/auth/      authentication
+internal/db/        database setup, migrations and restore
+internal/digest/    weekly email digests
+internal/events/    event storage and realtime delivery
+internal/images/    image processing and storage
+internal/mail/      email delivery
+internal/perm/      permission rules
+internal/push/      push notifications
+internal/sanitize/  content sanitisation
+internal/store/     database queries
+internal/version/   application version
+internal/web/       embedded frontend
+migrations/         database migrations
+web/                web client
 ```
 
 ## Licence
