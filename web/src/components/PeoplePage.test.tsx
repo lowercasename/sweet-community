@@ -77,7 +77,7 @@ describe('PeoplePage', () => {
   })
 
   it('offers Remove where the server allows it, never for the viewer, and removes after a confirmation', async () => {
-    const { removeUser } = await import('../api')
+    const { removeUser, listUsers } = await import('../api')
     const { PeoplePage } = await import('./PeoplePage')
     renderWithQuery(<PeoplePage me={user('raphael')} root={group(ROOT, 'owner')} onOpenGroup={() => {}} />)
     await screen.findByText('mo')
@@ -87,9 +87,10 @@ describe('PeoplePage', () => {
     expect(removeUser).not.toHaveBeenCalled()
     const dialog = screen.getByRole('dialog', { hidden: true })
     expect(within(dialog).getByText('Remove kit from this community?')).toBeTruthy()
+    vi.mocked(listUsers).mockResolvedValue({ users: [member('raphael', 'owner'), member('mo', 'moderator', true)] })
     fireEvent.click(within(dialog).getByRole('button', { name: 'Remove' }))
     expect(removeUser).toHaveBeenCalledWith('kit')
-    // The user is removed from the list immediately.
+    // The refreshed server list excludes the removed user.
     await vi.waitFor(() => expect(screen.queryByText('kit')).toBeNull())
   })
 

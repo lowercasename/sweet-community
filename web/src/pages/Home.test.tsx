@@ -1,7 +1,18 @@
 // @vitest-environment happy-dom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, screen, within } from '@testing-library/react'
-import { FakeEventSource, ROOT, dm, group, member, notification, post, renderWithQuery, user } from '../test-utils'
+import {
+  FakeEventSource,
+  ROOT,
+  dm,
+  group,
+  marker,
+  member,
+  notification,
+  post,
+  renderWithQuery,
+  user,
+} from '../test-utils'
 import { ApiError } from '../api'
 
 /**
@@ -11,8 +22,8 @@ import { ApiError } from '../api'
  * coming back, must not remount posts or chat. A remount would fetch their
  * first page again, so the tests assert one fetch each.
  *
- * The avatar bug. A user's picture is read from the users cache, so a change
- * that arrives on the stream updates it everywhere.
+ * The avatar bug. A user event fetches current identities from the server,
+ * so the updated picture appears everywhere.
  *
  * Groups. The nav lists my groups, a group opens with the panes its mode
  * sets, a DM is named after its members, and New room follows the root
@@ -46,7 +57,7 @@ vi.mock('../api', async (importOriginal) => ({
     Promise.resolve({ markers: [{ user_id: 'raphael', stream: 'notifications', read_at: 0, unread: 0 }] }),
   ),
   setMarker: vi.fn((stream: string, readAt: number) =>
-    Promise.resolve({ user_id: 'raphael', stream, read_at: readAt }),
+    Promise.resolve({ user_id: 'raphael', stream, read_at: readAt, unread: 0 }),
   ),
   setSettings: vi.fn(),
   logout: vi.fn(() => Promise.resolve()),
@@ -61,7 +72,8 @@ const kit = user('kit')
 afterEach(cleanup)
 
 beforeEach(async () => {
-  const { getPosts, listUsers, listGroups, getProfile } = await import('../api')
+  const { getPosts, listUsers, listGroups, getProfile, listMarkers } = await import('../api')
+  vi.mocked(listMarkers).mockResolvedValue({ markers: [marker('notifications', 0, 0)] })
   vi.mocked(getProfile).mockImplementation((name) =>
     Promise.resolve({
       ...user(name),
@@ -149,15 +161,19 @@ describe('Home', () => {
   })
 
   it('shows a changed picture on posts and in the nav as soon as the stream sends the change', async () => {
+    const { getPosts, listUsers } = await import('../api')
     await home()
-    const article = screen.getByText('p1').closest('article')!
-    const postAvatar = () => within(article).getByRole('img', { name: 'raphael' }).getAttribute('src')
+    const postAvatar = () =>
+      within(screen.getByText('p1').closest('article')!).getByRole('img', { name: 'raphael' }).getAttribute('src')
     // The profile picture in the nav is decorative (the row's name identifies the user). Its src is what to check.
     const navAvatar = () => nav().getByRole('button', { name: 'raphael' }).querySelector('img')!.getAttribute('src')
     expect(postAvatar()).not.toContain('/img/')
     expect(navAvatar()).not.toContain('/img/')
 
-    FakeEventSource.last!.emit('user', user('raphael', '/img/new-face'), 7)
+    const changed = user('raphael', '/img/new-face')
+    vi.mocked(getPosts).mockResolvedValue({ posts: [post('p1', changed)], next_before: null })
+    vi.mocked(listUsers).mockResolvedValue({ users: [{ ...member('raphael', 'owner'), ...changed }, member('kit')] })
+    FakeEventSource.last!.emit('user', changed, 7)
 
     await vi.waitFor(() => expect(postAvatar()).toBe('/img/new-face'))
     expect(navAvatar()).toBe('/img/new-face')
@@ -296,14 +312,14 @@ describe('Home', () => {
   })
 
   it('a notification from the stream puts a dot on the notifications button, the notifications page keeps it, and opening the notification removes it', async () => {
-    const { readNotification, listNotifications } = await import('../api')
+    const { readNotification, listNotifications, listMarkers } = await import('../api')
     await home()
     expect(nav().getByRole('button', { name: 'Notifications' })).toBeTruthy()
-    // The list is not loaded until the page requests it. Until then, the stream event increments the unread count on
-    // my marker.
+    // The notification event refreshes the server's unread count even before the list is loaded.
     const fresh = notification('n5', 'comment', kit, { post_id: 'p1' })
     vi.mocked(listNotifications).mockResolvedValue({ notifications: [fresh], next_before: null })
     vi.mocked(readNotification).mockResolvedValue({ ...fresh, read_at: 9 })
+    vi.mocked(listMarkers).mockResolvedValue({ markers: [marker('notifications', 0, 1)] })
     FakeEventSource.last!.emit('notification', fresh, 8)
     const bell = await nav().findByRole('button', { name: 'Notifications, unread' })
     fireEvent.click(bell)
@@ -311,16 +327,19 @@ describe('Home', () => {
     await screen.findByRole('heading', { name: 'Notifications' })
     const row = await screen.findByRole('button', { name: 'kit commented on your post, new' })
     expect(nav().getByRole('button', { name: 'Notifications, unread' }).getAttribute('aria-current')).toBe('page')
+    vi.mocked(listMarkers).mockResolvedValue({ markers: [marker('notifications', 9, 0)] })
     fireEvent.click(row)
     expect(readNotification).toHaveBeenCalledWith('n5')
     expect(window.location.pathname).toBe('/p/p1')
     await nav().findByRole('button', { name: 'Notifications' })
   })
 
-  it("a collapsed pane's rail shows the dot for that pane's stream, and opening the pane marks it read immediately", async () => {
+  it("a collapsed pane's rail shows the server's unread count, and opening the pane marks it read", async () => {
+    const { listMarkers } = await import('../api')
     await home()
     fireEvent.keyDown(screen.getByRole('separator'), { key: 'Home' })
     expect(screen.getByRole('button', { name: 'Show posts' })).toBeTruthy()
+    vi.mocked(listMarkers).mockResolvedValue({ markers: [marker(`feed:${ROOT}`, 1, 1)] })
     FakeEventSource.last!.emit('post', post('p9', kit, { created_at: 99 }), 9)
     await screen.findByRole('button', { name: 'Show posts, unread' })
     fireEvent.click(screen.getByRole('button', { name: 'Show posts, unread' }))
