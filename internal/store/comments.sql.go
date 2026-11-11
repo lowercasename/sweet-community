@@ -108,7 +108,7 @@ func (q *Queries) EditComment(ctx context.Context, arg EditCommentParams) error 
 
 const eraseAuthorComments = `-- name: EraseAuthorComments :exec
 UPDATE comments SET deleted_at = COALESCE(deleted_at, ?1), body_html = '', body_text = ''
-WHERE author_id = ?2
+WHERE author_id = ?2 AND (deleted_at IS NULL OR body_html != '' OR body_text != '')
 `
 
 type EraseAuthorCommentsParams struct {
@@ -116,7 +116,8 @@ type EraseAuthorCommentsParams struct {
 	AuthorID  string
 }
 
-// Deletes every comment of a removed user and clears its text.
+// Deletes and empties the comments of a removed user that eraseContent did not delete, such as comments deleted before.
+// Rows that are already deleted and empty are not updated again.
 func (q *Queries) EraseAuthorComments(ctx context.Context, arg EraseAuthorCommentsParams) error {
 	_, err := q.db.ExecContext(ctx, eraseAuthorComments, arg.DeletedAt, arg.AuthorID)
 	return err
@@ -185,34 +186,6 @@ func (q *Queries) GetCommentOwners(ctx context.Context, id string) (GetCommentOw
 		&i.GroupID,
 	)
 	return i, err
-}
-
-const listCommentIDsOfPost = `-- name: ListCommentIDsOfPost :many
-SELECT id FROM comments WHERE post_id = ?1
-`
-
-// The ids of a post's comments, deleted or not. Deleting the post removes their events from the log.
-func (q *Queries) ListCommentIDsOfPost(ctx context.Context, postID string) ([]string, error) {
-	rows, err := q.db.QueryContext(ctx, listCommentIDsOfPost, postID)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	items := []string{}
-	for rows.Next() {
-		var id string
-		if err := rows.Scan(&id); err != nil {
-			return nil, err
-		}
-		items = append(items, id)
-	}
-	if err := rows.Close(); err != nil {
-		return nil, err
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
 }
 
 const listComments = `-- name: ListComments :many

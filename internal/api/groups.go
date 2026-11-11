@@ -535,11 +535,16 @@ func (s *Server) deleteGroup(w http.ResponseWriter, r *http.Request) {
 
 // removeGroup deletes a room and returns its group_delete event. The room's row stays with its name emptied, so the
 // rows that point at it stay valid. Its posts, comments and messages are deleted and their text is emptied. Its
-// memberships, notifications and read markers are deleted, and their logged events are forgotten. The owner's
+// memberships, notifications and read markers are deleted, and so are their events in the event log. The owner's
 // delete, a last member leaving and the removal of a room's only member all use it.
 func removeGroup(ctx context.Context, qtx *store.Queries, id string, now int64) ([]events.Entry, error) {
 	at := sql.NullInt64{Int64: now, Valid: true}
 	if err := qtx.ForgetGroupEvents(ctx, id); err != nil {
+		return nil, err
+	}
+	// The room is marked deleted first. A trigger then removes its search entries in one statement, and the search
+	// triggers skip its rows (migration 009).
+	if err := qtx.DeleteGroup(ctx, store.DeleteGroupParams{DeletedAt: at, ID: id}); err != nil {
 		return nil, err
 	}
 	if err := qtx.DeleteGroupComments(ctx, store.DeleteGroupCommentsParams{DeletedAt: at, GroupID: id}); err != nil {
@@ -558,9 +563,6 @@ func removeGroup(ctx context.Context, qtx *store.Queries, id string, now int64) 
 		return nil, err
 	}
 	if err := qtx.DeleteGroupMemberships(ctx, id); err != nil {
-		return nil, err
-	}
-	if err := qtx.DeleteGroup(ctx, store.DeleteGroupParams{DeletedAt: at, ID: id}); err != nil {
 		return nil, err
 	}
 	return []events.Entry{{Kind: "group_delete", Payload: map[string]string{"id": id}}}, nil

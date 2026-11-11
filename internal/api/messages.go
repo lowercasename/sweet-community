@@ -140,9 +140,7 @@ func (s *Server) createMessage(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// deleteMessage deletes a message and empties its text. perm.DeleteMessage decides who may.
-// The replies to it are logged again, so the log no longer holds its text in
-// their quotes.
+// deleteMessage deletes a message. perm.DeleteMessage decides who may. removeMessage does the deletion.
 func (s *Server) deleteMessage(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
 	me, _ := userFrom(r.Context())
@@ -174,7 +172,8 @@ func (s *Server) deleteMessage(w http.ResponseWriter, r *http.Request) {
 }
 
 // removeMessage deletes a live message and empties its text. It returns the message_delete event, then the events of
-// the replies to it. The delete handler, a report's Delete action and the removal of a user all use it.
+// the replies to it. The replies are logged again so that their quotes say the original is deleted and the log no
+// longer holds its text. The delete handler, a report's Delete action and the removal of a user all use it.
 func removeMessage(ctx context.Context, qtx *store.Queries, id, groupID string, now int64) ([]events.Entry, error) {
 	if err := qtx.DeleteMessage(ctx, store.DeleteMessageParams{DeletedAt: sql.NullInt64{Int64: now, Valid: true}, ID: id}); err != nil {
 		return nil, err

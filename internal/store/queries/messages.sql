@@ -56,9 +56,10 @@ SELECT id FROM messages WHERE reply_to = sqlc.arg(reply_to) AND deleted_at IS NU
 SELECT id, group_id FROM messages WHERE author_id = sqlc.arg(author_id) AND deleted_at IS NULL;
 
 -- name: EraseAuthorMessages :exec
--- Deletes every message of a removed user and clears its text.
+-- Deletes and empties the messages of a removed user that eraseContent did not delete, such as messages deleted before.
+-- Rows that are already deleted and empty are not updated again.
 UPDATE messages SET deleted_at = COALESCE(deleted_at, sqlc.arg(deleted_at)), body_html = '', body_text = ''
-WHERE author_id = sqlc.arg(author_id);
+WHERE author_id = sqlc.arg(author_id) AND (deleted_at IS NULL OR body_html != '' OR body_text != '');
 
 -- name: CreateChatLine :exec
 -- A joined or added line in a chat. It has no body.

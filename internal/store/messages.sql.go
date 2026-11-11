@@ -99,7 +99,7 @@ func (q *Queries) DeleteMessage(ctx context.Context, arg DeleteMessageParams) er
 
 const eraseAuthorMessages = `-- name: EraseAuthorMessages :exec
 UPDATE messages SET deleted_at = COALESCE(deleted_at, ?1), body_html = '', body_text = ''
-WHERE author_id = ?2
+WHERE author_id = ?2 AND (deleted_at IS NULL OR body_html != '' OR body_text != '')
 `
 
 type EraseAuthorMessagesParams struct {
@@ -107,7 +107,8 @@ type EraseAuthorMessagesParams struct {
 	AuthorID  string
 }
 
-// Deletes every message of a removed user and clears its text.
+// Deletes and empties the messages of a removed user that eraseContent did not delete, such as messages deleted before.
+// Rows that are already deleted and empty are not updated again.
 func (q *Queries) EraseAuthorMessages(ctx context.Context, arg EraseAuthorMessagesParams) error {
 	_, err := q.db.ExecContext(ctx, eraseAuthorMessages, arg.DeletedAt, arg.AuthorID)
 	return err

@@ -94,7 +94,7 @@ func (q *Queries) EditPost(ctx context.Context, arg EditPostParams) error {
 
 const eraseAuthorPosts = `-- name: EraseAuthorPosts :exec
 UPDATE posts SET deleted_at = COALESCE(deleted_at, ?1), body_html = '', body_text = ''
-WHERE author_id = ?2
+WHERE author_id = ?2 AND (deleted_at IS NULL OR body_html != '' OR body_text != '')
 `
 
 type EraseAuthorPostsParams struct {
@@ -102,7 +102,8 @@ type EraseAuthorPostsParams struct {
 	AuthorID  string
 }
 
-// Deletes every post of a removed user and clears its text, including posts deleted before.
+// Deletes and empties the posts of a removed user that eraseContent did not delete, such as posts deleted before.
+// Rows that are already deleted and empty are not updated again.
 func (q *Queries) EraseAuthorPosts(ctx context.Context, arg EraseAuthorPostsParams) error {
 	_, err := q.db.ExecContext(ctx, eraseAuthorPosts, arg.DeletedAt, arg.AuthorID)
 	return err

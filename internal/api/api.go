@@ -644,8 +644,8 @@ func (s *Server) editPost(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// deletePost deletes a post. perm.DeletePost decides who may. removePost says what deleting does. The event carries
-// the post's id and group id.
+// deletePost deletes a post. perm.DeletePost decides who may. removePost does the deletion. The event carries the
+// post's id and group id.
 func (s *Server) deletePost(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
 	me, _ := userFrom(r.Context())
@@ -687,16 +687,7 @@ func removePost(ctx context.Context, qtx *store.Queries, id, groupID string, now
 	if err := qtx.DeletePostComments(ctx, store.DeletePostCommentsParams{DeletedAt: at, PostID: id}); err != nil {
 		return nil, err
 	}
-	// The comments go with the post and get no delete event of their own, so their events leave the log here.
-	comments, err := qtx.ListCommentIDsOfPost(ctx, id)
-	if err != nil {
-		return nil, err
-	}
-	keys := make([]string, len(comments))
-	for i, c := range comments {
-		keys[i] = "comment:" + c
-	}
-	if err := events.Forget(ctx, qtx, keys...); err != nil {
+	if err := qtx.ForgetPostCommentEvents(ctx, id); err != nil {
 		return nil, err
 	}
 	return []events.Entry{{Kind: "post_delete", Payload: map[string]string{"id": id, "group_id": groupID}}}, nil

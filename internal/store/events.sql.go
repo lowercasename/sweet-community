@@ -43,9 +43,20 @@ DELETE FROM events WHERE key IN (
 `
 
 // Deletes the logged events of a group's posts, comments, messages, memberships, read markers and notifications.
-// Deleting the group calls it before it deletes them.
+// removeGroup calls it before it deletes those rows. The keys are those that events.Key makes.
 func (q *Queries) ForgetGroupEvents(ctx context.Context, groupID string) error {
 	_, err := q.db.ExecContext(ctx, forgetGroupEvents, groupID)
+	return err
+}
+
+const forgetPostCommentEvents = `-- name: ForgetPostCommentEvents :exec
+DELETE FROM events WHERE key IN (SELECT 'comment:' || c.id FROM comments c WHERE c.post_id = ?1)
+`
+
+// Deletes the logged events of a post's comments. The comments are deleted with the post and get no delete events of
+// their own. The keys are those that events.Key makes.
+func (q *Queries) ForgetPostCommentEvents(ctx context.Context, postID string) error {
+	_, err := q.db.ExecContext(ctx, forgetPostCommentEvents, postID)
 	return err
 }
 

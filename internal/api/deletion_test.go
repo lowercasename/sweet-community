@@ -2,7 +2,11 @@ package api
 
 import (
 	"database/sql"
+	"net/http"
 	"testing"
+	"time"
+
+	"sweet/internal/perm"
 )
 
 // count runs a COUNT query against the database.
@@ -15,8 +19,8 @@ func count(t *testing.T, d *sql.DB, query string, args ...any) int {
 	return n
 }
 
-// written counts the rows of a table, by id, that still hold text.
-func written(t *testing.T, d *sql.DB, table string, ids ...string) int {
+// withText counts the rows of a table, by id, that still hold text.
+func withText(t *testing.T, d *sql.DB, table string, ids ...string) int {
 	t.Helper()
 	n := 0
 	for _, id := range ids {
@@ -44,94 +48,66 @@ func TestDeletingEmptiesTheText(t *testing.T) {
 	if n := count(t, srv.DB, "SELECT COUNT(*) FROM posts WHERE id = ? AND deleted_at IS NOT NULL", post); n != 1 {
 		t.Fatal("the deleted post's row is gone or not marked deleted")
 	}
-	if n := written(t, srv.DB, "posts", post); n != 0 {
+	if n := withText(t, srv.DB, "posts", post); n != 0 {
 		t.Fatal("the deleted post still holds its text")
 	}
 	if n := count(t, srv.DB, "SELECT COUNT(*) FROM comments WHERE id IN (?, ?) AND deleted_at IS NOT NULL", under, comment); n != 2 {
 		t.Fatalf("deleted comments marked deleted: %d, want 2", n)
 	}
-	if n := written(t, srv.DB, "comments", under, comment); n != 0 {
+	if n := withText(t, srv.DB, "comments", under, comment); n != 0 {
 		t.Fatalf("deleted comments that still hold text: %d", n)
 	}
-	if n := written(t, srv.DB, "messages", message); n != 0 {
+	if n := withText(t, srv.DB, "messages", message); n != 0 {
 		t.Fatal("the deleted message still holds its text")
 	}
 	if n := count(t, srv.DB, "SELECT COUNT(*) FROM search WHERE text LIKE '%secret%'"); n != 0 {
 		t.Fatalf("search entries with deleted text: %d", n)
 	}
-	if n := written(t, srv.DB, "posts", other); n != 1 {
+	if n := withText(t, srv.DB, "posts", other); n != 1 {
 		t.Fatal("the post that was not deleted lost its text")
 	}
 }
 
-// Removing a user deletes their posts as the author would, so the comments on those posts are emptied too.
-func TestRemovingAUserEmptiesTheCommentsOnTheirPosts(t *testing.T) {
+// Deleting a room empties its name and the text of everything in it. Its members, read markers, notifications,
+// search entries and logged events are deleted. Every path that deletes a room uses removeGroup.
+func TestDeletingARoomEmptiesEverythingInIt(t *testing.T) {
 	ts, owner, srv := newTestServerWith(t)
 	kit, kitID := registerMember(t, ts, owner, "kit")
-	post := kit.mustStatus(201, "POST", rootPath+"/posts", map[string]string{"body_html": "<p>kit's post</p>"})["id"].(string)
-	comment := owner.mustStatus(201, "POST", "/api/posts/"+post+"/comments", map[string]string{"body_html": "<p>a reply to kit</p>"})["id"].(string)
-
-	owner.mustStatus(204, "DELETE", "/api/users/"+kitID, nil)
-
-	if n := written(t, srv.DB, "comments", comment); n != 0 {
-		t.Fatal("a comment on a removed user's post still holds its text")
+	gid := owner.mustStatus(201, "POST", "/api/groups", map[string]any{"kind": "group", "name": "Secret room", "mode": "both"})["id"].(string)
+	gp := "/api/groups/" + gid
+	owner.mustStatus(201, "POST", gp+"/members", map[string]string{"user_id": kitID})
+	post := kit.mustStatus(201, "POST", gp+"/posts", map[string]string{"body_html": "<p>secret post</p>"})["id"].(string)
+	comment := owner.mustStatus(201, "POST", "/api/posts/"+post+"/comments", map[string]string{"body_html": "<p>secret comment</p>"})["id"].(string)
+	message := kit.mustStatus(201, "POST", gp+"/messages", map[string]string{"body_html": "<p>secret message</p>"})["id"].(string)
+	kit.mustStatus(200, "PUT", "/api/markers/chat:"+gid, map[string]any{"read_at": int64(1)})
+	if count(t, srv.DB, "SELECT COUNT(*) FROM notifications WHERE group_id = ?", gid) == 0 {
+		t.Fatal("the room made no notifications to test with")
 	}
-}
 
-// Deleting a room empties its name and the text of everything in it. Its members, read markers, notifications,
-// search entries and logged events are deleted. A room whose only member is removed from the community is deleted
-// the same way.
-func TestDeletingARoomEmptiesEverythingInIt(t *testing.T) {
-	for _, how := range []string{"deleted by its owner", "its only member removed"} {
-		t.Run(how, func(t *testing.T) {
-			ts, owner, srv := newTestServerWith(t)
-			kit, kitID := registerMember(t, ts, owner, "kit")
-			maker := owner
-			if how == "its only member removed" {
-				maker = kit
-			}
-			gid := maker.mustStatus(201, "POST", "/api/groups", map[string]any{"kind": "group", "name": "Secret room", "mode": "both"})["id"].(string)
-			gp := "/api/groups/" + gid
-			if maker == owner {
-				owner.mustStatus(201, "POST", gp+"/members", map[string]string{"user_id": kitID})
-			}
-			post := kit.mustStatus(201, "POST", gp+"/posts", map[string]string{"body_html": "<p>secret post</p>"})["id"].(string)
-			comment := maker.mustStatus(201, "POST", "/api/posts/"+post+"/comments", map[string]string{"body_html": "<p>secret comment</p>"})["id"].(string)
-			message := kit.mustStatus(201, "POST", gp+"/messages", map[string]string{"body_html": "<p>secret message</p>"})["id"].(string)
-			kit.mustStatus(200, "PUT", "/api/markers/chat:"+gid, map[string]any{"read_at": int64(1)})
-			if maker == owner && count(t, srv.DB, "SELECT COUNT(*) FROM notifications WHERE group_id = ?", gid) == 0 {
-				t.Fatal("the room made no notifications to test with")
-			}
+	owner.mustStatus(200, "DELETE", gp, nil)
 
-			if maker == owner {
-				owner.mustStatus(200, "DELETE", gp, nil)
-			} else {
-				owner.mustStatus(204, "DELETE", "/api/users/"+kitID, nil)
-			}
-
-			if n := count(t, srv.DB, "SELECT COUNT(*) FROM groups WHERE id = ? AND deleted_at IS NOT NULL AND name = ''", gid); n != 1 {
-				t.Fatal("the room is not marked deleted with its name emptied")
-			}
-			if n := written(t, srv.DB, "posts", post) + written(t, srv.DB, "comments", comment) + written(t, srv.DB, "messages", message); n != 0 {
-				t.Fatalf("rows in the deleted room that still hold text: %d", n)
-			}
-			for _, q := range []string{
-				"SELECT COUNT(*) FROM posts WHERE group_id = ? AND deleted_at IS NULL",
-				"SELECT COUNT(*) FROM messages WHERE group_id = ? AND deleted_at IS NULL",
-				"SELECT COUNT(*) FROM comments c JOIN posts p ON p.id = c.post_id WHERE p.group_id = ? AND c.deleted_at IS NULL",
-				"SELECT COUNT(*) FROM memberships WHERE group_id = ?",
-				"SELECT COUNT(*) FROM notifications WHERE group_id = ?",
-				"SELECT COUNT(*) FROM read_markers WHERE stream IN ('chat:' || ?1, 'feed:' || ?1)",
-				"SELECT COUNT(*) FROM search WHERE group_id = ?",
-			} {
-				if n := count(t, srv.DB, q, gid); n != 0 {
-					t.Errorf("%s: %d rows left", q, n)
-				}
-			}
-			if n := count(t, srv.DB, "SELECT COUNT(*) FROM events WHERE payload LIKE '%secret%' OR payload LIKE '%Secret room%'"); n != 0 {
-				t.Errorf("logged events that hold the room's text: %d", n)
-			}
-		})
+	if n := count(t, srv.DB, "SELECT COUNT(*) FROM groups WHERE id = ? AND deleted_at IS NOT NULL AND name = ''", gid); n != 1 {
+		t.Fatal("the room is not marked deleted with its name emptied")
+	}
+	if n := withText(t, srv.DB, "posts", post) + withText(t, srv.DB, "comments", comment) + withText(t, srv.DB, "messages", message); n != 0 {
+		t.Fatalf("rows in the deleted room that still hold text: %d", n)
+	}
+	for _, q := range []string{
+		"SELECT COUNT(*) FROM posts WHERE group_id = ? AND deleted_at IS NULL",
+		"SELECT COUNT(*) FROM messages WHERE group_id = ? AND deleted_at IS NULL",
+		"SELECT COUNT(*) FROM comments c JOIN posts p ON p.id = c.post_id WHERE p.group_id = ? AND c.deleted_at IS NULL",
+		"SELECT COUNT(*) FROM memberships WHERE group_id = ?",
+		"SELECT COUNT(*) FROM notifications WHERE group_id = ?",
+		"SELECT COUNT(*) FROM read_markers WHERE stream IN ('chat:' || ?1, 'feed:' || ?1)",
+		"SELECT COUNT(*) FROM search WHERE group_id = ?",
+	} {
+		if n := count(t, srv.DB, q, gid); n != 0 {
+			t.Errorf("%s: %d rows left", q, n)
+		}
+	}
+	// LIKE ignores case, so this also finds the room's name.
+	if n := count(t, srv.DB, "SELECT COUNT(*) FROM events WHERE payload LIKE '%secret%'"); n != 0 {
+		t.Errorf("logged events that hold the room's text: %d", n)
 	}
 }
 
@@ -153,14 +129,75 @@ func TestClosingAReportEmptiesItsCopy(t *testing.T) {
 	}
 }
 
-// SQLite overwrites deleted content with zeros, and the search index removes deleted entries at once, so emptied
-// text does not stay in the database file.
-func TestTheDatabaseOverwritesDeletedContent(t *testing.T) {
-	_, _, srv := newTestServerWith(t)
-	if n := count(t, srv.DB, "SELECT secure_delete FROM pragma_secure_delete"); n != 1 {
-		t.Fatalf("secure_delete is %d, want 1", n)
+// Deleting a room or a post holds the write lock briefly, however large the search index is. Another write waits at
+// most five seconds for the lock (busy_timeout), so a slow delete makes other users' messages fail.
+func TestDeletingALargeRoomOrPostIsQuick(t *testing.T) {
+	_, owner, srv := newTestServerWith(t)
+	var uid string
+	if err := srv.DB.QueryRow("SELECT id FROM users WHERE username = 'raphael'").Scan(&uid); err != nil {
+		t.Fatal(err)
 	}
-	if n := count(t, srv.DB, "SELECT COUNT(*) FROM search_config WHERE k = 'secure-delete' AND v = 1"); n != 1 {
-		t.Fatal("the search index does not have secure-delete set")
+	gid := owner.mustStatus(201, "POST", "/api/groups", map[string]any{"kind": "group", "name": "Large", "mode": "both"})["id"].(string)
+	post := owner.mustStatus(201, "POST", rootPath+"/posts", map[string]string{"body_html": "<p>Many replies</p>"})["id"].(string)
+	// 20,000 messages on Home, 1,000 in the room and 1,000 comments on the post, each with a search entry.
+	fill := func(n int, query string, args ...any) {
+		t.Helper()
+		if _, err := srv.DB.Exec("WITH RECURSIVE n(i) AS (SELECT 1 UNION ALL SELECT i + 1 FROM n WHERE i < ?) "+query, append([]any{n}, args...)...); err != nil {
+			t.Fatal(err)
+		}
+	}
+	fill(20000, "INSERT INTO messages (id, group_id, author_id, body_html, body_text, created_at) SELECT 'home-' || i, ?, ?, '<p>x</p>', 'filler text ' || i, i FROM n", perm.Root, uid)
+	fill(1000, "INSERT INTO messages (id, group_id, author_id, body_html, body_text, created_at) SELECT 'room-' || i, ?, ?, '<p>x</p>', 'room text ' || i, i FROM n", gid, uid)
+	fill(1000, "INSERT INTO comments (id, post_id, author_id, body_html, body_text, created_at) SELECT 'comment-' || i, ?, ?, '<p>x</p>', 'comment text ' || i, i FROM n", post, uid)
+
+	for _, path := range []string{"/api/groups/" + gid, "/api/posts/" + post} {
+		start := time.Now()
+		owner.mustStatus(http.StatusOK, "DELETE", path, nil)
+		if took := time.Since(start); took > 2*time.Second {
+			t.Errorf("DELETE %s took %v", path, took)
+		}
+	}
+	if n := count(t, srv.DB, "SELECT COUNT(*) FROM search WHERE text LIKE 'room text%' OR text LIKE 'comment text%'"); n != 0 {
+		t.Fatalf("search entries left from the deleted room and post: %d", n)
+	}
+}
+
+// Removing a user empties each of their rows once. Each update of a row also updates the search index.
+func TestRemovingAUserEmptiesEachRowOnce(t *testing.T) {
+	ts, owner, srv := newTestServerWith(t)
+	kit, kitID := registerMember(t, ts, owner, "kit")
+	for range 3 {
+		kit.mustStatus(201, "POST", rootPath+"/messages", map[string]string{"body_html": "<p>hello</p>"})
+	}
+	if _, err := srv.DB.Exec(`CREATE TABLE updates (n INTEGER);
+		INSERT INTO updates VALUES (0);
+		CREATE TRIGGER count_updates AFTER UPDATE ON messages BEGIN UPDATE updates SET n = n + 1; END;`); err != nil {
+		t.Fatal(err)
+	}
+	// Kit's rows are the three messages and the chat line that says kit joined.
+	rows := count(t, srv.DB, "SELECT COUNT(*) FROM messages WHERE author_id = ?", kitID)
+	owner.mustStatus(204, "DELETE", "/api/users/"+kitID, nil)
+	if n := count(t, srv.DB, "SELECT n FROM updates"); n != rows {
+		t.Fatalf("message rows updated %d times, want %d", n, rows)
+	}
+}
+
+// When a removed user was the only member left in a room, the room is deleted with everything in it, including
+// replies by people who left. No reply is logged again with its text.
+func TestRemovingARoomsLastMemberLogsNoTextFromTheRoom(t *testing.T) {
+	ts, owner, srv := newTestServerWith(t)
+	kit, kitID := registerMember(t, ts, owner, "kit")
+	mo, moID := registerMember(t, ts, owner, "mo")
+	gid := kit.mustStatus(201, "POST", "/api/groups", map[string]any{"kind": "group", "name": "Small", "mode": "both"})["id"].(string)
+	gp := "/api/groups/" + gid
+	kit.mustStatus(201, "POST", gp+"/members", map[string]string{"user_id": moID})
+	asked := kit.mustStatus(201, "POST", gp+"/messages", map[string]string{"body_html": "<p>A question</p>"})["id"]
+	mo.mustStatus(201, "POST", gp+"/messages", map[string]any{"body_html": "<p>secret reply</p>", "reply_to": asked})
+	mo.mustStatus(204, "DELETE", gp+"/members/"+moID, nil)
+
+	owner.mustStatus(204, "DELETE", "/api/users/"+kitID, nil)
+
+	if n := count(t, srv.DB, "SELECT COUNT(*) FROM events WHERE payload LIKE '%secret reply%'"); n != 0 {
+		t.Fatalf("logged events that hold the reply's text: %d", n)
 	}
 }

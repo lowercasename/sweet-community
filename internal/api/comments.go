@@ -180,7 +180,7 @@ func (s *Server) editComment(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// deleteComment deletes a comment and empties its text. perm.DeleteComment decides who may.
+// deleteComment deletes a comment. perm.DeleteComment decides who may. removeComment does the deletion.
 // The event carries the ids so that pages can remove the comment and
 // decrement the post's comment count.
 func (s *Server) deleteComment(w http.ResponseWriter, r *http.Request) {

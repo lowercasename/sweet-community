@@ -95,17 +95,6 @@ func (s *Server) removeUser(w http.ResponseWriter, r *http.Request) {
 		if err := events.Forget(ctx, qtx, "profile:"+uid); err != nil {
 			return nil, nil, http.StatusInternalServerError, err
 		}
-		// Their posts, comments and messages are deleted and their text is cleared (Raphael, 2026-11-08).
-		erased, err := eraseContent(ctx, qtx, uid, now)
-		if err != nil {
-			return nil, nil, http.StatusInternalServerError, err
-		}
-		entries = append(entries, erased...)
-		closed, err := closeReportsAbout(ctx, qtx, uid, me.ID, now)
-		if err != nil {
-			return nil, nil, http.StatusInternalServerError, err
-		}
-		entries = append(entries, closed...)
 		rows, err := qtx.ListUserMemberships(ctx, uid)
 		if err != nil {
 			return nil, nil, http.StatusInternalServerError, err
@@ -152,6 +141,18 @@ func (s *Server) removeUser(w http.ResponseWriter, r *http.Request) {
 				}
 			}
 		}
+		// Their posts, comments and messages are deleted and their text is cleared (Raphael, 2026-11-08). This runs
+		// after the rooms they were alone in are deleted, so nothing from those rooms is logged again.
+		erased, err := eraseContent(ctx, qtx, uid, now)
+		if err != nil {
+			return nil, nil, http.StatusInternalServerError, err
+		}
+		entries = append(entries, erased...)
+		closed, err := closeReportsAbout(ctx, qtx, uid, me.ID, now)
+		if err != nil {
+			return nil, nil, http.StatusInternalServerError, err
+		}
+		entries = append(entries, closed...)
 		// The account's email links and push subscriptions go with its sessions. A link sent before the removal
 		// cannot sign the account in, and its devices receive no more pushes.
 		if err := qtx.DeleteUserEmailTokens(ctx, uid); err != nil {
@@ -167,8 +168,8 @@ func (s *Server) removeUser(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// eraseContent deletes a removed user's posts, comments and messages with removePost, removeComment and
-// removeMessage, and returns their delete events. It then empties the text of the user's content that was deleted
+// eraseContent deletes a removed user's live posts, comments and messages with removePost, removeComment and
+// removeMessage, and returns their delete events. It then empties the rest of the user's content, which was deleted
 // before.
 func eraseContent(ctx context.Context, qtx *store.Queries, uid string, now int64) ([]events.Entry, error) {
 	comments, err := qtx.ListLiveCommentsByAuthor(ctx, uid)

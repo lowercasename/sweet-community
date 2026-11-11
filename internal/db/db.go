@@ -26,12 +26,11 @@ func LitestreamOwnsCheckpoints(q url.Values) { q.Add("_pragma", "wal_autocheckpo
 
 // Open opens the database at path, creating it if it does not exist.
 //
-// The pragmas are as follows. WAL mode means readers never block the writer.
-// busy_timeout means a second writer waits instead of failing.
-// synchronous=NORMAL is safe under WAL. Foreign keys are on. secure_delete makes SQLite overwrite deleted and
-// replaced content with zeros, so emptied text does not stay in the file. _txlock=immediate
-// makes every transaction begin with BEGIN IMMEDIATE, so a transaction that
-// reads and then writes can never fail with SQLITE_BUSY_SNAPSHOT.
+// The pragmas are as follows. WAL mode means readers never block the writer. busy_timeout means a second writer waits
+// instead of failing. synchronous=NORMAL is safe under WAL. Foreign keys are on. secure_delete makes SQLite overwrite
+// deleted and replaced content with zeros, so emptied text does not stay in the file. _txlock=immediate makes every
+// transaction begin with BEGIN IMMEDIATE, so a transaction that reads and then writes can never fail with
+// SQLITE_BUSY_SNAPSHOT.
 func Open(path string, opts ...Option) (*sql.DB, error) {
 	q := url.Values{}
 	q.Add("_pragma", "busy_timeout(5000)")

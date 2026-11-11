@@ -261,3 +261,24 @@ func migratedTo(t *testing.T, d *sql.DB, prefix string) {
 		t.Fatal(err)
 	}
 }
+
+// SQLite overwrites deleted and replaced content with zeros, and the search index removes an entry at once when its
+// row is deleted or edited, so emptied text does not stay in the database file.
+func TestSecureDeleteIsOn(t *testing.T) {
+	ctx := context.Background()
+	d, err := Open(filepath.Join(t.TempDir(), "sweet.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer d.Close()
+	if err := Migrate(ctx, d, os.DirFS("../../migrations")); err != nil {
+		t.Fatal(err)
+	}
+	var on, search int
+	if err := d.QueryRowContext(ctx, `PRAGMA secure_delete`).Scan(&on); err != nil || on != 1 {
+		t.Fatalf("secure_delete = %d %v, want 1", on, err)
+	}
+	if err := d.QueryRowContext(ctx, `SELECT v FROM search_config WHERE k = 'secure-delete'`).Scan(&search); err != nil || search != 1 {
+		t.Fatalf("the search index's secure-delete = %d %v, want 1", search, err)
+	}
+}

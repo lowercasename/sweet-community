@@ -12,9 +12,14 @@ DELETE FROM events WHERE key = sqlc.arg(key);
 -- Deletes the events older than the replay window.
 DELETE FROM events WHERE created_at < sqlc.arg(before);
 
+-- name: ForgetPostCommentEvents :exec
+-- Deletes the logged events of a post's comments. The comments are deleted with the post and get no delete events of
+-- their own. The keys are those that events.Key makes.
+DELETE FROM events WHERE key IN (SELECT 'comment:' || c.id FROM comments c WHERE c.post_id = sqlc.arg(post_id));
+
 -- name: ForgetGroupEvents :exec
 -- Deletes the logged events of a group's posts, comments, messages, memberships, read markers and notifications.
--- Deleting the group calls it before it deletes them.
+-- removeGroup calls it before it deletes those rows. The keys are those that events.Key makes.
 DELETE FROM events WHERE key IN (
     SELECT 'post:' || p.id FROM posts p WHERE p.group_id = sqlc.arg(group_id)
     UNION ALL SELECT 'comment:' || c.id FROM comments c JOIN posts p ON p.id = c.post_id WHERE p.group_id = sqlc.arg(group_id)

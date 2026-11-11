@@ -104,6 +104,10 @@ func TestRemoveFromInstance(t *testing.T) {
 		+ (SELECT count(*) FROM messages WHERE author_id = ?1 AND (body_text != '' OR deleted_at IS NULL))`, kitID).Scan(&kept); err != nil || kept != 0 {
 		t.Fatalf("the removed person's content kept in the database: %d %v", kept, err)
 	}
+	// Their posts are deleted as the author would delete them, so jo's comment on kit's post is emptied too.
+	if err := srv.DB.QueryRow(`SELECT count(*) FROM comments WHERE post_id = ? AND body_text != ''`, post["id"]).Scan(&kept); err != nil || kept != 0 {
+		t.Fatalf("comments on the removed person's post that still hold text: %d %v", kept, err)
+	}
 	// Ownership of the club passed to mo, its moderator, instead of jo. The room kit was alone in was deleted. The
 	// conversation stays for mo, with kit under the removed name.
 	for _, m := range mo.mustStatus(200, "GET", cp+"/members", nil)["members"].([]any) {

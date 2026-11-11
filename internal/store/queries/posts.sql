@@ -60,6 +60,7 @@ LIMIT sqlc.arg(page_size);
 SELECT id, group_id FROM posts WHERE author_id = sqlc.arg(author_id) AND deleted_at IS NULL;
 
 -- name: EraseAuthorPosts :exec
--- Deletes every post of a removed user and clears its text, including posts deleted before.
+-- Deletes and empties the posts of a removed user that eraseContent did not delete, such as posts deleted before.
+-- Rows that are already deleted and empty are not updated again.
 UPDATE posts SET deleted_at = COALESCE(deleted_at, sqlc.arg(deleted_at)), body_html = '', body_text = ''
-WHERE author_id = sqlc.arg(author_id);
+WHERE author_id = sqlc.arg(author_id) AND (deleted_at IS NULL OR body_html != '' OR body_text != '');
