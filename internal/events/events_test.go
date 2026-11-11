@@ -15,10 +15,11 @@ import (
 // another version can reload. The event
 // has no id because it is not part of the log.
 func TestServeAnnouncesTheVersionFirst(t *testing.T) {
-	h := NewHub(nil)
+	d := openLog(t)
+	h := NewHub(d)
 	h.Version = "abc123"
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		h.Serve(w, r, func(e Event) (Event, bool) { return e, true }, func() bool { return true })
+		h.Serve(w, r, func(e Event) (Event, bool, error) { return e, true, nil }, func() (bool, error) { return true, nil })
 	}))
 	defer srv.Close()
 
@@ -51,30 +52,42 @@ func TestServeEndsWhenTheViewerMayNoLongerReceive(t *testing.T) {
 	defer func() { Heartbeat = saved }()
 
 	for _, quiet := range []bool{false, true} {
-		h := NewHub(nil)
+		d := openLog(t)
+		h := NewHub(d)
 		var allowed atomic.Bool
 		allowed.Store(true)
 		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			h.Serve(w, r, func(e Event) (Event, bool) { return e, true }, allowed.Load)
+			h.Serve(w, r, func(e Event) (Event, bool, error) { return e, true, nil }, func() (bool, error) { return allowed.Load(), nil })
 		}))
 		res, err := http.Get(srv.URL)
 		if err != nil {
 			t.Fatal(err)
 		}
 		// One event while allowed, then one after the viewer has signed out, unless the stream is quiet.
-		h.Broadcast(Event{Seq: 1, Kind: "message", Payload: []byte(`{}`)})
-		time.Sleep(20 * time.Millisecond)
+		logged(t, d, "message", map[string]string{"id": "first"}, 1)
+		h.Notify()
+		reader := bufio.NewReader(res.Body)
+		for {
+			line, err := reader.ReadString('\n')
+			if err != nil {
+				t.Fatal(err)
+			}
+			if line == "event: message\n" {
+				break
+			}
+		}
 		allowed.Store(false)
 		if !quiet {
-			h.Broadcast(Event{Seq: 2, Kind: "message", Payload: []byte(`{}`)})
+			logged(t, d, "message", map[string]string{"id": "second"}, 1)
+			h.Notify()
 		}
-		body, err := io.ReadAll(res.Body)
+		body, err := io.ReadAll(reader)
 		res.Body.Close()
 		srv.Close()
 		if err != nil {
 			t.Fatal(err)
 		}
-		var kinds []string
+		kinds := []string{"message"}
 		for _, line := range strings.Split(string(body), "\n") {
 			if strings.HasPrefix(line, "event: ") {
 				kinds = append(kinds, strings.TrimPrefix(line, "event: "))

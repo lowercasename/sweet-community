@@ -199,7 +199,7 @@ func (s *Server) register(w http.ResponseWriter, r *http.Request) {
 	}
 	m := wireMembership(perm.Root, joined)
 	u = m.User // use the row's values, which are what the event carries
-	ev, err := events.Log(ctx, tx, "membership", m, now)
+	_, err = events.Log(ctx, tx, "membership", m, now)
 	if err != nil {
 		writeErr(w, http.StatusInternalServerError, err.Error())
 		return
@@ -210,7 +210,7 @@ func (s *Server) register(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusInternalServerError, err.Error())
 		return
 	}
-	lineEv, err := events.Log(ctx, tx, line.Kind, line.Payload, now)
+	_, err = events.Log(ctx, tx, line.Kind, line.Payload, now)
 	if err != nil {
 		writeErr(w, http.StatusInternalServerError, err.Error())
 		return
@@ -222,7 +222,6 @@ func (s *Server) register(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusInternalServerError, err.Error())
 		return
 	}
-	var told []events.Event
 	for _, m := range staff {
 		if m.Role != perm.Owner && m.Role != perm.Moderator {
 			continue
@@ -233,12 +232,11 @@ func (s *Server) register(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		if entry != nil {
-			tev, err := events.Log(ctx, tx, entry.Kind, entry.Payload, now)
+			_, err := events.Log(ctx, tx, entry.Kind, entry.Payload, now)
 			if err != nil {
 				writeErr(w, http.StatusInternalServerError, err.Error())
 				return
 			}
-			told = append(told, tev)
 		}
 	}
 	if err := tx.Commit(); err != nil {
@@ -246,11 +244,7 @@ func (s *Server) register(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	setRegistrationCookie(w, r, proof)
-	s.Hub.Broadcast(ev)
-	s.Hub.Broadcast(lineEv)
-	for _, t := range told {
-		s.Hub.Broadcast(t)
-	}
+	s.Hub.Notify()
 	// No session is issued yet. The first sign-in email finishes joining, and using it verifies the address. Its code
 	// works in this browser, which the sign-in cookie identifies.
 	request, err := signinRequest(w, r)

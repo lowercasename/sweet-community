@@ -533,11 +533,15 @@ func (s *Server) deleteGroup(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// removeGroup deletes a room and returns its group_delete event. The room's row stays with its name emptied, so the
+// removeGroup deletes a room and returns its deletion and each member’s removal. The room's row stays with its name emptied, so the
 // rows that point at it stay valid. Its posts, comments and messages are deleted and their text is emptied. Its
 // memberships, notifications and read markers are deleted, and so are their events in the event log. The owner's
 // delete, a last member leaving and the removal of a room's only member all use it.
 func removeGroup(ctx context.Context, qtx *store.Queries, id string, now int64) ([]events.Entry, error) {
+	members, err := qtx.ListMembers(ctx, id)
+	if err != nil {
+		return nil, err
+	}
 	at := sql.NullInt64{Int64: now, Valid: true}
 	if err := qtx.ForgetGroupEvents(ctx, id); err != nil {
 		return nil, err
@@ -563,7 +567,11 @@ func removeGroup(ctx context.Context, qtx *store.Queries, id string, now int64) 
 	if err := qtx.DeleteGroupMemberships(ctx, id); err != nil {
 		return nil, err
 	}
-	return []events.Entry{{Kind: "group_delete", Payload: map[string]string{"id": id}}}, nil
+	entries := []events.Entry{{Kind: "group_delete", Payload: map[string]string{"id": id}}}
+	for _, member := range members {
+		entries = append(entries, events.Entry{Kind: "membership_delete", Payload: map[string]string{"group_id": id, "user_id": member.ID}})
+	}
+	return entries, nil
 }
 
 func (s *Server) listMembers(w http.ResponseWriter, r *http.Request) {
@@ -760,46 +768,6 @@ func (s *Server) removeMember(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// events is the SSE endpoint, filtered and personalised for the signed-in
-// viewer. The connection tracks the viewer's
-// role in each group and updates it from the viewer's own membership events,
-// so an event for a group they are not in is never written.
-func (s *Server) events(w http.ResponseWriter, r *http.Request) {
-	viewer, _ := userFrom(r.Context())
-	ctx, end := context.WithCancel(r.Context())
-	defer end()
-	leave := s.Hub.Join(viewer.ID, end)
-	defer leave()
-	r = r.WithContext(ctx)
-	rows, err := s.q().ListMyGroups(r.Context(), viewer.ID)
-	if err != nil {
-		writeErr(w, http.StatusInternalServerError, err.Error())
-		return
-	}
-	roles := map[string]string{}
-	for _, row := range rows {
-		if !row.HiddenAt.Valid {
-			roles[row.ID] = row.Role
-		}
-	}
-	st, err := s.settings(r.Context())
-	if err != nil {
-		writeErr(w, http.StatusInternalServerError, err.Error())
-		return
-	}
-	// The session is checked again before each event and at each heartbeat, so the stream ends when the session ends:
-	// on signing out, signing out everywhere, a password change, removal or expiry. Only a session that no longer
-	// exists ends it. A database error does not.
-	sid := sessionFrom(r.Context())
-	allowed := func() bool {
-		_, err := s.sessionUser(r.Context(), sid)
-		return !errors.Is(err, sql.ErrNoRows)
-	}
-	s.Hub.Serve(w, r, func(e events.Event) (events.Event, bool) {
-		return filterEvent(viewer, roles, &st, e)
-	}, allowed)
-}
-
 // getSettings and setSettings read and write the instance's settings. Only
 // the root group's owner may write them.
 func (s *Server) getSettings(w http.ResponseWriter, r *http.Request) {
@@ -846,150 +814,4 @@ func (s *Server) setSettings(w http.ResponseWriter, r *http.Request) {
 		st, err := settingsOf(r.Context(), qtx)
 		return st, http.StatusOK, err
 	})
-}
-
-// filterEvent decides whether one viewer receives one event, and personalises it.
-func filterEvent(viewer User, roles map[string]string, st *Settings, e events.Event) (events.Event, bool) {
-	inGroup := func(gid string) (perm.Actor, bool) {
-		role, ok := roles[gid]
-		return perm.Actor{ID: viewer.ID, Role: role}, ok
-	}
-	encode := func(v any) (events.Event, bool) {
-		raw, err := json.Marshal(v)
-		if err != nil {
-			return e, false
-		}
-		e.Payload = raw
-		return e, true
-	}
-	switch e.Kind {
-	case "post":
-		var p Post
-		if json.Unmarshal(e.Payload, &p) != nil {
-			return e, false
-		}
-		a, ok := inGroup(p.GroupID)
-		if !ok {
-			return e, false
-		}
-		return encode(forViewer(a, &p, *st))
-	case "comment":
-		var c Comment
-		if json.Unmarshal(e.Payload, &c) != nil {
-			return e, false
-		}
-		a, ok := inGroup(c.GroupID)
-		if !ok {
-			return e, false
-		}
-		return encode(forViewer(a, &c, *st))
-	case "message":
-		var m Message
-		if json.Unmarshal(e.Payload, &m) != nil {
-			return e, false
-		}
-		a, ok := inGroup(m.GroupID)
-		if !ok {
-			return e, false
-		}
-		return encode(forViewer(a, &m, *st))
-	case "group":
-		var g Group
-		if json.Unmarshal(e.Payload, &g) != nil {
-			return e, false
-		}
-		a, ok := inGroup(g.ID)
-		if !ok {
-			return e, false
-		}
-		return encode(forViewer(a, &g, *st))
-	case "post_delete", "comment_delete", "message_delete":
-		// Sent to the group's members only, so the event does not show activity in a group the viewer is not in.
-		var d struct {
-			GroupID string `json:"group_id"`
-		}
-		if json.Unmarshal(e.Payload, &d) != nil {
-			return e, false
-		}
-		_, ok := roles[d.GroupID]
-		return e, ok
-	case "group_delete":
-		var d struct {
-			ID string `json:"id"`
-		}
-		if json.Unmarshal(e.Payload, &d) != nil {
-			return e, false
-		}
-		if _, ok := roles[d.ID]; !ok {
-			return e, false
-		}
-		delete(roles, d.ID)
-		return e, true
-	case "membership":
-		var m Membership
-		if json.Unmarshal(e.Payload, &m) != nil {
-			return e, false
-		}
-		if m.User.ID == viewer.ID {
-			// The viewer's own membership, either joined or hidden. The viewer
-			// receives it in both cases.
-			if m.HiddenAt != nil {
-				delete(roles, m.GroupID)
-			} else {
-				roles[m.GroupID] = m.Role
-			}
-			return e, true
-		}
-		// Another user hiding a conversation is sent to that user only.
-		if m.HiddenAt != nil {
-			return e, false
-		}
-		_, ok := roles[m.GroupID]
-		return e, ok
-	case "membership_delete":
-		var d struct {
-			GroupID string `json:"group_id"`
-			UserID  string `json:"user_id"`
-		}
-		if json.Unmarshal(e.Payload, &d) != nil {
-			return e, false
-		}
-		if d.UserID == viewer.ID {
-			_, was := roles[d.GroupID]
-			delete(roles, d.GroupID)
-			return e, was
-		}
-		_, ok := roles[d.GroupID]
-		return e, ok
-	case "settings":
-		var next Settings
-		if json.Unmarshal(e.Payload, &next) == nil {
-			*st = next
-		}
-		return e, true
-	case "report", "report_delete":
-		// Sent to the root group's owner and moderators only. A report is personalised
-		// with the viewer's role in the reported item's group, which decides whether they can open it.
-		if !perm.HandleReports(perm.Actor{ID: viewer.ID, Role: roles[perm.Root]}) {
-			return e, false
-		}
-		if e.Kind == "report_delete" {
-			return e, true
-		}
-		var rp Report
-		if json.Unmarshal(e.Payload, &rp) != nil {
-			return e, false
-		}
-		a, _ := inGroup(rp.GroupID)
-		return encode(forViewer(a, &rp, *st))
-	case "notification", "notification_delete", "marker":
-		// Sent to the owning user only. A notification belongs to its recipient, and a marker records how far its user has read.
-		var own struct {
-			UserID string `json:"user_id"`
-		}
-		return e, json.Unmarshal(e.Payload, &own) == nil && own.UserID == viewer.ID
-	default:
-		// A user event, or any other instance-wide event, is sent to every user on the instance.
-		return e, true
-	}
 }

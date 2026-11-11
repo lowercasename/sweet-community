@@ -1,6 +1,5 @@
-// Package events holds the instance's event log, the in-process pub/sub, and
-// the SSE handler that serves them. There is one process per instance, so a
-// map of channels is sufficient as the broker.
+// Package events stores committed resource updates and serves them over SSE.
+// In-process signals wake subscribers to read the database log.
 package events
 
 import (
@@ -25,19 +24,19 @@ type Event struct {
 	Payload json.RawMessage `json:"payload"`
 }
 
-// Hub fans events out to connected SSE clients.
+// Hub wakes connected SSE clients when the event log changes.
 type Hub struct {
 	db *sql.DB
 	// Version identifies the running binary. The stream sends it first, so
 	// a tab that loaded another version can reload.
 	Version string
 	mu      sync.Mutex
-	subs    map[chan Event]struct{}
+	subs    map[chan struct{}]struct{}
 	streams map[string][]*context.CancelFunc // each user's open streams, the oldest first
 }
 
 func NewHub(db *sql.DB) *Hub {
-	return &Hub{db: db, subs: map[chan Event]struct{}{}, streams: map[string][]*context.CancelFunc{}}
+	return &Hub{db: db, subs: map[chan struct{}]struct{}{}, streams: map[string][]*context.CancelFunc{}}
 }
 
 // MaxStreams is the most event streams one user may have open at once, one for each tab and device. It limits the
@@ -69,7 +68,7 @@ func (h *Hub) Join(user string, end context.CancelFunc) (leave func()) {
 
 // Log appends an event inside the caller's write transaction. The returned
 // seq is in commit order because it is assigned while the write lock is
-// held. Callers must broadcast after Commit, not before. Log first deletes
+// held. Callers must notify subscribers after Commit, not before. Log first deletes
 // the earlier events about the same resource, so the log keeps only the
 // newest event for each key.
 func Log(ctx context.Context, tx *sql.Tx, kind string, payload any, now int64) (Event, error) {
@@ -191,29 +190,28 @@ func PruneEvery(ctx context.Context, db *sql.DB, every time.Duration, logf func(
 	}
 }
 
-// Broadcast delivers a committed event to every connected subscriber. A
-// subscriber whose channel is full is skipped rather than blocking the
-// writer. It catches up from the log on its next reconnect.
-func (h *Hub) Broadcast(e Event) {
+// Notify wakes subscribers after a transaction commits. Events are read from the database in sequence.
+// One pending notification is enough because every subscriber reads until it has caught up.
+func (h *Hub) Notify() {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	for ch := range h.subs {
 		select {
-		case ch <- e:
+		case ch <- struct{}{}:
 		default:
 		}
 	}
 }
 
-func (h *Hub) subscribe() chan Event {
-	ch := make(chan Event, 64)
+func (h *Hub) subscribe() chan struct{} {
+	ch := make(chan struct{}, 1)
 	h.mu.Lock()
 	h.subs[ch] = struct{}{}
 	h.mu.Unlock()
 	return ch
 }
 
-func (h *Hub) unsubscribe(ch chan Event) {
+func (h *Hub) unsubscribe(ch chan struct{}) {
 	h.mu.Lock()
 	delete(h.subs, ch)
 	h.mu.Unlock()
@@ -243,25 +241,15 @@ type Entry struct {
 	Payload any
 }
 
-// Serve is the SSE endpoint. It replays events after Last-Event-ID or
-// ?since=, then streams live events. Every event carries id: <seq>. filter
-// runs on each event before it is written. The log holds every event once,
-// unfiltered. Each connection decides whether its viewer may receive the
-// event and adds the viewer's own view, such as can flags. A filtered-out
-// event still advances the viewer's sequence.
-//
-// allowed reports whether the viewer may still receive events, which is whether their session still exists. The
-// stream checks it before each live event and at each heartbeat. When it fails, the stream sends signed_out and ends,
-// so a page that has been signed out elsewhere receives nothing more.
-func (h *Hub) Serve(w http.ResponseWriter, r *http.Request, filter func(Event) (Event, bool), allowed func() bool) {
+// Serve reads committed events in sequence for live delivery and replay. The filter checks current permissions
+// before each event. A filtered event still advances the cursor. Database errors end the stream so it can retry.
+func (h *Hub) Serve(w http.ResponseWriter, r *http.Request, filter func(Event) (Event, bool, error), allowed func() (bool, error)) {
 	flusher, ok := w.(http.Flusher)
 	if !ok {
 		http.Error(w, "streaming unsupported", http.StatusInternalServerError)
 		return
 	}
-	// A client that sends a sequence, including 0, wants every event after
-	// it. A client that sends none has just loaded the page from the API and
-	// wants only events from now on.
+	ctx := r.Context()
 	after, replay := int64(0), false
 	if v := r.Header.Get("Last-Event-ID"); v != "" {
 		after, _ = strconv.ParseInt(v, 10, 64)
@@ -270,54 +258,78 @@ func (h *Hub) Serve(w http.ResponseWriter, r *http.Request, filter func(Event) (
 		after, _ = strconv.ParseInt(v, 10, 64)
 		replay = true
 	}
-
-	// Subscribe before replaying so that no event committed during the replay
-	// is missed. Duplicates are filtered by seq below.
+	if !replay {
+		var err error
+		after, err = store.New(h.db).LatestEventSequence(ctx)
+		if err != nil {
+			http.Error(w, "Cannot open the event stream", http.StatusServiceUnavailable)
+			return
+		}
+	}
+	// Read the cursor before subscribing, then catch up after subscribing. A commit between them is in the log.
 	ch := h.subscribe()
 	defer h.unsubscribe(ch)
-
 	w.Header().Set("Content-Type", "text/event-stream")
 	w.Header().Set("Cache-Control", "no-cache")
 	w.Header().Set("X-Accel-Buffering", "no")
 	w.WriteHeader(http.StatusOK)
 	fmt.Fprint(w, ": connected\n\n")
 	if h.Version != "" {
-		// The version event has no id. It is not part of the log and must not
-		// change Last-Event-ID.
 		v, _ := json.Marshal(h.Version)
 		fmt.Fprintf(w, "event: version\ndata: %s\n\n", v)
 	}
 	flusher.Flush()
 
-	ctx := r.Context()
-	write := func(e Event) {
-		e, ok := filter(e)
-		if !ok {
-			// A comment line with the id advances Last-Event-ID.
-			fmt.Fprintf(w, "id: %d\n: skipped\n\n", e.Seq)
-			return
+	checkSession := func() bool {
+		ok, err := allowed()
+		if err != nil {
+			return false
 		}
-		fmt.Fprintf(w, "id: %d\nevent: %s\ndata: %s\n\n", e.Seq, e.Kind, e.Payload)
-	}
-
-	last := after
-	if replay {
-		backlog, err := h.Since(ctx, after, 1000)
-		if err == nil {
-			for _, e := range backlog {
-				write(e)
-				last = e.Seq
-			}
-			// A comment line marks the end of the replay, so a reader that
-			// wants only the backlog knows when it has received all of it.
-			fmt.Fprint(w, ": caught up\n\n")
+		if !ok {
+			fmt.Fprint(w, "event: signed_out\ndata: {}\n\n")
 			flusher.Flush()
 		}
+		return ok
 	}
-
-	// signedOut ends the stream with an event that has no id, like the version event, so the page can sign out.
-	signedOut := func() {
-		fmt.Fprint(w, "event: signed_out\ndata: {}\n\n")
+	catchUp := func() bool {
+		const batch = 1000
+		for {
+			if ctx.Err() != nil || !checkSession() {
+				return false
+			}
+			rows, err := h.Since(ctx, after, batch)
+			if err != nil {
+				return false
+			}
+			for _, row := range rows {
+				if ctx.Err() != nil || !checkSession() {
+					return false
+				}
+				e, visible, err := filter(row)
+				if err != nil {
+					return false
+				}
+				if visible {
+					_, err = fmt.Fprintf(w, "id: %d\nevent: %s\ndata: %s\n\n", row.Seq, e.Kind, e.Payload)
+				} else {
+					_, err = fmt.Fprintf(w, "id: %d\n: skipped\n\n", row.Seq)
+				}
+				if err != nil {
+					return false
+				}
+				after = row.Seq
+			}
+			flusher.Flush()
+			if len(rows) < batch {
+				return true
+			}
+		}
+	}
+	if !catchUp() {
+		return
+	}
+	if replay {
+		fmt.Fprint(w, ": caught up\n\n")
 		flusher.Flush()
 	}
 	tick := time.NewTicker(Heartbeat)
@@ -326,20 +338,13 @@ func (h *Hub) Serve(w http.ResponseWriter, r *http.Request, filter func(Event) (
 		select {
 		case <-ctx.Done():
 			return
-		case e := <-ch:
-			if e.Seq <= last {
-				continue
-			}
-			if !allowed() {
-				signedOut()
+		case <-ch:
+			if !catchUp() {
 				return
 			}
-			write(e)
-			last = e.Seq
-			flusher.Flush()
 		case <-tick.C:
-			if !allowed() {
-				signedOut()
+			// A heartbeat also catches a commit whose caller never reached Notify.
+			if !catchUp() {
 				return
 			}
 			if _, err := fmt.Fprint(w, ": hb\n\n"); err != nil {

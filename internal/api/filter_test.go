@@ -24,3 +24,9 @@ func TestDeleteEventsReachOnlyTheGroupsMembers(t *testing.T) {
 		}
 	}
 }
+
+func TestUnknownEventKindsAreNotDisclosed(t *testing.T) {
+	if _, sent := filterEvent(User{ID: "viewer"}, map[string]string{}, &Settings{}, events.Event{Kind: "new_private_resource", Payload: []byte(`{}`)}); sent {
+		t.Fatal("unknown event was disclosed")
+	}
+}

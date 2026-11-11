@@ -467,7 +467,7 @@ func readPostBody(w http.ResponseWriter, r *http.Request) (clean string, topicID
 }
 
 // logged runs fn inside a write transaction, logs the one event fn returns,
-// commits, broadcasts the event, and responds with the payload personalised
+// commits, notifies subscribers, and responds with the payload personalised
 // for the actor. fn returns the resource without can flags. The log stores it
 // that way and every reader adds their own view.
 func (s *Server) logged(w http.ResponseWriter, r *http.Request, kind string, now int64, fn func(qtx *store.Queries) (payload any, status int, err error)) {
@@ -524,9 +524,9 @@ func (s *Server) loggedMany(w http.ResponseWriter, r *http.Request, now int64, f
 		writeErr(w, http.StatusInternalServerError, err.Error())
 		return
 	}
+	s.Hub.Notify()
 	var told []json.RawMessage
 	for _, ev := range logged {
-		s.Hub.Broadcast(ev)
 		if ev.Kind == "notification" {
 			told = append(told, ev.Payload)
 		}

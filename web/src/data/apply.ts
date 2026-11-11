@@ -550,6 +550,9 @@ function deleteMembership(qc: QueryClient, groupId: string, userId: string) {
       return
     }
     dropGroup(qc, groupId)
+    // Room deletion also removes memberships. Refetch because deletion clears notifications but leaving keeps them.
+    void qc.invalidateQueries({ queryKey: keys.notifications })
+    void qc.invalidateQueries({ queryKey: keys.markers })
     return
   }
   qc.setQueryData<Members>(keys.members(groupId), (old) =>

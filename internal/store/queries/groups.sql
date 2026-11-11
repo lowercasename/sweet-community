@@ -102,3 +102,7 @@ UPDATE memberships SET hidden_at = NULL WHERE group_id = sqlc.arg(group_id) AND 
 
 -- name: GetGroupOwnerID :one
 SELECT user_id FROM memberships WHERE group_id = sqlc.arg(group_id) AND role = 'owner';
+
+-- name: ListEventRoles :many
+SELECT m.group_id, m.role FROM memberships m JOIN groups g ON g.id = m.group_id
+WHERE m.user_id = sqlc.arg(user_id) AND m.hidden_at IS NULL AND g.deleted_at IS NULL;

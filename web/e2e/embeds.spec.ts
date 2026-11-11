@@ -196,7 +196,7 @@ test.describe('link preview cards', () => {
     await article(kit.page, post).locator('.editor-line .ProseMirror').click()
     await kit.page.keyboard.type(OPEN_DAY)
     await kit.page.getByRole('button', { name: 'Reply', exact: true }).click()
-    await expect(card(article(kit.page, post))).toContainText('Allotment open day')
+    await expect(article(kit.page, post).locator('a.link-preview')).toContainText('Allotment open day')
     await kit.context.close()
   })
 

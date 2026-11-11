@@ -29,3 +29,6 @@ DELETE FROM events WHERE key IN (
         WHERE rm.stream IN ('chat:' || sqlc.arg(group_id), 'feed:' || sqlc.arg(group_id))
     UNION ALL SELECT 'notification:' || n.id FROM notifications n WHERE n.group_id = sqlc.arg(group_id)
 );
+
+-- name: LatestEventSequence :one
+SELECT CAST(COALESCE(MAX(seq), 0) AS INTEGER) FROM events;

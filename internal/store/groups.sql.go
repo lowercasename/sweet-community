@@ -281,6 +281,39 @@ func (q *Queries) HideMembership(ctx context.Context, arg HideMembershipParams) 
 	return err
 }
 
+const listEventRoles = `-- name: ListEventRoles :many
+SELECT m.group_id, m.role FROM memberships m JOIN groups g ON g.id = m.group_id
+WHERE m.user_id = ?1 AND m.hidden_at IS NULL AND g.deleted_at IS NULL
+`
+
+type ListEventRolesRow struct {
+	GroupID string
+	Role    string
+}
+
+func (q *Queries) ListEventRoles(ctx context.Context, userID string) ([]ListEventRolesRow, error) {
+	rows, err := q.db.QueryContext(ctx, listEventRoles, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListEventRolesRow{}
+	for rows.Next() {
+		var i ListEventRolesRow
+		if err := rows.Scan(&i.GroupID, &i.Role); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listMembers = `-- name: ListMembers :many
 SELECT u.id, u.username, u.picture_id, m.role, m.joined_at, m.hidden_at
 FROM memberships m JOIN users u ON u.id = m.user_id

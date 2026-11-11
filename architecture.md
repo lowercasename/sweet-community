@@ -300,7 +300,8 @@ Search covers the posts, comments and chat messages that the searcher can see.
 
 The server sends updates over server-sent events (SSE), and the client sends ordinary HTTP requests. Both are plain HTTP, so cookies and proxies work, and the browser reconnects on its own. Each client has one stream. WebSockets should be reconsidered only for presence or typing indicators.
 
-- **The database is the replay buffer.** Events carry sequence numbers in commit order. A reconnecting client sends its last number, and the server replays later events from the database.
+- **Permissions are checked before each event.** Live delivery and replay use the viewer’s current membership and role (Raphael, 2026-11-11). A connection keeps no separate permission state because permissions can change while it is open. Deleting a room sends each former member their own removal notice.
+- **The database is the replay buffer.** Events carry sequence numbers in commit order. A reconnecting client sends its last number, and the server replays later events from the database. Live delivery reads from the same log in sequence. Concurrent writes and slow connections do not depend on an in-memory event queue (Raphael, 2026-11-11).
 - **The log keeps only each resource's newest event, for one day** (Raphael, 2026-11-08). A full log let members replay deleted content.
 - **Each resource has two kinds of event.** One carries its current state. The other announces its deletion.
 - **Each resource has one builder.** A handler that writes reads the row back and passes it to the builder. A test checks that the response and the event equal a fresh fetch.
@@ -435,6 +436,8 @@ These decisions came from a security audit (2026-11-08).
 ## Record
 
 ### Reversed
+
+- **Stream permissions.** Streams no longer keep their own copy of memberships and roles. They read current permissions before each event (Raphael, 2026-11-11). A missed removal or demotion could otherwise disclose private content.
 
 - **Address correction after joining.** Requesting a sign-in email no longer grants permission to change an unverified address. Only the browser or app that created the account has that permission for 15 minutes (Raphael, 2026-11-11). A review showed that the earlier rule let an unrelated browser claim a pending account.
 
