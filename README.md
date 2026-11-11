@@ -11,7 +11,7 @@ Sweet runs as one container, with Caddy in a second one for HTTPS. Everything it
 ### What you need
 
 - A Linux server with Docker and Docker Compose.
-- A domain name with an A record pointing at the server. Set the record before you start.
+- A domain name pointing at your server.
 - An SMTP account, for the sign-in emails. Members sign in with a link and a code sent by email, so it is needed before anyone joins. Any provider works.
 - Optional: an S3-compatible storage bucket. Images are kept in it and the database is backed up to it continuously. Without one, images stay on the server's disk and nothing is backed up.
 
