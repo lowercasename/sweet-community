@@ -2,7 +2,6 @@ package api
 
 import (
 	"database/sql"
-	"net/http"
 	"testing"
 	"time"
 
@@ -129,17 +128,19 @@ func TestClosingAReportEmptiesItsCopy(t *testing.T) {
 	}
 }
 
-// Deleting a room or a post holds the write lock briefly, however large the search index is. Another write waits at
-// most five seconds for the lock (busy_timeout), so a slow delete makes other users' messages fail.
-func TestDeletingALargeRoomOrPostIsQuick(t *testing.T) {
-	_, owner, srv := newTestServerWith(t)
+// Each deletion holds the write lock briefly, however large the search index is. Another write waits at most five
+// seconds for the lock (busy_timeout), so a slow deletion makes other users' messages fail.
+func TestLargeDeletionsAreQuick(t *testing.T) {
+	ts, owner, srv := newTestServerWith(t)
+	_, kitID := registerMember(t, ts, owner, "kit")
 	var uid string
 	if err := srv.DB.QueryRow("SELECT id FROM users WHERE username = 'raphael'").Scan(&uid); err != nil {
 		t.Fatal(err)
 	}
 	gid := owner.mustStatus(201, "POST", "/api/groups", map[string]any{"kind": "group", "name": "Large", "mode": "both"})["id"].(string)
 	post := owner.mustStatus(201, "POST", rootPath+"/posts", map[string]string{"body_html": "<p>Many replies</p>"})["id"].(string)
-	// 20,000 messages on Home, 1,000 in the room and 1,000 comments on the post, each with a search entry.
+	topic := owner.mustStatus(201, "POST", "/api/topics", map[string]string{"name": "Busy"})["id"].(string)
+	// 20,000 messages on Home, and 1,000 rows for each deletion below, each with a search entry.
 	fill := func(n int, query string, args ...any) {
 		t.Helper()
 		if _, err := srv.DB.Exec("WITH RECURSIVE n(i) AS (SELECT 1 UNION ALL SELECT i + 1 FROM n WHERE i < ?) "+query, append([]any{n}, args...)...); err != nil {
@@ -149,16 +150,25 @@ func TestDeletingALargeRoomOrPostIsQuick(t *testing.T) {
 	fill(20000, "INSERT INTO messages (id, group_id, author_id, body_html, body_text, created_at) SELECT 'home-' || i, ?, ?, '<p>x</p>', 'filler text ' || i, i FROM n", perm.Root, uid)
 	fill(1000, "INSERT INTO messages (id, group_id, author_id, body_html, body_text, created_at) SELECT 'room-' || i, ?, ?, '<p>x</p>', 'room text ' || i, i FROM n", gid, uid)
 	fill(1000, "INSERT INTO comments (id, post_id, author_id, body_html, body_text, created_at) SELECT 'comment-' || i, ?, ?, '<p>x</p>', 'comment text ' || i, i FROM n", post, uid)
+	fill(1000, "INSERT INTO messages (id, group_id, author_id, body_html, body_text, created_at) SELECT 'kit-' || i, ?, ?, '<p>x</p>', 'kit text ' || i, i FROM n", perm.Root, kitID)
+	fill(1000, "INSERT INTO posts (id, group_id, author_id, body_html, body_text, created_at, topic_id) SELECT 'topic-' || i, ?, ?, '<p>x</p>', 'topic text ' || i, i, ? FROM n", perm.Root, uid, topic)
 
-	for _, path := range []string{"/api/groups/" + gid, "/api/posts/" + post} {
+	for _, d := range []struct{ path string }{
+		{"/api/groups/" + gid}, {"/api/posts/" + post}, {"/api/users/" + kitID}, {"/api/topics/" + topic},
+	} {
 		start := time.Now()
-		owner.mustStatus(http.StatusOK, "DELETE", path, nil)
+		if status, body := owner.do("DELETE", d.path, nil); status >= 300 {
+			t.Fatalf("DELETE %s: %d %v", d.path, status, body)
+		}
 		if took := time.Since(start); took > 2*time.Second {
-			t.Errorf("DELETE %s took %v", path, took)
+			t.Errorf("DELETE %s took %v", d.path, took)
 		}
 	}
-	if n := count(t, srv.DB, "SELECT COUNT(*) FROM search WHERE text LIKE 'room text%' OR text LIKE 'comment text%'"); n != 0 {
-		t.Fatalf("search entries left from the deleted room and post: %d", n)
+	if n := count(t, srv.DB, "SELECT COUNT(*) FROM search WHERE text LIKE 'room text%' OR text LIKE 'comment text%' OR text LIKE 'kit text%'"); n != 0 {
+		t.Fatalf("search entries left from the deleted rows: %d", n)
+	}
+	if n := count(t, srv.DB, "SELECT COUNT(*) FROM search WHERE text LIKE 'topic text%'"); n != 1000 {
+		t.Fatalf("search entries of the posts whose topic was deleted: %d, want 1000", n)
 	}
 }
 

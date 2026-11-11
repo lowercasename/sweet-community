@@ -542,8 +542,6 @@ func removeGroup(ctx context.Context, qtx *store.Queries, id string, now int64) 
 	if err := qtx.ForgetGroupEvents(ctx, id); err != nil {
 		return nil, err
 	}
-	// The room is marked deleted first. A trigger then removes its search entries in one statement, and the search
-	// triggers skip its rows (migration 009).
 	if err := qtx.DeleteGroup(ctx, store.DeleteGroupParams{DeletedAt: at, ID: id}); err != nil {
 		return nil, err
 	}

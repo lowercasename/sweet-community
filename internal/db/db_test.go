@@ -262,6 +262,66 @@ func migratedTo(t *testing.T, d *sql.DB, prefix string) {
 	}
 }
 
+// Migration 009 rebuilds the search index with a table that holds each entry's number, so a trigger finds an entry
+// without reading the whole index. The rebuilt index holds the live posts, comments and messages only, and an edit
+// after the migration replaces the entry.
+func TestMigrationRebuildsTheSearchIndex(t *testing.T) {
+	ctx := context.Background()
+	d, err := Open(filepath.Join(t.TempDir(), "sweet.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer d.Close()
+	migratedTo(t, d, "008")
+	const root = "00000000-0000-7000-8000-000000000000"
+	for _, q := range []string{
+		`INSERT INTO users (id, username, created_at) VALUES ('u', 'kit', 1)`,
+		`INSERT INTO groups (id, kind, name, created_at, deleted_at) VALUES ('gone', 'group', '', 1, 2)`,
+		`INSERT INTO posts (id, group_id, author_id, body_html, body_text, created_at) VALUES
+			('p', '` + root + `', 'u', '', 'live post', 1), ('old', '` + root + `', 'u', '', 'deleted post', 1),
+			('room', 'gone', 'u', '', 'post in a deleted room', 1)`,
+		`UPDATE posts SET deleted_at = 2 WHERE id = 'old'`,
+		`INSERT INTO comments (id, post_id, author_id, body_html, body_text, created_at) VALUES ('c', 'p', 'u', '', 'live comment', 1)`,
+		`INSERT INTO messages (id, group_id, author_id, body_html, body_text, created_at) VALUES ('m', '` + root + `', 'u', '', 'live message', 1)`,
+	} {
+		if _, err := d.ExecContext(ctx, q); err != nil {
+			t.Fatal(err)
+		}
+	}
+	migratedTo(t, d, "009")
+	entries := func() []string {
+		t.Helper()
+		rows, err := d.QueryContext(ctx, `SELECT e.kind || ' ' || e.id || ' ' || s.text FROM search_entries e
+			JOIN search s ON s.rowid = e.entry ORDER BY 1`)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer rows.Close()
+		var out []string
+		for rows.Next() {
+			var s string
+			rows.Scan(&s)
+			out = append(out, s)
+		}
+		return out
+	}
+	var all int
+	if err := d.QueryRowContext(ctx, `SELECT COUNT(*) FROM search`).Scan(&all); err != nil || all != 3 {
+		t.Fatalf("search entries after the migration: %d %v, want 3", all, err)
+	}
+	want := []string{"comment c live comment", "message m live message", "post p live post"}
+	if got := entries(); !slices.Equal(got, want) {
+		t.Fatalf("entries after the migration:\n%v\nwant\n%v", got, want)
+	}
+	if _, err := d.ExecContext(ctx, `UPDATE posts SET body_text = 'edited post' WHERE id = 'p'`); err != nil {
+		t.Fatal(err)
+	}
+	want = []string{"comment c live comment", "message m live message", "post p edited post"}
+	if got := entries(); !slices.Equal(got, want) {
+		t.Fatalf("entries after an edit:\n%v\nwant\n%v", got, want)
+	}
+}
+
 // SQLite overwrites deleted and replaced content with zeros, and the search index removes an entry at once when its
 // row is deleted or edited, so emptied text does not stay in the database file.
 func TestSecureDeleteIsOn(t *testing.T) {
