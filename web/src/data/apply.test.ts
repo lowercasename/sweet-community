@@ -248,6 +248,16 @@ describe('applyEvent', () => {
     expect(pages.map((p) => p.comments.map((c) => c.id))).toEqual([['c3', 'c2'], ['c1']])
   })
 
+  it('leaves out an edited post that is older than every loaded post while earlier pages are not loaded', () => {
+    const page = { pages: [{ posts: [post('p9', mo, { created_at: 9 })], next_before: 9 }], pageParams: [null] }
+    qc.setQueryData(keys.posts(ROOT), page)
+    qc.setQueryData(keys.userPosts('mo'), page)
+    applyEvent(qc, 'post', post('p5', mo, { created_at: 5, edited_at: 99 }))
+    expect(posts().map((p) => p.id)).toEqual(['p9'])
+    const profile = (qc.getQueryData(keys.userPosts('mo')) as { pages: PostPage[] }).pages.flatMap((p) => p.posts)
+    expect(profile.map((p) => p.id)).toEqual(['p9'])
+  })
+
   it('in a thread with earlier pages not loaded, a deleted earlier comment lowers the count, and an edited one is not added', () => {
     qc.setQueryData(keys.comments('p2'), {
       pages: [{ comments: [comment('c9', 'p2', mo)], next_before: 9 }],

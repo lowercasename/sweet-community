@@ -213,15 +213,21 @@ function holds<K extends string, P extends Record<K, { id: string }[]>>(
   return old?.pages.some((p) => p[key].some((x) => x.id === id)) ?? false
 }
 
-/** Replaces an item in a paged list, or puts it first in the newest page when the list does not hold it. */
-function upsertInPages<K extends string, P extends Record<K, { id: string }[]>>(
-  old: InfiniteData<P> | undefined,
-  key: K,
-  item: P[K][number],
-): InfiniteData<P> | undefined {
+/**
+ * Replaces an item in a paged list, or puts a new one first in the newest page. An item older than every loaded item
+ * is left out while earlier pages are not loaded, because it belongs on one of those pages. That is an edit of an old
+ * post or comment, or an old notification marked read.
+ */
+function upsertInPages<
+  K extends string,
+  P extends Record<K, { id: string; created_at: number }[]> & { next_before: number | null },
+>(old: InfiniteData<P> | undefined, key: K, item: P[K][number]): InfiniteData<P> | undefined {
   if (!old) return old
   if (holds(old, key, item.id))
     return eachPage(old, key, (items) => items.map((x) => (x.id === item.id ? item : x)) as P[K])
+  const loaded = old.pages.flatMap((p) => p[key])
+  const more = old.pages[old.pages.length - 1]?.next_before != null
+  if (more && loaded.length > 0 && loaded.every((x) => x.created_at > item.created_at)) return old
   return { ...old, pages: old.pages.map((p, i) => (i === 0 ? { ...p, [key]: [item, ...p[key]] } : p)) }
 }
 
@@ -275,14 +281,9 @@ function countComments(qc: QueryClient, postId: string, groupId: string, by: num
   qc.setQueriesData<Posts>({ queryKey: keys.posts(groupId) }, recount)
 }
 
-/**
- * A new comment goes into the newest page, which is the first. An edit replaces the comment if its page is loaded.
- * An edit of a comment on a page that is not loaded is left for that page's fetch.
- */
 function upsertComment(qc: QueryClient, c: Comment) {
   const known = holds(qc.getQueryData<Thread>(keys.comments(c.post_id)), 'comments', c.id)
-  if (known || c.edited_at == null)
-    qc.setQueryData<Thread>(keys.comments(c.post_id), (old) => upsertInPages(old, 'comments', c))
+  qc.setQueryData<Thread>(keys.comments(c.post_id), (old) => upsertInPages(old, 'comments', c))
   // A new comment increments its post's comment count. An edit or a replay does not.
   if (!known && c.edited_at == null) countComments(qc, c.post_id, c.group_id, 1)
 }
