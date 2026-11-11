@@ -266,7 +266,7 @@ export interface Report {
 
 export interface NotificationPage {
   notifications: Notification[]
-  next_before: number | null
+  next_before: string | null
 }
 
 /**
@@ -301,12 +301,12 @@ export interface Hit {
 
 export interface MessagePage {
   messages: Message[]
-  next_before: number | null
+  next_before: string | null
 }
 
 export interface PostPage {
   posts: Post[]
-  next_before: number | null
+  next_before: string | null
 }
 
 export class ApiError extends Error {
@@ -450,7 +450,7 @@ export function removeMember(groupId: string, userId: string): Promise<Membershi
 
 export function getPosts(
   groupId: string,
-  before?: number | null,
+  before?: string | null,
   limit = 20,
   topicId?: string | null,
 ): Promise<PostPage> {
@@ -512,7 +512,7 @@ export async function deletePost(id: string): Promise<void> {
   await request(`/api/posts/${encodeURIComponent(id)}`, { method: 'DELETE' })
 }
 
-export function getMessages(groupId: string, before?: number | null, limit = 50): Promise<MessagePage> {
+export function getMessages(groupId: string, before?: string | null, limit = 50): Promise<MessagePage> {
   const params = new URLSearchParams({ limit: String(limit) })
   if (before != null) params.set('before', String(before))
   return request<MessagePage>(`${g(groupId)}/messages?${params}`)
@@ -526,7 +526,7 @@ export async function deleteMessage(id: string): Promise<void> {
   await request(`/api/messages/${encodeURIComponent(id)}`, { method: 'DELETE' })
 }
 
-export function listNotifications(before?: number | null, limit = 30): Promise<NotificationPage> {
+export function listNotifications(before?: string | null, limit = 30): Promise<NotificationPage> {
   const params = new URLSearchParams({ limit: String(limit) })
   if (before != null) params.set('before', String(before))
   return request<NotificationPage>(`/api/notifications?${params}`)
@@ -568,10 +568,10 @@ export function setMarker(stream: string, readAt: number): Promise<Marker> {
 /** A page of a post's comments, as listComments in internal/api/comments.go returns it. */
 export interface CommentPage {
   comments: Comment[]
-  next_before: number | null
+  next_before: string | null
 }
 
-export function getComments(postId: string, before?: number | null, limit = 50): Promise<CommentPage> {
+export function getComments(postId: string, before?: string | null, limit = 50): Promise<CommentPage> {
   const params = new URLSearchParams({ limit: String(limit) })
   if (before != null) params.set('before', String(before))
   return request<CommentPage>(`/api/posts/${encodeURIComponent(postId)}/comments?${params}`)
@@ -784,7 +784,7 @@ export function setBio(bodyHtml: string): Promise<Profile> {
 }
 
 /** Returns one user's posts, newest first, from the groups I am a member of. */
-export function getUserPosts(name: string, before?: number | null, limit = 20): Promise<PostPage> {
+export function getUserPosts(name: string, before?: string | null, limit = 20): Promise<PostPage> {
   const params = new URLSearchParams({ limit: String(limit) })
   if (before != null) params.set('before', String(before))
   return request<PostPage>(`/api/users/${encodeURIComponent(name)}/posts?${params}`)

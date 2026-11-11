@@ -46,8 +46,12 @@ type ReplyTo struct {
 // reverses it for display. ?before= pages backwards through history.
 func (s *Server) listMessages(w http.ResponseWriter, r *http.Request) {
 	g, a := groupFrom(r.Context())
-	before, limit := pageParams(r, 50, 200)
-	rows, err := s.q().ListMessages(r.Context(), store.ListMessagesParams{GroupID: g.ID, Before: before, PageSize: int64(limit + 1)})
+	before, limit, err := pageParams(r, 50, 200)
+	if err != nil {
+		writeErr(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	rows, err := s.q().ListMessages(r.Context(), store.ListMessagesParams{GroupID: g.ID, Before: before.CreatedAt, BeforeID: before.ID, PageSize: int64(limit + 1)})
 	if err != nil {
 		writeErr(w, http.StatusInternalServerError, err.Error())
 		return
@@ -57,7 +61,7 @@ func (s *Server) listMessages(w http.ResponseWriter, r *http.Request) {
 		m := wireMessage(store.GetMessageRow(row))
 		msgs = append(msgs, *forViewer(a, &m, Settings{}).(*Message))
 	}
-	msgs, next := page(msgs, limit, func(m Message) int64 { return m.CreatedAt })
+	msgs, next := page(msgs, limit, func(m Message) pageCursor { return pageCursor{m.CreatedAt, m.ID} })
 	writeJSON(w, http.StatusOK, map[string]any{"messages": msgs, "next_before": next})
 }
 

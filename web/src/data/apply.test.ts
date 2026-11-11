@@ -57,10 +57,10 @@ beforeEach(() => {
   qc.setQueryData(keys.me, kit)
   qc.setQueryData(keys.posts(ROOT), {
     pages: [
-      { posts: [post('p3', kit), post('p2', mo)], next_before: 2 },
+      { posts: [post('p3', kit), post('p2', mo)], next_before: '2' },
       { posts: [post('p1', kit)], next_before: null },
     ],
-    pageParams: [null, 2],
+    pageParams: [null, '2'],
   })
   qc.setQueryData(keys.posts(CLUB), {
     pages: [{ posts: [post('c9', mo, { group_id: CLUB })], next_before: null }],
@@ -238,10 +238,10 @@ describe('applyEvent', () => {
   it('adds a new comment to the newest page of a thread whose earlier pages are loaded too', () => {
     qc.setQueryData(keys.comments('p2'), {
       pages: [
-        { comments: [comment('c2', 'p2', mo)], next_before: 2 },
+        { comments: [comment('c2', 'p2', mo)], next_before: '2' },
         { comments: [comment('c1', 'p2', kit)], next_before: null },
       ],
-      pageParams: [null, 2],
+      pageParams: [null, '2'],
     })
     applyEvent(qc, 'comment', comment('c3', 'p2', mo))
     const pages = (qc.getQueryData(keys.comments('p2')) as { pages: CommentPage[] }).pages
@@ -249,7 +249,7 @@ describe('applyEvent', () => {
   })
 
   it('leaves out an edited post that is older than every loaded post while earlier pages are not loaded', () => {
-    const page = { pages: [{ posts: [post('p9', mo, { created_at: 9 })], next_before: 9 }], pageParams: [null] }
+    const page = { pages: [{ posts: [post('p9', mo, { created_at: 9 })], next_before: '9' }], pageParams: [null] }
     qc.setQueryData(keys.posts(ROOT), page)
     qc.setQueryData(keys.userPosts('mo'), page)
     applyEvent(qc, 'post', post('p5', mo, { created_at: 5, edited_at: 99 }))
@@ -260,7 +260,7 @@ describe('applyEvent', () => {
 
   it('in a thread with earlier pages not loaded, a deleted earlier comment lowers the count, and an edited one is not added', () => {
     qc.setQueryData(keys.comments('p2'), {
-      pages: [{ comments: [comment('c9', 'p2', mo)], next_before: 9 }],
+      pages: [{ comments: [comment('c9', 'p2', mo)], next_before: '9' }],
       pageParams: [null],
     })
     qc.setQueryData(keys.post('p2'), post('p2', kit, { comment_count: 9 }))

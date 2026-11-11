@@ -209,8 +209,12 @@ func insertNotification(r *http.Request, qtx *store.Queries, p store.CreateNotif
 // listNotifications returns the user's notifications, newest first, paged like the feed.
 func (s *Server) listNotifications(w http.ResponseWriter, r *http.Request) {
 	me, _ := userFrom(r.Context())
-	before, limit := pageParams(r, 30, 100)
-	rows, err := s.q().ListNotifications(r.Context(), store.ListNotificationsParams{UserID: me.ID, Before: before, PageSize: int64(limit + 1)})
+	before, limit, err := pageParams(r, 30, 100)
+	if err != nil {
+		writeErr(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	rows, err := s.q().ListNotifications(r.Context(), store.ListNotificationsParams{UserID: me.ID, Before: before.CreatedAt, BeforeID: before.ID, PageSize: int64(limit + 1)})
 	if err != nil {
 		writeErr(w, http.StatusInternalServerError, err.Error())
 		return
@@ -219,7 +223,7 @@ func (s *Server) listNotifications(w http.ResponseWriter, r *http.Request) {
 	for _, row := range rows {
 		out = append(out, wireNotification(store.GetNotificationRow(row)))
 	}
-	out, next := page(out, limit, func(n Notification) int64 { return n.CreatedAt })
+	out, next := page(out, limit, func(n Notification) pageCursor { return pageCursor{n.CreatedAt, n.ID} })
 	writeJSON(w, http.StatusOK, map[string]any{"notifications": out, "next_before": next})
 }
 

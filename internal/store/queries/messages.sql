@@ -12,7 +12,8 @@ FROM messages m JOIN users u ON u.id = m.author_id
 LEFT JOIN messages r ON r.id = m.reply_to
 LEFT JOIN users ru ON ru.id = r.author_id
 LEFT JOIN users su ON su.id = m.subject_id
-WHERE m.group_id = sqlc.arg(group_id) AND m.deleted_at IS NULL AND m.created_at < sqlc.arg(before)
+WHERE m.group_id = sqlc.arg(group_id) AND m.deleted_at IS NULL AND m.created_at <= sqlc.arg(before)
+  AND (m.created_at < sqlc.arg(before) OR m.id < sqlc.arg(before_id))
 ORDER BY m.created_at DESC, m.id DESC
 LIMIT sqlc.arg(page_size);
 

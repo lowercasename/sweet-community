@@ -20,7 +20,8 @@ UPDATE notifications SET read_at = sqlc.arg(read_at) WHERE id = sqlc.arg(id) AND
 SELECT n.id, n.user_id, n.kind, n.group_id, n.post_id, n.topic_id, n.message_id, n.created_at, n.read_at,
        u.id AS actor_id, u.username AS actor_username, u.picture_id AS actor_picture_id, rp.kind AS report_kind
 FROM notifications n JOIN users u ON u.id = n.actor_id LEFT JOIN reports rp ON rp.id = n.report_id
-WHERE n.user_id = sqlc.arg(user_id) AND n.created_at < sqlc.arg(before)
+WHERE n.user_id = sqlc.arg(user_id) AND n.created_at <= sqlc.arg(before)
+  AND (n.created_at < sqlc.arg(before) OR n.id < sqlc.arg(before_id))
 ORDER BY n.created_at DESC, n.id DESC
 LIMIT sqlc.arg(page_size);
 

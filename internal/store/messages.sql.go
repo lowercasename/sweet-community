@@ -236,14 +236,16 @@ FROM messages m JOIN users u ON u.id = m.author_id
 LEFT JOIN messages r ON r.id = m.reply_to
 LEFT JOIN users ru ON ru.id = r.author_id
 LEFT JOIN users su ON su.id = m.subject_id
-WHERE m.group_id = ?1 AND m.deleted_at IS NULL AND m.created_at < ?2
+WHERE m.group_id = ?1 AND m.deleted_at IS NULL AND m.created_at <= ?2
+  AND (m.created_at < ?2 OR m.id < ?3)
 ORDER BY m.created_at DESC, m.id DESC
-LIMIT ?3
+LIMIT ?4
 `
 
 type ListMessagesParams struct {
 	GroupID  string
 	Before   int64
+	BeforeID string
 	PageSize int64
 }
 
@@ -272,7 +274,12 @@ type ListMessagesRow struct {
 // Each message with the message it replies to, if any: its author and text, or
 // its deleted time once deleted. The columns match GetMessage.
 func (q *Queries) ListMessages(ctx context.Context, arg ListMessagesParams) ([]ListMessagesRow, error) {
-	rows, err := q.db.QueryContext(ctx, listMessages, arg.GroupID, arg.Before, arg.PageSize)
+	rows, err := q.db.QueryContext(ctx, listMessages,
+		arg.GroupID,
+		arg.Before,
+		arg.BeforeID,
+		arg.PageSize,
+	)
 	if err != nil {
 		return nil, err
 	}

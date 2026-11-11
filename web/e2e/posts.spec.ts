@@ -1,3 +1,4 @@
+import { execFileSync } from 'node:child_process'
 import { article, confirm, expect, member, open, pick, ROOT, sendMessage, test, uniq, view, writePost } from './helpers'
 
 test.describe('posts and comments', () => {
@@ -209,6 +210,15 @@ test.describe('long threads', () => {
           data: { body_html: `<p>Comment number ${i}</p>` },
         })
       }
+      // Equal timestamps must not leave a comment between pages.
+      execFileSync('python3', [
+        '-I',
+        '-c',
+        `import sqlite3, sys
+with sqlite3.connect('../data/e2e.db') as db:
+    db.execute('UPDATE comments SET created_at = 100 WHERE post_id = ?', (sys.argv[1],))`,
+        pid,
+      ])
       await kit.page.goto(`/p/${pid}`)
       const shown = kit.page.locator('article:visible').filter({ hasText: text })
       await expect(shown.getByText('Comment number 51', { exact: true })).toBeVisible()

@@ -2,6 +2,7 @@ package api
 
 import (
 	"fmt"
+	"net/url"
 	"testing"
 )
 
@@ -29,10 +30,10 @@ func TestCommentsArePaged(t *testing.T) {
 	}
 	first := owner.mustStatus(200, "GET", "/api/posts/"+post+"/comments", nil)
 	got := ids(first)
-	if len(got) != 50 || got[0] != "c60" || got[49] != "c11" || first["next_before"] != float64(11) {
+	if len(got) != 50 || got[0] != "c60" || got[49] != "c11" || first["next_before"] == nil {
 		t.Fatalf("first page: %d comments from %s to %s, next_before %v", len(got), got[0], got[len(got)-1], first["next_before"])
 	}
-	earlier := owner.mustStatus(200, "GET", "/api/posts/"+post+"/comments?before=11", nil)
+	earlier := owner.mustStatus(200, "GET", "/api/posts/"+post+"/comments?before="+url.QueryEscape(first["next_before"].(string)), nil)
 	got = ids(earlier)
 	if len(got) != 10 || got[0] != "c10" || got[9] != "c01" || earlier["next_before"] != nil {
 		t.Fatalf("earlier page: %v, next_before %v", got, earlier["next_before"])

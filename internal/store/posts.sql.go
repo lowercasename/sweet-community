@@ -206,15 +206,17 @@ SELECT p.id, p.group_id, p.topic_id, p.body_html, p.body_text, p.created_at, p.e
        u.id AS author_id, u.username AS author_username, u.picture_id AS author_picture_id,
        (SELECT COUNT(*) FROM comments c WHERE c.post_id = p.id AND c.deleted_at IS NULL) AS comment_count
 FROM posts p JOIN users u ON u.id = p.author_id
-WHERE p.group_id = ?1 AND p.deleted_at IS NULL AND p.created_at < ?2
-  AND (?3 IS NULL OR p.topic_id = ?3)
+WHERE p.group_id = ?1 AND p.deleted_at IS NULL AND p.created_at <= ?2
+  AND (p.created_at < ?2 OR p.id < ?3)
+  AND (?4 IS NULL OR p.topic_id = ?4)
 ORDER BY p.created_at DESC, p.id DESC
-LIMIT ?4
+LIMIT ?5
 `
 
 type ListPostsParams struct {
 	GroupID  string
 	Before   int64
+	BeforeID string
 	TopicID  interface{}
 	PageSize int64
 }
@@ -240,6 +242,7 @@ func (q *Queries) ListPosts(ctx context.Context, arg ListPostsParams) ([]ListPos
 	rows, err := q.db.QueryContext(ctx, listPosts,
 		arg.GroupID,
 		arg.Before,
+		arg.BeforeID,
 		arg.TopicID,
 		arg.PageSize,
 	)
@@ -283,15 +286,17 @@ SELECT p.id, p.group_id, p.topic_id, p.body_html, p.body_text, p.created_at, p.e
 FROM posts p JOIN users u ON u.id = p.author_id
 JOIN memberships v ON v.group_id = p.group_id AND v.user_id = ?1 AND v.hidden_at IS NULL
 JOIN groups g ON g.id = p.group_id AND g.deleted_at IS NULL
-WHERE p.author_id = ?2 AND p.deleted_at IS NULL AND p.created_at < ?3
+WHERE p.author_id = ?2 AND p.deleted_at IS NULL AND p.created_at <= ?3
+  AND (p.created_at < ?3 OR p.id < ?4)
 ORDER BY p.created_at DESC, p.id DESC
-LIMIT ?4
+LIMIT ?5
 `
 
 type ListPostsByAuthorParams struct {
 	ViewerID string
 	AuthorID string
 	Before   int64
+	BeforeID string
 	PageSize int64
 }
 
@@ -316,6 +321,7 @@ func (q *Queries) ListPostsByAuthor(ctx context.Context, arg ListPostsByAuthorPa
 		arg.ViewerID,
 		arg.AuthorID,
 		arg.Before,
+		arg.BeforeID,
 		arg.PageSize,
 	)
 	if err != nil {

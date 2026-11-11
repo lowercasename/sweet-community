@@ -153,23 +153,26 @@ export function useRootGroup(): Group | undefined {
  * next_before. `items` takes the list out of a page. The list comes back without duplicates, newest first or oldest
  * first. loadMore fetches the page before the loaded ones.
  */
-function usePages<P extends { next_before: number | null }, T extends { id: string; created_at: number }>(
+function usePages<P extends { next_before: string | null }, T extends { id: string; created_at: number }>(
   queryKey: readonly unknown[],
-  fetch: (before: number | null) => Promise<P>,
+  fetch: (before: string | null) => Promise<P>,
   items: (page: P) => T[],
   order: 'newest first' | 'oldest first' = 'newest first',
 ) {
   const q = useInfiniteQuery({
     queryKey,
     queryFn: ({ pageParam }) => fetch(pageParam),
-    initialPageParam: null as number | null,
+    initialPageParam: null as string | null,
     getNextPageParam: (last) => last.next_before,
   })
   const seen = new Set<string>()
   const list = (q.data?.pages ?? [])
     .flatMap(items)
     .filter((x) => !seen.has(x.id) && seen.add(x.id))
-    .sort((a, b) => (order === 'oldest first' ? a.created_at - b.created_at : b.created_at - a.created_at))
+    .sort((a, b) => {
+      const compared = a.created_at - b.created_at || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0)
+      return order === 'oldest first' ? compared : -compared
+    })
   return {
     items: list,
     loading: q.isPending || q.isFetchingNextPage,

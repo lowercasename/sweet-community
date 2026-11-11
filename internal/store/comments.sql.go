@@ -193,14 +193,16 @@ const listComments = `-- name: ListComments :many
 SELECT c.id, c.post_id, c.body_html, c.body_text, c.created_at, c.edited_at, p.author_id AS post_author_id, p.group_id,
        u.id AS author_id, u.username AS author_username, u.picture_id AS author_picture_id
 FROM comments c JOIN users u ON u.id = c.author_id JOIN posts p ON p.id = c.post_id
-WHERE c.post_id = ?1 AND c.deleted_at IS NULL AND c.created_at < ?2
+WHERE c.post_id = ?1 AND c.deleted_at IS NULL AND c.created_at <= ?2
+  AND (c.created_at < ?2 OR c.id < ?3)
 ORDER BY c.created_at DESC, c.id DESC
-LIMIT ?3
+LIMIT ?4
 `
 
 type ListCommentsParams struct {
 	PostID   string
 	Before   int64
+	BeforeID string
 	PageSize int64
 }
 
@@ -222,7 +224,12 @@ type ListCommentsRow struct {
 // membership. perm decides who can edit or delete, after GetCommentOwners.
 // A page of a post's comments, the newest first. listComments in internal/api/comments.go describes the paging.
 func (q *Queries) ListComments(ctx context.Context, arg ListCommentsParams) ([]ListCommentsRow, error) {
-	rows, err := q.db.QueryContext(ctx, listComments, arg.PostID, arg.Before, arg.PageSize)
+	rows, err := q.db.QueryContext(ctx, listComments,
+		arg.PostID,
+		arg.Before,
+		arg.BeforeID,
+		arg.PageSize,
+	)
 	if err != nil {
 		return nil, err
 	}

@@ -62,8 +62,12 @@ func (s *Server) listComments(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, status, err.Error())
 		return
 	}
-	before, limit := pageParams(r, 50, 200)
-	rows, err := s.q().ListComments(r.Context(), store.ListCommentsParams{PostID: postID, Before: before, PageSize: int64(limit + 1)})
+	before, limit, err := pageParams(r, 50, 200)
+	if err != nil {
+		writeErr(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	rows, err := s.q().ListComments(r.Context(), store.ListCommentsParams{PostID: postID, Before: before.CreatedAt, BeforeID: before.ID, PageSize: int64(limit + 1)})
 	if err != nil {
 		writeErr(w, http.StatusInternalServerError, err.Error())
 		return
@@ -73,7 +77,7 @@ func (s *Server) listComments(w http.ResponseWriter, r *http.Request) {
 		c := wireComment(store.GetCommentRow(row))
 		out = append(out, *forViewer(a, &c, Settings{}).(*Comment))
 	}
-	out, next := page(out, limit, func(c Comment) int64 { return c.CreatedAt })
+	out, next := page(out, limit, func(c Comment) pageCursor { return pageCursor{c.CreatedAt, c.ID} })
 	writeJSON(w, http.StatusOK, map[string]any{"comments": out, "next_before": next})
 }
 

@@ -220,7 +220,7 @@ function holds<K extends string, P extends Record<K, { id: string }[]>>(
  */
 function upsertInPages<
   K extends string,
-  P extends Record<K, { id: string; created_at: number }[]> & { next_before: number | null },
+  P extends Record<K, { id: string; created_at: number }[]> & { next_before: string | null },
 >(old: InfiniteData<P> | undefined, key: K, item: P[K][number]): InfiniteData<P> | undefined {
   if (!old) return old
   if (holds(old, key, item.id))

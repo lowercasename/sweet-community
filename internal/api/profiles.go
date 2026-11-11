@@ -88,8 +88,12 @@ func (s *Server) listUserPosts(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusInternalServerError, err.Error())
 		return
 	}
-	before, limit := pageParams(r, 20, 100)
-	rows, err := s.q().ListPostsByAuthor(r.Context(), store.ListPostsByAuthorParams{ViewerID: me.ID, AuthorID: who.ID, Before: before, PageSize: int64(limit + 1)})
+	before, limit, err := pageParams(r, 20, 100)
+	if err != nil {
+		writeErr(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	rows, err := s.q().ListPostsByAuthor(r.Context(), store.ListPostsByAuthorParams{ViewerID: me.ID, AuthorID: who.ID, Before: before.CreatedAt, BeforeID: before.ID, PageSize: int64(limit + 1)})
 	if err != nil {
 		writeErr(w, http.StatusInternalServerError, err.Error())
 		return
@@ -110,6 +114,6 @@ func (s *Server) listUserPosts(w http.ResponseWriter, r *http.Request) {
 		p := wirePost(store.GetPostRow(row))
 		posts = append(posts, *forViewer(perm.Actor{ID: me.ID, Role: roles[p.GroupID]}, &p, Settings{}).(*Post))
 	}
-	posts, next := page(posts, limit, func(p Post) int64 { return p.CreatedAt })
+	posts, next := page(posts, limit, func(p Post) pageCursor { return pageCursor{p.CreatedAt, p.ID} })
 	writeJSON(w, http.StatusOK, map[string]any{"posts": posts, "next_before": next})
 }

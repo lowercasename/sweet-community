@@ -289,14 +289,16 @@ const listNotifications = `-- name: ListNotifications :many
 SELECT n.id, n.user_id, n.kind, n.group_id, n.post_id, n.topic_id, n.message_id, n.created_at, n.read_at,
        u.id AS actor_id, u.username AS actor_username, u.picture_id AS actor_picture_id, rp.kind AS report_kind
 FROM notifications n JOIN users u ON u.id = n.actor_id LEFT JOIN reports rp ON rp.id = n.report_id
-WHERE n.user_id = ?1 AND n.created_at < ?2
+WHERE n.user_id = ?1 AND n.created_at <= ?2
+  AND (n.created_at < ?2 OR n.id < ?3)
 ORDER BY n.created_at DESC, n.id DESC
-LIMIT ?3
+LIMIT ?4
 `
 
 type ListNotificationsParams struct {
 	UserID   string
 	Before   int64
+	BeforeID string
 	PageSize int64
 }
 
@@ -317,7 +319,12 @@ type ListNotificationsRow struct {
 }
 
 func (q *Queries) ListNotifications(ctx context.Context, arg ListNotificationsParams) ([]ListNotificationsRow, error) {
-	rows, err := q.db.QueryContext(ctx, listNotifications, arg.UserID, arg.Before, arg.PageSize)
+	rows, err := q.db.QueryContext(ctx, listNotifications,
+		arg.UserID,
+		arg.Before,
+		arg.BeforeID,
+		arg.PageSize,
+	)
 	if err != nil {
 		return nil, err
 	}
