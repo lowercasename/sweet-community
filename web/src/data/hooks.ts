@@ -146,25 +146,44 @@ export function useRootGroup(): Group | undefined {
   return useGroups().groups.find((g) => g.kind === 'root')
 }
 
-export function usePosts(groupId: string, topicId: string | null = null) {
+/**
+ * A list that the server sends a page at a time, the newest page first, with the cursor of the page before in
+ * next_before. `items` takes the list out of a page. The list comes back without duplicates, newest first or oldest
+ * first. loadMore fetches the page before the loaded ones.
+ */
+function usePages<P extends { next_before: number | null }, T extends { id: string; created_at: number }>(
+  queryKey: readonly unknown[],
+  fetch: (before: number | null) => Promise<P>,
+  items: (page: P) => T[],
+  order: 'newest first' | 'oldest first' = 'newest first',
+) {
   const q = useInfiniteQuery({
-    queryKey: keys.posts(groupId, topicId),
-    queryFn: ({ pageParam }) => getPosts(groupId, pageParam, 20, topicId),
+    queryKey,
+    queryFn: ({ pageParam }) => fetch(pageParam),
     initialPageParam: null as number | null,
     getNextPageParam: (last) => last.next_before,
   })
   const seen = new Set<string>()
-  const posts = (q.data?.pages ?? [])
-    .flatMap((p) => p.posts)
-    .filter((p) => !seen.has(p.id) && seen.add(p.id))
-    .sort((a, b) => b.created_at - a.created_at)
+  const list = (q.data?.pages ?? [])
+    .flatMap(items)
+    .filter((x) => !seen.has(x.id) && seen.add(x.id))
+    .sort((a, b) => (order === 'oldest first' ? a.created_at - b.created_at : b.created_at - a.created_at))
   return {
-    posts,
+    items: list,
     loading: q.isPending || q.isFetchingNextPage,
     error: q.error,
     hasMore: q.hasNextPage,
-    loadMore: () => void q.fetchNextPage(),
+    loadMore: () => q.fetchNextPage(),
   }
+}
+
+export function usePosts(groupId: string, topicId: string | null = null) {
+  const { items, ...rest } = usePages(
+    keys.posts(groupId, topicId),
+    (before) => getPosts(groupId, before, 20, topicId),
+    (p) => p.posts,
+  )
+  return { posts: items, ...rest }
 }
 
 /**
@@ -209,24 +228,13 @@ export function usePostActions(groupId: string) {
 
 /** A post's comments, oldest first. The newest page loads first (listComments), and loadEarlier loads the page before. */
 export function useComments(postId: string) {
-  const q = useInfiniteQuery({
-    queryKey: keys.comments(postId),
-    queryFn: ({ pageParam }) => getComments(postId, pageParam),
-    initialPageParam: null as number | null,
-    getNextPageParam: (last) => last.next_before,
-  })
-  const seen = new Set<string>()
-  const comments = (q.data?.pages ?? [])
-    .flatMap((p) => p.comments)
-    .filter((c) => !seen.has(c.id) && seen.add(c.id))
-    .sort((a, b) => a.created_at - b.created_at)
-  return {
-    comments,
-    loading: q.isPending || q.isFetchingNextPage,
-    error: q.error,
-    hasEarlier: q.hasNextPage,
-    loadEarlier: () => q.fetchNextPage(),
-  }
+  const { items, hasMore, loadMore, ...rest } = usePages(
+    keys.comments(postId),
+    (before) => getComments(postId, before),
+    (p) => p.comments,
+    'oldest first',
+  )
+  return { comments: items, hasEarlier: hasMore, loadEarlier: loadMore, ...rest }
 }
 
 export function useCommentActions(postId: string, groupId: string) {
@@ -247,24 +255,13 @@ export function useCommentActions(postId: string, groupId: string) {
 
 /** A group's messages, oldest first. Pages arrive newest first, and older pages are fetched backwards. */
 export function useMessages(groupId: string) {
-  const q = useInfiniteQuery({
-    queryKey: keys.messages(groupId),
-    queryFn: ({ pageParam }) => getMessages(groupId, pageParam),
-    initialPageParam: null as number | null,
-    getNextPageParam: (last) => last.next_before,
-  })
-  const seen = new Set<string>()
-  const messages = (q.data?.pages ?? [])
-    .flatMap((p) => p.messages)
-    .filter((m) => !seen.has(m.id) && seen.add(m.id))
-    .sort((a, b) => a.created_at - b.created_at)
-  return {
-    messages,
-    loading: q.isPending || q.isFetchingNextPage,
-    error: q.error,
-    hasEarlier: q.hasNextPage,
-    loadEarlier: () => q.fetchNextPage(),
-  }
+  const { items, hasMore, loadMore, ...rest } = usePages(
+    keys.messages(groupId),
+    (before) => getMessages(groupId, before),
+    (p) => p.messages,
+    'oldest first',
+  )
+  return { messages: items, hasEarlier: hasMore, loadEarlier: loadMore, ...rest }
 }
 
 export function useMessageActions(groupId: string) {
@@ -360,24 +357,8 @@ export function useGroupActions() {
 
 /** The user's notifications, newest first, paged. */
 export function useNotifications() {
-  const q = useInfiniteQuery({
-    queryKey: keys.notifications,
-    queryFn: ({ pageParam }) => listNotifications(pageParam),
-    initialPageParam: null as number | null,
-    getNextPageParam: (last) => last.next_before,
-  })
-  const seen = new Set<string>()
-  const notifications = (q.data?.pages ?? [])
-    .flatMap((p) => p.notifications)
-    .filter((n) => !seen.has(n.id) && seen.add(n.id))
-    .sort((a, b) => b.created_at - a.created_at)
-  return {
-    notifications,
-    loading: q.isPending || q.isFetchingNextPage,
-    error: q.error,
-    hasMore: q.hasNextPage,
-    loadMore: () => void q.fetchNextPage(),
-  }
+  const { items, ...rest } = usePages(keys.notifications, listNotifications, (p) => p.notifications)
+  return { notifications: items, ...rest }
 }
 
 /** Marks a notification read when it is opened. The cache is updated at once, and the server's reply is applied through the same path. */
@@ -458,24 +439,12 @@ export function useProfile(name: string) {
 
 /** A user's posts, newest first, from the groups the viewer is in. applyEvent keeps the list current. */
 export function useUserPosts(name: string) {
-  const q = useInfiniteQuery({
-    queryKey: keys.userPosts(name),
-    queryFn: ({ pageParam }) => getUserPosts(name, pageParam),
-    initialPageParam: null as number | null,
-    getNextPageParam: (last) => last.next_before,
-  })
-  const seen = new Set<string>()
-  const posts = (q.data?.pages ?? [])
-    .flatMap((p) => p.posts)
-    .filter((p) => !seen.has(p.id) && seen.add(p.id))
-    .sort((a, b) => b.created_at - a.created_at)
-  return {
-    posts,
-    loading: q.isPending || q.isFetchingNextPage,
-    error: q.error,
-    hasMore: q.hasNextPage,
-    loadMore: () => void q.fetchNextPage(),
-  }
+  const { items, ...rest } = usePages(
+    keys.userPosts(name),
+    (before) => getUserPosts(name, before),
+    (p) => p.posts,
+  )
+  return { posts: items, ...rest }
 }
 
 /** Search results for the query. Nothing is fetched for an empty query. */

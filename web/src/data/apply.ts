@@ -176,14 +176,8 @@ export function applyFollowing(qc: QueryClient, t: Topic) {
 function deleteTopic(qc: QueryClient, id: string) {
   qc.setQueryData<Topics>(keys.topics, (old) => old && { topics: old.topics.filter((x) => x.id !== id) })
   const unfiled = (p: Post) => (p.topic_id === id ? { ...p, topic_id: null } : p)
-  qc.setQueriesData<Posts>(
-    { queryKey: ['posts'] },
-    (old) => old && { ...old, pages: old.pages.map((pg) => ({ ...pg, posts: pg.posts.map(unfiled) })) },
-  )
-  qc.setQueriesData<Posts>(
-    { queryKey: ['userPosts'] },
-    (old) => old && { ...old, pages: old.pages.map((pg) => ({ ...pg, posts: pg.posts.map(unfiled) })) },
-  )
+  qc.setQueriesData<Posts>({ queryKey: ['posts'] }, (old) => eachPage(old, 'posts', (ps) => ps.map(unfiled)))
+  qc.setQueriesData<Posts>({ queryKey: ['userPosts'] }, (old) => eachPage(old, 'posts', (ps) => ps.map(unfiled)))
   qc.setQueriesData<Post>({ queryKey: ['post'] }, (old) => old && unfiled(old))
   qc.removeQueries({ queryKey: ['posts'], predicate: (q) => q.queryKey[2] === id })
 }
@@ -201,6 +195,36 @@ type Users = { users: Member[] }
 type Groups = { groups: Group[] }
 type Members = { members: Membership[] }
 
+/** Changes the items of each page of a paged list, under `key`, such as a page's posts. */
+function eachPage<K extends string, P extends Record<K, unknown[]>>(
+  old: InfiniteData<P> | undefined,
+  key: K,
+  change: (items: P[K]) => P[K],
+): InfiniteData<P> | undefined {
+  return old && { ...old, pages: old.pages.map((p) => ({ ...p, [key]: change(p[key]) })) }
+}
+
+/** Whether a paged list holds an item. */
+function holds<K extends string, P extends Record<K, { id: string }[]>>(
+  old: InfiniteData<P> | undefined,
+  key: K,
+  id: string,
+): boolean {
+  return old?.pages.some((p) => p[key].some((x) => x.id === id)) ?? false
+}
+
+/** Replaces an item in a paged list, or puts it first in the newest page when the list does not hold it. */
+function upsertInPages<K extends string, P extends Record<K, { id: string }[]>>(
+  old: InfiniteData<P> | undefined,
+  key: K,
+  item: P[K][number],
+): InfiniteData<P> | undefined {
+  if (!old) return old
+  if (holds(old, key, item.id))
+    return eachPage(old, key, (items) => items.map((x) => (x.id === item.id ? item : x)) as P[K])
+  return { ...old, pages: old.pages.map((p, i) => (i === 0 ? { ...p, [key]: [item, ...p[key]] } : p)) }
+}
+
 /** Finds a post in any loaded feed, as initial data for the post's page. */
 export function findPost(qc: QueryClient, id: string): Post | undefined {
   for (const [, data] of qc.getQueriesData<Posts>({ queryKey: ['posts'] })) {
@@ -212,14 +236,7 @@ export function findPost(qc: QueryClient, id: string): Post | undefined {
 
 /** Upserts a post into its author's posts list, if that list is loaded. */
 function upsertUserPost(qc: QueryClient, post: Post) {
-  qc.setQueryData<Posts>(keys.userPosts(post.author.username), (old) => {
-    if (!old) return old
-    const known = old.pages.some((p) => p.posts.some((x) => x.id === post.id))
-    const pages = known
-      ? old.pages.map((p) => ({ ...p, posts: p.posts.map((x) => (x.id === post.id ? post : x)) }))
-      : old.pages.map((p, i) => (i === 0 ? { ...p, posts: [post, ...p.posts] } : p))
-    return { ...old, pages }
-  })
+  qc.setQueryData<Posts>(keys.userPosts(post.author.username), (old) => upsertInPages(old, 'posts', post))
 }
 
 function upsertPost(qc: QueryClient, post: Post) {
@@ -235,54 +252,27 @@ function upsertPost(qc: QueryClient, post: Post) {
   for (const [key] of qc.getQueriesData<Posts>({ queryKey: keys.posts(post.group_id) })) {
     const topicId = key[2]
     const belongs = topicId === undefined || topicId === post.topic_id
-    qc.setQueryData<Posts>(key, (old) => {
-      if (!old) return old
-      const known = old.pages.some((p) => p.posts.some((x) => x.id === post.id))
-      if (!belongs) {
-        return known ? withoutPosts(old, (x) => x.id === post.id) : old
-      }
-      const pages = known
-        ? old.pages.map((p) => ({ ...p, posts: p.posts.map((x) => (x.id === post.id ? post : x)) }))
-        : old.pages.map((p, i) => (i === 0 ? { ...p, posts: [post, ...p.posts] } : p))
-      return { ...old, pages }
-    })
+    qc.setQueryData<Posts>(key, (old) =>
+      belongs ? upsertInPages(old, 'posts', post) : eachPage(old, 'posts', (ps) => ps.filter((x) => x.id !== post.id)),
+    )
   }
 }
 
-/** A list of posts without the posts that `drop` matches. */
-function withoutPosts(old: Posts | undefined, drop: (post: Post) => boolean): Posts | undefined {
-  return old && { ...old, pages: old.pages.map((p) => ({ ...p, posts: p.posts.filter((x) => !drop(x)) })) }
-}
-
 function deletePost(qc: QueryClient, id: string, groupId: string) {
-  qc.setQueriesData<Posts>({ queryKey: keys.posts(groupId) }, (old) => withoutPosts(old, (x) => x.id === id))
+  const without = (old: Posts | undefined) => eachPage(old, 'posts', (ps) => ps.filter((x) => x.id !== id))
+  qc.setQueriesData<Posts>({ queryKey: keys.posts(groupId) }, without)
   qc.removeQueries({ queryKey: keys.comments(id) })
   qc.removeQueries({ queryKey: keys.post(id) })
-  qc.setQueriesData<Posts>({ queryKey: ['userPosts'] }, (old) => withoutPosts(old, (x) => x.id === id))
+  qc.setQueriesData<Posts>({ queryKey: ['userPosts'] }, without)
 }
 
 function countComments(qc: QueryClient, postId: string, groupId: string, by: number) {
   const counted = (x: Post) => ({ ...x, comment_count: Math.max(0, x.comment_count + by) })
   qc.setQueryData<Post>(keys.post(postId), (old) => (old ? counted(old) : old))
-  qc.setQueriesData<Posts>(
-    { queryKey: ['userPosts'] },
-    (old) =>
-      old && {
-        ...old,
-        pages: old.pages.map((p) => ({ ...p, posts: p.posts.map((x) => (x.id === postId ? counted(x) : x)) })),
-      },
-  )
-  qc.setQueriesData<Posts>({ queryKey: keys.posts(groupId) }, (old) =>
-    old
-      ? {
-          ...old,
-          pages: old.pages.map((p) => ({
-            ...p,
-            posts: p.posts.map((x) => (x.id === postId ? counted(x) : x)),
-          })),
-        }
-      : old,
-  )
+  const recount = (old: Posts | undefined) =>
+    eachPage(old, 'posts', (ps) => ps.map((x) => (x.id === postId ? counted(x) : x)))
+  qc.setQueriesData<Posts>({ queryKey: ['userPosts'] }, recount)
+  qc.setQueriesData<Posts>({ queryKey: keys.posts(groupId) }, recount)
 }
 
 /**
@@ -290,16 +280,9 @@ function countComments(qc: QueryClient, postId: string, groupId: string, by: num
  * An edit of a comment on a page that is not loaded is left for that page's fetch.
  */
 function upsertComment(qc: QueryClient, c: Comment) {
-  const thread = qc.getQueryData<Thread>(keys.comments(c.post_id))
-  const known = thread?.pages.some((p) => p.comments.some((x) => x.id === c.id)) ?? false
-  if (thread && (known || c.edited_at == null)) {
-    qc.setQueryData<Thread>(keys.comments(c.post_id), {
-      ...thread,
-      pages: known
-        ? thread.pages.map((p) => ({ ...p, comments: p.comments.map((x) => (x.id === c.id ? c : x)) }))
-        : thread.pages.map((p, i) => (i === 0 ? { ...p, comments: [c, ...p.comments] } : p)),
-    })
-  }
+  const known = holds(qc.getQueryData<Thread>(keys.comments(c.post_id)), 'comments', c.id)
+  if (known || c.edited_at == null)
+    qc.setQueryData<Thread>(keys.comments(c.post_id), (old) => upsertInPages(old, 'comments', c))
   // A new comment increments its post's comment count. An edit or a replay does not.
   if (!known && c.edited_at == null) countComments(qc, c.post_id, c.group_id, 1)
 }
@@ -307,15 +290,10 @@ function upsertComment(qc: QueryClient, c: Comment) {
 function deleteComment(qc: QueryClient, id: string, postId: string, groupId: string) {
   const thread = qc.getQueryData<Thread>(keys.comments(postId))
   // A comment that is not in the loaded pages may be on a page that is not loaded yet, so it still counts.
-  const known =
-    !thread ||
-    thread.pages.some((p) => p.comments.some((x) => x.id === id)) ||
-    thread.pages[thread.pages.length - 1]?.next_before != null
-  if (thread)
-    qc.setQueryData<Thread>(keys.comments(postId), {
-      ...thread,
-      pages: thread.pages.map((p) => ({ ...p, comments: p.comments.filter((x) => x.id !== id) })),
-    })
+  const known = !thread || holds(thread, 'comments', id) || thread.pages[thread.pages.length - 1]?.next_before != null
+  qc.setQueryData<Thread>(keys.comments(postId), (old) =>
+    eachPage(old, 'comments', (cs) => cs.filter((x) => x.id !== id)),
+  )
   if (known) countComments(qc, postId, groupId, -1)
 }
 
@@ -337,14 +315,7 @@ function upsertMessage(qc: QueryClient, m: Message) {
           }
         : old,
     )
-  qc.setQueryData<Messages>(keys.messages(m.group_id), (old) => {
-    if (!old) return old
-    const known = old.pages.some((p) => p.messages.some((x) => x.id === m.id))
-    const pages = known
-      ? old.pages.map((p) => ({ ...p, messages: p.messages.map((x) => (x.id === m.id ? m : x)) }))
-      : old.pages.map((p, i) => (i === 0 ? { ...p, messages: [m, ...p.messages] } : p))
-    return { ...old, pages }
-  })
+  qc.setQueryData<Messages>(keys.messages(m.group_id), (old) => upsertInPages(old, 'messages', m))
 }
 
 function deleteMessage(qc: QueryClient, id: string, groupId: string) {
@@ -353,9 +324,7 @@ function deleteMessage(qc: QueryClient, id: string, groupId: string) {
   const gone = (m: Message): Message =>
     m.reply_to?.id === id ? { ...m, reply_to: { id, author: null, text: '', deleted: true } } : m
   qc.setQueryData<Messages>(keys.messages(groupId), (old) =>
-    old
-      ? { ...old, pages: old.pages.map((p) => ({ ...p, messages: p.messages.filter((x) => x.id !== id).map(gone) })) }
-      : old,
+    eachPage(old, 'messages', (ms) => ms.filter((x) => x.id !== id).map(gone)),
   )
 }
 
@@ -370,47 +339,24 @@ function upsertUser(qc: QueryClient, u: User) {
   // a renamed or removed user is shown correctly at once, whether or not they
   // are still in the users list.
   const as = (a: User) => (a.id === u.id ? { ...a, ...u } : a)
-  qc.setQueriesData<Posts>(
-    { queryKey: ['posts'] },
-    (old) =>
-      old && {
-        ...old,
-        pages: old.pages.map((p) => ({ ...p, posts: p.posts.map((x) => ({ ...x, author: as(x.author) })) })),
-      },
-  )
+  const authored = (old: Posts | undefined) =>
+    eachPage(old, 'posts', (ps) => ps.map((x) => ({ ...x, author: as(x.author) })))
+  qc.setQueriesData<Posts>({ queryKey: ['posts'] }, authored)
   qc.setQueriesData<Post>({ queryKey: ['post'] }, (old) => old && { ...old, author: as(old.author) })
-  qc.setQueriesData<Posts>(
-    { queryKey: ['userPosts'] },
-    (old) =>
-      old && {
-        ...old,
-        pages: old.pages.map((p) => ({ ...p, posts: p.posts.map((x) => ({ ...x, author: as(x.author) })) })),
-      },
-  )
+  qc.setQueriesData<Posts>({ queryKey: ['userPosts'] }, authored)
   // Profile pages are refetched. A renamed user's profile is at a new path.
   void qc.invalidateQueries({ queryKey: ['profile'] })
-  qc.setQueriesData<Thread>(
-    { queryKey: ['comments'] },
-    (old) =>
-      old && {
-        ...old,
-        pages: old.pages.map((p) => ({ ...p, comments: p.comments.map((c) => ({ ...c, author: as(c.author) })) })),
-      },
+  qc.setQueriesData<Thread>({ queryKey: ['comments'] }, (old) =>
+    eachPage(old, 'comments', (cs) => cs.map((c) => ({ ...c, author: as(c.author) }))),
   )
-  qc.setQueriesData<Messages>(
-    { queryKey: ['messages'] },
-    (old) =>
-      old && {
-        ...old,
-        pages: old.pages.map((p) => ({
-          ...p,
-          messages: p.messages.map((m) => ({
-            ...m,
-            author: as(m.author),
-            reply_to: m.reply_to?.author ? { ...m.reply_to, author: as(m.reply_to.author) } : m.reply_to,
-          })),
-        })),
-      },
+  qc.setQueriesData<Messages>({ queryKey: ['messages'] }, (old) =>
+    eachPage(old, 'messages', (ms) =>
+      ms.map((m) => ({
+        ...m,
+        author: as(m.author),
+        reply_to: m.reply_to?.author ? { ...m.reply_to, author: as(m.reply_to.author) } : m.reply_to,
+      })),
+    ),
   )
 }
 
@@ -452,28 +398,13 @@ function upsertNotification(qc: QueryClient, n: Notification) {
   const unread = (x: Notification | undefined) => x !== undefined && x.read_at == null
   const by = (unread(n) ? 1 : 0) - (was ? (unread(was) ? 1 : 0) : 0)
   if (by !== 0) countUnread(qc, 'notifications', by)
-  qc.setQueryData<Notifications>(keys.notifications, (old) => {
-    if (!old) return old
-    const known = old.pages.some((p) => p.notifications.some((x) => x.id === n.id))
-    const pages = known
-      ? old.pages.map((p) => ({ ...p, notifications: p.notifications.map((x) => (x.id === n.id ? n : x)) }))
-      : old.pages.map((p, i) => (i === 0 ? { ...p, notifications: [n, ...p.notifications] } : p))
-    return { ...old, pages }
-  })
+  qc.setQueryData<Notifications>(keys.notifications, (old) => upsertInPages(old, 'notifications', n))
 }
 
 /** Removes the opened notifications created before a time. Unopened notifications stay. */
 function clearNotifications(qc: QueryClient, before: number) {
   qc.setQueryData<Notifications>(keys.notifications, (old) =>
-    old
-      ? {
-          ...old,
-          pages: old.pages.map((p) => ({
-            ...p,
-            notifications: p.notifications.filter((n) => n.read_at == null || n.created_at > before),
-          })),
-        }
-      : old,
+    eachPage(old, 'notifications', (ns) => ns.filter((n) => n.read_at == null || n.created_at > before)),
   )
 }
 
@@ -520,7 +451,9 @@ function dropGroup(qc: QueryClient, id: string) {
   qc.removeQueries({
     predicate: (q) => q.queryKey[0] === 'post' && (q.state.data as Post | undefined)?.group_id === id,
   })
-  qc.setQueriesData<Posts>({ queryKey: ['userPosts'] }, (old) => withoutPosts(old, (x) => x.group_id === id))
+  qc.setQueriesData<Posts>({ queryKey: ['userPosts'] }, (old) =>
+    eachPage(old, 'posts', (ps) => ps.filter((x) => x.group_id !== id)),
+  )
   dropMarker(qc, `chat:${id}`)
   dropMarker(qc, `feed:${id}`)
 }
@@ -530,13 +463,8 @@ function dropGroup(qc: QueryClient, id: string) {
  * changed, so the markers are fetched again.
  */
 function dropNotifications(qc: QueryClient, groupId: string) {
-  qc.setQueryData<Notifications>(
-    keys.notifications,
-    (old) =>
-      old && {
-        ...old,
-        pages: old.pages.map((p) => ({ ...p, notifications: p.notifications.filter((n) => n.group_id !== groupId) })),
-      },
+  qc.setQueryData<Notifications>(keys.notifications, (old) =>
+    eachPage(old, 'notifications', (ns) => ns.filter((n) => n.group_id !== groupId)),
   )
   void qc.invalidateQueries({ queryKey: keys.markers })
 }
@@ -633,8 +561,7 @@ function deleteMembership(qc: QueryClient, groupId: string, userId: string) {
 
 /** Whether the post with this id is in this group's loaded feed. */
 function inGroup(qc: QueryClient, postId: unknown, groupId: string): boolean {
-  const posts = qc.getQueryData<Posts>(keys.posts(groupId))
-  return posts?.pages.some((p) => p.posts.some((x) => x.id === postId)) ?? false
+  return typeof postId === 'string' && holds(qc.getQueryData<Posts>(keys.posts(groupId)), 'posts', postId)
 }
 
 /** Whether the id is the root group's fixed id. Used when the groups list is not loaded yet. */

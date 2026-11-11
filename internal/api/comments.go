@@ -73,12 +73,7 @@ func (s *Server) listComments(w http.ResponseWriter, r *http.Request) {
 		c := wireComment(store.GetCommentRow(row))
 		out = append(out, *forViewer(a, &c, Settings{}).(*Comment))
 	}
-	var next *int64
-	if len(out) > limit {
-		out = out[:limit]
-		n := out[len(out)-1].CreatedAt
-		next = &n
-	}
+	out, next := page(out, limit, func(c Comment) int64 { return c.CreatedAt })
 	writeJSON(w, http.StatusOK, map[string]any{"comments": out, "next_before": next})
 }
 

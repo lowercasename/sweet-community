@@ -219,12 +219,7 @@ func (s *Server) listNotifications(w http.ResponseWriter, r *http.Request) {
 	for _, row := range rows {
 		out = append(out, wireNotification(store.GetNotificationRow(row)))
 	}
-	var next *int64
-	if len(out) > limit {
-		out = out[:limit]
-		n := out[len(out)-1].CreatedAt
-		next = &n
-	}
+	out, next := page(out, limit, func(n Notification) int64 { return n.CreatedAt })
 	writeJSON(w, http.StatusOK, map[string]any{"notifications": out, "next_before": next})
 }
 

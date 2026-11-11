@@ -110,11 +110,6 @@ func (s *Server) listUserPosts(w http.ResponseWriter, r *http.Request) {
 		p := wirePost(store.GetPostRow(row))
 		posts = append(posts, *forViewer(perm.Actor{ID: me.ID, Role: roles[p.GroupID]}, &p, Settings{}).(*Post))
 	}
-	var next *int64
-	if len(posts) > limit {
-		posts = posts[:limit]
-		n := posts[len(posts)-1].CreatedAt
-		next = &n
-	}
+	posts, next := page(posts, limit, func(p Post) int64 { return p.CreatedAt })
 	writeJSON(w, http.StatusOK, map[string]any{"posts": posts, "next_before": next})
 }

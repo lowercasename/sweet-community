@@ -339,6 +339,17 @@ func writeErr(w http.ResponseWriter, status int, msg string) {
 const ServerErrorMessage = "Something went wrong on the server. Try again in a moment."
 
 // pageParams reads ?before= and ?limit= for the feeds ordered newest first.
+// page cuts a list that was fetched with one item more than limit. It returns the first limit items and the cursor of
+// the page after them, which is the time of the last item, or nil when the list has no more items.
+func page[T any](items []T, limit int, createdAt func(T) int64) ([]T, *int64) {
+	if len(items) <= limit {
+		return items, nil
+	}
+	items = items[:limit]
+	next := createdAt(items[limit-1])
+	return items, &next
+}
+
 func pageParams(r *http.Request, defaultLimit, maxLimit int) (before int64, limit int) {
 	limit = defaultLimit
 	if v, err := strconv.Atoi(r.URL.Query().Get("limit")); err == nil && v > 0 && v <= maxLimit {
@@ -369,12 +380,7 @@ func (s *Server) listPosts(w http.ResponseWriter, r *http.Request) {
 		p := wirePost(store.GetPostRow(row))
 		posts = append(posts, *forViewer(a, &p, Settings{}).(*Post))
 	}
-	var next *int64
-	if len(posts) > limit {
-		posts = posts[:limit]
-		n := posts[len(posts)-1].CreatedAt
-		next = &n
-	}
+	posts, next := page(posts, limit, func(p Post) int64 { return p.CreatedAt })
 	writeJSON(w, http.StatusOK, map[string]any{"posts": posts, "next_before": next})
 }
 

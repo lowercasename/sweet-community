@@ -57,12 +57,7 @@ func (s *Server) listMessages(w http.ResponseWriter, r *http.Request) {
 		m := wireMessage(store.GetMessageRow(row))
 		msgs = append(msgs, *forViewer(a, &m, Settings{}).(*Message))
 	}
-	var next *int64
-	if len(msgs) > limit {
-		msgs = msgs[:limit]
-		n := msgs[len(msgs)-1].CreatedAt
-		next = &n
-	}
+	msgs, next := page(msgs, limit, func(m Message) int64 { return m.CreatedAt })
 	writeJSON(w, http.StatusOK, map[string]any{"messages": msgs, "next_before": next})
 }
 
