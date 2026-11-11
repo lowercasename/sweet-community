@@ -29,7 +29,7 @@ docker compose logs sweet      # look for the line starting SETUP:
 
 The `SETUP:` line holds a link. Open it to become the owner, name the community and get an invite link to send to your people.
 
-The image is built from this repository on every change, for amd64 and arm64. To build it yourself instead, run `docker compose up -d --build` in place of the pull.
+To build the image yourself, run `docker compose up -d --build` instead of pulling it.
 
 ### If you already run a reverse proxy
 
