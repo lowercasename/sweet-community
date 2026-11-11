@@ -115,16 +115,43 @@ Keep Sweet and Litestream stopped throughout a restore. Start Sweet only after t
 
 ## Develop
 
+Install Go, Node.js and pnpm. The required Go version is in `go.mod`.
+
+Start the frontend from the repository root:
+
 ```
-make dev-backend               # go run on :8080 (serves a placeholder page without a frontend build)
-                               # set SWEET_OWNER_PASSWORD the first time. Email lands in data/mail,
-                               # with links to :5173 so they open in the dev server
-cd web && pnpm install && pnpm dev   # Vite on :5173, proxies /api and /healthz to :8080
+cd web
+pnpm install --frozen-lockfile
+pnpm dev
 ```
 
-`make build` then `./bin/sweet -db data/sweet.db -owner raphael -owner-password 'something long'` runs the built binary on :8080. With no `-owner-password`, a fresh instance prints the setup link instead. Settings come from the environment: copy `.env.example` to `.env` (gitignored) and the `make` targets load it. For a bare `./bin/sweet`, run `set -a; . ./.env; set +a` first. Flags: `-addr` (default `:8080`), `-db`, `-owner`, `-owner-password` (or `SWEET_OWNER_PASSWORD`), `-images-dir`, `-mail-dir`, `-base-url` (or `SWEET_BASE_URL`), `-trust-proxy`, `-litestream`, `-restore-from`, `-version`.
+In a second terminal, start the backend from the repository root:
 
-Backend: `go test ./...`. After changing a query or migration, `make generate` (sqlc runs via `go tool`, nothing to install). Frontend, in `web/`: `pnpm typecheck`, `pnpm test`, `pnpm check:atomic` (no raw HTML outside `src/ui/`).
+```
+make dev-backend
+```
+
+Open `http://localhost:5173`. The frontend forwards API requests to the backend on port 8080.
+
+On a fresh database, the backend prints a `SETUP:` link. Open it to create your account. Leave `SWEET_OWNER_PASSWORD` unset to use this setup flow. Without SMTP settings, sign-in emails are saved in `data/mail`.
+
+For optional settings, copy `.env.example` to `.env` and edit it. The Make targets load this file. It is ignored by Git.
+
+### Run the built app
+
+From the repository root:
+
+```
+make run
+```
+
+This builds and starts the app at `http://localhost:8080`. To build without starting it, use `make build`. Run `./bin/sweet -help` for the available flags.
+
+### Tests and generated code
+
+Use focused checks for the code you change. Backend tests use `go test`. Frontend unit tests use Vitest, and browser tests use Playwright. The commands are listed in [web/README.md](web/README.md).
+
+After changing SQL queries or the database schema, run `make generate`. It regenerates the Go query code with sqlc. No separate sqlc installation is needed.
 
 ### Releases
 
