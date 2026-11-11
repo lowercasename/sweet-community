@@ -18,7 +18,7 @@ pnpm e2e            # Playwright, against the built binary and the dev server (r
 pnpm e2e:release    # Selected sign-in and privacy checks on desktop, phone and the dev server
 ```
 
-The image workflow runs `e2e:release` before publishing. It selects existing tests marked `@release`. A failure blocks publication and saves browser traces and screenshots for seven days. Use this command locally when changing these flows. Other changes can run the tests they affect.
+The image workflow runs `e2e:release` before publishing. It selects existing tests marked `@release`. A failure blocks publication and saves browser traces and screenshots for seven days. Use this command locally when changing these flows. Other development changes can run the tests they affect. Before tagging or pushing a release, run the complete `pnpm e2e` suite as part of the release checks in the root README.
 
 Run the backend from the repository root with `make dev-backend` alongside `pnpm dev`. The dev proxy passes `/api/events` through unbuffered, so the server-sent event stream works on the same origin.
 

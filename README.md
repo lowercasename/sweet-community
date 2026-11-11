@@ -83,7 +83,7 @@ docker compose pull
 docker compose up -d
 ```
 
-`git pull` updates the compose files, and `docker compose pull` downloads the new image. To run a particular release instead of the latest image, set `SWEET_IMAGE=ghcr.io/lowercasename/sweet-community:<version>` in `.env`, such as `1.0.0`. Then an upgrade is a change of that line. A release is made from main with `make release KIND=patch`, `minor` or `major`, which updates `CHANGELOG.md`, tags and pushes, and CI publishes the image for the tag. Before a migration changes the database schema, Sweet copies the database to `sweet.db.before-upgrade` in the same volume. Open browser tabs reload automatically when the new version starts.
+`git pull` updates the compose files, and `docker compose pull` downloads the new image. To run a particular release instead of the latest image, set `SWEET_IMAGE=ghcr.io/lowercasename/sweet-community:<version>` in `.env`, such as `1.0.0`. Then an upgrade is a change of that line. Before a migration changes the database schema, Sweet copies the database to `sweet.db.before-upgrade` in the same volume. Open browser tabs reload automatically when the new version starts.
 
 ### Restoring
 
@@ -122,9 +122,25 @@ make dev-backend               # go run on :8080 (serves a placeholder page with
 cd web && pnpm install && pnpm dev   # Vite on :5173, proxies /api and /healthz to :8080
 ```
 
-`make build` then `./bin/sweet -db data/sweet.db -owner raphael -owner-password 'something long'` runs the built binary on :8080. With no `-owner-password`, a fresh instance prints the setup link instead. Settings come from the environment: copy `.env.example` to `.env` (gitignored) and the `make` targets load it. For a bare `./bin/sweet`, run `set -a; . ./.env; set +a` first. Flags: `-addr` (default `:8080`), `-db`, `-owner`, `-owner-password` (or `SWEET_OWNER_PASSWORD`), `-images-dir`, `-mail-dir`, `-base-url` (or `SWEET_BASE_URL`), `-trust-proxy`, `-litestream`, `-version`.
+`make build` then `./bin/sweet -db data/sweet.db -owner raphael -owner-password 'something long'` runs the built binary on :8080. With no `-owner-password`, a fresh instance prints the setup link instead. Settings come from the environment: copy `.env.example` to `.env` (gitignored) and the `make` targets load it. For a bare `./bin/sweet`, run `set -a; . ./.env; set +a` first. Flags: `-addr` (default `:8080`), `-db`, `-owner`, `-owner-password` (or `SWEET_OWNER_PASSWORD`), `-images-dir`, `-mail-dir`, `-base-url` (or `SWEET_BASE_URL`), `-trust-proxy`, `-litestream`, `-restore-from`, `-version`.
 
 Backend: `go test ./...`. After changing a query or migration, `make generate` (sqlc runs via `go tool`, nothing to install). Frontend, in `web/`: `pnpm typecheck`, `pnpm test`, `pnpm check:atomic` (no raw HTML outside `src/ui/`).
+
+### Releases
+
+Run the complete checks from the repository root before tagging or pushing a release:
+
+```
+make build
+go vet ./...
+go test ./...
+(cd web && pnpm typecheck && pnpm check:atomic && pnpm format:check && pnpm test)
+make e2e
+```
+
+After they pass, commit any changes and run `make release KIND=patch` from a clean `main` checkout. The command updates `CHANGELOG.md`, commits it, tags the release and pushes. Use `minor` for new features and `major` for changes that require operators to act. Bug fixes, including security and privacy corrections, are patch releases regardless of the size of the code change.
+
+CI runs the unit checks and selected sign-in and privacy browser tests before publishing the image. A failed check blocks publication. These CI checks do not replace the complete browser suite before a release.
 
 ## Layout
 
@@ -136,7 +152,7 @@ internal/api        HTTP handlers, wire shapes (wire.go) and their tests
 internal/auth       password hashing, tokens, username and email validation
 internal/db         SQLite open (WAL, busy_timeout, BEGIN IMMEDIATE) and migrations
 internal/digest     the weekly email digest
-internal/events     event log, in-process pub/sub, SSE handler
+internal/events     database event log, subscriber wakeups and SSE delivery
 internal/images     upload processing (checks magic bytes, writes bounded JPEG/PNG) and storage (local directory or S3/R2)
 internal/mail       the email template and the SMTP or file sender
 internal/perm       permission rules: who may do what
