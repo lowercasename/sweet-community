@@ -1,5 +1,15 @@
 # Changelog
 
+## v1.7.0 (2026-11-11)
+
+- Tighten the deletion timing test, and widen the search rebuild test
+- Find search entries by their number, and index replies
+- Show the stored text again in an open edit when another edit of it ends
+- Keep editors with the same draft in step, and keep notifications on leaving
+- Make large deletions quick, and fix two faults in removing a user
+- Keep unsent posts, comments and messages in the browser
+- Empty the text of deleted posts, comments, messages and rooms
+
 ## v1.6.2 (2026-11-10)
 
 - Delete an upload's temporary file after reading it
