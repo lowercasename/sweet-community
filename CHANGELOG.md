@@ -1,5 +1,9 @@
 # Changelog
 
+## v1.7.1 (2026-11-11)
+
+- Recreate the live views in migration 009 for databases from v1.6.1
+
 ## v1.7.0 (2026-11-11)
 
 - Tighten the deletion timing test, and widen the search rebuild test
