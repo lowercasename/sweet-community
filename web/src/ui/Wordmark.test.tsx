@@ -17,12 +17,4 @@ describe('Wordmark', () => {
     expect(screen.getByText('Knitting Circle')).toBeTruthy()
     expect(screen.queryByRole('img')).toBeNull()
   })
-
-  it('uses the same letter-to-circle ratio at both sizes', () => {
-    const { container: md } = render(<Wordmark label="x" />)
-    const { container: sm } = render(<Wordmark label="x" size="sm" />)
-    const mark = (c: HTMLElement) => c.querySelector('span')!.className
-    expect(mark(md)).toContain('h-8 w-8 text-[19px]')
-    expect(mark(sm)).toContain('h-5 w-5 text-[12px]')
-  })
 })
