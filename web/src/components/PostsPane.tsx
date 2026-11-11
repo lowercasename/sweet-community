@@ -152,6 +152,7 @@ export function PostsPane({ groupId, side = 'full', watching, topicId = null, fo
                 submitLabel="Post"
                 disabled={offline}
                 onSubmit={post}
+                draft={`post:${groupId}`}
               />
             </Card>
             <Stack gap={3}>

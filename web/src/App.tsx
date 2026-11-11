@@ -4,6 +4,7 @@ import { useLocation, useRoute } from 'wouter'
 import type { User } from './api'
 import { keys } from './data/keys'
 import { useGroups, useMe, useSession, useSettings } from './data/hooks'
+import { clearDrafts, pruneDrafts } from './editor/drafts'
 import { Home } from './pages/Home'
 import { Join } from './pages/Join'
 import { Login } from './pages/Login'
@@ -29,6 +30,13 @@ export function App() {
   const [verifying, verifyParams] = useRoute('/verify/:token')
   const [settingUp, setupParams] = useRoute('/setup/:token')
   const [linked, linkParams] = useRoute('/signin/:token')
+
+  // Drafts are kept for the signed-in user only. Signing out, by any means, deletes every draft in this browser, so a
+  // shared computer keeps none. Drafts not saved for 30 days are deleted.
+  useEffect(() => {
+    if (me === null) clearDrafts()
+    else if (me) pruneDrafts()
+  }, [me])
 
   // Set the browser tab's title to the community's name.
   useEffect(() => {

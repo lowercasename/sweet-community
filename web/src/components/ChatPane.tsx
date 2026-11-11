@@ -197,6 +197,7 @@ export function ChatPane({ groupId, side = 'full', watching, focusMessage = null
             submitLabel="Send"
             disabled={status === 'offline'}
             onSubmit={send}
+            draft={`message:${groupId}`}
             head={
               replying && (
                 <ReplyStrip

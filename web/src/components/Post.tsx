@@ -168,6 +168,7 @@ export function Post({
               size="post"
               submitLabel="Save"
               initialHtml={post.body_html}
+              draft={`post-edit:${post.id}`}
               disabled={disabled}
               onSubmit={save}
               onCancel={() => setEditing(false)}

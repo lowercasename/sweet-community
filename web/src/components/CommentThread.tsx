@@ -99,6 +99,7 @@ function CommentItem({ comment, groupId, disabled, onEdit, onDelete }: CommentIt
             size="line"
             submitLabel="Save"
             initialHtml={comment.body_html}
+            draft={`comment-edit:${comment.id}`}
             disabled={disabled}
             onSubmit={save}
             onCancel={() => setEditing(false)}
@@ -171,6 +172,7 @@ export function CommentThread({ postId, groupId, replyTo, disabled }: CommentThr
           submitLabel="Reply"
           disabled={disabled}
           onSubmit={create}
+          draft={`comment:${postId}`}
         />
       </Stack>
     </Card>

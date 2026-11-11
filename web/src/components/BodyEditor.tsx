@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
-import { useEditor, useEditorState, type Extensions } from '@tiptap/react'
+import { useEditor, useEditorState, type Editor, type Extensions } from '@tiptap/react'
 import { DEFAULT_PLACEHOLDER, withPlaceholder } from '../editor/extensions'
 import { mentionSuggestionKey, withMentions } from '../editor/mentions'
-import { useMembers } from '../data/hooks'
+import { useMe, useMembers } from '../data/hooks'
+import { clearDraft, loadDraft, saveDraft } from '../editor/drafts'
 import type { Topic } from '../api'
 import { Alert, Button, EditorSurface, Form, ImageCard, Row, Stack } from '../ui'
 import { convertAndUpload, failedUploads, failureReason, imageFiles, imagesHtml, insertImages } from '../editor/images'
@@ -72,7 +73,16 @@ interface BodyEditorProps {
   onEscape?: () => void
   /** When this value changes to a new non-empty value, the editor takes focus, such as when Reply is clicked. */
   focus?: string
+  /**
+   * The key of this editor's draft, such as `post:<group id>`. With a key, the unsent text is kept in the browser
+   * (editor/drafts.ts) and the editor opens with it, in place of `initialHtml`. Sending, saving an edit or cancelling
+   * an edit deletes the draft. Attached images are not kept.
+   */
+  draft?: string
 }
+
+/** How long after the last change the draft is saved. Hiding the page or closing the editor saves it at once. */
+const DRAFT_DELAY = 400
 
 /**
  * The single editor component. Posts, chat and comments differ only in
@@ -95,6 +105,7 @@ export function BodyEditor({
   head,
   onEscape,
   focus,
+  draft,
 }: BodyEditorProps) {
   const editing = initialHtml !== undefined
   const [busy, setBusy] = useState(false)
@@ -117,8 +128,36 @@ export function BodyEditor({
   // The link panel. Mod+K opens it from the editor, whose keydown handler is created once, so it is reached by a ref.
   const [linkOpen, setLinkOpen] = useState(false)
   const openLinkRef = useRef(() => setLinkOpen(true))
-  const cancelRef = useRef<(() => void) | undefined>(onCancel ?? onEscape)
-  cancelRef.current = onCancel ?? onEscape
+
+  // The draft's owner and key, read by the editor's update handler, which TipTap creates once. A pending timer means
+  // the text has changed since the draft was last saved.
+  const { data: me } = useMe()
+  const draftRef = useRef<{ user: string; key: string } | null>(null)
+  draftRef.current = draft && me ? { user: me.id, key: draft } : null
+  const pendingDraft = useRef<number | undefined>(undefined)
+  const keepDraft = (ed: Editor) => {
+    pendingDraft.current = undefined
+    const d = draftRef.current
+    if (!d) return
+    if (ed.isEmpty) clearDraft(d.user, d.key)
+    else saveDraft(d.user, d.key, ed.getHTML())
+  }
+  const forgetDraft = () => {
+    window.clearTimeout(pendingDraft.current)
+    pendingDraft.current = undefined
+    const d = draftRef.current
+    if (d) clearDraft(d.user, d.key)
+  }
+  // Cancelling an edit deletes its draft.
+  const cancel = onCancel
+    ? () => {
+        forgetDraft()
+        onCancel()
+      }
+    : undefined
+
+  const cancelRef = useRef<(() => void) | undefined>(cancel ?? onEscape)
+  cancelRef.current = cancel ?? onEscape
 
   // The users the @ list can suggest. These are the group's members, read from the query cache when the list opens.
   const { members } = useMembers(groupId)
@@ -133,8 +172,12 @@ export function BodyEditor({
       withPlaceholder(extensions, () => placeholderRef.current ?? DEFAULT_PLACEHOLDER),
       () => peopleRef.current.map((m) => m.user),
     ),
-    content: initialHtml ?? '',
+    content: (draftRef.current && loadDraft(draftRef.current.user, draftRef.current.key)) ?? initialHtml ?? '',
     autofocus: editing ? 'end' : false,
+    onUpdate: ({ editor }) => {
+      window.clearTimeout(pendingDraft.current)
+      if (draftRef.current) pendingDraft.current = window.setTimeout(() => keepDraft(editor), DRAFT_DELAY)
+    },
     editorProps: {
       handleKeyDown(view, event) {
         // While an @ list is open, Enter selects from the list. The suggestion
@@ -165,6 +208,28 @@ export function BodyEditor({
   useEffect(() => {
     if (focus) editor?.commands.focus('end')
   }, [focus, editor])
+  // A change not yet saved is saved when the page is hidden, which also happens before it is closed or reloaded, and
+  // when the editor closes. An editor with no unsaved change writes nothing, so a second editor with the same draft
+  // does not overwrite it.
+  useEffect(() => {
+    if (!editor) return
+    const flush = () => {
+      if (pendingDraft.current === undefined) return
+      window.clearTimeout(pendingDraft.current)
+      keepDraft(editor)
+    }
+    const hidden = () => {
+      if (document.visibilityState === 'hidden') flush()
+    }
+    document.addEventListener('visibilitychange', hidden)
+    window.addEventListener('pagehide', flush)
+    return () => {
+      document.removeEventListener('visibilitychange', hidden)
+      window.removeEventListener('pagehide', flush)
+      flush()
+    }
+    // keepDraft reads its draft through a ref, so the listeners need only the editor.
+  }, [editor])
   // An empty transaction makes the editor draw its decorations again, which reads the new placeholder.
   useEffect(() => {
     if (editor && !editor.isDestroyed) editor.view.dispatch(editor.state.tr)
@@ -263,6 +328,7 @@ export function BodyEditor({
       const sending = attached
       const sent = sending.flatMap((a) => (a.uploaded ? [{ ...a.uploaded, alt: a.alt }] : []))
       await onSubmit(imagesHtml(sent) + (isEmpty ? '' : editor.getHTML()))
+      forgetDraft()
       if (!editing) {
         editor.commands.clearContent(true)
         // Images attached while the message was sending stay for the next one.
@@ -328,8 +394,8 @@ export function BodyEditor({
             )}
           </Row>
           <Row gap={2} align="center" wrap="never" shrink={false} push="end">
-            {onCancel && (
-              <Button variant="ghost" disabled={busy} onClick={onCancel}>
+            {cancel && (
+              <Button variant="ghost" disabled={busy} onClick={cancel}>
                 Cancel
               </Button>
             )}
