@@ -1,4 +1,4 @@
-# Sweet v2
+# Sweet
 
 A small social network for one community. Each community has a feed of posts and a chat, private rooms with their own posts and chat, and private conversations between two people. One instance is one binary with one SQLite database.
 
