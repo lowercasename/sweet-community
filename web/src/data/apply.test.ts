@@ -246,8 +246,18 @@ describe('applyEvent', () => {
     applyEvent(qc, 'comment', comment('c3', 'p2', mo))
     const pages = (qc.getQueryData(keys.comments('p2')) as { pages: CommentPage[] }).pages
     expect(pages.map((p) => p.comments.map((c) => c.id))).toEqual([['c3', 'c2'], ['c1']])
-    applyEvent(qc, 'comment_delete', { id: 'c1', post_id: 'p2', group_id: ROOT })
-    expect(thread('p2').map((c) => c.id)).toEqual(['c3', 'c2'])
+  })
+
+  it('in a thread with earlier pages not loaded, a deleted earlier comment lowers the count, and an edited one is not added', () => {
+    qc.setQueryData(keys.comments('p2'), {
+      pages: [{ comments: [comment('c9', 'p2', mo)], next_before: 9 }],
+      pageParams: [null],
+    })
+    qc.setQueryData(keys.post('p2'), post('p2', kit, { comment_count: 9 }))
+    applyEvent(qc, 'comment', comment('c5', 'p2', mo, { body_html: '<p>edited</p>', edited_at: 99 }))
+    expect(thread('p2').map((c) => c.id)).toEqual(['c9'])
+    applyEvent(qc, 'comment_delete', { id: 'c5', post_id: 'p2', group_id: ROOT })
+    expect((qc.getQueryData(keys.post('p2')) as Post).comment_count).toBe(8)
   })
 
   it('removes a deleted comment and decrements the comment count', () => {

@@ -285,11 +285,14 @@ function countComments(qc: QueryClient, postId: string, groupId: string, by: num
   )
 }
 
-/** A new comment goes into the newest page, which is the first. The thread shows its comments oldest first. */
+/**
+ * A new comment goes into the newest page, which is the first. An edit replaces the comment if its page is loaded.
+ * An edit of a comment on a page that is not loaded is left for that page's fetch.
+ */
 function upsertComment(qc: QueryClient, c: Comment) {
   const thread = qc.getQueryData<Thread>(keys.comments(c.post_id))
   const known = thread?.pages.some((p) => p.comments.some((x) => x.id === c.id)) ?? false
-  if (thread) {
+  if (thread && (known || c.edited_at == null)) {
     qc.setQueryData<Thread>(keys.comments(c.post_id), {
       ...thread,
       pages: known
@@ -303,7 +306,11 @@ function upsertComment(qc: QueryClient, c: Comment) {
 
 function deleteComment(qc: QueryClient, id: string, postId: string, groupId: string) {
   const thread = qc.getQueryData<Thread>(keys.comments(postId))
-  const known = thread?.pages.some((p) => p.comments.some((x) => x.id === id)) ?? true
+  // A comment that is not in the loaded pages may be on a page that is not loaded yet, so it still counts.
+  const known =
+    !thread ||
+    thread.pages.some((p) => p.comments.some((x) => x.id === id)) ||
+    thread.pages[thread.pages.length - 1]?.next_before != null
   if (thread)
     qc.setQueryData<Thread>(keys.comments(postId), {
       ...thread,

@@ -564,7 +564,7 @@ export function setMarker(stream: string, readAt: number): Promise<Marker> {
   return request<Marker>(`/api/markers/${encodeURIComponent(stream)}`, json('PUT', { read_at: readAt }))
 }
 
-/** A page of a post's comments, the newest first. `next_before` asks for the page before it, or is null at the start. */
+/** A page of a post's comments, as listComments in internal/api/comments.go returns it. */
 export interface CommentPage {
   comments: Comment[]
   next_before: number | null

@@ -194,7 +194,7 @@ test.describe('menus', () => {
 
 test.describe('long threads', () => {
   for (const phone of [false, true]) {
-    test(`${phone ? '@phone ' : ''}a long thread opens at its newest comments and loads the earlier ones above`, async ({
+    test(`${phone ? '@phone ' : ''}a long thread opens at its newest comments, and Load earlier comments shows the first`, async ({
       browser,
     }, testInfo) => {
       const kit = await member(browser, testInfo, 'kit')

@@ -2,7 +2,7 @@
 -- membership. perm decides who can edit or delete, after GetCommentOwners.
 
 -- name: ListComments :many
--- A page of a post's comments, the newest first, as chat messages are listed.
+-- A page of a post's comments, the newest first. listComments in internal/api/comments.go describes the paging.
 SELECT c.id, c.post_id, c.body_html, c.body_text, c.created_at, c.edited_at, p.author_id AS post_author_id, p.group_id,
        u.id AS author_id, u.username AS author_username, u.picture_id AS author_picture_id
 FROM comments c JOIN users u ON u.id = c.author_id JOIN posts p ON p.id = c.post_id

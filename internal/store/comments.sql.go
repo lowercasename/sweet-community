@@ -220,7 +220,7 @@ type ListCommentsRow struct {
 
 // A comment belongs to a group through its post. The handler checks
 // membership. perm decides who can edit or delete, after GetCommentOwners.
-// A page of a post's comments, the newest first, as chat messages are listed.
+// A page of a post's comments, the newest first. listComments in internal/api/comments.go describes the paging.
 func (q *Queries) ListComments(ctx context.Context, arg ListCommentsParams) ([]ListCommentsRow, error) {
 	rows, err := q.db.QueryContext(ctx, listComments, arg.PostID, arg.Before, arg.PageSize)
 	if err != nil {

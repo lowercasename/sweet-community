@@ -207,7 +207,7 @@ export function usePostActions(groupId: string) {
   }
 }
 
-/** A post's comments, oldest first. The newest page loads first, and loadEarlier loads the page before. */
+/** A post's comments, oldest first. The newest page loads first (listComments), and loadEarlier loads the page before. */
 export function useComments(postId: string) {
   const q = useInfiniteQuery({
     queryKey: keys.comments(postId),
