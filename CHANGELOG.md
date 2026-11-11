@@ -1,5 +1,12 @@
 # Changelog
 
+## v1.7.2 (2026-11-11)
+
+- Simplify the failed-upgrade test and the start of an upgrade
+- Run an upgrade's migrations in one transaction
+- Limit a search query to 200 characters
+- Wait for an upload before choosing the file in two upload tests
+
 ## v1.7.1 (2026-11-11)
 
 - Recreate the live views in migration 009 for databases from v1.6.1
