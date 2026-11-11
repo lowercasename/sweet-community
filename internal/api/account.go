@@ -127,7 +127,8 @@ func useToken(ctx context.Context, q *store.Queries, token, kind string) (store.
 
 // verify is `POST /api/verify {token}`. It confirms a changed address. The
 // pending address that the link was sent to becomes the account's verified
-// address. It signs nobody in, and the old address is told of the change.
+// address. Outstanding sign-in links and codes are voided in the same transaction.
+// Existing sessions stay active. The old address is told of the change.
 // Before 2026-11-08 the link also signed in whoever opened it.
 func (s *Server) verify(w http.ResponseWriter, r *http.Request) {
 	var in struct {
@@ -171,6 +172,10 @@ func (s *Server) verify(w http.ResponseWriter, r *http.Request) {
 			writeErr(w, http.StatusConflict, "That address now belongs to another account")
 			return
 		}
+		writeErr(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	if err := qtx.VoidUserTokensOfKind(ctx, store.VoidUserTokensOfKindParams{Now: sql.NullInt64{Int64: db.Now(), Valid: true}, UserID: tok.UserID, Kind: TokenSignin}); err != nil {
 		writeErr(w, http.StatusInternalServerError, err.Error())
 		return
 	}

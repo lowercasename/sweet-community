@@ -182,6 +182,7 @@ An account has a username and an email address. A password is optional, and the 
 - There are no reset pages. A user who forgets a password signs in by email.
 - Changing a password needs no current password, because email can always sign in. Each change ends the other sessions and emails a notice.
 - A new email address is confirmed by a link sent to it (2026-11-08). The old address gets a notice.
+- Confirming a new address invalidates all outstanding sign-in links and codes for the account. Existing sessions stay signed in (Raphael, 2026-11-11). Confirmation and invalidation succeed together. Changing back to an earlier address must not make its old links usable again.
 - A username can change, because content refers to the user's id.
 - The server never reveals whether an address has an account. It emails the account's owner about the attempt instead.
 
@@ -438,6 +439,8 @@ These decisions came from a security audit (2026-11-08).
 ## Record
 
 ### Reversed
+
+- **Sign-in links after an address change.** Address confirmation now invalidates outstanding sign-in links and codes (Raphael, 2026-11-11). Checking the current address alone allowed an old link to work again if the account changed back to that address.
 
 - **Reporter identities.** Reports and report notifications no longer identify the reporter to staff. Reported authors cannot see or resolve reports about their content (Raphael, 2026-11-11). The previous behaviour exposed reporters to staff authors despite the confidentiality promise.
 

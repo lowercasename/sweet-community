@@ -280,6 +280,61 @@ func TestChangeEmailConfirmsOnly(t *testing.T) {
 	mo.mustStatus(409, "POST", "/api/verify", map[string]string{"token": moLink})
 }
 
+func TestEmailChangePermanentlyVoidsOutstandingSignins(t *testing.T) {
+	ts, owner := newTestServer(t)
+	kit, _ := registerMember(t, ts, owner, "kit")
+	elsewhere := signIn(t, ts, "kit", "kit@example.test")
+	type pending struct {
+		browser     *client
+		token, code string
+	}
+	var outstanding []pending
+	for range 2 {
+		c := newClient(t, ts)
+		c.mustStatus(202, "POST", "/api/signin/email", map[string]string{"login": "kit"})
+		token, code := signinMail(t, ts, "kit@example.test")
+		outstanding = append(outstanding, pending{c, token, code})
+	}
+	// Changing back must not make old links or codes usable again.
+	for _, email := range []string{"new@example.test", "kit@example.test"} {
+		kit.mustStatus(200, "PUT", "/api/me/email", map[string]string{"email": email})
+		kit.mustStatus(200, "POST", "/api/verify", map[string]string{"token": linkToken(mailed(t, ts, email, "verify")[0])})
+		for _, old := range outstanding {
+			old.browser.mustStatus(404, "POST", "/api/signin/link", map[string]string{"token": old.token})
+			old.browser.mustStatus(400, "POST", "/api/signin/code", map[string]string{"code": old.code})
+		}
+		kit.mustStatus(200, "GET", "/api/me", nil)
+		elsewhere.mustStatus(200, "GET", "/api/me", nil)
+	}
+	signIn(t, ts, "kit", "kit@example.test")
+}
+
+func TestEmailConfirmationRollsBackWhenSigninCleanupFails(t *testing.T) {
+	ts, owner, srv := newTestServerWith(t)
+	kit, _ := registerMember(t, ts, owner, "kit")
+	asker := newClient(t, ts)
+	asker.mustStatus(202, "POST", "/api/signin/email", map[string]string{"login": "kit"})
+	old, _ := signinMail(t, ts, "kit@example.test")
+	kit.mustStatus(200, "PUT", "/api/me/email", map[string]string{"email": "new@example.test"})
+	confirmation := linkToken(mailed(t, ts, "new@example.test", "verify")[0])
+	if _, err := srv.DB.Exec(`CREATE TRIGGER fail_signin_cleanup BEFORE UPDATE OF used_at ON email_tokens
+		WHEN OLD.kind = 'signin' AND OLD.used_at IS NULL AND NEW.used_at IS NOT NULL
+		BEGIN SELECT RAISE(ABORT, 'test cleanup failure'); END`); err != nil {
+		t.Fatal(err)
+	}
+	kit.mustStatus(500, "POST", "/api/verify", map[string]string{"token": confirmation})
+	account := kit.mustStatus(200, "GET", "/api/me/account", nil)
+	if account["email"] != "kit@example.test" || account["pending_email"] != "new@example.test" {
+		t.Fatal("failed confirmation changed the account's email")
+	}
+	if _, err := srv.DB.Exec("DROP TRIGGER fail_signin_cleanup"); err != nil {
+		t.Fatal(err)
+	}
+	asker.mustStatus(200, "POST", "/api/signin/link", map[string]string{"token": old})
+	// The confirmation was rolled back too, so the same link can be retried.
+	kit.mustStatus(200, "POST", "/api/verify", map[string]string{"token": confirmation})
+}
+
 func TestSignInPaysOnlyForWrongGuesses(t *testing.T) {
 	ts, owner := newTestServer(t)
 	kit, _ := registerMember(t, ts, owner, "kit")
