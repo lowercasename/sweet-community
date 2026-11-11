@@ -1,5 +1,34 @@
 import { article, expect, member, open, test, uniq, writePost } from './helpers'
 
+for (const suffix of ['', ' @phone']) {
+  test(`live profile updates keep editing controls available only to the profile owner${suffix}`, async ({
+    browser,
+  }, info) => {
+    const kit = await member(browser, info)
+    const mo = await member(browser, info, 'mo')
+    await open(kit.page, `/u/${kit.username}`)
+    await open(mo.page, `/u/${kit.username}`)
+    await expect(kit.page.getByRole('button', { name: 'Write a bio' })).toBeVisible()
+    await expect(mo.page.getByRole('button', { name: 'Message', exact: true })).toBeVisible()
+
+    // The request updates neither page's cache. Both pages receive the change through their stream.
+    const bio = uniq('Updated bio ')
+    expect((await kit.context.request.put('/api/me/bio', { data: { body_html: `<p>${bio}</p>` } })).status()).toBe(200)
+    await expect(kit.page.getByText(bio, { exact: true })).toBeVisible()
+    await expect(mo.page.getByText(bio, { exact: true })).toBeVisible()
+    await expect(kit.page.getByRole('button', { name: 'Edit bio' })).toBeVisible()
+    await expect(kit.page.getByRole('button', { name: 'Settings', exact: true })).toBeVisible()
+    await expect(kit.page.getByRole('button', { name: 'Message', exact: true })).toHaveCount(0)
+    await expect(mo.page.getByRole('button', { name: /bio/ })).toHaveCount(0)
+    await expect(mo.page.getByRole('button', { name: 'Settings', exact: true })).toHaveCount(0)
+    await expect(mo.page.getByRole('button', { name: 'Message', exact: true })).toBeVisible()
+    await kit.page.getByRole('button', { name: 'Edit bio' }).click()
+    await expect(kit.page.locator('.editor-line .ProseMirror >> visible=true')).toHaveText(bio)
+    await kit.context.close()
+    await mo.context.close()
+  })
+}
+
 test.describe('profiles', () => {
   test('a bio holds text and links, with no image button, and a link on its own line stays a link', async ({
     browser,

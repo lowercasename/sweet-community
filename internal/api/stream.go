@@ -167,7 +167,13 @@ func filterEvent(viewer User, roles map[string]string, st *Settings, e events.Ev
 			UserID string `json:"user_id"`
 		}
 		return e, json.Unmarshal(e.Payload, &own) == nil && own.UserID == viewer.ID
-	case "user", "profile", "settings", "rules", "welcome", "topic", "topic_delete":
+	case "profile":
+		var p Profile
+		if json.Unmarshal(e.Payload, &p) != nil {
+			return e, false
+		}
+		return encode(forViewer(perm.Actor{ID: viewer.ID}, &p, *st))
+	case "user", "settings", "rules", "welcome", "topic", "topic_delete":
 		return e, true
 	default:
 		return e, false

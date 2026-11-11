@@ -66,8 +66,8 @@ type Post struct {
 	Can          Can     `json:"can"`
 }
 
-// forViewer fills in the viewer's can flags on a post, comment, message or
-// group. a is the viewer's Actor in that resource's group. Any other value is
+// forViewer fills in the viewer's can flags on a post, comment, message, group,
+// profile or report. a is the viewer's Actor in that resource's group. Any other value is
 // returned unchanged. It is used on every response and on the stream.
 func forViewer(a perm.Actor, v any, st Settings) any {
 	switch x := v.(type) {

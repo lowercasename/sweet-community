@@ -34,14 +34,20 @@ func TestProfiles(t *testing.T) {
 	if fetched["bio_html"] != "<p>I knit</p>" {
 		t.Fatalf("mo's view of kit's bio: %v", fetched)
 	}
-	var ev map[string]any
-	for _, e := range mo.readEvents(80) {
-		if e["kind"] == "profile" {
-			ev = e["payload"].(map[string]any)
+	for name, viewer := range map[string]*client{"self": kit, "member": mo, "staff": owner} {
+		fetched := viewer.mustStatus(200, "GET", "/api/users/kit", nil)
+		if name == "self" && !reflect.DeepEqual(set, fetched) {
+			t.Fatal("the saved profile differs from a fetch")
 		}
-	}
-	if !reflect.DeepEqual(ev, fetched) {
-		t.Fatalf("the profile event differs from a fetch\nevent: %v\nfetch: %v", ev, fetched)
+		var ev map[string]any
+		for _, e := range viewer.readEvents(80) {
+			if e["kind"] == "profile" {
+				ev = e["payload"].(map[string]any)
+			}
+		}
+		if !reflect.DeepEqual(ev, fetched) {
+			t.Errorf("%s: the profile event differs from a fetch\nevent: %v\nfetch: %v", name, ev, fetched)
+		}
 	}
 	if got := kit.mustStatus(200, "PUT", "/api/me/bio", map[string]string{"body_html": "<p></p>"}); got["bio_html"] != "" {
 		t.Fatalf("an emptied bio: %v", got["bio_html"])
