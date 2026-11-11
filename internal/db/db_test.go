@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"strings"
 	"testing"
 	"testing/fstest"
 )
@@ -328,6 +329,72 @@ func TestMigrationRebuildsTheSearchIndex(t *testing.T) {
 	want = []string{"comment c live comment", "message m live message", "post p edited post"}
 	if got := entries(); !slices.Equal(got, want) {
 		t.Fatalf("entries after an edit:\n%v\nwant\n%v", got, want)
+	}
+}
+
+// A database that ran migrations 006 and 007 of v1.6.1 has no live_bodies view, because both were changed before
+// v1.6.2 and a migration that has run is not run again. The later migrations run on it, and it ends with the same views
+// as any other database.
+func TestMigrationsRunOnADatabaseFromV161(t *testing.T) {
+	ctx := context.Background()
+	d, err := Open(filepath.Join(t.TempDir(), "sweet.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer d.Close()
+	migratedTo(t, d, "008")
+	// The views as v1.6.1 created them.
+	if _, err := d.ExecContext(ctx, `DROP VIEW image_references; DROP VIEW live_link_uses; DROP VIEW live_image_uses;
+		DROP VIEW live_bodies;
+		CREATE VIEW live_image_uses AS
+    SELECT u.image_id, u.kind, p.group_id FROM image_uses u
+        JOIN posts p ON u.kind = 'post' AND p.id = u.id AND p.deleted_at IS NULL
+        JOIN groups g ON g.id = p.group_id AND g.deleted_at IS NULL
+    UNION ALL
+    SELECT u.image_id, u.kind, p.group_id FROM image_uses u
+        JOIN comments c ON u.kind = 'comment' AND c.id = u.id AND c.deleted_at IS NULL
+        JOIN posts p ON p.id = c.post_id AND p.deleted_at IS NULL
+        JOIN groups g ON g.id = p.group_id AND g.deleted_at IS NULL
+    UNION ALL
+    SELECT u.image_id, u.kind, x.group_id FROM image_uses u
+        JOIN messages x ON u.kind = 'message' AND x.id = u.id AND x.deleted_at IS NULL
+        JOIN groups g ON g.id = x.group_id AND g.deleted_at IS NULL
+    UNION ALL
+    SELECT u.image_id, u.kind, r.group_id FROM image_uses u
+        JOIN reports r ON u.kind = 'report' AND r.id = u.id AND r.closed_at IS NULL;
+		CREATE VIEW live_link_uses AS
+    SELECT u.url FROM link_uses u
+        JOIN posts p ON u.kind = 'post' AND p.id = u.id AND p.deleted_at IS NULL
+        JOIN groups g ON g.id = p.group_id AND g.deleted_at IS NULL
+    UNION ALL
+    SELECT u.url FROM link_uses u
+        JOIN comments c ON u.kind = 'comment' AND c.id = u.id AND c.deleted_at IS NULL
+        JOIN posts p ON p.id = c.post_id AND p.deleted_at IS NULL
+        JOIN groups g ON g.id = p.group_id AND g.deleted_at IS NULL
+    UNION ALL
+    SELECT u.url FROM link_uses u
+        JOIN messages x ON u.kind = 'message' AND x.id = u.id AND x.deleted_at IS NULL
+        JOIN groups g ON g.id = x.group_id AND g.deleted_at IS NULL;
+		CREATE VIEW image_references AS
+			SELECT picture_id AS image_id FROM users WHERE picture_id IS NOT NULL
+			UNION ALL
+			SELECT picture_id FROM groups WHERE picture_id IS NOT NULL AND deleted_at IS NULL
+			UNION ALL
+			SELECT image_id FROM link_previews WHERE image_id IS NOT NULL
+			UNION ALL
+			SELECT image_id FROM live_image_uses;`); err != nil {
+		t.Fatal(err)
+	}
+	migratedTo(t, d, "010")
+	for _, view := range []string{"live_bodies", "live_image_uses", "live_link_uses", "image_references"} {
+		var n int
+		if err := d.QueryRowContext(ctx, `SELECT COUNT(*) FROM `+view).Scan(&n); err != nil {
+			t.Fatalf("%s after the migrations: %v", view, err)
+		}
+	}
+	var uses string
+	if err := d.QueryRowContext(ctx, `SELECT sql FROM sqlite_schema WHERE name = 'live_image_uses'`).Scan(&uses); err != nil || !strings.Contains(uses, "live_bodies") {
+		t.Fatalf("live_image_uses after the migrations is not built on live_bodies: %v\n%s", err, uses)
 	}
 }
 

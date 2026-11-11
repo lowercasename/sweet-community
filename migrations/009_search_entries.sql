@@ -1,3 +1,32 @@
+-- A database that ran migrations 006 and 007 of v1.6.1 has no live_bodies view, because both were changed before
+-- v1.6.2 and a migration that has run is not run again. live_bodies and the two views built on it are created here as
+-- 006 and 007 define them, so every database has the same views. The rebuild below reads live_bodies.
+DROP VIEW IF EXISTS live_link_uses;
+DROP VIEW IF EXISTS live_image_uses;
+DROP VIEW IF EXISTS live_bodies;
+CREATE VIEW live_bodies AS
+    SELECT 'post' AS kind, p.id, p.group_id FROM posts p
+        JOIN groups g ON g.id = p.group_id AND g.deleted_at IS NULL
+        WHERE p.deleted_at IS NULL
+    UNION ALL
+    SELECT 'comment', c.id, p.group_id FROM comments c
+        JOIN posts p ON p.id = c.post_id AND p.deleted_at IS NULL
+        JOIN groups g ON g.id = p.group_id AND g.deleted_at IS NULL
+        WHERE c.deleted_at IS NULL
+    UNION ALL
+    SELECT 'message', x.id, x.group_id FROM messages x
+        JOIN groups g ON g.id = x.group_id AND g.deleted_at IS NULL
+        WHERE x.deleted_at IS NULL;
+CREATE VIEW live_image_uses AS
+    SELECT u.image_id, u.kind, b.group_id FROM image_uses u
+        JOIN live_bodies b ON b.kind = u.kind AND b.id = u.id
+    UNION ALL
+    SELECT u.image_id, u.kind, r.group_id FROM image_uses u
+        JOIN reports r ON u.kind = 'report' AND r.id = u.id AND r.closed_at IS NULL;
+CREATE VIEW live_link_uses AS
+    SELECT u.url FROM link_uses u
+        JOIN live_bodies b ON b.kind = u.kind AND b.id = u.id;
+
 -- The rowid of each search entry, by the kind and id of its post, comment or message. FTS5 finds a row by its rowid
 -- but not by an UNINDEXED column such as kind or id. The search triggers below keep this table.
 CREATE TABLE search_entries (
