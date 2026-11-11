@@ -28,6 +28,9 @@ interface SearchPageProps {
 
 const KIND_WORD: Record<Hit['kind'], string> = { post: 'Post', comment: 'Comment', message: 'Message' }
 
+/** The most characters a query may have. The server refuses a longer one (MaxQuery in internal/api/search.go). */
+const QUERY_MAX = 200
+
 /**
  * The search page. The query is stored in the URL,
  * so a search can be bookmarked or shared. The hits are posts, comments and
@@ -52,7 +55,14 @@ export function SearchPage({ query, groups, onGo }: SearchPageProps) {
           <Stack gap={3}>
             <Card>
               <Form onSubmit={() => typed.trim() !== '' && onGo(`/search?q=${encodeURIComponent(typed.trim())}`)}>
-                <Input value={typed} onChange={setTyped} label="Search" placeholder="Search" autoFocus />
+                <Input
+                  value={typed}
+                  onChange={setTyped}
+                  label="Search"
+                  placeholder="Search"
+                  autoFocus
+                  maxLength={QUERY_MAX}
+                />
               </Form>
             </Card>
             {error && <Alert tone="error">{error.message}</Alert>}

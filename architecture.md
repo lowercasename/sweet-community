@@ -292,6 +292,7 @@ Search covers the posts, comments and chat messages that the searcher can see.
 - A word matches inside longer words, so "armalade" finds "marmalade" (Raphael, 2026-11-06). Raphael accepted the larger index that this needs.
 - Results are ranked by relevance, not by date. At most fifty are returned, because nobody reads more.
 - The query is part of the page's address, so a search can be shared.
+- A query is at most 200 characters, which holds a pasted sentence (Raphael asked for a limit, 2026-11-11). A longer query would become thousands of search terms.
 - The search box has no button (Raphael, 2026-11-06), because a field with a button looked like a form.
 
 ## Realtime

@@ -58,6 +58,11 @@ describe('SearchPage', () => {
     expect(onGo).toHaveBeenCalledWith('/search?q=marmalade')
   })
 
+  it('takes at most 200 characters, the most the server accepts', async () => {
+    await draw('')
+    expect(screen.getByRole('textbox', { name: 'Search' }).getAttribute('maxlength')).toBe('200')
+  })
+
   it('shows each hit with its kind, location, author and time, with the match in bold, and opens it', async () => {
     const { search } = await import('../api')
     const onGo = await draw('marmalade')

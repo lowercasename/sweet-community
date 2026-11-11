@@ -84,3 +84,14 @@ func TestSearch(t *testing.T) {
 		t.Fatalf("after deleting the post: %v", k)
 	}
 }
+
+// A query is at most MaxQuery characters. A longer one would become thousands of search terms.
+func TestSearchQueriesHaveAMaximumLength(t *testing.T) {
+	_, owner := newTestServer(t)
+	longest := strings.Repeat("é", MaxQuery)
+	owner.mustStatus(200, "GET", "/api/search?q="+url.QueryEscape(longest), nil)
+	refused := owner.mustStatus(400, "GET", "/api/search?q="+url.QueryEscape(longest+"x"), nil)
+	if refused["error"] != "A search can be at most 200 characters long." {
+		t.Fatalf("the refusal: %v", refused)
+	}
+}

@@ -1,9 +1,11 @@
 package api
 
 import (
+	"fmt"
 	"net/http"
 	"strconv"
 	"strings"
+	"unicode/utf8"
 )
 
 // Hit is one search result. It holds the kind of
@@ -33,6 +35,10 @@ const (
 // ("armalade" finds marmalade). A word of fewer than three characters cannot
 // match at all, so such words are dropped. When no words remain, the query
 // is empty.
+// MaxQuery is the most characters a search query may have. It holds a pasted sentence. A longer query would become
+// thousands of search terms.
+const MaxQuery = 200
+
 func ftsQuery(q string) string {
 	var terms []string
 	for _, w := range strings.Fields(q) {
@@ -49,7 +55,12 @@ func ftsQuery(q string) string {
 // best match first, up to fifty. The index is a virtual table that sqlc does
 // not read, so this one query is written by hand.
 func (s *Server) search(w http.ResponseWriter, r *http.Request) {
-	q := ftsQuery(r.URL.Query().Get("q"))
+	raw := r.URL.Query().Get("q")
+	if utf8.RuneCountInString(raw) > MaxQuery {
+		writeErr(w, http.StatusBadRequest, fmt.Sprintf("A search can be at most %d characters long.", MaxQuery))
+		return
+	}
+	q := ftsQuery(raw)
 	if q == "" {
 		writeErr(w, http.StatusBadRequest, "You can search for words of three letters or more.")
 		return
