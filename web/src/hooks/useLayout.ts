@@ -1,5 +1,6 @@
 import { useEffect, useState, useSyncExternalStore } from 'react'
 import { SPLIT_DEFAULT, SPLIT_MAX, SPLIT_MIN } from '../ui'
+import { store, stored } from '../storage'
 
 export type Layout = 'both' | 'posts' | 'chat'
 
@@ -8,22 +9,6 @@ const SPLIT_KEY = 'sweet.split'
 const NAV_KEY = 'sweet.nav'
 /** The phone layout: one pane and a tab bar. */
 export const NARROW = '(max-width: 799px)'
-
-function read(key: string): string | null {
-  try {
-    return localStorage.getItem(key)
-  } catch {
-    return null // storage unavailable
-  }
-}
-
-function write(key: string, value: string) {
-  try {
-    localStorage.setItem(key, value)
-  } catch {
-    // The stored layout is a per-viewer convenience only, so a failed write is ignored.
-  }
-}
 
 export function useMediaQuery(query: string): boolean {
   const [matches, setMatches] = useState(() =>
@@ -54,14 +39,14 @@ const listeners = new Set<() => void>()
 
 function current(): LayoutState {
   if (!state) {
-    const v = read(KEY)
-    const r = Number(read(SPLIT_KEY))
+    const v = stored(KEY)
+    const r = Number(stored(SPLIT_KEY))
     state = {
       stored: v === 'both' || v === 'posts' || v === 'chat' ? v : 'both',
       ratio: r >= SPLIT_MIN && r <= SPLIT_MAX ? r : SPLIT_DEFAULT,
       // The nav starts expanded, so a new user sees its labels. It stays collapsed only once someone collapses it
       // (Raphael, 2026-11-09).
-      navExpanded: read(NAV_KEY) !== 'collapsed',
+      navExpanded: stored(NAV_KEY) !== 'collapsed',
     }
   }
   return state
@@ -98,16 +83,16 @@ export function useLayout(): {
 
   const setLayout = (l: Layout) => {
     update({ stored: l })
-    write(KEY, l)
+    store(KEY, l)
   }
   const setRatio = (r: number) => {
     update({ ratio: r })
-    write(SPLIT_KEY, String(r))
+    store(SPLIT_KEY, String(r))
   }
   const toggleNav = () => {
     const next = !current().navExpanded
     update({ navExpanded: next })
-    write(NAV_KEY, next ? 'expanded' : 'collapsed')
+    store(NAV_KEY, next ? 'expanded' : 'collapsed')
   }
 
   const layout: Layout = narrow && s.stored === 'both' ? 'chat' : s.stored

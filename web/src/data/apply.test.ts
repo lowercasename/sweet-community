@@ -374,6 +374,19 @@ describe('applyEvent', () => {
     expect(qc.getQueryState(keys.markers)?.isInvalidated).toBe(true)
   })
 
+  it('leaving a room keeps its notifications, because the server keeps them', () => {
+    qc.setQueryData(keys.notifications, {
+      pages: [{ notifications: [notification('n2', 'added', mo, { group_id: CLUB })], next_before: null }],
+      pageParams: [null],
+    })
+    applyEvent(qc, 'membership_delete', { group_id: CLUB, user_id: kit.id })
+    expect(groups().map((g) => g.id)).not.toContain(CLUB)
+    const list = (qc.getQueryData(keys.notifications) as { pages: { notifications: Notification[] }[] }).pages.flatMap(
+      (p) => p.notifications,
+    )
+    expect(list.map((n) => n.id)).toEqual(['n2'])
+  })
+
   it('a settings change refetches the groups, because the root group carries the setting as a can flag', () => {
     qc.setQueryData(keys.settings, { group_creation: 'anyone' })
     applyEvent(qc, 'settings', { group_creation: 'staff' })

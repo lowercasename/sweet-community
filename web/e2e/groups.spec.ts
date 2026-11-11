@@ -160,12 +160,13 @@ test.describe('groups', () => {
     const text = uniq('A post in the room ')
     await writePost(kit.page, text)
 
-    // Mo has the room in the nav and a notification of being added. In a second tab, kit's page shows the post.
+    // Mo has the room in the nav and a notification of being added. After the room is deleted, the notification must
+    // be gone, not shown without the room's name, so it is found by the actor alone.
     await open(mo.page, '/notifications')
-    await expect(mo.page.getByRole('button', { name: new RegExp(`added you to ${name}`) })).toBeVisible()
-    // After the room is deleted, the notification is gone, not shown without the room's name.
     const added = mo.page.getByRole('button', { name: new RegExp(`${kit.username} added you to`) })
+    await expect(added).toContainText(name)
     await expect(nav(mo.page).getByRole('button', { name })).toBeVisible()
+    // Mo opens kit's profile in a second tab, and it shows the post.
     const profile = await mo.context.newPage()
     await open(profile, `/u/${kit.username}`)
     await expect(profile.getByText(text)).toBeVisible()

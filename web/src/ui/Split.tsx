@@ -14,7 +14,7 @@ interface SplitProps {
   onRatio: (ratio: number) => void
   /** Called when the handle is dragged, or moved with the keyboard, past a pane's edge. */
   onCollapse: (side: 'left' | 'right') => void
-  /** Which panes are open. A closed pane stays mounted but hidden, so its editor keeps its draft. */
+  /** Which panes are open. A closed pane stays mounted but hidden, so its scroll position and its uploads are kept. */
   show: SplitShow
   /** Rendered in place of a closed pane. A Rail. Omit on narrow screens, where the tab bar reopens panes instead. */
   leftRail?: ReactNode

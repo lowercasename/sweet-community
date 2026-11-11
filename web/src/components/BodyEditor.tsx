@@ -3,7 +3,7 @@ import { useEditor, useEditorState, type Editor, type Extensions } from '@tiptap
 import { DEFAULT_PLACEHOLDER, withPlaceholder } from '../editor/extensions'
 import { mentionSuggestionKey, withMentions } from '../editor/mentions'
 import { useMe, useMembers } from '../data/hooks'
-import { clearDraft, loadDraft, saveDraft } from '../editor/drafts'
+import { clearDraft, loadDraft, saveDraft, watchDraft } from '../editor/drafts'
 import type { Topic } from '../api'
 import { Alert, Button, EditorSurface, Form, ImageCard, Row, Stack } from '../ui'
 import { convertAndUpload, failedUploads, failureReason, imageFiles, imagesHtml, insertImages } from '../editor/images'
@@ -81,9 +81,6 @@ interface BodyEditorProps {
   draft?: string
 }
 
-/** How long after the last change the draft is saved. Hiding the page or closing the editor saves it at once. */
-const DRAFT_DELAY = 400
-
 /**
  * The single editor component. Posts, chat and comments differ only in
  * schema, size, submit key and image placement.
@@ -129,24 +126,20 @@ export function BodyEditor({
   const [linkOpen, setLinkOpen] = useState(false)
   const openLinkRef = useRef(() => setLinkOpen(true))
 
-  // The draft's owner and key, read by the editor's update handler, which TipTap creates once. A pending timer means
-  // the text has changed since the draft was last saved.
+  // The draft's owner and key, read by the editor's update handler, which TipTap creates once. Each change is saved
+  // at once. An editor that has not changed writes nothing.
   const { data: me } = useMe()
   const draftRef = useRef<{ user: string; key: string } | null>(null)
   draftRef.current = draft && me ? { user: me.id, key: draft } : null
-  const pendingDraft = useRef<number | undefined>(undefined)
   const keepDraft = (ed: Editor) => {
-    pendingDraft.current = undefined
     const d = draftRef.current
     if (!d) return
-    if (ed.isEmpty) clearDraft(d.user, d.key)
-    else saveDraft(d.user, d.key, ed.getHTML())
+    if (ed.isEmpty) clearDraft(d.user, d.key, ed)
+    else saveDraft(d.user, d.key, ed.getHTML(), ed)
   }
   const forgetDraft = () => {
-    window.clearTimeout(pendingDraft.current)
-    pendingDraft.current = undefined
     const d = draftRef.current
-    if (d) clearDraft(d.user, d.key)
+    if (d) clearDraft(d.user, d.key, editor ?? undefined)
   }
   // Cancelling an edit deletes its draft.
   const cancel = onCancel
@@ -174,10 +167,7 @@ export function BodyEditor({
     ),
     content: (draftRef.current && loadDraft(draftRef.current.user, draftRef.current.key)) ?? initialHtml ?? '',
     autofocus: editing ? 'end' : false,
-    onUpdate: ({ editor }) => {
-      window.clearTimeout(pendingDraft.current)
-      if (draftRef.current) pendingDraft.current = window.setTimeout(() => keepDraft(editor), DRAFT_DELAY)
-    },
+    onUpdate: ({ editor }) => keepDraft(editor),
     editorProps: {
       handleKeyDown(view, event) {
         // While an @ list is open, Enter selects from the list. The suggestion
@@ -208,28 +198,13 @@ export function BodyEditor({
   useEffect(() => {
     if (focus) editor?.commands.focus('end')
   }, [focus, editor])
-  // A change not yet saved is saved when the page is hidden, which also happens before it is closed or reloaded, and
-  // when the editor closes. An editor with no unsaved change writes nothing, so a second editor with the same draft
-  // does not overwrite it.
+  // Another editor in this tab with the same draft, such as a post's thread on Home and on the post's page, shows
+  // each change made in this one.
+  const user = me?.id
   useEffect(() => {
-    if (!editor) return
-    const flush = () => {
-      if (pendingDraft.current === undefined) return
-      window.clearTimeout(pendingDraft.current)
-      keepDraft(editor)
-    }
-    const hidden = () => {
-      if (document.visibilityState === 'hidden') flush()
-    }
-    document.addEventListener('visibilitychange', hidden)
-    window.addEventListener('pagehide', flush)
-    return () => {
-      document.removeEventListener('visibilitychange', hidden)
-      window.removeEventListener('pagehide', flush)
-      flush()
-    }
-    // keepDraft reads its draft through a ref, so the listeners need only the editor.
-  }, [editor])
+    if (!editor || !draft || !user) return
+    return watchDraft(user, draft, editor, (html) => editor.commands.setContent(html ?? '', { emitUpdate: false }))
+  }, [editor, draft, user])
   // An empty transaction makes the editor draw its decorations again, which reads the new placeholder.
   useEffect(() => {
     if (editor && !editor.isDestroyed) editor.view.dispatch(editor.state.tr)

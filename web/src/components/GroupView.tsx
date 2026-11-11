@@ -9,7 +9,7 @@ import { SweetColophon } from './SweetColophon'
 
 interface GroupViewProps {
   group: Group
-  /** True while the view is behind another page. The view stays mounted so drafts are kept. */
+  /** True while the view is behind another page. The view stays mounted, so its scroll position and uploads are kept. */
   hidden: boolean
   /** The topic that the community's feed is filtered to. */
   topicId?: string | null

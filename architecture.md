@@ -105,10 +105,10 @@ Hashtags are on hold. Raphael asked on 2026-11-06 whether tags are the same as t
 A post is long-form text with inline images. Comments are a flat list, oldest first. A reply to one comment quotes it.
 
 - The author edits a post or comment as a whole, and the post is marked as edited. There is no version history.
-- Deleting a post deletes its comments, because the author asked for the post to go.
+- Deleting a post deletes its comments and empties their text, because the author asked for the post to go.
 - Every post has its own address, which notifications link to.
 - Each editor keeps its unsent text in the browser, so a reload or a closed tab does not lose it (Raphael, 2026-11-10). This covers new posts, comments and messages, and edits of posts and comments. Sending, saving an edit or cancelling an edit deletes the draft. Safari will clear saved drafts after seven days without a visit unless the app is installed, and this is accepted.
-- A draft belongs to the signed-in user. Signing out, by any means, deletes every draft in the browser, so a shared computer keeps none. A draft not changed for 30 days is deleted. A message's attached images, an image still uploading and the message being replied to are not kept. An image in a draft is deleted after a day, like any upload that nothing uses, and the server then refuses the draft until the image is removed. These details were decided while building and are open to change.
+- A draft belongs to the signed-in user. Signing out, by any means, deletes every draft in the browser, so a shared computer keeps none. A draft not changed for 30 days is deleted. A message's attached images, an image still uploading and the message being replied to are not kept. Raphael left these details to Claude (2026-11-10), and they are open to change.
 - The @ list offers only the members of the current group (Raphael, 2026-11-08).
 - Links are added and edited in a small panel from the editor's Link button or Cmd+K, in place of the browser's prompt box (Raphael, 2026-11-10). Like the emoji picker, the panel never covers the text being written. An address without https:// gets it.
 - On a device with a mouse or trackpad, every composer has an emoji picker. Phones have none, because their keyboards have emoji (Raphael, 2026-11-10). The picker shows the device's own emoji, so it loads nothing from another site.
@@ -377,7 +377,7 @@ There is no separate mobile app, and there must never be a second codebase. The 
 - Times are stored in UTC. The browser converts them for display.
 - Lists are paged by cursor, never by offset.
 - A deleted post, comment, message or room keeps its row, and its text is emptied (Raphael, 2026-11-10). The row stays so that the replies, notifications and reports that point at it stay valid. The text has no use once it is deleted.
-- Deleting a post empties its comments too. Deleting a room empties its name and everything in it, and deletes its memberships, read markers and notifications.
+- Deleting a room empties its name and everything in it, and deletes its memberships, read markers and notifications.
 - SQLite and the search index overwrite deleted text, so it does not stay in the database file.
 - Content deleted before this rule keeps its text, because old content is not changed (Raphael, 2026-11-10).
 - A migration never changes user content: posts, comments, messages, bios, the rules and the welcome message stay as their authors saved them (Raphael, 2026-11-10).

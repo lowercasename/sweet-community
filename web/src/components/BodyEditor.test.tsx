@@ -96,11 +96,11 @@ describe('BodyEditor', () => {
 
   describe('drafts', () => {
     /** TipTap keeps its editor on the editable element, so a test can change the text as typing would. */
-    const typed = (html: string) =>
-      (document.querySelector('.ProseMirror') as HTMLElement & { editor: Editor }).editor.commands.setContent(html, {
-        emitUpdate: true,
-      })
-    const text = () => document.querySelector('.ProseMirror')?.textContent
+    const editorIn = (container: HTMLElement) =>
+      (container.querySelector('.ProseMirror') as HTMLElement & { editor: Editor }).editor
+    const typed = (container: HTMLElement, html: string) =>
+      editorIn(container).commands.setContent(html, { emitUpdate: true })
+    const text = (container: HTMLElement) => container.querySelector('.ProseMirror')?.textContent
 
     async function editor(props: { draft: string; initialHtml?: string; onCancel?: () => void }) {
       const { BodyEditor } = await import('./BodyEditor')
@@ -120,64 +120,50 @@ describe('BodyEditor', () => {
           />
         </QueryClientProvider>,
       )
-      await waitFor(() => expect(document.querySelector('.ProseMirror')).not.toBeNull())
+      await waitFor(() => expect(view.container.querySelector('.ProseMirror')).not.toBeNull())
       return { ...view, onSubmit }
     }
 
     it('opens with its saved draft, saves what is typed, and deletes the draft when it is sent', async () => {
       saveDraft('kit', 'post:home', paragraph('Saved earlier'))
-      const { onSubmit } = await editor({ draft: 'post:home' })
-      expect(text()).toBe('Saved earlier')
-      typed(paragraph('Written now'))
-      await waitFor(() => expect(loadDraft('kit', 'post:home')).toBe(paragraph('Written now')))
+      const { container, onSubmit } = await editor({ draft: 'post:home' })
+      expect(text(container)).toBe('Saved earlier')
+      typed(container, paragraph('Written now'))
+      expect(loadDraft('kit', 'post:home')).toBe(paragraph('Written now'))
       fireEvent.click(screen.getByRole('button', { name: 'Post' }))
       await waitFor(() => expect(onSubmit).toHaveBeenCalledWith(paragraph('Written now')))
       await waitFor(() => expect(loadDraft('kit', 'post:home')).toBeNull())
-      expect(text()).toBe('')
+      expect(text(container)).toBe('')
     })
 
-    it('saves what was typed when it closes before the draft was saved, and an unchanged copy overwrites nothing', async () => {
-      const { unmount } = await editor({ draft: 'post:home' })
-      typed(paragraph('Typed just before closing'))
-      unmount()
-      expect(loadDraft('kit', 'post:home')).toBe(paragraph('Typed just before closing'))
-      // A second editor with the same draft, such as a post's thread open in two places, opens with the draft and
-      // does not overwrite it when it closes unchanged.
-      const second = await editor({ draft: 'post:home' })
-      expect(text()).toBe('Typed just before closing')
-      saveDraft('kit', 'post:home', paragraph('Typed in the other editor'))
-      second.unmount()
-      expect(loadDraft('kit', 'post:home')).toBe(paragraph('Typed in the other editor'))
+    it('shows the same text in two editors with the same draft, such as a thread on Home and on its post page', async () => {
+      const first = await editor({ draft: 'comment:p1' })
+      const second = await editor({ draft: 'comment:p1' })
+      typed(first.container, paragraph('Typed in the first'))
+      await waitFor(() => expect(text(second.container)).toBe('Typed in the first'))
+      typed(second.container, paragraph('Typed in the second'))
+      await waitFor(() => expect(text(first.container)).toBe('Typed in the second'))
+      expect(loadDraft('kit', 'comment:p1')).toBe(paragraph('Typed in the second'))
     })
 
     it('opens an edit with its draft in place of the stored text, and Cancel deletes the draft', async () => {
       saveDraft('kit', 'post-edit:p1', paragraph('Half an edit'))
       const onCancel = vi.fn()
-      await editor({ draft: 'post-edit:p1', initialHtml: paragraph('Stored'), onCancel })
-      expect(text()).toBe('Half an edit')
-      typed(paragraph('More of the edit'))
+      const { container } = await editor({ draft: 'post-edit:p1', initialHtml: paragraph('Stored'), onCancel })
+      expect(text(container)).toBe('Half an edit')
+      typed(container, paragraph('More of the edit'))
       fireEvent.click(screen.getByRole('button', { name: 'Cancel' }))
       expect(onCancel).toHaveBeenCalled()
       expect(loadDraft('kit', 'post-edit:p1')).toBeNull()
     })
 
     it('deletes the draft when an edit is saved, although the editor keeps the text', async () => {
-      const { unmount } = await editor({ draft: 'post-edit:p1', initialHtml: paragraph('Stored'), onCancel: vi.fn() })
-      typed(paragraph('Edited'))
+      const { container } = await editor({ draft: 'post-edit:p1', initialHtml: paragraph('Stored'), onCancel: vi.fn() })
+      typed(container, paragraph('Edited'))
+      expect(loadDraft('kit', 'post-edit:p1')).toBe(paragraph('Edited'))
       fireEvent.click(screen.getByRole('button', { name: 'Post' }))
       await waitFor(() => expect(loadDraft('kit', 'post-edit:p1')).toBeNull())
-      // The parent closes the editor after a save. Closing it saves nothing.
-      unmount()
-      expect(loadDraft('kit', 'post-edit:p1')).toBeNull()
-    })
-
-    it('saves the draft when the page is hidden, before the delay has passed', async () => {
-      await editor({ draft: 'message:home' })
-      typed(paragraph('Switching apps'))
-      vi.spyOn(document, 'visibilityState', 'get').mockReturnValue('hidden')
-      document.dispatchEvent(new Event('visibilitychange'))
-      expect(loadDraft('kit', 'message:home')).toBe(paragraph('Switching apps'))
-      vi.restoreAllMocks()
+      expect(text(container)).toBe('Edited')
     })
   })
 })

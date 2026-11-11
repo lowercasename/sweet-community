@@ -31,8 +31,8 @@ export function App() {
   const [settingUp, setupParams] = useRoute('/setup/:token')
   const [linked, linkParams] = useRoute('/signin/:token')
 
-  // Drafts are kept for the signed-in user only. Signing out, by any means, deletes every draft in this browser, so a
-  // shared computer keeps none. Drafts not saved for 30 days are deleted.
+  // Deletes every draft when the signed-in user query returns no user, and old drafts when it returns one
+  // (editor/drafts.ts).
   useEffect(() => {
     if (me === null) clearDrafts()
     else if (me) pruneDrafts()

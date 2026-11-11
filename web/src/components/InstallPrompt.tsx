@@ -1,18 +1,15 @@
 import { useState, useSyncExternalStore } from 'react'
 import { install, installWay, subscribeInstall } from '../install'
 import { Alert, Button, Row, Stack, Strip, Text } from '../ui'
+import { store, stored } from '../storage'
 
 const DISMISSED = 'sweet.install'
 const QUIET_FOR = 30 * 24 * 60 * 60 * 1000
 
-/** Whether Not now was chosen in this browser in the last 30 days. Storage can be unavailable, and then it was not. */
+/** Whether Not now was chosen in this browser in the last 30 days. Without storage it was not. */
 function dismissedRecently(): boolean {
-  try {
-    const at = Number(localStorage.getItem(DISMISSED))
-    return at > 0 && Date.now() - at < QUIET_FOR
-  } catch {
-    return false
-  }
+  const at = Number(stored(DISMISSED))
+  return at > 0 && Date.now() - at < QUIET_FOR
 }
 
 /**
@@ -29,11 +26,8 @@ export function InstallPrompt({ name }: { name: string }) {
   if (hidden || !touch || (way !== 'dialog' && way !== 'ios')) return null
 
   const notNow = () => {
-    try {
-      localStorage.setItem(DISMISSED, String(Date.now()))
-    } catch {
-      // Without storage it is hidden until the page is loaded again.
-    }
+    // Without storage it is hidden until the page is loaded again.
+    store(DISMISSED, String(Date.now()))
     setHidden(true)
   }
   const add = async () => {

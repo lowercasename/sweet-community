@@ -84,7 +84,10 @@ export function applyEvent(qc: QueryClient, kind: string, data: unknown): void {
       if (isGroup(data)) upsertGroup(qc, data)
       break
     case 'group_delete':
-      if (hasId(data)) dropGroup(qc, data.id)
+      if (hasId(data)) {
+        dropGroup(qc, data.id)
+        dropNotifications(qc, data.id)
+      }
       break
     case 'membership':
       if (isMembership(data)) upsertMembership(qc, data)
@@ -235,9 +238,7 @@ function upsertPost(qc: QueryClient, post: Post) {
       if (!old) return old
       const known = old.pages.some((p) => p.posts.some((x) => x.id === post.id))
       if (!belongs) {
-        return known
-          ? { ...old, pages: old.pages.map((p) => ({ ...p, posts: p.posts.filter((x) => x.id !== post.id) })) }
-          : old
+        return known ? withoutPosts(old, (x) => x.id === post.id) : old
       }
       const pages = known
         ? old.pages.map((p) => ({ ...p, posts: p.posts.map((x) => (x.id === post.id ? post : x)) }))
@@ -247,16 +248,16 @@ function upsertPost(qc: QueryClient, post: Post) {
   }
 }
 
+/** A list of posts without the posts that `drop` matches. */
+function withoutPosts(old: Posts | undefined, drop: (post: Post) => boolean): Posts | undefined {
+  return old && { ...old, pages: old.pages.map((p) => ({ ...p, posts: p.posts.filter((x) => !drop(x)) })) }
+}
+
 function deletePost(qc: QueryClient, id: string, groupId: string) {
-  qc.setQueriesData<Posts>({ queryKey: keys.posts(groupId) }, (old) =>
-    old ? { ...old, pages: old.pages.map((p) => ({ ...p, posts: p.posts.filter((x) => x.id !== id) })) } : old,
-  )
+  qc.setQueriesData<Posts>({ queryKey: keys.posts(groupId) }, (old) => withoutPosts(old, (x) => x.id === id))
   qc.removeQueries({ queryKey: keys.comments(id) })
   qc.removeQueries({ queryKey: keys.post(id) })
-  qc.setQueriesData<Posts>(
-    { queryKey: ['userPosts'] },
-    (old) => old && { ...old, pages: old.pages.map((p) => ({ ...p, posts: p.posts.filter((x) => x.id !== id) })) },
-  )
+  qc.setQueriesData<Posts>({ queryKey: ['userPosts'] }, (old) => withoutPosts(old, (x) => x.id === id))
 }
 
 function countComments(qc: QueryClient, postId: string, groupId: string, by: number) {
@@ -489,10 +490,9 @@ function upsertGroup(qc: QueryClient, g: Group) {
   if (!known) void qc.invalidateQueries({ queryKey: keys.markers })
 }
 
-/** Removes everything about a group from the cache, when the group is deleted or the user leaves it. */
 /**
- * Removes a deleted group and everything in it: its lists, its posts wherever they are shown, its markers and its
- * notifications. The server deleted the notifications, so the markers are fetched again for their unread count.
+ * Removes a group from the cache when it is deleted or the user leaves it. Its lists, its posts in every list and its
+ * markers are removed.
  */
 function dropGroup(qc: QueryClient, id: string) {
   qc.setQueryData<Groups>(keys.groups, (old) => (old ? { groups: old.groups.filter((x) => x.id !== id) } : old))
@@ -502,21 +502,24 @@ function dropGroup(qc: QueryClient, id: string) {
   qc.removeQueries({
     predicate: (q) => q.queryKey[0] === 'post' && (q.state.data as Post | undefined)?.group_id === id,
   })
-  qc.setQueriesData<Posts>(
-    { queryKey: ['userPosts'] },
-    (old) =>
-      old && { ...old, pages: old.pages.map((p) => ({ ...p, posts: p.posts.filter((x) => x.group_id !== id) })) },
-  )
+  qc.setQueriesData<Posts>({ queryKey: ['userPosts'] }, (old) => withoutPosts(old, (x) => x.group_id === id))
+  dropMarker(qc, `chat:${id}`)
+  dropMarker(qc, `feed:${id}`)
+}
+
+/**
+ * Removes a deleted group's notifications, which the server deleted with the group. Their unread count may have
+ * changed, so the markers are fetched again.
+ */
+function dropNotifications(qc: QueryClient, groupId: string) {
   qc.setQueryData<Notifications>(
     keys.notifications,
     (old) =>
       old && {
         ...old,
-        pages: old.pages.map((p) => ({ ...p, notifications: p.notifications.filter((n) => n.group_id !== id) })),
+        pages: old.pages.map((p) => ({ ...p, notifications: p.notifications.filter((n) => n.group_id !== groupId) })),
       },
   )
-  dropMarker(qc, `chat:${id}`)
-  dropMarker(qc, `feed:${id}`)
   void qc.invalidateQueries({ queryKey: keys.markers })
 }
 
