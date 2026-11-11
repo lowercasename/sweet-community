@@ -433,7 +433,9 @@ func (q *Queries) ListSigninTokensForRequest(ctx context.Context, arg ListSignin
 }
 
 const removeUser = `-- name: RemoveUser :exec
-UPDATE users SET username = ?1, password_hash = NULL, picture_id = NULL, bio_html = '', bio_text = '', registration_hash = NULL, registration_expires_at = NULL, removed_at = ?2
+UPDATE users SET username = ?1, password_hash = NULL, picture_id = NULL, bio_html = '', bio_text = '',
+    email = NULL, pending_email = NULL, email_verified_at = NULL, digest_sent_at = NULL,
+    registration_hash = NULL, registration_expires_at = NULL, removed_at = ?2
 WHERE id = ?3
 `
 
@@ -443,9 +445,7 @@ type RemoveUserParams struct {
 	ID        string
 }
 
-// Anonymises a user. The username becomes
-// removed-<id prefix>, and the password, picture and bio are cleared. The row
-// and the id stay so that the user's content keeps its author.
+// Clears account details and assigns a removed name. The row stays for existing references.
 func (q *Queries) RemoveUser(ctx context.Context, arg RemoveUserParams) error {
 	_, err := q.db.ExecContext(ctx, removeUser, arg.Username, arg.RemovedAt, arg.ID)
 	return err

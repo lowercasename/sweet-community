@@ -246,6 +246,7 @@ Raphael decided on 2026-11-08 that "a deleted user's posts should actually just 
 
 - The account row stays under a "removed-" name, so records that name it stay valid.
 - Their password, picture, bio, sessions and push subscriptions are deleted.
+- Their current and pending email addresses, verification date and last digest date are erased (Raphael, 2026-11-11). This also applies to accounts already removed. Keeping references to an account does not require its email details. A new account may use either address with an invitation.
 - Rooms they owned pass to new owners by seniority.
 - Open reports about their content are closed.
 
@@ -439,6 +440,8 @@ These decisions came from a security audit (2026-11-08).
 ## Record
 
 ### Reversed
+
+- **Email details after removal.** Removed accounts no longer retain their email addresses or email metadata (Raphael, 2026-11-11). Retaining them kept removed accounts identifiable and blocked new registration with the same address. Existing removed accounts are included in the cleanup.
 
 - **Sign-in links after an address change.** Address confirmation now invalidates outstanding sign-in links and codes (Raphael, 2026-11-11). Checking the current address alone allowed an old link to work again if the account changed back to that address.
 

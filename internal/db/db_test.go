@@ -14,6 +14,35 @@ import (
 
 func file(s string) *fstest.MapFile { return &fstest.MapFile{Data: []byte(s)} }
 
+func TestMigrationClearsRemovedAccountEmails(t *testing.T) {
+	d, err := Open(filepath.Join(t.TempDir(), "sweet.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer d.Close()
+	migratedTo(t, d, "012")
+	for _, id := range []string{"removed", "active"} {
+		if _, err := d.Exec(`INSERT INTO users (id, username, created_at, email, pending_email, email_verified_at, digest_sent_at)
+			VALUES (?, ?, 1, ?, ?, 2, 3)`, id, id, id+"@example.test", id+"-pending@example.test"); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if _, err := d.Exec(`UPDATE users SET removed_at = 4 WHERE id = 'removed'`); err != nil {
+		t.Fatal(err)
+	}
+	migratedTo(t, d, "013")
+	var cleared, unchanged bool
+	if err := d.QueryRow(`SELECT email IS NULL AND pending_email IS NULL AND email_verified_at IS NULL
+		AND digest_sent_at IS NULL AND username = 'removed' AND removed_at = 4 AND created_at = 1
+		FROM users WHERE id = 'removed'`).Scan(&cleared); err != nil || !cleared {
+		t.Fatalf("removed account email data cleared: %v, error: %v", cleared, err)
+	}
+	if err := d.QueryRow(`SELECT email = 'active@example.test' AND pending_email = 'active-pending@example.test'
+		AND email_verified_at = 2 AND digest_sent_at = 3 AND removed_at IS NULL FROM users WHERE id = 'active'`).Scan(&unchanged); err != nil || !unchanged {
+		t.Fatalf("active account unchanged: %v, error: %v", unchanged, err)
+	}
+}
+
 // A migration on a database that has been migrated before is an upgrade,
 // and an upgrade copies the database first.
 func TestMigrateCopiesTheDatabaseBeforeAnUpgrade(t *testing.T) {

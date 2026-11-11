@@ -15,7 +15,7 @@ import (
 
 // Removing a user from the instance. Staff
 // remove users from People. Any user can remove themselves from Settings. The
-// removed user's content stays under a removed name. Each room they owned
+// removed user's content is deleted. Each room they owned
 // passes to another member by seniority, or is deleted. Their conversations
 // stay in place. Their sessions end, and the name cannot be registered.
 func TestRemoveFromInstance(t *testing.T) {
@@ -203,5 +203,41 @@ func TestRemovedUserCannotComeBackAndIsNotNotified(t *testing.T) {
 	var n int
 	if err := srv.DB.QueryRow("SELECT count(*) FROM notifications WHERE user_id = ?", moID).Scan(&n); err != nil || n != 0 {
 		t.Fatalf("notifications for a removed user: %d %v", n, err)
+	}
+}
+
+func TestRemovalClearsEmailAndAllowsANewAccount(t *testing.T) {
+	for _, by := range []string{"self", "staff"} {
+		t.Run(by, func(t *testing.T) {
+			ts, owner, srv := newTestServerWith(t)
+			kit, id := registerMember(t, ts, owner, "kit")
+			kit.mustStatus(200, "PUT", "/api/me/email", map[string]string{"email": "pending@example.test"})
+			confirmation := linkToken(mailed(t, ts, "pending@example.test", "verify")[0])
+			if _, err := srv.DB.Exec(`UPDATE users SET digest_sent_at = 1 WHERE id = ?`, id); err != nil {
+				t.Fatal(err)
+			}
+			actor := kit
+			if by == "staff" {
+				actor = owner
+			}
+			actor.mustStatus(204, "DELETE", "/api/users/"+id, nil)
+			var cleared bool
+			if err := srv.DB.QueryRow(`SELECT email IS NULL AND pending_email IS NULL AND email_verified_at IS NULL
+				AND digest_sent_at IS NULL AND registration_hash IS NULL AND registration_expires_at IS NULL
+				AND removed_at IS NOT NULL FROM users WHERE id = ?`, id).Scan(&cleared); err != nil || !cleared {
+				t.Fatalf("removed account email data cleared: %v, error: %v", cleared, err)
+			}
+			kit.mustStatus(401, "GET", "/api/me", nil)
+			newClient(t, ts).mustStatus(404, "POST", "/api/verify", map[string]string{"token": confirmation})
+			code := invite(t, owner)
+			for name, email := range map[string]string{"again": "kit@example.test", "pending": "pending@example.test"} {
+				c := newClient(t, ts)
+				c.mustStatus(202, "POST", "/api/register", map[string]string{"code": code, "username": name, "email": email})
+				fresh := signIn(t, ts, name, email).mustStatus(200, "GET", "/api/me", nil)
+				if fresh["id"] == id || fresh["username"] != name {
+					t.Fatal("registration did not create a separate account")
+				}
+			}
+		})
 	}
 }
