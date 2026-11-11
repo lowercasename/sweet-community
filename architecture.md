@@ -428,7 +428,7 @@ These decisions came from a security audit (2026-11-08).
 - Behind proxies, the operator states how many proxies there are. The client address is read that many entries from the right, because a visitor can forge only the entries on the left.
 - Images that are too large are refused before decoding.
 - Push goes only to the known push services, so a member cannot make the server send requests to any host.
-- One account can have at most 20 event streams open at once, one for each tab and device (Raphael, 2026-11-11). A further stream is refused until one closes. Closing the oldest stream instead was rejected, because browsers reconnect by themselves, so more than 20 tabs would keep pushing each other out.
+- One account can have at most 20 event streams open at once, one for each tab and device (Raphael, 2026-11-11). A new stream beyond that ends the account's oldest stream. A phone that the system stops in the background can leave its stream open on the server for many minutes, so the oldest stream is the likeliest to be dead. A live tab whose stream ends reconnects without missing events.
 - The server never lists a directory of the app's files.
 
 ## Record
@@ -449,6 +449,7 @@ These decisions came from a security audit (2026-11-08).
 - **Destructive actions.** They appeared in many places. They now sit in a page's last card, so people know where to look (Raphael, 2026-11-08).
 - **Credit line.** Home's feed also ended with a line saying who built Sweet. It was removed, because it stood out on a feed with no posts (Raphael, 2026-11-10).
 - **Deleted text.** Deleted posts, comments, messages and rooms kept their text, and no reason was recorded. Raphael asked why anything was soft-deleted. The rows are now kept only so that the rows that point at them stay valid, and the text is emptied (Raphael, 2026-11-10).
+- **Stream limit.** A stream beyond the limit was first refused. A review found that streams left open by phones in the background could fill the limit, and a refused tab showed nothing. A new stream now ends the oldest (Raphael, 2026-11-11).
 - **Connection state.** A notice above the editors showed connecting, reconnecting and offline. It moved the editors each time the connection changed and added noise. Only offline is shown now, as a badge in the bar (Raphael, 2026-11-09).
 
 ### Considered and rejected

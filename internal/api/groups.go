@@ -5,7 +5,6 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"net/http"
 	"sort"
 	"strings"
@@ -767,12 +766,11 @@ func (s *Server) removeMember(w http.ResponseWriter, r *http.Request) {
 // so an event for a group they are not in is never written.
 func (s *Server) events(w http.ResponseWriter, r *http.Request) {
 	viewer, _ := userFrom(r.Context())
-	leave, ok := s.Hub.Join(viewer.ID)
-	if !ok {
-		writeErr(w, http.StatusTooManyRequests, fmt.Sprintf("This account has %d tabs open. Close one, then reload this one.", events.MaxStreams))
-		return
-	}
+	ctx, end := context.WithCancel(r.Context())
+	defer end()
+	leave := s.Hub.Join(viewer.ID, end)
 	defer leave()
+	r = r.WithContext(ctx)
 	rows, err := s.q().ListMyGroups(r.Context(), viewer.ID)
 	if err != nil {
 		writeErr(w, http.StatusInternalServerError, err.Error())

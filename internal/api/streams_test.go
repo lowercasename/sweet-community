@@ -2,6 +2,7 @@ package api
 
 import (
 	"context"
+	"io"
 	"net/http"
 	"testing"
 	"time"
@@ -9,55 +10,45 @@ import (
 	"sweet/internal/events"
 )
 
-// A user has at most events.MaxStreams event streams open at once. A further one is refused until one of them closes.
-// Another user is not affected.
-func TestEventStreamsPerUserAreLimited(t *testing.T) {
-	ts, owner := newTestServer(t)
-	kit, _ := registerMember(t, ts, owner, "kit")
-	// open opens a stream and returns its status and a function that closes it.
-	open := func(c *client) (int, func()) {
+// A user has at most events.MaxStreams event streams open at once. A new stream beyond that is accepted, and the
+// user's oldest stream ends, so a stream that a phone left open in the background cannot lock the user out.
+func TestANewStreamEndsTheOldestBeyondTheLimit(t *testing.T) {
+	_, owner := newTestServer(t)
+	// open opens a stream and returns its status and its body.
+	open := func() (int, io.ReadCloser) {
 		t.Helper()
 		ctx, cancel := context.WithCancel(context.Background())
-		req, _ := http.NewRequestWithContext(ctx, "GET", c.base+"/api/events", nil)
-		res, err := c.http.Do(req)
+		t.Cleanup(cancel)
+		req, _ := http.NewRequestWithContext(ctx, "GET", owner.base+"/api/events", nil)
+		res, err := owner.http.Do(req)
 		if err != nil {
 			t.Fatal(err)
 		}
-		stop := func() {
-			cancel()
-			res.Body.Close()
-		}
-		t.Cleanup(stop)
-		return res.StatusCode, stop
+		t.Cleanup(func() { res.Body.Close() })
+		return res.StatusCode, res.Body
 	}
-	var first func()
-	for i := range events.MaxStreams {
-		status, stop := open(owner)
-		if status != http.StatusOK {
+	_, oldest := open()
+	ended := make(chan struct{})
+	go func() {
+		io.Copy(io.Discard, oldest)
+		close(ended)
+	}()
+	for i := 1; i < events.MaxStreams; i++ {
+		if status, _ := open(); status != http.StatusOK {
 			t.Fatalf("stream %d: %d", i+1, status)
 		}
-		if i == 0 {
-			first = stop
-		}
 	}
-	if status, _ := open(owner); status != http.StatusTooManyRequests {
-		t.Fatalf("one stream more than the limit: %d, want 429", status)
+	select {
+	case <-ended:
+		t.Fatal("the oldest stream ended before the limit was passed")
+	default:
 	}
-	if status, _ := open(kit); status != http.StatusOK {
-		t.Fatalf("another user's stream: %d", status)
+	if status, _ := open(); status != http.StatusOK {
+		t.Fatalf("one stream more than the limit: %d, want 200", status)
 	}
-	// The server counts a stream as closed once its request has ended.
-	first()
-	deadline := time.Now().Add(5 * time.Second)
-	for {
-		status, stop := open(owner)
-		stop()
-		if status == http.StatusOK {
-			break
-		}
-		if time.Now().After(deadline) {
-			t.Fatalf("a stream after one was closed: %d", status)
-		}
-		time.Sleep(20 * time.Millisecond)
+	select {
+	case <-ended:
+	case <-time.After(5 * time.Second):
+		t.Fatal("the oldest stream did not end when the limit was passed")
 	}
 }

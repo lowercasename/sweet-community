@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -32,33 +33,38 @@ type Hub struct {
 	Version string
 	mu      sync.Mutex
 	subs    map[chan Event]struct{}
-	streams map[string]int // open streams by user id
+	streams map[string][]*context.CancelFunc // each user's open streams, the oldest first
 }
 
 func NewHub(db *sql.DB) *Hub {
-	return &Hub{db: db, subs: map[chan Event]struct{}{}, streams: map[string]int{}}
+	return &Hub{db: db, subs: map[chan Event]struct{}{}, streams: map[string][]*context.CancelFunc{}}
 }
 
 // MaxStreams is the most event streams one user may have open at once, one for each tab and device. It limits the
 // connections and memory that one account can hold on the server.
 const MaxStreams = 20
 
-// Join counts a new stream for a user. It reports false when the user already has MaxStreams open. The stream calls
-// leave when it ends.
-func (h *Hub) Join(user string) (leave func(), ok bool) {
+// Join records a new stream for a user. end ends the stream. When the user already has MaxStreams open, Join ends
+// the oldest. A phone that the system stops in the background can leave its stream open on the server for many
+// minutes, so the oldest stream is the likeliest to be dead. The stream calls leave when it ends.
+func (h *Hub) Join(user string, end context.CancelFunc) (leave func()) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
-	if h.streams[user] >= MaxStreams {
-		return nil, false
+	this := &end
+	open := append(h.streams[user], this)
+	if len(open) > MaxStreams {
+		(*open[0])()
+		open = open[1:]
 	}
-	h.streams[user]++
+	h.streams[user] = open
 	return func() {
 		h.mu.Lock()
 		defer h.mu.Unlock()
-		if h.streams[user]--; h.streams[user] == 0 {
+		h.streams[user] = slices.DeleteFunc(h.streams[user], func(s *context.CancelFunc) bool { return s == this })
+		if len(h.streams[user]) == 0 {
 			delete(h.streams, user)
 		}
-	}, true
+	}
 }
 
 // Log appends an event inside the caller's write transaction. The returned
