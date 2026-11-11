@@ -231,15 +231,6 @@ function upsertInPages<
   return { ...old, pages: old.pages.map((p, i) => (i === 0 ? { ...p, [key]: [item, ...p[key]] } : p)) }
 }
 
-/** Finds a post in any loaded feed, as initial data for the post's page. */
-export function findPost(qc: QueryClient, id: string): Post | undefined {
-  for (const [, data] of qc.getQueriesData<Posts>({ queryKey: ['posts'] })) {
-    const found = data?.pages.flatMap((p) => p.posts).find((p) => p.id === id)
-    if (found) return found
-  }
-  return undefined
-}
-
 /** Upserts a post into its author's posts list, if that list is loaded. */
 function upsertUserPost(qc: QueryClient, post: Post) {
   qc.setQueryData<Posts>(keys.userPosts(post.author.username), (old) => upsertInPages(old, 'posts', post))
@@ -329,36 +320,32 @@ function deleteMessage(qc: QueryClient, id: string, groupId: string) {
   )
 }
 
-/** A user changed, for example their picture or their name. Updates every copy of the user in the cache. */
+/** Queries whose responses include user identities. */
+const identityQueries = new Set([
+  'users',
+  'groups',
+  'members',
+  'posts',
+  'post',
+  'userPosts',
+  'comments',
+  'messages',
+  'notifications',
+  'profile',
+  'search',
+  'reports',
+  'invites',
+])
+
+/** Clears old identities and cancels older requests. Active views fetch fresh server responses. */
+function refreshIdentities(qc: QueryClient) {
+  void qc.resetQueries({ predicate: (q) => identityQueries.has(String(q.queryKey[0])) })
+}
+
 function upsertUser(qc: QueryClient, u: User) {
-  qc.setQueryData<Users>(keys.users, (old) =>
-    old ? { users: old.users.map((x) => (x.id === u.id ? { ...x, ...u } : x)) } : old,
-  )
   const me = qc.getQueryData<User | null>(keys.me)
-  if (me && me.id === u.id) qc.setQueryData<User>(keys.me, { ...me, ...u })
-  // Update the author snapshots in every loaded feed, thread and chat too, so
-  // a renamed or removed user is shown correctly at once, whether or not they
-  // are still in the users list.
-  const as = (a: User) => (a.id === u.id ? { ...a, ...u } : a)
-  const authored = (old: Posts | undefined) =>
-    eachPage(old, 'posts', (ps) => ps.map((x) => ({ ...x, author: as(x.author) })))
-  qc.setQueriesData<Posts>({ queryKey: ['posts'] }, authored)
-  qc.setQueriesData<Post>({ queryKey: ['post'] }, (old) => old && { ...old, author: as(old.author) })
-  qc.setQueriesData<Posts>({ queryKey: ['userPosts'] }, authored)
-  // Profile pages are refetched. A renamed user's profile is at a new path.
-  void qc.invalidateQueries({ queryKey: ['profile'] })
-  qc.setQueriesData<Thread>({ queryKey: ['comments'] }, (old) =>
-    eachPage(old, 'comments', (cs) => cs.map((c) => ({ ...c, author: as(c.author) }))),
-  )
-  qc.setQueriesData<Messages>({ queryKey: ['messages'] }, (old) =>
-    eachPage(old, 'messages', (ms) =>
-      ms.map((m) => ({
-        ...m,
-        author: as(m.author),
-        reply_to: m.reply_to?.author ? { ...m.reply_to, author: as(m.reply_to.author) } : m.reply_to,
-      })),
-    ),
-  )
+  if (me?.id === u.id) qc.setQueryData<User>(keys.me, u)
+  refreshIdentities(qc)
 }
 
 /** Adjusts a stream's unread count by the number of notifications opened or received. */
@@ -558,9 +545,8 @@ function deleteMembership(qc: QueryClient, groupId: string, userId: string) {
   qc.setQueryData<Members>(keys.members(groupId), (old) =>
     old ? { members: old.members.filter((x) => x.user.id !== userId) } : old,
   )
-  // The root group's members are the instance's users list.
-  if (root)
-    qc.setQueryData<Users>(keys.users, (old) => (old ? { users: old.users.filter((x) => x.id !== userId) } : old))
+  // Removal also arrives through the HTTP response, without waiting for the user event.
+  if (root) refreshIdentities(qc)
 }
 
 /** Whether the post with this id is in this group's loaded feed. */

@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
-import { beforeEach, describe, expect, it } from 'vitest'
-import type { QueryClient } from '@tanstack/react-query'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { QueryObserver, type QueryClient } from '@tanstack/react-query'
 import { makeQueryClient } from './client'
 import { keys } from './keys'
 import { readFileSync } from 'node:fs'
@@ -82,6 +82,98 @@ beforeEach(() => {
 })
 
 describe('applyEvent', () => {
+  it.each(['user', 'membership_delete'])('clears cached identity data after %s, including inactive views', (kind) => {
+    const identityKeys = [
+      keys.users,
+      keys.groups,
+      keys.members(CLUB),
+      keys.posts(ROOT),
+      keys.post('p2'),
+      keys.comments('p2'),
+      keys.messages(ROOT),
+      keys.notifications,
+      keys.profile('mo'),
+      keys.userPosts('mo'),
+      keys.search('hello'),
+      keys.reports,
+      keys.invites,
+    ]
+    qc.setQueryData(keys.post('p2'), post('p2', mo))
+    qc.setQueryData(keys.notifications, {
+      pages: [{ notifications: [notification('n1', 'joined', mo)], next_before: null }],
+      pageParams: [null],
+    })
+    qc.setQueryData(keys.profile('mo'), mo)
+    qc.setQueryData(keys.userPosts('mo'), {
+      pages: [{ posts: [post('p2', mo)], next_before: null }],
+      pageParams: [null],
+    })
+    qc.setQueryData(keys.search('hello'), { hits: [{ author: mo }] })
+    qc.setQueryData(keys.reports, { reports: [report('post', 'p2')] })
+    qc.setQueryData(keys.invites, { invites: [{ created_by: mo }] })
+    qc.setQueryData(keys.settings, { name: 'Community' })
+    applyEvent(
+      qc,
+      kind,
+      kind === 'user' ? { ...mo, username: 'removed-account', picture: null } : { group_id: ROOT, user_id: mo.id },
+    )
+    for (const key of identityKeys) expect(qc.getQueryData(key), String(key)).toBeUndefined()
+    expect(qc.getQueryData(keys.me)).toEqual(kit)
+    expect(qc.getQueryData(keys.settings)).toEqual({ name: 'Community' })
+  })
+
+  it('refreshes active identity data and discards an older request that finishes later', async () => {
+    let finishOld!: (value: { actor: User }) => void
+    let finishNew!: (value: { actor: User }) => void
+    const removed = { ...mo, username: 'removed-account', picture: null }
+    qc.setQueryData(keys.notifications, { actor: mo })
+    const fetch = vi
+      .fn()
+      .mockImplementationOnce(
+        () =>
+          new Promise((resolve) => {
+            finishOld = resolve
+          }),
+      )
+      .mockImplementationOnce(
+        () =>
+          new Promise((resolve) => {
+            finishNew = resolve
+          }),
+      )
+    const observer = new QueryObserver(qc, { queryKey: keys.notifications, queryFn: fetch, staleTime: 0 })
+    const stop = observer.subscribe(() => {})
+    try {
+      applyEvent(qc, 'user', removed)
+      expect(qc.getQueryData(keys.notifications)).toBeUndefined()
+      await vi.waitFor(() => expect(fetch).toHaveBeenCalledTimes(2))
+      finishNew({ actor: removed })
+      await vi.waitFor(() => expect(qc.getQueryData(keys.notifications)).toEqual({ actor: removed }))
+      finishOld({ actor: mo })
+      await new Promise((resolve) => setTimeout(resolve, 0))
+      expect(qc.getQueryData(keys.notifications)).toEqual({ actor: removed })
+    } finally {
+      stop()
+    }
+  })
+
+  it('does not restore an old profile when its refresh fails', async () => {
+    qc.setQueryData(keys.profile('mo'), mo)
+    const observer = new QueryObserver(qc, {
+      queryKey: keys.profile('mo'),
+      queryFn: () => Promise.reject(new Error('Not found')),
+      retry: false,
+    })
+    const stop = observer.subscribe(() => {})
+    try {
+      applyEvent(qc, 'user', { ...mo, username: 'removed-account' })
+      await vi.waitFor(() => expect(observer.getCurrentResult().isError).toBe(true))
+      expect(observer.getCurrentResult().data).toBeUndefined()
+    } finally {
+      stop()
+    }
+  })
+
   it('the stream listens for every kind of event that applyEvent handles', () => {
     // The browser receives an event only for a kind it listens for. A kind missing from the list is dropped, as the
     // report and topic events were until 2026-11-08.
@@ -167,7 +259,7 @@ describe('applyEvent', () => {
     ])
   })
 
-  it('keeps a post page in sync with its feed, so edits, comment counts, author changes and deletion reach the post query', () => {
+  it('keeps a post page in sync with its feed, so edits, comment counts and deletion reach the post query', () => {
     qc.setQueryData(keys.post('p2'), post('p2', mo))
     const page = () => qc.getQueryData(keys.post('p2')) as Post | undefined
     applyEvent(qc, 'post', post('p2', mo, { body_html: '<p>new</p>', edited_at: 5 }))
@@ -177,8 +269,6 @@ describe('applyEvent', () => {
     expect(posts().find((p) => p.id === 'p2')!.comment_count).toBe(1)
     applyEvent(qc, 'comment_delete', { id: 'c2', post_id: 'p2', group_id: ROOT })
     expect(page()!.comment_count).toBe(0)
-    applyEvent(qc, 'user', user('mo', '/img/mo'))
-    expect(page()!.author.picture).toBe('/img/mo')
     // A post page query that is not loaded is not created by a post event.
     applyEvent(qc, 'post', post('p9', mo))
     expect(qc.getQueryData(keys.post('p9'))).toBeUndefined()
@@ -291,7 +381,7 @@ describe('applyEvent', () => {
     expect(qc.getQueryData(keys.messages('elsewhere'))).toBeUndefined()
   })
 
-  it('a deleted message turns the snippet in each reply to it into a deleted one, and a renamed author is renamed in snippets', () => {
+  it('a deleted message turns the snippet in each reply to it into a deleted one', () => {
     qc.setQueryData(keys.messages(ROOT), {
       pages: [
         {
@@ -308,19 +398,13 @@ describe('applyEvent', () => {
       (qc.getQueryData(keys.messages(ROOT)) as { pages: { messages: Message[] }[] }).pages[0].messages.find(
         (m) => m.id === 'm2',
       )?.reply_to
-    applyEvent(qc, 'user', user('kit', '/img/new'))
-    expect(reply()?.author?.picture).toBe('/img/new')
     applyEvent(qc, 'message_delete', { id: 'm1', group_id: ROOT })
     expect(reply()).toEqual({ id: 'm1', author: null, text: '', deleted: true })
   })
 
-  it('updates a user in every place the cache holds them, including the signed-in user', () => {
+  it('updates the signed-in user directly from the server event', () => {
     applyEvent(qc, 'user', user('kit', '/img/new'))
-    expect((qc.getQueryData(keys.users) as { users: Member[] }).users.find((u) => u.id === 'kit')?.picture).toBe(
-      '/img/new',
-    )
-    expect((qc.getQueryData(keys.users) as { users: Member[] }).users.find((u) => u.id === 'kit')?.role).toBe('member')
-    expect((qc.getQueryData(keys.me) as User).picture).toBe('/img/new')
+    expect(qc.getQueryData(keys.me)).toEqual(user('kit', '/img/new'))
   })
 
   it('a membership updates the group members list and the instance list for the root', () => {
@@ -355,21 +439,6 @@ describe('applyEvent', () => {
     expect(qc.getQueryData(keys.members(CLUB))).toBeUndefined()
   })
 
-  it('a user event updates the author in loaded feeds, threads and chats, whether or not the user is in the users list', () => {
-    qc.setQueryData(keys.comments('p2'), onePage(comment('c1', 'p2', mo)))
-    qc.setQueryData(keys.messages(ROOT), {
-      pages: [{ messages: [message('m1', mo)], next_before: null }],
-      pageParams: [null],
-    })
-    applyEvent(qc, 'user', { id: 'mo', username: 'removed-abc', picture: null })
-    expect(posts().find((p) => p.id === 'p2')?.author.username).toBe('removed-abc')
-    expect(thread('p2')[0].author.username).toBe('removed-abc')
-    expect(
-      (qc.getQueryData(keys.messages(ROOT)) as { pages: { messages: { author: User }[] }[] }).pages[0].messages[0]
-        .author.username,
-    ).toBe('removed-abc')
-  })
-
   it('signing out sets the user to nobody and clears every other query', () => {
     qc.setQueryData(keys.users, { users: [member('kit')] })
     signedOut(qc)
@@ -381,7 +450,7 @@ describe('applyEvent', () => {
   it('leaving the root group is leaving the instance, so the user is removed from the users list, and the viewer is signed out with the cache cleared', () => {
     qc.setQueryData(keys.users, { users: [member('kit'), member('mo')] })
     applyEvent(qc, 'membership_delete', { group_id: ROOT, user_id: 'mo' })
-    expect((qc.getQueryData(keys.users) as { users: Member[] }).users.map((u) => u.id)).toEqual(['kit'])
+    expect(qc.getQueryData(keys.users)).toBeUndefined()
     applyEvent(qc, 'membership_delete', { group_id: ROOT, user_id: 'kit' })
     expect(qc.getQueryData(keys.me)).toBeNull()
     expect(qc.getQueryData(keys.posts(ROOT))).toBeUndefined()

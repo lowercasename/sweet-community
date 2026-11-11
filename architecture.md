@@ -313,7 +313,7 @@ The server sends updates over server-sent events (SSE), and the client sends ord
 - **A stream ends with its session** (Raphael, 2026-11-10). The stream checks the session before each event and at each heartbeat. When the session has ended, by signing out anywhere, a password change, removal or expiry, the stream tells the page and closes, and the page signs out.
 - **Open tabs reload when the server's version changes.** The web app is embedded in the binary, so only tabs that were already open can run an older version.
 
-One cache in the web app holds all server data. Events are its write path, and a reconnect refetches everything. Content refers to users by id, so a new name or picture shows everywhere at once.
+One cache in the web app holds all server data. Events are its write path, and a reconnect refetches everything. The server supplies current names and pictures with content. When a user changes or is removed, the client clears cached identity data and fetches current data for open views (Raphael, 2026-11-11). Other views fetch when opened. Outdated identities do not remain visible if a refresh fails.
 
 ## Interface
 
@@ -440,6 +440,8 @@ These decisions came from a security audit (2026-11-08).
 ## Record
 
 ### Reversed
+
+- **Identity updates in the browser.** The client now clears and refetches data after a user changes or is removed (Raphael, 2026-11-11). Manual updates missed some copies of names and pictures. The earlier description of identity references did not match the code.
 
 - **Email details after removal.** Removed accounts no longer retain their email addresses or email metadata (Raphael, 2026-11-11). Retaining them kept removed accounts identifiable and blocked new registration with the same address. Existing removed accounts are included in the cleanup.
 

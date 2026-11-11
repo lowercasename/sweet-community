@@ -72,7 +72,7 @@ import {
   type Topic,
   type User,
 } from '../api'
-import { applyEvent, applyFollowing, findPost, refetchForOwnRole } from './apply'
+import { applyEvent, applyFollowing, refetchForOwnRole } from './apply'
 import { ROOT_ID, keys } from './keys'
 import { NOTIFICATIONS, unreadPlaces, type UnreadPlace } from './notifications'
 
@@ -191,19 +191,11 @@ export function usePosts(groupId: string, topicId: string | null = null) {
   return { posts: items, ...rest }
 }
 
-/**
- * One post, for its page. A loaded feed's copy is the initial data, so a
- * post opened from the feed renders at once, and the server's copy is fetched
- * in the background. applyEvent keeps this query in sync with the feed from
- * then on.
- */
+/** Fetches the post's current state for its page. */
 export function usePost(id: string, enabled = true) {
-  const qc = useQueryClient()
   const q = useQuery({
     queryKey: keys.post(id),
     queryFn: () => getPost(id),
-    initialData: () => findPost(qc, id),
-    initialDataUpdatedAt: 0,
     enabled,
     // A 404 is a definite answer, not a transient failure, so it is not retried.
     retry: (n, e) => n < 1 && !(e instanceof ApiError && e.status === 404),
