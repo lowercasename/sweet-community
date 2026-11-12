@@ -38,10 +38,14 @@ export const mentionSuggestionKey = new PluginKey('sweetMention')
 
 /** Adds the mention extension for these users to a set of editor extensions. */
 export function withMentions(extensions: Extensions, people: () => User[]): Extensions {
+  // A stored mention keeps the name it was written with. The editor shows and saves the user's current name instead,
+  // when the user is in the list.
+  const name = (attrs: { id?: string | null; label?: string | null }) =>
+    people().find((u) => u.id === attrs.id)?.username ?? attrs.label ?? attrs.id
   const mention = SweetMention.configure({
     HTMLAttributes: { 'data-type': 'mention' },
-    renderText: ({ node }) => `@${node.attrs.label ?? node.attrs.id}`,
-    renderHTML: ({ options, node }) => ['span', options.HTMLAttributes, `@${node.attrs.label ?? node.attrs.id}`],
+    renderText: ({ node }) => `@${name(node.attrs)}`,
+    renderHTML: ({ options, node }) => ['span', options.HTMLAttributes, `@${name(node.attrs)}`],
     suggestion: {
       pluginKey: mentionSuggestionKey,
       char: '@',

@@ -193,6 +193,7 @@ func (s *Server) Routes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/me", s.requireAuth(s.me))
 	mux.HandleFunc("GET /api/me/account", s.requireAuth(s.getAccount))
 	mux.HandleFunc("PUT /api/me/email", s.requireAuth(s.changeEmail))
+	mux.HandleFunc("PUT /api/me/username", s.requireAuth(s.setUsername))
 	mux.HandleFunc("PUT /api/me/password", s.requireAuth(s.setPassword))
 	mux.HandleFunc("DELETE /api/me/password", s.requireAuth(s.removePassword))
 	mux.HandleFunc("GET /api/me/settings", s.requireAuth(s.getMySettings))

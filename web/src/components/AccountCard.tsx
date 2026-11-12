@@ -1,19 +1,24 @@
 import { useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { removePassword, setPassword } from '../api'
-import { useAccount, useChangeEmail } from '../data/hooks'
+import { useAccount, useChangeEmail, useSetUsername } from '../data/hooks'
 import { keys } from '../data/keys'
 import { Alert, Button, Card, ConfirmDialog, Field, Form, Heading, Input, Row, Stack, Text } from '../ui'
+import { UsernameField } from './AccountFields'
 
 /**
- * The user's email address and password. A new address stays pending until the link sent
- * to it is used. A password is optional. Setting, changing and removing it ask for no current password, because the
+ * The user's username, email address and password. A new username takes effect at once. A new address stays pending
+ * until the link sent to it is used. A password is optional. Setting, changing and removing it ask for no current password, because the
  * account's email can always sign in. Each one signs out every other device and emails a notice.
  */
-export function AccountCard() {
+export function AccountCard({ username: current }: { username: string }) {
   const qc = useQueryClient()
   const { data: account, error } = useAccount()
   const changeEmail = useChangeEmail()
+  const setUsername = useSetUsername()
+  const [username, setUsernameValue] = useState('')
+  const [usernameBusy, setUsernameBusy] = useState(false)
+  const [usernameError, setUsernameError] = useState<string | null>(null)
   const [email, setEmail] = useState('')
   const [emailBusy, setEmailBusy] = useState(false)
   const [emailError, setEmailError] = useState<string | null>(null)
@@ -23,6 +28,20 @@ export function AccountCard() {
   const [removing, setRemoving] = useState(false)
   const hasPassword = account?.has_password === true
 
+  const submitUsername = async () => {
+    if (usernameBusy) return
+    setUsernameBusy(true)
+    setUsernameError(null)
+    try {
+      // The new name is shown above the field and in the nav, which confirms the change.
+      await setUsername(username.trim())
+      setUsernameValue('')
+    } catch (e) {
+      setUsernameError(e instanceof Error ? e.message : 'Could not change the username')
+    } finally {
+      setUsernameBusy(false)
+    }
+  }
   const submitEmail = async () => {
     if (emailBusy) return
     setEmailBusy(true)
@@ -57,6 +76,26 @@ export function AccountCard() {
   return (
     <Card>
       <Stack gap={3}>
+        <Stack gap={2}>
+          <Heading level={2}>Username</Heading>
+          <Text>
+            <Text as="span" weight="bold">
+              {current}
+            </Text>
+          </Text>
+          <Text variant="small">
+            After a change, links to your old profile stop working, and anyone can take your old username.
+          </Text>
+          <Form onSubmit={() => void submitUsername()}>
+            <UsernameField label="New username" value={username} onChange={setUsernameValue} />
+            {usernameError && <Alert tone="error">{usernameError}</Alert>}
+            <Row justify="end">
+              <Button type="submit" disabled={!username.trim() || username.trim() === current} busy={usernameBusy}>
+                Change username
+              </Button>
+            </Row>
+          </Form>
+        </Stack>
         <Stack gap={2}>
           <Heading level={2}>Email address</Heading>
           {error && <Alert tone="error">{error.message}</Alert>}

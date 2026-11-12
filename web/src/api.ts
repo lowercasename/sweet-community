@@ -859,6 +859,11 @@ export function uploadImage(
   })
 }
 
+/** Changes the signed-in user's username. The old name is free for anyone at once. */
+export function setUsername(username: string): Promise<User> {
+  return request<User>('/api/me/username', json('PUT', { username }))
+}
+
 export function setPicture(imageId: string | null): Promise<User> {
   return request<User>('/api/me/picture', json('PUT', { image_id: imageId }))
 }

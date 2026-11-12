@@ -63,6 +63,7 @@ import {
   setMemberRole,
   setPicture,
   setSettings,
+  setUsername,
   updateComment,
   updateGroup,
   updatePost,
@@ -509,6 +510,13 @@ export function useSetSettings() {
   const qc = useQueryClient()
   return async (s: Pick<Settings, 'group_creation' | 'name' | 'description'>) => {
     applyEvent(qc, 'settings', await setSettings(s))
+  }
+}
+
+export function useSetUsername() {
+  const qc = useQueryClient()
+  return async (username: string) => {
+    applyEvent(qc, 'user', await setUsername(username))
   }
 }
 

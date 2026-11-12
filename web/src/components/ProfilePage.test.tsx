@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, screen } from '@testing-library/react'
-import { ROOT, group, paragraph, post, renderWithQuery, user } from '../test-utils'
+import { ROOT, group, member, paragraph, post, renderWithQuery, user } from '../test-utils'
 import type { Profile } from '../api'
 
 /**
@@ -56,6 +56,36 @@ async function draw(name = 'kit') {
 }
 
 describe('ProfilePage', () => {
+  it('moves to the new name of the user it showed, even when someone else has taken the old name', async () => {
+    const { getProfile, listUsers } = await import('../api')
+    const { applyEvent } = await import('../data/apply')
+    vi.mocked(listUsers).mockResolvedValue({ users: [member('kit')] })
+    const { ProfilePage } = await import('./ProfilePage')
+    const onGo = vi.fn()
+    const { qc } = renderWithQuery(<ProfilePage name="kit" me={raphael} onGo={onGo} />)
+    await screen.findByText('I knit')
+    // kit is renamed kat, and jo takes the name kit. The profile request answers before the users list does.
+    const jo = { id: 'jo', username: 'kit', picture: null }
+    vi.mocked(getProfile).mockResolvedValue(profile(jo, { bio_html: paragraph('I am jo') }))
+    vi.mocked(listUsers).mockImplementation(
+      () =>
+        new Promise((done) =>
+          setTimeout(
+            () =>
+              done({
+                users: [
+                  { ...member('kit'), username: 'kat' },
+                  { ...member('jo'), username: 'kit' },
+                ],
+              }),
+            50,
+          ),
+        ),
+    )
+    applyEvent(qc, 'user', { ...kit, username: 'kat' })
+    await vi.waitFor(() => expect(onGo).toHaveBeenCalledWith('/u/kat', { replace: true }))
+  })
+
   it("shows the user's details, their bio, Message, and their posts with each post's group", async () => {
     const { openDM } = await import('../api')
     vi.mocked(openDM).mockResolvedValue(group('d1', 'member', { kind: 'dm' }))

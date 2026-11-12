@@ -185,7 +185,8 @@ An account has a username and an email address. A password is optional, and the 
 - Changing a password needs no current password, because email can always sign in. Each change ends the other sessions and emails a notice.
 - A new email address is confirmed by a link sent to it (2026-11-08). The old address gets a notice.
 - Confirming a new address invalidates all outstanding sign-in links and codes for the account. Existing sessions stay signed in. Confirmation and invalidation succeed together. Changing back to an earlier address must not make its old links usable again.
-- A username can change, because content refers to the user's id.
+- A user changes their username on Settings, as often as they like. Content refers to the user's id, so the name beside posts, comments and messages, and the name in a mention, show the new name.
+- The old name is free for anyone at once, and links to the old profile stop working. An open profile page moves to the new address. Holding old names back was rejected, because a community is small and joins by invitation, and staff can deal with impersonation.
 - The server never reveals whether an address has an account. It emails the account's owner about the attempt instead.
 
 Sessions are stored in the database and last 180 days, extended while used. The web app holds the session in an httpOnly cookie. The server also accepts the session id in a header, for a future store app. Sign out everywhere ends every session. It replaces a list of sessions, because the real cases are a lost phone and a compromised account.

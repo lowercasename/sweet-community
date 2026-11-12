@@ -181,7 +181,7 @@ func (s *Server) register(w http.ResponseWriter, r *http.Request) {
 		RegistrationHash: sql.NullString{String: proofHash, Valid: true}, RegistrationExpiresAt: sql.NullInt64{Int64: now + registrationTTL.Milliseconds(), Valid: true},
 	}); err != nil {
 		if db.IsUniqueViolation(err) {
-			writeErr(w, http.StatusConflict, "That username is taken")
+			writeErr(w, http.StatusConflict, auth.ErrUsernameTaken.Error())
 			return
 		}
 		writeErr(w, http.StatusInternalServerError, err.Error())

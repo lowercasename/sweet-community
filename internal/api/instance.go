@@ -119,7 +119,7 @@ func (s *Server) setup(w http.ResponseWriter, r *http.Request) {
 		if row.Username != in.Username {
 			if err := qtx.RenameUser(ctx, store.RenameUserParams{Username: in.Username, ID: ownerID}); err != nil {
 				if db.IsUniqueViolation(err) {
-					writeErr(w, http.StatusConflict, "That username is taken")
+					writeErr(w, http.StatusConflict, auth.ErrUsernameTaken.Error())
 					return
 				}
 				writeErr(w, http.StatusInternalServerError, err.Error())
@@ -130,7 +130,7 @@ func (s *Server) setup(w http.ResponseWriter, r *http.Request) {
 	} else if errors.Is(err, sql.ErrNoRows) {
 		if err := qtx.CreateUser(ctx, store.CreateUserParams{ID: id.String(), Username: in.Username, CreatedAt: now}); err != nil {
 			if db.IsUniqueViolation(err) {
-				writeErr(w, http.StatusConflict, "That username is taken")
+				writeErr(w, http.StatusConflict, auth.ErrUsernameTaken.Error())
 				return
 			}
 			writeErr(w, http.StatusInternalServerError, err.Error())

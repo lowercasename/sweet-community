@@ -287,6 +287,44 @@ func (s *Server) changeEmail(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, accountOf(row))
 }
 
+// setUsername is `PUT /api/me/username {username}`. It renames the signed-in user. Content refers to the user's id, so
+// posts, comments, messages and mentions show the new name. A "user" event carries the user, so every open page redraws
+// the name. The old name is free for anyone at once.
+func (s *Server) setUsername(w http.ResponseWriter, r *http.Request) {
+	var in struct {
+		Username string `json:"username"`
+	}
+	r.Body = http.MaxBytesReader(w, r.Body, 4096)
+	if err := json.NewDecoder(r.Body).Decode(&in); err != nil {
+		writeErr(w, http.StatusBadRequest, "Bad request")
+		return
+	}
+	if err := auth.ValidateUsername(in.Username); err != nil {
+		writeErr(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	me, _ := userFrom(r.Context())
+	s.logged(w, r, "user", db.Now(), func(qtx *store.Queries) (any, int, error) {
+		if err := qtx.RenameUser(r.Context(), store.RenameUserParams{Username: in.Username, ID: me.ID}); err != nil {
+			if db.IsUniqueViolation(err) {
+				return nil, http.StatusConflict, auth.ErrUsernameTaken
+			}
+			return nil, http.StatusInternalServerError, err
+		}
+		return currentUser(r.Context(), qtx, me.ID)
+	})
+}
+
+// currentUser reads a user inside a write, for its "user" event. The event then carries the row as it is now. The
+// request's own copy of the user was read before the write began, and another change may have happened since.
+func currentUser(ctx context.Context, qtx *store.Queries, id string) (any, int, error) {
+	row, err := qtx.GetUser(ctx, id)
+	if err != nil {
+		return nil, http.StatusInternalServerError, err
+	}
+	return wireUser(row.ID, row.Username, row.PictureID), http.StatusOK, nil
+}
+
 // setPassword is `PUT /api/me/password {password}`. It sets a password, or
 // changes the one the account has. It asks for no current password, because
 // the account's email can always sign in. It ends every other session and

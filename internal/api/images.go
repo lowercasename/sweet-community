@@ -194,7 +194,6 @@ func (s *Server) setPicture(w http.ResponseWriter, r *http.Request) {
 		if err := qtx.SetUserPicture(r.Context(), store.SetUserPictureParams{PictureID: pic, ID: me.ID}); err != nil {
 			return nil, http.StatusInternalServerError, err
 		}
-		me.Picture = pictureURL(pic)
-		return me, http.StatusOK, nil
+		return currentUser(r.Context(), qtx, me.ID)
 	})
 }

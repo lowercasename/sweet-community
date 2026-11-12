@@ -1,10 +1,18 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import type { Post as PostData, Profile, User } from '../api'
-import { useGroupActions, useGroups, usePostActions, useProfile, useSetBio, useUserPosts } from '../data/hooks'
+import {
+  useGroupActions,
+  useGroups,
+  usePostActions,
+  useProfile,
+  useSetBio,
+  useUserPosts,
+  useUsers,
+} from '../data/hooks'
 import { useStreamStatus } from '../hooks/StreamContext'
 import { textExtensions } from '../editor/extensions'
 import { ROOT_ID } from '../data/keys'
-import { groupPath } from '../routes'
+import { groupPath, profilePath } from '../routes'
 import { Alert, Avatar, Button, Card, Heading, Measure, Pane, Row, ScrollArea, Stack, Text, Time } from '../ui'
 import { Body } from './Body'
 import { BodyEditor } from './BodyEditor'
@@ -13,7 +21,7 @@ import { Post } from './Post'
 interface ProfilePageProps {
   name: string
   me: User
-  onGo: (path: string) => void
+  onGo: (path: string, options?: { replace?: boolean }) => void
 }
 
 const ROLE_WORD: Record<Profile['role'], string> = {
@@ -31,6 +39,7 @@ const ROLE_WORD: Record<Profile['role'], string> = {
  */
 export function ProfilePage({ name, me, onGo }: ProfilePageProps) {
   const { profile, loading, error } = useProfile(name)
+  useFollowRename(name, profile?.id, onGo)
   if (profile) return <Loaded profile={profile} me={me} onGo={onGo} />
   return (
     <Pane>
@@ -54,6 +63,23 @@ export function ProfilePage({ name, me, onGo }: ProfilePageProps) {
       </ScrollArea>
     </Pane>
   )
+}
+
+/**
+ * Moves the page to the user's new address when the user it showed is renamed. The rename's "user" event resets the
+ * profile query, and the old name then finds no user, or a user who has taken it since. The page remembers the first
+ * user it showed, and the users list gives that user's current name.
+ */
+function useFollowRename(name: string, id: string | undefined, onGo: ProfilePageProps['onGo']) {
+  const [shown, setShown] = useState<string | null>(null)
+  const { data: users } = useUsers()
+  useEffect(() => {
+    if (id) setShown((first) => first ?? id)
+  }, [id])
+  const current = shown ? users?.get(shown)?.username : undefined
+  useEffect(() => {
+    if (current && current !== name) onGo(profilePath(current), { replace: true })
+  }, [current, name, onGo])
 }
 
 function Loaded({ profile, me, onGo }: { profile: Profile; me: User; onGo: (path: string) => void }) {

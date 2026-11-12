@@ -130,7 +130,7 @@ export function SettingsPage({ me, root, onSignOut }: SettingsPageProps) {
                 {pictureError && <Alert tone="error">{pictureError}</Alert>}
               </Stack>
             </Card>
-            <AccountCard />
+            <AccountCard username={me.username} />
             <NotificationsCard />
             <ColoursCard />
             <ShowWelcomeCard />

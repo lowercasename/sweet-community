@@ -15,6 +15,7 @@ vi.mock('../api', async (importOriginal) => ({
   setPassword: vi.fn(() => Promise.resolve()),
   removePassword: vi.fn(() => Promise.resolve()),
   changeEmail: vi.fn(),
+  setUsername: vi.fn(),
 }))
 
 afterEach(cleanup)
@@ -29,10 +30,38 @@ const account = (extra: Partial<Account> = {}): Account => ({
 })
 
 describe('AccountCard', () => {
+  it('shows the username and changes it', async () => {
+    const { setUsername } = await import('../api')
+    vi.mocked(setUsername).mockResolvedValue({ id: 'kit', username: 'kat', picture: null })
+    const { AccountCard } = await import('./AccountCard')
+    renderWithQuery(<AccountCard username="kit" />, (qc) => qc.setQueryData(keys.account, account()))
+    expect(screen.getByRole('heading', { name: 'Username' })).toBeTruthy()
+    expect(screen.getByText('kit')).toBeTruthy()
+    const field = screen.getByLabelText('New username') as HTMLInputElement
+    const change = screen.getByRole('button', { name: 'Change username' }) as HTMLButtonElement
+    // The same name would change nothing.
+    fireEvent.change(field, { target: { value: 'kit' } })
+    expect(change.disabled).toBe(true)
+    fireEvent.change(field, { target: { value: ' kat ' } })
+    fireEvent.click(change)
+    await vi.waitFor(() => expect(field.value).toBe(''))
+    expect(setUsername).toHaveBeenCalledWith('kat')
+  })
+
+  it("shows the server's reason when a username cannot be changed", async () => {
+    const { setUsername } = await import('../api')
+    vi.mocked(setUsername).mockRejectedValue(new Error('That username is taken'))
+    const { AccountCard } = await import('./AccountCard')
+    renderWithQuery(<AccountCard username="kit" />, (qc) => qc.setQueryData(keys.account, account()))
+    fireEvent.change(screen.getByLabelText('New username'), { target: { value: 'jo' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Change username' }))
+    await screen.findByText('That username is taken')
+  })
+
   it('an account without a password says how it signs in and offers Set password', async () => {
     const { setPassword } = await import('../api')
     const { AccountCard } = await import('./AccountCard')
-    renderWithQuery(<AccountCard />, (qc) => qc.setQueryData(keys.account, account()))
+    renderWithQuery(<AccountCard username="kit" />, (qc) => qc.setQueryData(keys.account, account()))
     expect(screen.getByText(/You sign in by email/)).toBeTruthy()
     expect(screen.queryByRole('button', { name: 'Remove password' })).toBeNull()
     fireEvent.change(screen.getByLabelText('Password'), { target: { value: 'longenough' } })
@@ -44,7 +73,9 @@ describe('AccountCard', () => {
     const { getAccount, setPassword, removePassword } = await import('../api')
     const { AccountCard } = await import('./AccountCard')
     vi.mocked(getAccount).mockResolvedValue(account({ has_password: true }))
-    renderWithQuery(<AccountCard />, (qc) => qc.setQueryData(keys.account, account({ has_password: true })))
+    renderWithQuery(<AccountCard username="kit" />, (qc) =>
+      qc.setQueryData(keys.account, account({ has_password: true })),
+    )
     fireEvent.change(screen.getByLabelText('New password'), { target: { value: 'anotherlongone' } })
     fireEvent.click(screen.getByRole('button', { name: 'Change password' }))
     await screen.findByText(/Password changed/)
@@ -61,7 +92,7 @@ describe('AccountCard', () => {
     const { changeEmail } = await import('../api')
     const { AccountCard } = await import('./AccountCard')
     vi.mocked(changeEmail).mockResolvedValue(account({ pending_email: 'new@example.test' }))
-    renderWithQuery(<AccountCard />, (qc) => qc.setQueryData(keys.account, account()))
+    renderWithQuery(<AccountCard username="kit" />, (qc) => qc.setQueryData(keys.account, account()))
     fireEvent.change(screen.getByLabelText('New email address'), { target: { value: 'new@example.test' } })
     fireEvent.click(screen.getByRole('button', { name: 'Change email address' }))
     await screen.findByText(/new@example.test/)

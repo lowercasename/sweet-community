@@ -20,6 +20,7 @@ import (
 var (
 	ErrUsernameInvalid  = errors.New("Usernames are 2 to 32 letters, digits or underscores")
 	ErrUsernameReserved = errors.New("That username is reserved")
+	ErrUsernameTaken    = errors.New("That username is taken")
 	ErrPasswordShort    = errors.New("Passwords are at least 8 characters")
 	ErrEmailInvalid     = errors.New("That does not look like an email address")
 )
