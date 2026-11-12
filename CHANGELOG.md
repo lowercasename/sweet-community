@@ -1,5 +1,19 @@
 # Changelog
 
+## v1.9.0 (2026-11-12)
+
+- Update gitignore
+- Fix reaction cleanup and picker interactions
+- Use grayscale antialiasing, so Ubuntu renders crisper on macOS
+- Add reactions, and a floating action bar for messages and comments
+- Shorten the username change explanation
+- Keep identities current without discarding open work
+- Record that text copies keep a mention's old name
+- Let users change their username
+- Remove the owner password, image prefix and Litestream settings
+- Reword the setup and invite copy
+- Explain the setup page and number the setup steps
+
 ## v1.8.0 (2026-11-12)
 
 - Use clock times and calendar dates consistently throughout Sweet
