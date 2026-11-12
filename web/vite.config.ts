@@ -7,7 +7,7 @@ const backend = 'http://localhost:8080'
 export default defineConfig({
   plugins: [react(), tailwindcss()],
   // Playwright owns e2e/; vitest must not try to run those specs.
-  test: { exclude: ['e2e/**', 'node_modules/**'] },
+  test: { exclude: ['e2e/**', 'node_modules/**'], setupFiles: ['./src/test-setup.ts'] },
   build: {
     // The Go binary embeds this directory (internal/web/web.go).
     outDir: '../internal/web/dist',

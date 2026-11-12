@@ -145,19 +145,17 @@ After changing SQL queries or the database schema, run `make generate`. It regen
 
 ### Releases
 
-Run the complete checks from the repository root before tagging or pushing a release:
+Commit your changes, then run this from a clean `main` checkout:
 
 ```
-make build
-go vet ./...
-go test ./...
-(cd web && pnpm typecheck && pnpm check:atomic && pnpm format:check && pnpm test)
-make e2e
+make release KIND=patch
 ```
 
-After they pass, commit any changes and run `make release KIND=patch` from a clean `main` checkout. The command updates `CHANGELOG.md`, commits it, tags the release and pushes. Use `minor` for new features and `major` for changes that require operators to act. Bug fixes, including security and privacy corrections, are patch releases regardless of the size of the code change.
+The command builds the app and runs all Go, frontend and browser checks. If a check fails or the checkout changes during the checks, it stops before updating `CHANGELOG.md`, committing or tagging. After the checks pass, it updates the changelog, commits it, tags the release and pushes.
 
-CI runs the unit checks and selected sign-in and privacy browser tests before publishing the image. A failed check blocks publication. These CI checks do not replace the complete browser suite before a release.
+Use `minor` for new features and `major` for changes that require operators to act. Bug fixes, including security and privacy corrections, are patch releases regardless of the size of the code change.
+
+CI also runs the unit checks and selected sign-in and privacy browser tests before publishing the image. A failed check blocks publication.
 
 ## Layout
 

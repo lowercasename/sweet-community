@@ -1,7 +1,7 @@
 #!/bin/sh
-# Releases main as a new version. It names the next version from the newest tag, adds an
-# entry to CHANGELOG.md made of the commit titles since that tag, commits, tags and pushes. The pushed tag makes CI
-# publish the image ghcr.io/lowercasename/sweet-community:<version>, which a server pins with SWEET_IMAGE.
+# Runs all checks, then releases main as a new version. It adds the commit titles
+# since the previous tag to CHANGELOG.md, commits, tags and pushes.
+# CI publishes the image after its checks pass.
 #
 #   scripts/release.sh patch     bug, security and privacy fixes, or internal improvements, regardless of size
 #   scripts/release.sh minor     new behaviour or features that users will notice
@@ -16,6 +16,7 @@ kind=${1:-}
 cd "$(git rev-parse --show-toplevel)"
 [ "$(git rev-parse --abbrev-ref HEAD)" = main ] || { echo "Release from main." >&2; exit 1; }
 [ -z "$(git status --porcelain)" ] || { echo "Commit or stash the changes first." >&2; exit 1; }
+release_commit=$(git rev-parse HEAD)
 git fetch -q --tags origin
 
 last=$(git describe --tags --abbrev=0 --match 'v[0-9]*' 2>/dev/null || true)
@@ -52,6 +53,26 @@ if [ -n "$last" ]; then
   [ -n "$notes" ] || { echo "Nothing has changed since $last." >&2; exit 1; }
 else
   notes='- The first release.'
+fi
+
+echo "Running all release checks for $next."
+make build
+go vet ./...
+go test ./...
+(
+  cd web
+  pnpm typecheck
+  pnpm check:atomic
+  pnpm format:check
+  pnpm test
+)
+make e2e
+
+if [ "$(git rev-parse HEAD)" != "$release_commit" ] ||
+   [ "$(git rev-parse --abbrev-ref HEAD)" != main ] ||
+   [ -n "$(git status --porcelain)" ]; then
+  echo "The checkout changed during the checks. Commit any changes and run the release again." >&2
+  exit 1
 fi
 
 # The changelog lists the newest release first, under its title.
