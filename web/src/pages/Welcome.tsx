@@ -55,8 +55,9 @@ export function Welcome({ settings: initial, onDone }: WelcomeProps) {
             Invite people
           </Heading>
           <Text variant="small">
-            Anyone with this link can join {settings.name} for the next seven days. After that, you can create a new
-            link from the People page. You will receive a notification each time someone joins.
+            Anyone with this link can join {settings.name}. The link will be valid for any number of uses for seven
+            days. After that, you can create a new link from the People page. You will receive a notification each time
+            someone joins.
           </Text>
           {link ? (
             <>

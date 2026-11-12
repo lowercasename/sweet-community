@@ -45,11 +45,11 @@ export function Setup({ token, onSetUp }: SetupProps) {
       </Heading>
       <Text variant="small">
         You are setting up a new Sweet community at {window.location.host}. Sweet is a private social network for one
-        group of people, with a feed of posts and a live chat.
+        group of people.
       </Text>
       <Text variant="small">
-        This is your own account. You post and chat with it like everyone else. It also makes you the community's owner.
-        The owner looks after the community's name, its rules and who can join.
+        First, create your own account. You post and chat with it like everyone else. You will also be the community's
+        owner. The owner looks after the community's settings, its rules, and invites new members.
       </Text>
       <Form onSubmit={() => void submit()}>
         <AccountFields username={username} onUsername={setUsername} email={email} onEmail={setEmail} />

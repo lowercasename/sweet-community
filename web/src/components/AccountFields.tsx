@@ -11,7 +11,10 @@ interface AccountFieldsProps {
 export function AccountFields({ username, onUsername, email, onEmail }: AccountFieldsProps) {
   return (
     <>
-      <Field label="Username" hint="Shown next to your posts and messages. Letters, numbers, and underscores.">
+      <Field
+        label="Username"
+        hint="Shown next to your posts and messages. You can use letters, numbers, and underscores."
+      >
         <Input name="username" value={username} onChange={onUsername} autoComplete="username" autoFocus required />
       </Field>
       <Field

@@ -26,8 +26,10 @@ describe('Setup', () => {
     expect(
       screen.getByText('You are setting up a new Sweet community at localhost:3000.', { exact: false }),
     ).toBeTruthy()
-    expect(screen.getByText("It also makes you the community's owner.", { exact: false })).toBeTruthy()
-    expect(screen.getByText('Shown next to your posts and messages. Letters, numbers, and underscores.')).toBeTruthy()
+    expect(screen.getByText("You will also be the community's owner.", { exact: false })).toBeTruthy()
+    expect(
+      screen.getByText('Shown next to your posts and messages. You can use letters, numbers, and underscores.'),
+    ).toBeTruthy()
     expect(
       screen.getByText(
         'Sweet signs you in by email, so there is no password to remember. You can add one in Settings later.',
