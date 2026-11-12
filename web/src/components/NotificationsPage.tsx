@@ -129,14 +129,16 @@ function NotificationRow({ notification: n, groups, onOpen }: NotificationRowPro
     <ListItem>
       <ListRow label={fresh ? `${sentence}, new` : sentence} onClick={onOpen}>
         {actor && <Avatar name={actor.username} picture={actor.picture} size="sm" />}
-        <Text as="span" variant="body" weight={fresh ? 'bold' : 'normal'}>
-          {sentence}
-        </Text>
-        {/* Only the owner and moderators get these, so they carry the shield. */}
-        {(n.kind === 'joined' || n.kind === 'report') && <ShieldMark />}
-        <Text as="span" variant="small">
-          <Time at={n.created_at} />
-        </Text>
+        <Stack gap={0}>
+          <Text as="span" variant="body" weight={fresh ? 'bold' : 'normal'}>
+            {sentence}
+            {/* Only the owner and moderators get these, so they carry the shield. */}
+            {(n.kind === 'joined' || n.kind === 'report') && <ShieldMark />}
+          </Text>
+          <Text as="span" variant="small">
+            <Time at={n.created_at} />
+          </Text>
+        </Stack>
       </ListRow>
     </ListItem>
   )

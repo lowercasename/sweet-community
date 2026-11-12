@@ -36,7 +36,7 @@ test.describe('roles', () => {
     await pick(o.page, row, `Options for ${kit.username}`, 'Make moderator')
     await expect(row).toContainText('moderator')
     // The membership keeps its joined time, and the menu button stays on the same line as the name at this width.
-    await expect(row).toContainText(/joined (just now|\d+m ago)/)
+    await expect(row.locator('time')).toContainText(/\d{1,2}:\d{2}/)
     await expect(row).not.toContainText('1970')
     const face = await row.getByRole('img').boundingBox()
     const action = await row.getByRole('button', { name: `Options for ${kit.username}` }).boundingBox()

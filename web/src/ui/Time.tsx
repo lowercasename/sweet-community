@@ -3,27 +3,11 @@ import { useEffect, useState } from 'react'
 interface TimeProps {
   /** Unix milliseconds UTC. */
   at: number
+  /** The surrounding chat divider already shows the date. */
+  clockOnly?: boolean
 }
 
-/**
- * A short relative time, past or future. The server's clock and the browser's clock never agree exactly,
- * so a difference under a minute in either direction returns "just now".
- */
-export function relative(at: number, now: number): string {
-  const future = at > now
-  const s = Math.round(Math.abs(now - at) / 1000)
-  const wrap = (v: string) => (future ? `in ${v}` : `${v} ago`)
-  if (s < 45) return 'just now'
-  const m = Math.round(s / 60)
-  if (m < 60) return wrap(`${m}m`)
-  const h = Math.round(m / 60)
-  if (h < 24) return wrap(`${h}h`)
-  const d = Math.round(h / 24)
-  if (d < 30) return wrap(`${d}d`)
-  return new Date(at).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' })
-}
-
-/** Returns the current time and re-renders once a minute, so a relative time such as "3m ago" stays current. */
+/** Re-renders once a minute so calendar labels change after midnight. */
 export function useNow(): number {
   const [now, setNow] = useState(() => Date.now())
   useEffect(() => {
@@ -45,23 +29,17 @@ export function dayLabel(at: number, now: number): string {
   return new Date(at).toLocaleDateString(undefined, { day: 'numeric', month: 'long', year: 'numeric' })
 }
 
-/** A clock time in the viewer's locale, with the full date and time available on hover. */
-export function ClockTime({ at }: TimeProps) {
-  const date = new Date(at)
-  return (
-    <time className="whitespace-nowrap tabular-nums" dateTime={date.toISOString()} title={date.toLocaleString()}>
-      {date.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })}
-    </time>
-  )
-}
-
-/** A relative time. The absolute UTC instant is in the dateTime and title attributes. */
-export function Time({ at }: TimeProps) {
+/** A local timestamp. Chat omits the date supplied by its day divider. */
+export function Time({ at, clockOnly = false }: TimeProps) {
   const now = useNow()
-  const iso = new Date(at).toISOString()
+  const date = new Date(at)
+  const label = !clockOnly && !sameDay(at, now) ? dayLabel(at, now) : null
   return (
-    <time className="whitespace-nowrap text-mute" dateTime={iso} title={iso}>
-      {relative(at, now)}
+    <time className="text-mute tabular-nums" dateTime={date.toISOString()} title={date.toLocaleString()}>
+      {label && `${label} at `}
+      <span className="whitespace-nowrap">
+        {date.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })}
+      </span>
     </time>
   )
 }

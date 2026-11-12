@@ -60,12 +60,14 @@ export function MessagesPage({ me, onGo }: MessagesPageProps) {
           <Dotted shown={n > 0}>
             <ConversationFace group={g} me={me} />
           </Dotted>
-          <Text as="span" variant="name">
-            {label}
-          </Text>
-          <Text as="span" variant="small">
-            <Time at={activity(g)} />
-          </Text>
+          <Stack gap={0}>
+            <Text as="span" variant="name">
+              {label}
+            </Text>
+            <Text as="span" variant="small">
+              <Time at={activity(g)} />
+            </Text>
+          </Stack>
         </ListRow>
       </ListItem>
     )

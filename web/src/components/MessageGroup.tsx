@@ -1,19 +1,7 @@
 import { useState } from 'react'
 import type { Message } from '../api'
 import { useAuthor } from '../data/hooks'
-import {
-  Box,
-  Button,
-  ClockTime,
-  ConfirmDialog,
-  Menu,
-  MessageBlock,
-  ReplyQuote,
-  Row,
-  shieldText,
-  Stack,
-  Text,
-} from '../ui'
+import { Box, Button, Time, ConfirmDialog, Menu, MessageBlock, ReplyQuote, Row, shieldText, Stack, Text } from '../ui'
 import { Body } from './Body'
 import { PersonName } from './PersonName'
 import { ReportDialog } from './ReportDialog'
@@ -76,7 +64,7 @@ export function MessageGroup({
             key={m.id}
             id={`message-${m.id}`}
             highlight={highlight === m.id}
-            time={<ClockTime at={m.created_at} />}
+            time={<Time at={m.created_at} clockOnly />}
             menu={
               onReply || m.can.delete || m.can.report ? (
                 <>

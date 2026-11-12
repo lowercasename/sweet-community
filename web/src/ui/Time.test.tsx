@@ -1,14 +1,17 @@
 // @vitest-environment happy-dom
-import { describe, expect, it } from 'vitest'
-import { dayLabel, relative, sameDay } from './Time'
+import { act, cleanup, render, screen } from '@testing-library/react'
+import { afterEach, describe, expect, it, vi } from 'vitest'
+import { dayLabel, sameDay, Time } from './Time'
 
-const now = 1_700_000_000_000
-const minute = 60_000
-const day = 24 * 60 * minute
+const now = new Date(2026, 10, 12, 0, 5).getTime()
 
-describe('chat dates', () => {
+afterEach(() => {
+  cleanup()
+  vi.useRealTimers()
+})
+
+describe('calendar dates', () => {
   it('labels local calendar days rather than elapsed twenty-four-hour periods', () => {
-    const now = new Date(2026, 10, 12, 0, 5).getTime()
     expect(dayLabel(now, now)).toBe('Today')
     expect(dayLabel(new Date(2026, 10, 11, 23, 55).getTime(), now)).toBe('Yesterday')
     const earlier = new Date(2026, 10, 10, 23, 55)
@@ -20,20 +23,38 @@ describe('chat dates', () => {
   })
 })
 
-describe('relative', () => {
-  it('returns just now for small differences in either direction, since a server and a browser never agree to the millisecond', () => {
-    expect(relative(now - 10_000, now)).toBe('just now')
-    expect(relative(now + 300, now)).toBe('just now')
-    expect(relative(now + 44_000, now)).toBe('just now')
+describe('Time', () => {
+  it.each([
+    ['today', new Date(2026, 10, 12, 0, 1), ''],
+    ['yesterday', new Date(2026, 10, 11, 23, 55), 'Yesterday at '],
+    ['older', new Date(2025, 10, 10, 14, 32), null],
+    ['future', new Date(2026, 10, 19, 14, 32), null],
+  ])('shows a clock time with the date needed for %s', (_, date, prefix) => {
+    vi.useFakeTimers().setSystemTime(now)
+    render(<Time at={date.getTime()} />)
+    const time = screen.getByRole('time')
+    const label =
+      prefix ?? `${date.toLocaleDateString(undefined, { day: 'numeric', month: 'long', year: 'numeric' })} at `
+    expect(time.textContent).toBe(label + date.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' }))
+    expect(time.getAttribute('datetime')).toBe(date.toISOString())
+    expect(time.getAttribute('title')).toBe(date.toLocaleString())
   })
 
-  it('counts minutes, hours and days, past and future', () => {
-    expect(relative(now - 3 * minute, now)).toBe('3m ago')
-    expect(relative(now - 5 * 60 * minute, now)).toBe('5h ago')
-    expect(relative(now + 7 * day, now)).toBe('in 7d')
+  it('omits the date when a chat divider supplies it', () => {
+    vi.useFakeTimers().setSystemTime(now)
+    const date = new Date(2026, 10, 10, 14, 32)
+    render(<Time at={date.getTime()} clockOnly />)
+    expect(screen.getByRole('time').textContent).toBe(
+      date.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' }),
+    )
   })
 
-  it('returns a date for differences over a month', () => {
-    expect(relative(now - 40 * day, now)).toMatch(/\d{4}/)
+  it('updates the day label when midnight passes', () => {
+    const date = new Date(2026, 10, 11, 23, 59)
+    vi.useFakeTimers().setSystemTime(date)
+    render(<Time at={date.getTime()} />)
+    expect(screen.getByRole('time').textContent).not.toContain('Yesterday')
+    act(() => vi.advanceTimersByTime(60_000))
+    expect(screen.getByRole('time').textContent).toContain('Yesterday at ')
   })
 })

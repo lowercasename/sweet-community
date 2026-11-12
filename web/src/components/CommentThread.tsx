@@ -78,7 +78,7 @@ function CommentItem({ comment, groupId, disabled, onEdit, onDelete }: CommentIt
   return (
     <Box as="article">
       <Stack gap={1}>
-        <Row justify="between" align="center">
+        <Row justify="between" align="start" wrap="never">
           <Row gap={2} align="center">
             <PersonName user={author} avatar="xs" small />
             <Text as="span" variant="small">
