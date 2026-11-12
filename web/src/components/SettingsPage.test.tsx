@@ -13,6 +13,7 @@ vi.mock('../api', () => ({
   logoutEverywhere: vi.fn(),
   uploadImage: vi.fn(),
   setPicture: vi.fn(),
+  setUsername: vi.fn(),
   removeUser: vi.fn(() => Promise.resolve()),
   getAccount: vi.fn(() =>
     Promise.resolve({ email: 'kit@example.test', email_verified: true, pending_email: null, has_password: false }),

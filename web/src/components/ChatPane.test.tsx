@@ -1,7 +1,8 @@
 // @vitest-environment happy-dom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { cleanup, fireEvent, screen } from '@testing-library/react'
-import { ROOT, marker, message, renderWithQuery, user } from '../test-utils'
+import { act, cleanup, fireEvent, screen } from '@testing-library/react'
+import type { Editor } from '@tiptap/react'
+import { ROOT, marker, message, paragraph, renderWithQuery, user } from '../test-utils'
 
 /**
  * A visible chat pane marks its group's chat as read. While the pane is watched, the user's read marker on the
@@ -10,6 +11,7 @@ import { ROOT, marker, message, renderWithQuery, user } from '../test-utils'
  */
 vi.mock('../api', () => ({
   getMessages: vi.fn(),
+  createMessage: vi.fn(),
   getRoomNotificationPreference: vi.fn(() => Promise.resolve({ mode: 'all' })),
   listMarkers: vi.fn(),
   setMarker: vi.fn(),
@@ -88,6 +90,28 @@ describe('ChatPane lines', () => {
 })
 
 describe('ChatPane replies', () => {
+  it('keeps the selected reply in the server cache when its author changes or the message is deleted', async () => {
+    const { ChatPane } = await import('./ChatPane')
+    const { applyEvent } = await import('../data/apply')
+    const { createMessage } = await import('../api')
+    const { qc } = renderWithQuery(<ChatPane groupId={ROOT} watching={false} />)
+    await screen.findByText('m2')
+    fireEvent.click(screen.getAllByRole('button', { name: 'Reply to this message' })[1])
+    expect(screen.getByText(/Replying to/).textContent).toContain('mo')
+    applyEvent(qc, 'message', message('m2', { ...mo, username: 'morgan' }, { created_at: 20 }))
+    await vi.waitFor(() => expect(screen.getByText(/Replying to/).textContent).toContain('morgan'))
+    applyEvent(qc, 'message_delete', { id: 'm2', group_id: ROOT })
+    await screen.findByText('Replying to an unavailable message')
+    const editor = (document.querySelector('.ProseMirror') as HTMLElement & { editor: Editor }).editor
+    await act(async () => {
+      editor.commands.setContent(paragraph('Answer'))
+    })
+    vi.mocked(createMessage).mockRejectedValueOnce(new Error('Message is unavailable'))
+    fireEvent.click(screen.getByRole('button', { name: 'Send' }))
+    await screen.findByText('Message is unavailable')
+    expect(createMessage).toHaveBeenCalledWith(ROOT, paragraph('Answer'), 'm2')
+  })
+
   it('attaches the message to the editor on Reply, and Cancel reply removes it', async () => {
     await draw(true)
     fireEvent.click(screen.getAllByRole('button', { name: 'Reply to this message' })[1])

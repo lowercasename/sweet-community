@@ -39,18 +39,28 @@ const ROLE_WORD: Record<Profile['role'], string> = {
  */
 export function ProfilePage({ name, me, onGo }: ProfilePageProps) {
   const { profile, loading, error } = useProfile(name)
-  useFollowRename(name, profile?.id, onGo)
-  if (profile) return <Loaded profile={profile} me={me} onGo={onGo} />
+  const [subject, setSubject] = useState<string>()
+  const { data: users, error: identityError, isFetching: refreshingIdentity } = useUsers()
+  if (profile && !subject) setSubject(profile.id)
+  const currentName = subject ? users?.get(subject)?.username : undefined
+  useEffect(() => {
+    if (!refreshingIdentity && !identityError && currentName && currentName !== name)
+      onGo(profilePath(currentName), { replace: true })
+  }, [currentName, name, onGo, refreshingIdentity, identityError])
+  const replaced = profile && subject !== undefined && profile.id !== subject
+  if (profile && !replaced) return <Loaded profile={profile} me={me} onGo={onGo} />
   return (
     <Pane>
       <ScrollArea>
         <Measure>
           <Card>
-            {loading && !error ? (
+            {(loading || replaced) && !error && !identityError ? (
               <Text variant="secondary">Loading…</Text>
             ) : (
               <Stack gap={2}>
-                <Text variant="secondary">There is no user with that name.</Text>
+                <Text variant="secondary">
+                  {replaced ? 'Could not load this profile.' : 'There is no user with that name.'}
+                </Text>
                 <Row>
                   <Button variant="secondary" onClick={() => onGo('/people')}>
                     People
@@ -65,25 +75,9 @@ export function ProfilePage({ name, me, onGo }: ProfilePageProps) {
   )
 }
 
-/**
- * Moves the page to the user's new address when the user it showed is renamed. The rename's "user" event resets the
- * profile query, and the old name then finds no user, or a user who has taken it since. The page remembers the first
- * user it showed, and the users list gives that user's current name.
- */
-function useFollowRename(name: string, id: string | undefined, onGo: ProfilePageProps['onGo']) {
-  const [shown, setShown] = useState<string | null>(null)
-  const { data: users } = useUsers()
-  useEffect(() => {
-    if (id) setShown((first) => first ?? id)
-  }, [id])
-  const current = shown ? users?.get(shown)?.username : undefined
-  useEffect(() => {
-    if (current && current !== name) onGo(profilePath(current), { replace: true })
-  }, [current, name, onGo])
-}
-
 function Loaded({ profile, me, onGo }: { profile: Profile; me: User; onGo: (path: string) => void }) {
-  const { posts, loading, error, hasMore, loadMore } = useUserPosts(profile.username)
+  const { posts: fetchedPosts, loading, error, hasMore, loadMore } = useUserPosts(profile.username)
+  const posts = fetchedPosts.filter((post) => post.author.id === profile.id)
   const { groups } = useGroups()
   const { openDM } = useGroupActions()
   const setBio = useSetBio()

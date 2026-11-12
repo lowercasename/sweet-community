@@ -186,7 +186,7 @@ An account has a username and an email address. A password is optional, and the 
 - A new email address is confirmed by a link sent to it (2026-11-08). The old address gets a notice.
 - Confirming a new address invalidates all outstanding sign-in links and codes for the account. Existing sessions stay signed in. Confirmation and invalidation succeed together. Changing back to an earlier address must not make its old links usable again.
 - A user changes their username on Settings, as often as they like. Content refers to the user's id, so the name beside posts, comments and messages, and the name in a mention, show the new name. Text copies made when content is saved, such as a chat reply's quote and search results, keep the name as it was written.
-- The old name is free for anyone at once, and links to the old profile stop working. An open profile page moves to the new address. Holding old names back was rejected, because a community is small and joins by invitation, and staff can deal with impersonation.
+- The old name is free for anyone at once. Links using that name stop finding the account and lead to another person if they take the name. An open profile page follows the original account to its new address. It never switches to a different account. Holding old names back was rejected, because a community is small and joins by invitation, and staff can deal with impersonation.
 - The server never reveals whether an address has an account. It emails the account's owner about the attempt instead.
 
 Sessions are stored in the database and last 180 days, extended while used. The web app holds the session in an httpOnly cookie. The server also accepts the session id in a header, for a future store app. Sign out everywhere ends every session. It replaces a list of sessions, because the real cases are a lost phone and a compromised account.
@@ -320,7 +320,7 @@ The server sends updates over server-sent events (SSE), and the client sends ord
 - **A stream ends with its session**. The stream checks the session before each event and at each heartbeat. When the session has ended, by signing out anywhere, a password change, removal or expiry, the stream tells the page and closes, and the page signs out.
 - **Open tabs reload when the server's version changes.** The web app is embedded in the binary, so only tabs that were already open can run an older version.
 
-One cache in the web app holds all server data. Events are its write path, and a reconnect refetches everything. The server supplies current names and pictures with content. When a user changes or is removed, the client clears cached identity data and fetches current data for open views. Other views fetch when opened. Outdated identities do not remain visible if a refresh fails.
+One cache in the web app holds all server data. Events are its write path, and a reconnect refetches everything. The server supplies current names and pictures with content. When a user changes their name or picture, open views refetch in place so unfinished work survives. Closed views clear their identity data and fetch when opened. Failed or paused refreshes clear their data. Account removal clears identity data immediately. An unresolved mention shows no historical name or profile link.
 
 Comment and unread counts come from the server. The client refreshes them when content changes. It waits for confirmation before showing an item as read. Repeated updates must not change a count.
 
@@ -460,7 +460,7 @@ These decisions came from a security audit (2026-11-08).
 
 - **Counts in the browser.** The client no longer adds or subtracts comment and unread counts locally. Repeated updates and partially loaded lists made those counts incorrect. Read requests no longer clear unread indicators before the server confirms them.
 
-- **Identity updates in the browser.** The client now clears and refetches data after a user changes or is removed. Manual updates missed some copies of names and pictures. The earlier description of identity references did not match the code.
+- **Identity updates in the browser.** Manual identity updates missed some copies of names and pictures. Clearing every view on each change then lost unfinished work. Open views now refetch in place after a name or picture changes. Account removal and failed refreshes still clear identity data.
 
 - **Email details after removal.** Removed accounts no longer retain their email addresses or email metadata. Retaining them kept removed accounts identifiable and blocked new registration with the same address. Existing removed accounts are included in the cleanup.
 

@@ -5,10 +5,10 @@ import { decorate } from './decorate'
 const mention = (id: string, name: string) => `<span data-type="mention" data-mention-id="${id}">@${name}</span>`
 
 describe('decorate', () => {
-  it('links a mention to the user by their current name, and keeps the stored name for an unknown id', () => {
+  it('links a mention to the user by their current name, and leaves unavailable identities unlinked', () => {
     const html = `<p>hi ${mention('u1', 'kit')} and ${mention('u2', 'old')}</p>`
     expect(decorate(html, { names: new Map([['u1', 'kitten']]) })).toBe(
-      '<p>hi <a href="/u/kitten" data-mention-id="u1">@kitten</a> and <a href="/u/old" data-mention-id="u2">@old</a></p>',
+      '<p>hi <a href="/u/kitten" data-mention-id="u1">@kitten</a> and <span data-mention-id="u2">Unavailable user</span></p>',
     )
   })
 

@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { QueryObserver, type QueryClient } from '@tanstack/react-query'
+import { onlineManager, QueryObserver, type QueryClient } from '@tanstack/react-query'
 import { makeQueryClient } from './client'
 import { keys } from './keys'
 import { readFileSync } from 'node:fs'
@@ -122,11 +122,11 @@ describe('applyEvent', () => {
     expect(qc.getQueryData(keys.settings)).toEqual({ name: 'Community' })
   })
 
-  it('refreshes active identity data and discards an older request that finishes later', async () => {
+  it.each([true, false])('keeps active data and replaces older requests with cached=%s', async (cached) => {
     let finishOld!: (value: { actor: User }) => void
     let finishNew!: (value: { actor: User }) => void
     const removed = { ...mo, username: 'removed-account', picture: null }
-    qc.setQueryData(keys.notifications, { actor: mo })
+    if (cached) qc.setQueryData(keys.notifications, { actor: mo })
     const fetch = vi
       .fn()
       .mockImplementationOnce(
@@ -145,7 +145,7 @@ describe('applyEvent', () => {
     const stop = observer.subscribe(() => {})
     try {
       applyEvent(qc, 'user', removed)
-      expect(qc.getQueryData(keys.notifications)).toBeUndefined()
+      expect(qc.getQueryData(keys.notifications)).toEqual(cached ? { actor: mo } : undefined)
       await vi.waitFor(() => expect(fetch).toHaveBeenCalledTimes(2))
       finishNew({ actor: removed })
       await vi.waitFor(() => expect(qc.getQueryData(keys.notifications)).toEqual({ actor: removed }))
@@ -171,6 +171,71 @@ describe('applyEvent', () => {
       expect(observer.getCurrentResult().data).toBeUndefined()
     } finally {
       stop()
+    }
+  })
+
+  it('clears open identity data immediately when an account is removed', () => {
+    const observer = new QueryObserver(qc, {
+      queryKey: keys.users,
+      queryFn: () => new Promise(() => {}),
+    })
+    const stop = observer.subscribe(() => {})
+    applyEvent(qc, 'membership_delete', { group_id: ROOT, user_id: mo.id })
+    expect(observer.getCurrentResult().data).toBeUndefined()
+    stop()
+  })
+
+  it('does not let a cancelled refresh clear a newer answer', async () => {
+    let failOld!: (error: Error) => void
+    const fetch = vi
+      .fn()
+      .mockImplementationOnce(
+        () =>
+          new Promise((_resolve, reject) => {
+            failOld = reject
+          }),
+      )
+      .mockResolvedValue({ users: [member('kit')] })
+    const observer = new QueryObserver(qc, { queryKey: keys.users, queryFn: fetch, retry: false })
+    const stop = observer.subscribe(() => {})
+    try {
+      applyEvent(qc, 'user', mo)
+      await vi.waitFor(() => expect(fetch).toHaveBeenCalledTimes(1))
+      applyEvent(qc, 'user', mo)
+      await vi.waitFor(() => expect(observer.getCurrentResult().data).toEqual({ users: [member('kit')] }))
+      failOld(new Error('Old request failed'))
+      await Promise.resolve()
+      expect(observer.getCurrentResult().data).toEqual({ users: [member('kit')] })
+    } finally {
+      stop()
+    }
+  })
+
+  it.each([true, false])('clears identity data when a refresh pauses, initially online=%s', async (online) => {
+    let fail!: (error: Error) => void
+    onlineManager.setOnline(online)
+    const observer = new QueryObserver(qc, {
+      queryKey: keys.users,
+      queryFn: () =>
+        new Promise((_resolve, reject) => {
+          fail = reject
+        }),
+      retry: 1,
+      retryDelay: 0,
+    })
+    const stop = observer.subscribe(() => {})
+    try {
+      applyEvent(qc, 'user', mo)
+      if (online) {
+        onlineManager.setOnline(false)
+        fail(new Error('Connection lost'))
+      }
+      await vi.waitFor(() => expect(observer.getCurrentResult().fetchStatus).toBe('paused'))
+      expect(observer.getCurrentResult().data).toBeUndefined()
+    } finally {
+      stop()
+      qc.clear()
+      onlineManager.setOnline(true)
     }
   })
 

@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { cleanup, fireEvent, screen } from '@testing-library/react'
+import { act, cleanup, fireEvent, screen } from '@testing-library/react'
 import { embedParagraph, member, mentionSpan, paragraph, renderWithQuery } from '../test-utils'
 
 /** A body's mentions show the mentioned users' current names and link to their profiles through the app's router. */
@@ -45,4 +45,23 @@ describe('Body', () => {
     expect(screen.getByRole('link', { name: 'https://plots.test/nothing' })).toBeTruthy()
     expect(document.querySelectorAll('.link-preview')).toHaveLength(1)
   })
+})
+
+it('does not restore an old mention name or link after the identity refresh fails', async () => {
+  const { Body } = await import('./Body')
+  const { listUsers } = await import('../api')
+  const { applyEvent } = await import('../data/apply')
+  const { keys } = await import('../data/keys')
+  const current = { ...member('kit'), username: 'kat' }
+  const { qc } = renderWithQuery(<Body html={paragraph(mentionSpan('kit', 'kit'))} />, (qc) => {
+    qc.setQueryDefaults(keys.users, { retry: false })
+    qc.setQueryData(keys.users, { users: [current] })
+  })
+  await screen.findByRole('link', { name: '@kat' })
+  vi.mocked(listUsers).mockRejectedValueOnce(new Error('Unavailable'))
+  act(() => applyEvent(qc, 'user', current))
+  await vi.waitFor(() => expect(qc.getQueryState(keys.users)?.status).toBe('error'))
+  await screen.findByText('Unavailable user')
+  expect(screen.queryByRole('link')).toBeNull()
+  expect(screen.queryByText('@kit')).toBeNull()
 })

@@ -32,8 +32,9 @@ export function ReplyQuote({ author, text, deleted, onClick }: ReplyQuoteProps) 
 }
 
 interface ReplyStripProps {
-  author: string
-  text: string
+  /** Missing when the selected message is no longer in the loaded chat. */
+  author?: string
+  text?: string
   onCancel: () => void
 }
 
@@ -45,7 +46,13 @@ export function ReplyStrip({ author, text, onCancel }: ReplyStripProps) {
   return (
     <div className="flex min-w-0 items-center gap-1 rounded-[4px] border border-line bg-field py-0.5 pr-0.5 pl-3 text-sm">
       <span className="min-w-0 flex-1 truncate text-mute">
-        Replying to <span className="font-medium text-sweet">{author}</span>: {text || 'An image'}
+        {author ? (
+          <>
+            Replying to <span className="font-medium text-sweet">{author}</span>: {text || 'An image'}
+          </>
+        ) : (
+          'Replying to an unavailable message'
+        )}
       </span>
       <Button variant="ghost" icon="remove" label="Cancel reply" compact onClick={onCancel} />
     </div>

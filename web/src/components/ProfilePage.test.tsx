@@ -2,7 +2,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, screen } from '@testing-library/react'
 import { ROOT, group, member, paragraph, post, renderWithQuery, user } from '../test-utils'
-import type { Profile } from '../api'
+import type { Member, Profile } from '../api'
 
 /**
  * A user's profile page. It shows the user's
@@ -37,7 +37,8 @@ const profile = (u = kit, extra: Partial<Profile> = {}): Profile => ({
 afterEach(cleanup)
 
 beforeEach(async () => {
-  const { getProfile, getUserPosts, listGroups } = await import('../api')
+  const { getProfile, getUserPosts, listGroups, listUsers } = await import('../api')
+  vi.mocked(listUsers).mockResolvedValue({ users: [] })
   vi.mocked(getProfile).mockResolvedValue(profile())
   vi.mocked(getUserPosts).mockResolvedValue({
     posts: [post('p2', kit, { group_id: 'knit' }), post('p1', kit)],
@@ -67,23 +68,50 @@ describe('ProfilePage', () => {
     // kit is renamed kat, and jo takes the name kit. The profile request answers before the users list does.
     const jo = { id: 'jo', username: 'kit', picture: null }
     vi.mocked(getProfile).mockResolvedValue(profile(jo, { bio_html: paragraph('I am jo') }))
+    let finishUsers!: (value: { users: Member[] }) => void
     vi.mocked(listUsers).mockImplementation(
       () =>
-        new Promise((done) =>
-          setTimeout(
-            () =>
-              done({
-                users: [
-                  { ...member('kit'), username: 'kat' },
-                  { ...member('jo'), username: 'kit' },
-                ],
-              }),
-            50,
-          ),
-        ),
+        new Promise((resolve) => {
+          finishUsers = resolve
+        }),
     )
     applyEvent(qc, 'user', { ...kit, username: 'kat' })
+    await vi.waitFor(() => expect(qc.getQueryData<{ id: string }>(['profile', 'kit'])?.id).toBe('jo'))
+    expect(screen.queryByText('I am jo')).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Message' })).toBeNull()
+    finishUsers({
+      users: [
+        { ...member('kit'), username: 'kat' },
+        { ...member('jo'), username: 'kit' },
+      ],
+    })
     await vi.waitFor(() => expect(onGo).toHaveBeenCalledWith('/u/kat', { replace: true }))
+  })
+
+  it('does not redirect a new profile address using an identity that is still refreshing', async () => {
+    const { getProfile, listUsers } = await import('../api')
+    const { ProfilePage } = await import('./ProfilePage')
+    vi.mocked(getProfile).mockResolvedValue(profile({ ...kit, username: 'kat' }))
+    vi.mocked(listUsers).mockImplementation(() => new Promise(() => {}))
+    const onGo = vi.fn()
+    renderWithQuery(<ProfilePage name="kat" me={raphael} onGo={onGo} />, (qc) => {
+      qc.setQueryData(['users'], { users: [member('kit')] })
+      void qc.invalidateQueries({ queryKey: ['users'] })
+    })
+    await screen.findByText('I knit')
+    expect(onGo).not.toHaveBeenCalled()
+  })
+
+  it('does not show a replacement account’s posts under the original profile', async () => {
+    const { ProfilePage } = await import('./ProfilePage')
+    renderWithQuery(<ProfilePage name="kit" me={raphael} onGo={vi.fn()} />, (qc) => {
+      qc.setQueryData(['userPosts', 'kit'], {
+        pages: [{ posts: [post('Someone else’s post', user('jo'))], next_before: null }],
+        pageParams: [null],
+      })
+    })
+    await screen.findByText('I knit')
+    expect(screen.queryByText('Someone else’s post')).toBeNull()
   })
 
   it("shows the user's details, their bio, Message, and their posts with each post's group", async () => {

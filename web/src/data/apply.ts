@@ -347,14 +347,38 @@ const identityQueries = new Set([
   'invites',
 ])
 
-/** Clears old identities and cancels older requests. Active views fetch fresh server responses. */
-function refreshIdentities(qc: QueryClient) {
-  void qc.resetQueries({ predicate: (q) => identityQueries.has(String(q.queryKey[0])) })
+/** Refreshes open views in place. Closed views and failed refreshes retain no identity data. */
+export function refreshIdentities(qc: QueryClient, includeMe = false) {
+  for (const query of qc.getQueryCache().findAll({
+    predicate: (q) => identityQueries.has(String(q.queryKey[0])) || (includeMe && q.queryKey[0] === 'me'),
+  })) {
+    if (!query.isActive()) {
+      query.reset()
+      continue
+    }
+    // Explicit cancellation also replaces an initial request that has no cached data yet.
+    void query.cancel({ silent: true })
+    // Observe the whole fetch because a retry can pause after the first attempt fails.
+    const stop = qc.getQueryCache().subscribe((event) => {
+      if (event.query !== query || event.type !== 'updated' || query.state.data === undefined) return
+      const paused = query.state.fetchStatus === 'paused'
+      if (query.state.status === 'error' || paused) {
+        query.setState({ data: undefined, dataUpdatedAt: 0, ...(paused ? { status: 'pending' } : {}) })
+      }
+    })
+    void query
+      .fetch()
+      .catch(() => {})
+      .finally(stop)
+  }
 }
 
 function upsertUser(qc: QueryClient, u: User) {
   const me = qc.getQueryData<User | null>(keys.me)
-  if (me?.id === u.id) qc.setQueryData<User>(keys.me, u)
+  if (me?.id === u.id) {
+    void qc.cancelQueries({ queryKey: keys.me })
+    qc.setQueryData<User>(keys.me, u)
+  }
   refreshIdentities(qc)
 }
 
@@ -535,7 +559,7 @@ function deleteMembership(qc: QueryClient, groupId: string, userId: string) {
     old ? { members: old.members.filter((x) => x.user.id !== userId) } : old,
   )
   // Removal also arrives through the HTTP response, without waiting for the user event.
-  if (root) refreshIdentities(qc)
+  if (root) void qc.resetQueries({ predicate: (q) => identityQueries.has(String(q.queryKey[0])) })
 }
 
 /** Whether the post with this id is in this group's loaded feed. */

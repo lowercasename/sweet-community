@@ -7,6 +7,7 @@ import { ROOT, group, renderWithQuery } from '../test-utils'
  * The Community page: the community's settings for the owner, and the topics for the owner and moderators.
  */
 vi.mock('../api', () => ({
+  listUsers: vi.fn(() => Promise.resolve({ users: [] })),
   listTopics: vi.fn(() => Promise.resolve({ topics: [] })),
   getRules: vi.fn(() => Promise.resolve({ body_html: '' })),
   getWelcome: vi.fn(() => Promise.resolve({ body_html: '' })),

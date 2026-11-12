@@ -1,9 +1,17 @@
 import Mention from '@tiptap/extension-mention'
-import { ReactRenderer, type Extensions } from '@tiptap/react'
+import {
+  NodeViewWrapper,
+  ReactNodeViewRenderer,
+  ReactRenderer,
+  type NodeViewProps,
+  type Extensions,
+} from '@tiptap/react'
 import type { SuggestionProps, SuggestionKeyDownProps } from '@tiptap/suggestion'
 import { computePosition, flip, offset, shift } from '@floating-ui/react'
 import { PluginKey } from '@tiptap/pm/state'
 import type { User } from '../api'
+import { useUsers } from '../data/hooks'
+import { mentionText } from '../content/decorate'
 import { SuggestionList, type SuggestionListHandle } from '../ui'
 
 /**
@@ -13,7 +21,19 @@ import { SuggestionList, type SuggestionListHandle } from '../ui'
  * only shape the server's sanitiser policy keeps. The name shown later is the
  * user's current name (content/decorate.ts), so the id is the important part.
  */
+function MentionView({ node }: NodeViewProps) {
+  const { data: users } = useUsers()
+  return (
+    <NodeViewWrapper as="span" contentEditable={false} data-type="mention" data-mention-id={node.attrs.id}>
+      {mentionText(users?.get(node.attrs.id)?.username)}
+    </NodeViewWrapper>
+  )
+}
+
 const SweetMention = Mention.extend({
+  addNodeView() {
+    return ReactNodeViewRenderer(MentionView)
+  },
   addAttributes() {
     return {
       id: {
@@ -37,15 +57,16 @@ const SweetMention = Mention.extend({
 export const mentionSuggestionKey = new PluginKey('sweetMention')
 
 /** Adds the mention extension for these users to a set of editor extensions. */
-export function withMentions(extensions: Extensions, people: () => User[]): Extensions {
-  // A stored mention keeps the name it was written with. The editor shows and saves the user's current name instead,
-  // when the user is in the list.
-  const name = (attrs: { id?: string | null; label?: string | null }) =>
-    people().find((u) => u.id === attrs.id)?.username ?? attrs.label ?? attrs.id
+export function withMentions(
+  extensions: Extensions,
+  people: () => User[],
+  users: () => ReadonlyMap<string, User> | undefined,
+): Extensions {
+  const text = (id: string) => mentionText(users()?.get(id)?.username)
   const mention = SweetMention.configure({
     HTMLAttributes: { 'data-type': 'mention' },
-    renderText: ({ node }) => `@${name(node.attrs)}`,
-    renderHTML: ({ options, node }) => ['span', options.HTMLAttributes, `@${name(node.attrs)}`],
+    renderText: ({ node }) => text(node.attrs.id),
+    renderHTML: ({ options, node }) => ['span', options.HTMLAttributes, text(node.attrs.id)],
     suggestion: {
       pluginKey: mentionSuggestionKey,
       char: '@',

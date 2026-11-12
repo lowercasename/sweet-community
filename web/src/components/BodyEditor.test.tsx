@@ -4,7 +4,7 @@ import { QueryClientProvider } from '@tanstack/react-query'
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import type { Editor } from '@tiptap/react'
 import { postExtensions } from '../editor/extensions'
-import { ROOT, paragraph, user } from '../test-utils'
+import { ROOT, member, mentionSpan, paragraph, user } from '../test-utils'
 import { makeQueryClient } from '../data/client'
 import { keys } from '../data/keys'
 import { loadDraft, saveDraft } from '../editor/drafts'
@@ -175,4 +175,33 @@ describe('BodyEditor', () => {
       expect(text(container)).toBe('Edited')
     })
   })
+})
+
+it('updates visible mentions from community identities without replacing the editor', async () => {
+  const { BodyEditor } = await import('./BodyEditor')
+  const qc = makeQueryClient()
+  qc.setQueryData(keys.me, user('kit'))
+  qc.setQueryData(keys.users, { users: [{ ...member('jo'), username: 'joseph' }] })
+  qc.setQueryData(keys.members(ROOT), { members: [] })
+  const { container } = render(
+    <QueryClientProvider client={qc}>
+      <BodyEditor
+        groupId={ROOT}
+        extensions={postExtensions}
+        size="post"
+        submitLabel="Save"
+        disabled={false}
+        onSubmit={() => Promise.resolve()}
+        initialHtml={paragraph(`Draft ${mentionSpan('jo', 'old')}`)}
+      />
+    </QueryClientProvider>,
+  )
+  const element = container.querySelector('.ProseMirror') as HTMLElement & { editor: Editor }
+  await waitFor(() => expect(element.textContent).toBe('Draft @joseph'))
+  const selection = element.editor.state.selection.from
+  qc.setQueryData(keys.users, { users: [{ ...member('jo'), username: 'josephine' }] })
+  await waitFor(() => expect(element.textContent).toBe('Draft @josephine'))
+  expect(container.querySelector('.ProseMirror')).toBe(element)
+  expect(element.editor.state.selection.from).toBe(selection)
+  expect(element.editor.getHTML()).toContain('@josephine')
 })

@@ -79,7 +79,7 @@ import {
   type Topic,
   type User,
 } from '../api'
-import { applyEvent, applyFollowing, refetchForOwnRole } from './apply'
+import { applyEvent, applyFollowing, refetchForOwnRole, refreshIdentities } from './apply'
 import { ROOT_ID, keys } from './keys'
 import { NOTIFICATIONS, unreadPlaces, type UnreadPlace } from './notifications'
 
@@ -513,18 +513,21 @@ export function useSetSettings() {
   }
 }
 
-export function useSetUsername() {
+/** Identity writes refetch current data because their response may arrive after a newer stream event. */
+function useIdentityChange<T>(write: (value: T) => Promise<User>) {
   const qc = useQueryClient()
-  return async (username: string) => {
-    applyEvent(qc, 'user', await setUsername(username))
+  return async (value: T) => {
+    await write(value)
+    refreshIdentities(qc, true)
   }
 }
 
+export function useSetUsername() {
+  return useIdentityChange(setUsername)
+}
+
 export function useSetPicture() {
-  const qc = useQueryClient()
-  return async (imageId: string | null) => {
-    applyEvent(qc, 'user', await setPicture(imageId))
-  }
+  return useIdentityChange(setPicture)
 }
 
 /** The user's account email address and its verification state, for Settings. */

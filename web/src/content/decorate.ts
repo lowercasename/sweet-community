@@ -8,9 +8,12 @@
  * Hashtags are plain text until the decision between tags and topics is made.
  */
 export interface Decoration {
-  /** Current usernames by id. A mention of an unknown id keeps its stored name. */
+  /** Current usernames by id. An unavailable identity is shown without a name or link. */
   names?: Map<string, string>
 }
+
+/** Displayed and edited mentions use the same text when the current identity is unavailable. */
+export const mentionText = (name: string | undefined) => (name ? `@${name}` : 'Unavailable user')
 
 export const profileHref = (name: string) => `/u/${encodeURIComponent(name)}`
 
@@ -20,11 +23,11 @@ export function decorate(html: string, { names }: Decoration = {}): string {
   const doc = new DOMParser().parseFromString(`<body>${html}</body>`, 'text/html')
   for (const span of Array.from(doc.querySelectorAll('span[data-mention-id]'))) {
     const id = span.getAttribute('data-mention-id') ?? ''
-    const name = names?.get(id) ?? span.textContent?.replace(/^@/, '') ?? ''
-    const a = doc.createElement('a')
-    a.setAttribute('href', profileHref(name))
+    const name = names?.get(id)
+    const a = doc.createElement(name ? 'a' : 'span')
+    if (name) a.setAttribute('href', profileHref(name))
     a.setAttribute('data-mention-id', id)
-    a.textContent = `@${name}`
+    a.textContent = mentionText(name)
     span.replaceWith(a)
   }
   return doc.body.innerHTML

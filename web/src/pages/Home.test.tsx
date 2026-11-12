@@ -61,6 +61,8 @@ vi.mock('../api', async (importOriginal) => ({
     Promise.resolve({ user_id: 'raphael', stream, read_at: readAt, unread: 0 }),
   ),
   setSettings: vi.fn(),
+  setPicture: vi.fn(),
+  setUsername: vi.fn(),
   logout: vi.fn(() => Promise.resolve()),
   readNotification: vi.fn(),
   search: vi.fn(() => Promise.resolve({ hits: [] })),

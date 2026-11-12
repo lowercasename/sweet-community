@@ -84,7 +84,8 @@ export function AccountCard({ username: current }: { username: string }) {
             </Text>
           </Text>
           <Text variant="small">
-            After a change, links to your old profile stop working, and anyone can take your old username.
+            Anyone can take your old username after you change it. Links using that name will then lead to their
+            profile.
           </Text>
           <Form onSubmit={() => void submitUsername()}>
             <UsernameField label="New username" value={username} onChange={setUsernameValue} />

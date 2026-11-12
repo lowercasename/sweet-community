@@ -105,13 +105,14 @@ export function ChatPane({ groupId, side = 'full', watching, focusMessage = null
   }
 
   // The message being replied to, attached above the editor until the reply is sent or cancelled.
-  const [replying, setReplying] = useState<MessageData | null>(null)
+  const [replyId, setReplyId] = useState<string | null>(null)
+  const replying = messages.find((message) => message.id === replyId)
   // The message a clicked quote scrolled to, highlighted briefly.
   const [highlight, setHighlight] = useState<string | null>(null)
   const send = async (bodyHtml: string) => {
     stickRef.current = true // The user's own message always scrolls into view.
-    await sendMessage(bodyHtml, replying?.id)
-    setReplying(null)
+    await sendMessage(bodyHtml, replyId ?? undefined)
+    setReplyId(null)
   }
   // Scrolls to a message, if it is loaded, and highlights it for a moment. The view stops following new
   // messages first. Otherwise the re-render for the highlight scrolled back to the bottom, and the quote
@@ -169,7 +170,7 @@ export function ChatPane({ groupId, side = 'full', watching, focusMessage = null
                   <MessageGroup
                     messages={run}
                     onDelete={remove}
-                    onReply={setReplying}
+                    onReply={(message) => setReplyId(message.id)}
                     onJump={quoted}
                     highlight={highlight}
                     conversation={conversation}
@@ -193,16 +194,16 @@ export function ChatPane({ groupId, side = 'full', watching, focusMessage = null
             onSubmit={send}
             draft={`message:${groupId}`}
             head={
-              replying && (
+              replyId && (
                 <ReplyStrip
-                  author={replying.author.username}
-                  text={replying.body_text}
-                  onCancel={() => setReplying(null)}
+                  author={replying?.author.username}
+                  text={replying?.body_text}
+                  onCancel={() => setReplyId(null)}
                 />
               )
             }
-            onEscape={replying ? () => setReplying(null) : undefined}
-            focus={replying?.id}
+            onEscape={replyId ? () => setReplyId(null) : undefined}
+            focus={replyId ?? undefined}
           />
         </Bar>
       </Card>

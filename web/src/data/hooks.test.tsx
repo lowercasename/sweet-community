@@ -2,7 +2,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { act, cleanup, fireEvent, screen } from '@testing-library/react'
 import { marker, post, renderWithQuery, ROOT, user } from '../test-utils'
-import type { Marker } from '../api'
+import type { Marker, User } from '../api'
 import { keys } from './keys'
 import { applyEvent } from './apply'
 
@@ -16,6 +16,8 @@ vi.mock('../api', () => ({
   logout: vi.fn(() => Promise.resolve()),
   getPost: vi.fn(),
   setMarker: vi.fn(),
+  setUsername: vi.fn(),
+  setPicture: vi.fn(),
 }))
 
 afterEach(cleanup)
@@ -69,7 +71,7 @@ it('does not restore a feed snapshot while a post refreshes after an identity ch
   })
   await screen.findByText('mo')
   await vi.waitFor(() => expect(getPost).toHaveBeenCalledTimes(1))
-  act(() => applyEvent(qc, 'user', { ...old.author, username: 'removed-account' }))
+  act(() => applyEvent(qc, 'membership_delete', { group_id: ROOT, user_id: old.author.id }))
   await screen.findByText('Loading')
   expect(screen.queryByText('mo')).toBeNull()
 })
@@ -87,4 +89,35 @@ describe('useSession', () => {
     fireEvent.click(await screen.findByRole('button', { name: 'out kit' }))
     await screen.findByText('anonymous')
   })
+})
+
+it.each(['username', 'picture'])('a delayed %s save cannot restore an older identity', async (kind) => {
+  const { getMe, setUsername, setPicture } = await import('../api')
+  const { useMe, useSetUsername, useSetPicture } = await import('./hooks')
+  let finishSave!: (value: User) => void
+  const save = kind === 'username' ? setUsername : setPicture
+  vi.mocked(save).mockImplementationOnce(
+    () =>
+      new Promise((resolve) => {
+        finishSave = resolve
+      }),
+  )
+  const old = user('kit')
+  const latest = { ...old, username: 'newest', picture: '/img/newest' }
+  vi.mocked(getMe).mockResolvedValue(latest)
+  function Account() {
+    const { data: me } = useMe()
+    const rename = useSetUsername()
+    const picture = useSetPicture()
+    return (
+      <button onClick={() => void (kind === 'username' ? rename('older') : picture('older'))}>{me?.username}</button>
+    )
+  }
+  const { qc } = renderWithQuery(<Account />, (qc) => qc.setQueryData(keys.me, old))
+  fireEvent.click(screen.getByRole('button', { name: 'kit' }))
+  await act(async () => {
+    applyEvent(qc, 'user', latest)
+    finishSave({ ...old, username: 'older', picture: '/img/older' })
+  })
+  await vi.waitFor(() => expect(qc.getQueryData(keys.me)).toEqual(latest))
 })

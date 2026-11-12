@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { useEditor, useEditorState, type Editor, type Extensions } from '@tiptap/react'
 import { DEFAULT_PLACEHOLDER, withPlaceholder } from '../editor/extensions'
 import { mentionSuggestionKey, withMentions } from '../editor/mentions'
-import { useMe, useMembers } from '../data/hooks'
+import { useMe, useMembers, useUsers } from '../data/hooks'
 import { clearDraft, loadDraft, saveDraft, watchDraft } from '../editor/drafts'
 import type { Topic } from '../api'
 import { Alert, Button, EditorSurface, Form, ImageCard, Row, Stack } from '../ui'
@@ -152,7 +152,10 @@ export function BodyEditor({
   const cancelRef = useRef<(() => void) | undefined>(cancel ?? onEscape)
   cancelRef.current = cancel ?? onEscape
 
-  // The users the @ list can suggest. These are the group's members, read from the query cache when the list opens.
+  const { data: users } = useUsers()
+  const usersRef = useRef(users)
+  usersRef.current = users
+  // Suggestions are limited to this group's members. Existing mentions use community identities.
   const { members } = useMembers(groupId)
   const peopleRef = useRef(members)
   peopleRef.current = members
@@ -164,6 +167,7 @@ export function BodyEditor({
     extensions: withMentions(
       withPlaceholder(extensions, () => placeholderRef.current ?? DEFAULT_PLACEHOLDER),
       () => peopleRef.current.map((m) => m.user),
+      () => usersRef.current,
     ),
     content: (draftRef.current && loadDraft(draftRef.current.user, draftRef.current.key)) ?? initialHtml ?? '',
     autofocus: editing ? 'end' : false,
