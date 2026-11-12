@@ -13,3 +13,6 @@ internal/web/dist/*
 cmd/sweet/migrations/
 /CLAUDE.md
 web/e2e.log
+.codex
+AGENTS.md
+docs/**
