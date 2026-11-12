@@ -95,6 +95,8 @@ func (w WebPush) Send(ctx context.Context, sub Subscription, data []byte) (bool,
 		Endpoint: sub.Endpoint,
 		Keys:     webpush.Keys{P256dh: sub.P256dh, Auth: sub.Auth},
 	}, &webpush.Options{
+		// Firefox on Android rejects the library's default 4096-byte padded payload.
+		RecordSize:      2048,
 		Subscriber:      w.Subscriber,
 		VAPIDPublicKey:  w.Keys.Public,
 		VAPIDPrivateKey: w.Keys.Private,
