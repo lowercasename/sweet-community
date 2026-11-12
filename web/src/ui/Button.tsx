@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react'
+import { Dotted } from './Dotted'
 import { Icon, type IconName } from './Icon'
 import { useTooltip } from './Tooltip'
 
@@ -24,6 +25,8 @@ interface ButtonProps {
   icon?: IconName
   /** A small number shown after the icon, as old Sweet's post toolbar showed comment counts. Hidden when 0. */
   count?: number
+  /** Whether there is unread content behind the button. Shows a dot on the icon and adds "unread" to the accessible name. */
+  dot?: boolean
   /** Names this element for the welcome tour, which points at it (src/tour/steps.ts). */
   tour?: string
   onClick?: () => void
@@ -119,6 +122,7 @@ export function Button({
   label,
   icon,
   count,
+  dot = false,
   tour,
   onClick,
   onHoverChange,
@@ -141,7 +145,7 @@ export function Button({
         aria-pressed={pressed === undefined ? undefined : pressed}
         data-tour={tour}
         aria-current={current ? 'page' : undefined}
-        aria-label={wordless ? label : undefined}
+        aria-label={wordless ? (dot ? `${label}, unread` : label) : undefined}
         {...tip.props({
           onMouseDown: pressed === undefined ? undefined : (e) => e.preventDefault(), // toggles keep editor focus
           onClick,
@@ -154,7 +158,11 @@ export function Button({
             <Icon name="spinner" />
           </span>
         ) : (
-          icon && <Icon name={icon} />
+          icon && (
+            <Dotted shown={dot}>
+              <Icon name={icon} />
+            </Dotted>
+          )
         )}
         {count ? <span className="text-sm">{count}</span> : null}
         {labels && children !== undefined ? (

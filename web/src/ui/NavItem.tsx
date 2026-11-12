@@ -29,13 +29,6 @@ interface NavItemProps {
   onClick?: () => void
 }
 
-/** The dot on an icon's corner. The icon's wrapper must be position: relative. The phone's tab bar also uses it. */
-export function UnreadDot() {
-  return (
-    <span aria-hidden className="absolute -top-0.5 -right-0.5 h-2.5 w-2.5 rounded-full bg-sweet ring-2 ring-card" />
-  )
-}
-
 /** One item in the NavBar: an icon or an image, plus its label when expanded. */
 export function NavItem({
   icon,

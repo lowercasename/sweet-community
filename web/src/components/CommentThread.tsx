@@ -1,6 +1,7 @@
 import { useRef, useState } from 'react'
 import type { Comment as CommentData } from '../api'
 import { useAuthor, useCommentActions, useComments } from '../data/hooks'
+import { postStream } from '../data/notifications'
 import { commentExtensions } from '../editor/extensions'
 import {
   Alert,
@@ -159,7 +160,7 @@ export function CommentThread({ postId, groupId, replyTo, disabled, postAt }: Co
   const { comments, loading, error, hasEarlier, loadEarlier } = useComments(postId)
   const { create, edit, remove } = useCommentActions(postId, groupId)
   const ref = useRef<HTMLDivElement>(null)
-  useReadProgress(ref, `post:${postId}`, !loading, `${comments.length}:${comments.at(-1)?.created_at}`)
+  useReadProgress(ref, postStream(postId), !loading, `${comments.length}:${comments.at(-1)?.created_at}`)
 
   return (
     <Box ref={ref}>

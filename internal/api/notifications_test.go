@@ -134,9 +134,9 @@ func TestNotifications(t *testing.T) {
 	}
 
 	// Read markers. Each of the user's streams has a row from the start. These are notifications (with its unread
-	// count), the root group's chat and feed, and Knitting's chat and feed. A chat marker only moves forward. Marker
-	// events are sent to this user only.
-	if m := kit.mustStatus(200, "GET", "/api/markers", nil)["markers"].([]any); len(m) != 5 {
+	// count), the root group's chat and feed, and Knitting's chat and feed. The post kit wrote also has one. A chat
+	// marker only moves forward. Marker events are sent to this user only.
+	if m := kit.mustStatus(200, "GET", "/api/markers", nil)["markers"].([]any); len(m) != 6 {
 		t.Fatalf("markers: %v", m)
 	}
 	readAt := int64(added["created_at"].(float64))
@@ -176,6 +176,50 @@ func TestNotifications(t *testing.T) {
 // includes the number of other users' messages newer than the user's read
 // position. After a join, the count starts from the join time, so earlier
 // history is not unread. The user's own messages are not unread either.
+func TestPostUnread(t *testing.T) {
+	ts, owner := newTestServer(t)
+	kit, _ := registerMember(t, ts, owner, "kit")
+	mo, _ := registerMember(t, ts, owner, "mo")
+	marker := func(c *client, stream string) map[string]any {
+		t.Helper()
+		for _, x := range c.mustStatus(200, "GET", "/api/markers", nil)["markers"].([]any) {
+			if m := x.(map[string]any); m["stream"] == stream {
+				return m
+			}
+		}
+		return nil
+	}
+
+	// Writing a post gives its author a read position for its comments, at the post's time, with nothing unread.
+	post := kit.mustStatus(201, "POST", rootPath+"/posts", map[string]string{"body_html": "<p>riddle</p>"})
+	id := post["id"].(string)
+	stream := "post:" + id
+	if m := marker(kit, stream); m == nil || m["unread"] != float64(0) || m["read_at"] != post["created_at"] {
+		t.Fatalf("the author's marker: %v", m)
+	}
+	// A user who has never opened the post's comments has no read position for it.
+	if m := marker(mo, stream); m != nil {
+		t.Fatalf("a marker for a post mo never opened: %v", m)
+	}
+
+	// Other users' comments after the read position are unread. The user's own comments and deleted comments are not.
+	time.Sleep(2 * time.Millisecond) // times are in milliseconds, and a comment in the same millisecond as the post is not after it
+	first := mo.mustStatus(201, "POST", "/api/posts/"+id+"/comments", map[string]string{"body_html": "<p>teeth?</p>"})
+	mo.mustStatus(201, "POST", "/api/posts/"+id+"/comments", map[string]string{"body_html": "<p>a boat?</p>"})
+	kit.mustStatus(201, "POST", "/api/posts/"+id+"/comments", map[string]string{"body_html": "<p>mine</p>"})
+	gone := owner.mustStatus(201, "POST", "/api/posts/"+id+"/comments", map[string]string{"body_html": "<p>oops</p>"})
+	owner.mustStatus(200, "DELETE", "/api/comments/"+gone["id"].(string), nil)
+	if m := marker(kit, stream); m["unread"] != float64(2) {
+		t.Fatalf("kit's unread comments: %v", m)
+	}
+
+	// Reading up to the first comment leaves one unread. The reply equals the listed row.
+	read := kit.mustStatus(200, "PUT", "/api/markers/"+stream, map[string]any{"read_at": int64(first["created_at"].(float64))})
+	if read["unread"] != float64(1) || !reflect.DeepEqual(marker(kit, stream), read) {
+		t.Fatalf("after reading the first comment: reply %v, listed %v", read, marker(kit, stream))
+	}
+}
+
 func TestChatUnread(t *testing.T) {
 	ts, owner := newTestServer(t)
 	kit, kitID := registerMember(t, ts, owner, "kit")
@@ -375,6 +419,8 @@ func TestPushForMentionsAndReplies(t *testing.T) {
 	// A comment on kit's post is pushed to both of kit's devices, with the text and the post's URL. It is not pushed to mo or the owner.
 	post := kit.mustStatus(201, "POST", rootPath+"/posts", map[string]string{"body_html": "<p>hello</p>"})
 	pid := post["id"].(string)
+	// Writing the post set kit's read position to its time. A comment in the same millisecond would count as read.
+	time.Sleep(2 * time.Millisecond)
 	mo.mustStatus(201, "POST", "/api/posts/"+pid+"/comments", map[string]string{"body_html": "<p>hi</p>"})
 	got := wait(2)
 	for _, s := range got {

@@ -84,7 +84,7 @@ import {
 } from '../api'
 import { applyEvent, applyFollowing, refetchForOwnRole, refreshIdentities } from './apply'
 import { ROOT_ID, keys } from './keys'
-import { NOTIFICATIONS, unreadPlaces, type UnreadPlace } from './notifications'
+import { hasUnread, NOTIFICATIONS, unreadPlaces, type UnreadPlace } from './notifications'
 
 /*
  * Queries hold server data. Stream events update the cache. Writes either apply
@@ -408,8 +408,7 @@ export function useMarkers() {
 
 /** Whether the notifications stream has unread notifications. Shown as the dot on the Notifications nav item. */
 export function useUnreadNotifications(): boolean {
-  const { markers } = useMarkers()
-  return (markers.find((m) => m.stream === NOTIFICATIONS)?.unread ?? 0) > 0
+  return hasUnread(useMarkers().markers, NOTIFICATIONS)
 }
 
 /** The groups with unread content, by group id, and which stream is unread. Shown as the dots in the nav and inside a room. */

@@ -49,7 +49,9 @@ ON CONFLICT (user_id, stream) DO UPDATE SET read_at = MAX(read_at, excluded.read
 -- notifications row has only an unread count, because a notification is
 -- read by opening it. Unread counts the items newer than the user's read
 -- position. These are other users' live messages or posts since the user's
--- marker, or since they joined if they have never read.
+-- marker, or since they joined if they have never read. A post has a row
+-- only once the user has a marker for it, and its unread count is other
+-- users' live comments since that marker.
 
 -- name: GetChatMarker :one
 SELECT m.user_id, CAST('chat:' || m.group_id AS TEXT) AS stream, CAST(COALESCE(r.read_at, m.joined_at) AS INTEGER) AS read_at,
@@ -95,7 +97,9 @@ FROM memberships m JOIN groups g ON g.id = m.group_id AND g.deleted_at IS NULL
 LEFT JOIN read_markers r ON r.user_id = m.user_id AND r.stream = 'feed:' || m.group_id
 WHERE m.user_id = sqlc.arg(user_id) AND m.hidden_at IS NULL
 UNION ALL
-SELECT r.user_id, r.stream, r.read_at, CAST(0 AS INTEGER) AS unread
+SELECT r.user_id, r.stream, r.read_at,
+       (SELECT COUNT(*) FROM comments c WHERE c.post_id = p.id AND c.deleted_at IS NULL AND c.author_id != r.user_id
+          AND c.created_at > r.read_at) AS unread
 FROM read_markers r JOIN posts p ON r.stream = 'post:' || p.id
 JOIN memberships m ON m.group_id = p.group_id AND m.user_id = r.user_id
 WHERE r.user_id = sqlc.arg(user_id) AND p.deleted_at IS NULL;

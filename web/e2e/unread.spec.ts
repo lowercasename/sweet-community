@@ -103,3 +103,36 @@ test.describe('chat unread', () => {
     await mo.context.close()
   })
 })
+
+test.describe('comment unread', () => {
+  test("another user's comment on your post shows a dot on its comments button, and reading the comments clears it", async ({
+    browser,
+  }, testInfo) => {
+    const kit = await member(browser, testInfo, 'kit')
+    const mo = await member(browser, testInfo, 'mo')
+    const text = uniq('A riddle ')
+    const created = await kit.context.request.post(`/api/groups/${ROOT}/posts`, {
+      data: { body_html: `<p>${text}</p>` },
+    })
+    const post = (await created.json()) as { id: string }
+    await open(kit.page)
+    const card = kit.page.getByRole('article').filter({ hasText: text })
+    await expect(card.getByRole('button', { name: 'Show comments', exact: true })).toBeVisible()
+
+    // Mo's comment arrives while kit is on the page.
+    const reply = uniq('Teeth? ')
+    await mo.context.request.post(`/api/posts/${post.id}/comments`, { data: { body_html: `<p>${reply}</p>` } })
+    const unread = card.getByRole('button', { name: 'Show comments, unread' })
+    await expect(unread).toBeVisible()
+
+    // Reading the reply clears the dot. The closed comments then show no dot, also after a reload.
+    await unread.click()
+    await expect(card.getByText(reply)).toBeVisible()
+    await card.getByRole('button', { name: 'Hide comments', exact: true }).click()
+    await expect(card.getByRole('button', { name: 'Show comments', exact: true })).toBeVisible()
+    await kit.page.reload()
+    await expect(card.getByRole('button', { name: 'Show comments', exact: true })).toBeVisible()
+    await kit.context.close()
+    await mo.context.close()
+  })
+})

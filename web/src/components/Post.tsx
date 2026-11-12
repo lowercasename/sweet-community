@@ -1,7 +1,8 @@
 import { useState } from 'react'
 import type { Post as PostData } from '../api'
-import { useAuthor, useTopics, usePostNotificationPreference } from '../data/hooks'
+import { useAuthor, useMarkers, useTopics, usePostNotificationPreference } from '../data/hooks'
 import { ROOT_ID } from '../data/keys'
+import { hasUnread, postStream } from '../data/notifications'
 import { postExtensions } from '../editor/extensions'
 import { groupPath, postPath, topicPath } from '../routes'
 import {
@@ -80,6 +81,8 @@ export function Post({
   const [draftTopic, setDraftTopic] = useState<string | null>(post.topic_id)
   const [editing, setEditing] = useState(false)
   const [open, setOpen] = useState(expanded)
+  // Other users' comments the user has not read. The dot shows on the comments button while the comments are closed.
+  const unread = hasUnread(useMarkers().markers, postStream(post.id))
   const [confirming, setConfirming] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const [deleteError, setDeleteError] = useState<string | null>(null)
@@ -228,6 +231,7 @@ export function Post({
             icon="comment"
             count={post.comment_count}
             label={open ? 'Hide comments' : 'Show comments'}
+            dot={!open && unread}
             pressed={open}
             onClick={() => setOpen((o) => !o)}
           />

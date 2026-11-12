@@ -5,6 +5,8 @@ import { COMMUNITY, groupPath, postPath, profilePath } from '../routes'
 export const NOTIFICATIONS = 'notifications'
 export const chatStream = (groupId: string) => `chat:${groupId}`
 export const feedStream = (groupId: string) => `feed:${groupId}`
+/** A post's comments stream. The user has a marker for it once they have opened its comments or written the post. */
+export const postStream = (postId: string) => `post:${postId}`
 
 /** Which of a group's streams have unread content. The group is marked unread when either is. */
 export interface UnreadPlace {
@@ -15,6 +17,11 @@ export interface UnreadPlace {
 /** The time the user has read a stream up to, or undefined if never. */
 export function markerOf(markers: Marker[] | undefined, stream: string): number | undefined {
   return markers?.find((m) => m.stream === stream)?.read_at
+}
+
+/** Whether a stream has unread content. */
+export function hasUnread(markers: Marker[] | undefined, stream: string): boolean {
+  return (markers?.find((m) => m.stream === stream)?.unread ?? 0) > 0
 }
 
 /** The groups with unread content, by group id, computed from the user's chat and feed markers. */

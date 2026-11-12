@@ -1,5 +1,4 @@
 import type { ReactNode } from 'react'
-import { UnreadDot } from './NavItem'
 
 interface DottedProps {
   /** Whether the dot shows. */
@@ -13,7 +12,7 @@ export function Dotted({ shown, children }: DottedProps) {
   return (
     <span className="relative flex flex-none">
       {children}
-      <UnreadDot />
+      <span aria-hidden className="absolute -top-0.5 -right-0.5 h-2.5 w-2.5 rounded-full bg-sweet ring-2 ring-card" />
     </span>
   )
 }

@@ -304,6 +304,8 @@ function setReactions(qc: QueryClient, r: Reactions) {
 
 /** Refetches the server's comment count everywhere the post is shown. */
 function refreshCommentCount(qc: QueryClient, postId: string, groupId: string) {
+  // The user's unread comments on the post are counted in their markers.
+  void qc.invalidateQueries({ queryKey: keys.markers })
   void qc.invalidateQueries({ queryKey: keys.post(postId) })
   void qc.invalidateQueries({ queryKey: keys.posts(groupId) })
   void qc.invalidateQueries({ queryKey: ['userPosts'] })
