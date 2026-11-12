@@ -92,13 +92,13 @@ export function NotificationsPage({ groups, onGo }: NotificationsPageProps) {
                 {!loading && notifications.length === 0 && <Text variant="secondary">Nice and quiet in here.</Text>}
                 {fresh.length > 0 && (
                   <Stack gap={1}>
-                    <Heading level={3}>New</Heading>
+                    <Heading level={2}>New</Heading>
                     {rows(fresh)}
                   </Stack>
                 )}
                 {earlier.length > 0 && (
                   <Stack gap={1}>
-                    <Heading level={3}>Earlier</Heading>
+                    <Heading level={2}>Earlier</Heading>
                     {rows(earlier)}
                   </Stack>
                 )}

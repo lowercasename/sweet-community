@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useMySettings, useSetMySettings } from '../data/hooks'
 import { pushState, turnPushOff, turnPushOn, type PushState } from '../push'
-import { ActionRow, ActionRows, Alert, Button, Card, Heading, Stack, Select, Text } from '../ui'
+import { ActionRow, ActionRows, Alert, Button, Card, Heading, Stack, Select } from '../ui'
 
 /**
  * The settings for notifications sent while the user is away. These are the weekly email summarising what the user
@@ -107,19 +107,19 @@ export function NotificationsCard({ title = 'Notifications' }: { title?: string 
               )
             }
           >
-            {deviceReason ?? 'Receive alerts outside Sweet. Choose which activity sends alerts below.'}
+            {deviceReason ?? 'Receive alerts on this browser or device. Choose which activity sends alerts below.'}
           </ActionRow>
           {(
             [
               [
                 'push_comments',
                 'Comments on followed posts',
-                'Posts you write or comment on are followed automatically. You can also follow or mute a discussion from the post’s menu.',
+                'Posts you write or comment on are followed automatically. You can always follow or mute a discussion from the post’s menu.',
               ],
               [
                 'push_mentions',
                 'Mentions and replies',
-                'When someone mentions you or replies to your chat message. A muted discussion or chat stays muted.',
+                'When someone mentions you or replies to your chat message, except in muted chats and posts.',
               ],
               ['push_conversations', 'Private conversations', 'New messages in your private conversations.'],
             ] as const
@@ -146,10 +146,6 @@ export function NotificationsCard({ title = 'Notifications' }: { title?: string 
             </ActionRow>
           ))}
         </ActionRows>
-        <Text variant="small">
-          Activity preferences apply across your devices. The community chat and each room chat have their own
-          device-alert controls. Turning alerts off keeps activity in Notifications and leaves unread dots visible.
-        </Text>
       </Stack>
     </Card>
   )
