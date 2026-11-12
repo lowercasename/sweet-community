@@ -83,10 +83,7 @@ export function AccountCard({ username: current }: { username: string }) {
               {current}
             </Text>
           </Text>
-          <Text variant="small">
-            Anyone can take your old username after you change it. Links using that name will then lead to their
-            profile.
-          </Text>
+          <Text variant="small">Anyone can take your old username after you change it.</Text>
           <Form onSubmit={() => void submitUsername()}>
             <UsernameField label="New username" value={username} onChange={setUsernameValue} />
             {usernameError && <Alert tone="error">{usernameError}</Alert>}
