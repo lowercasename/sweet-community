@@ -11,10 +11,12 @@ interface PaneProps {
 }
 
 // Side padding only. The ScrollArea supplies the top and bottom margin inside the scroll container, so a pane scrolls edge to edge.
+// A phone shows one full pane. Its 8px padding and the ScrollArea's 4px put a card 12px from the screen edge, which
+// is one column of the page's dots.
 const PADS: Record<NonNullable<PaneProps['side']>, string> = {
   left: 'pl-4',
   right: 'pr-4',
-  full: 'px-4',
+  full: 'px-4 phone:px-2',
 }
 
 /** One column of the layout. Its ScrollArea or Card child is the element that scrolls. */

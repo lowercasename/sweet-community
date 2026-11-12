@@ -32,6 +32,9 @@
   --radius-card: 6px;
 }
 
+/* The phone layout: one pane and a tab bar. The width is the same as NARROW in src/hooks/useLayout.ts. */
+@custom-variant phone (@media (max-width: 799px));
+
 @layer base {
   :root {
     color-scheme: light;

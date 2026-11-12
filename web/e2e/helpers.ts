@@ -181,6 +181,21 @@ export async function confirm(page: Page, action: string) {
   await expect(dialog).toBeHidden()
 }
 
+/**
+ * Sends the browser's offer to install the app. Headless browsers never send it, so this sends a fake one with the
+ * same shape: an event the page can cancel, with prompt() and userChoice. prompt() sets window.prompted.
+ */
+export const sendOffer = () =>
+  window.dispatchEvent(
+    Object.assign(new Event('beforeinstallprompt', { cancelable: true }), {
+      prompt: () => {
+        ;(window as unknown as { prompted: boolean }).prompted = true
+        return Promise.resolve()
+      },
+      userChoice: Promise.resolve({ outcome: 'accepted' }),
+    }),
+  )
+
 /** Returns a small valid PNG of w×h pixels in one solid colour. */
 export function png(w: number, h: number, rgb: [number, number, number] = [206, 23, 23]): Buffer {
   const crcTable = new Int32Array(256)

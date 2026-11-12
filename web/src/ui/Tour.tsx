@@ -90,7 +90,7 @@ function TourCardView({ step, index, size, controls, tooltipProps }: TooltipRend
     <div
       {...tooltipProps}
       aria-label={card.title}
-      className="flex w-[calc(100vw-2rem)] min-[800px]:w-[24rem] flex-col gap-3 rounded-card border border-line bg-card p-4 text-ink shadow-sm"
+      className="flex w-[24rem] phone:w-[calc(100vw-2rem)] flex-col gap-3 rounded-card border border-line bg-card p-4 text-ink shadow-sm"
     >
       <div className="flex flex-col gap-2">
         <Heading level={2} step={{ number: index + 1, total: size }}>

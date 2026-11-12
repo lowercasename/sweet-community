@@ -379,6 +379,8 @@ On a desktop the nav column is on the left. Posts and chat sit side by side with
 
 On a phone, one pane shows at a time. A tab bar at the bottom holds Home, Search, Notifications and Menu.
 
+On a phone the space beside cards and inside them is smaller than on a desktop, so posts and comments have more width for text. Cards keep their borders and the dotted background around them, because the cards on dotted paper are Sweet's look.
+
 **Every view has a top bar** that names it and holds its controls. On a phone the switch between posts and chat is in that bar. Posts and chat are two views of one group. When they were bottom tabs, a room's chat could not be told apart from Home's chat.
 
 **Every page has an address**, so the back button, a reload and links all work.

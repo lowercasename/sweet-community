@@ -7,7 +7,7 @@ export type Layout = 'both' | 'posts' | 'chat'
 const KEY = 'sweet.layout'
 const SPLIT_KEY = 'sweet.split'
 const NAV_KEY = 'sweet.nav'
-/** The phone layout: one pane and a tab bar. */
+/** The phone layout: one pane and a tab bar. The `phone` variant in global.css uses the same width. */
 export const NARROW = '(max-width: 799px)'
 
 export function useMediaQuery(query: string): boolean {

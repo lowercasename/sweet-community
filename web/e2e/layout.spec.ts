@@ -1,6 +1,34 @@
-import { expect, member, open, test, uniq, view } from './helpers'
+import { expect, member, open, ROOT, sendOffer, test, uniq, view } from './helpers'
 
 test.describe('layout', () => {
+  test('an open comment thread has the same space at its top and bottom, and above and below each divider', async ({
+    browser,
+  }, testInfo) => {
+    const kit = await member(browser, testInfo)
+    const created = await kit.context.request.post(`/api/groups/${ROOT}/posts`, {
+      data: { body_html: `<p>${uniq('Spacing ')}</p>` },
+    })
+    const post = (await created.json()) as { id: string }
+    for (const text of ['First comment', 'Second comment'])
+      await kit.context.request.post(`/api/posts/${post.id}/comments`, { data: { body_html: `<p>${text}</p>` } })
+    await open(kit.page, `/p/${post.id}`)
+    const second = kit.page.getByRole('article').filter({ hasText: 'Second comment' }).last()
+    await expect(second).toBeVisible()
+    const panel = second.locator('xpath=ancestor::div[contains(@class,"rounded-card")][1]')
+    const p = (await panel.boundingBox())!
+    // The block around a comment's text is the area its hover colour fills.
+    const first = (await kit.page
+      .getByText('First comment')
+      .locator('xpath=ancestor::div[contains(@class,"block-item")][1]')
+      .boundingBox())!
+    const next = (await second.locator('.block-item').first().boundingBox())!
+    const divider = (await panel.locator('hr').boundingBox())!
+    const content = (await panel.locator(':scope > :last-child').boundingBox())!
+    expect(Math.round(first.y - p.y)).toBe(Math.round(p.y + p.height - (content.y + content.height)))
+    expect(Math.round(divider.y - (first.y + first.height))).toBe(Math.round(next.y - (divider.y + divider.height)))
+    await kit.context.close()
+  })
+
   test('a draft is kept after its pane is closed and reopened, and after a visit to Settings', async ({
     browser,
   }, testInfo) => {
@@ -143,6 +171,29 @@ test.describe('layout', () => {
     // The menu tab contains People and Settings.
     await tabs.getByRole('button', { name: 'Menu' }).click()
     await expect(kit.page.getByRole('button', { name: 'People' })).toBeVisible()
+    await kit.context.close()
+  })
+
+  test('@phone a card sits 12px from each screen edge with 12px inside it, and the install notice lines up with it', async ({
+    browser,
+  }, testInfo) => {
+    const kit = await member(browser, testInfo)
+    await open(kit.page)
+    await view(kit.page, 'Posts').click()
+    const editor = kit.page.locator('.editor-post').first()
+    await expect(editor).toBeVisible()
+    await kit.page.evaluate(sendOffer)
+    const notice = kit.page.getByRole('status').filter({ hasText: 'to your home screen' })
+    await expect(notice).toBeVisible()
+    const card = (await editor.locator('xpath=ancestor::div[contains(@class,"rounded-card")][1]').boundingBox())!
+    const width = kit.page.viewportSize()!.width
+    expect(Math.round(card.x)).toBe(12)
+    expect(Math.round(width - card.x - card.width)).toBe(12)
+    // 1px of border and 12px of padding.
+    expect(Math.round((await editor.boundingBox())!.x - card.x)).toBe(13)
+    const n = (await notice.boundingBox())!
+    expect(Math.round(n.x)).toBe(Math.round(card.x))
+    expect(Math.round(n.width)).toBe(Math.round(card.width))
     await kit.context.close()
   })
 })

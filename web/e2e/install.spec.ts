@@ -1,22 +1,7 @@
 import { devices } from '@playwright/test'
-import { expect, member, open, prepare, test } from './helpers'
+import { expect, member, open, prepare, sendOffer, test } from './helpers'
 
-/**
- * The offer to add the community to the home screen. It shows at the top of Home on a touch
- * screen that can add it. Headless browsers never send the install offer, so the tests send a fake one with the same
- * shape: an event the page can cancel, with prompt() and userChoice.
- */
-const sendOffer = () =>
-  window.dispatchEvent(
-    Object.assign(new Event('beforeinstallprompt', { cancelable: true }), {
-      prompt: () => {
-        ;(window as unknown as { prompted: boolean }).prompted = true
-        return Promise.resolve()
-      },
-      userChoice: Promise.resolve({ outcome: 'accepted' }),
-    }),
-  )
-
+/** The offer to add the community to the home screen. It shows at the top of Home on a touch screen that can add it. */
 test.describe('install prompt', () => {
   test('@phone on a phone whose browser offers to install, Add to home screen opens the browser’s dialog', async ({
     browser,

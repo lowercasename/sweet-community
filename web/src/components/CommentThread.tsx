@@ -164,8 +164,9 @@ export function CommentThread({ postId, groupId, replyTo, disabled, postAt }: Co
   return (
     <Box ref={ref}>
       <Card tone="field">
+        {/* The read points are outside the stacks, so they add no gap. */}
+        <ReadPoint at={postAt} />
         <Stack gap={3}>
-          <ReadPoint at={postAt} />
           {(loading || error || comments.length > 0) && (
             <Stack gap={2}>
               {hasEarlier && (
@@ -188,8 +189,8 @@ export function CommentThread({ postId, groupId, replyTo, disabled, postAt }: Co
                       onEdit={(html) => edit(c.id, html)}
                       onDelete={() => remove(c.id)}
                     />
-                    <ReadPoint at={c.created_at} />
                   </Stack>
+                  <ReadPoint at={c.created_at} />
                 </Box>
               ))}
             </Stack>
