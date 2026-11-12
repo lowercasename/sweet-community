@@ -171,11 +171,9 @@ func TestNotifications(t *testing.T) {
 	}
 }
 
-// Chat unread counts. There is a marker row
-// for every room the user is in, whether or not they have read anything. It
-// includes the number of other users' messages newer than the user's read
-// position. After a join, the count starts from the join time, so earlier
-// history is not unread. The user's own messages are not unread either.
+// Unread comments on a post. A post has a marker row once the user has written
+// it or opened its comments. Its unread count is other users' live comments
+// newer than the user's read position.
 func TestPostUnread(t *testing.T) {
 	ts, owner := newTestServer(t)
 	kit, _ := registerMember(t, ts, owner, "kit")
@@ -220,6 +218,11 @@ func TestPostUnread(t *testing.T) {
 	}
 }
 
+// Chat unread counts. There is a marker row
+// for every room the user is in, whether or not they have read anything. It
+// includes the number of other users' messages newer than the user's read
+// position. After a join, the count starts from the join time, so earlier
+// history is not unread. The user's own messages are not unread either.
 func TestChatUnread(t *testing.T) {
 	ts, owner := newTestServer(t)
 	kit, kitID := registerMember(t, ts, owner, "kit")

@@ -26,6 +26,7 @@ import type {
 } from '../api'
 import { dismissDeviceNotifications } from '../reading'
 import { ROOT_ID, keys } from './keys'
+import { postStream, type Markers } from './notifications'
 
 /**
  * The kinds of event the stream listens for: the whole resource, or its deletion. The
@@ -214,7 +215,6 @@ function isTopic(v: unknown): v is Topic {
 
 type Posts = InfiniteData<PostPage>
 type Notifications = InfiniteData<NotificationPage>
-type Markers = { markers: Marker[] }
 type Messages = InfiniteData<MessagePage>
 type Thread = InfiniteData<CommentPage>
 type Users = { users: Member[] }
@@ -304,8 +304,9 @@ function setReactions(qc: QueryClient, r: Reactions) {
 
 /** Refetches the server's comment count everywhere the post is shown. */
 function refreshCommentCount(qc: QueryClient, postId: string, groupId: string) {
-  // The user's unread comments on the post are counted in their markers.
-  void qc.invalidateQueries({ queryKey: keys.markers })
+  // The user's unread comments on the post are counted in their marker for it, if they have one.
+  if (qc.getQueryData<Markers>(keys.markers)?.markers.some((m) => m.stream === postStream(postId)))
+    void qc.invalidateQueries({ queryKey: keys.markers })
   void qc.invalidateQueries({ queryKey: keys.post(postId) })
   void qc.invalidateQueries({ queryKey: keys.posts(groupId) })
   void qc.invalidateQueries({ queryKey: ['userPosts'] })

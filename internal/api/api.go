@@ -544,15 +544,10 @@ func (s *Server) createPost(w http.ResponseWriter, r *http.Request) {
 		pid := p.ID
 		entries := []events.Entry{{Kind: "post", Payload: &p}}
 		// The author gets a read position for the post's comments, so other users' comments show as unread to them.
+		// The post event makes the author's clients fetch their markers again, so no marker event is sent.
 		if err := qtx.SetMarker(r.Context(), store.SetMarkerParams{UserID: author.ID, Stream: "post:" + pid, ReadAt: now}); err != nil {
 			return nil, nil, http.StatusInternalServerError, err
 		}
-		read, err := qtx.GetPostMarker(r.Context(), store.GetPostMarkerParams{UserID: author.ID, PostID: pid})
-		if err != nil {
-			return nil, nil, http.StatusInternalServerError, err
-		}
-		m := wireMarker(store.ListMarkersRow(read))
-		entries = append(entries, events.Entry{Kind: "marker", Payload: &m})
 		told, err := mentionEvents(r, qtx, clean, author.ID, g.ID, &pid, nil, now, "")
 		if err != nil {
 			return nil, nil, http.StatusInternalServerError, err

@@ -1,6 +1,9 @@
 import type { Group, Marker, Notification, Topic } from '../api'
 import { COMMUNITY, groupPath, postPath, profilePath } from '../routes'
 
+/** The user's markers, as the server lists them. */
+export type Markers = { markers: Marker[] }
+
 /** The notifications stream's marker name. A room's chat and feed each have their own stream name. */
 export const NOTIFICATIONS = 'notifications'
 export const chatStream = (groupId: string) => `chat:${groupId}`
@@ -17,6 +20,21 @@ export interface UnreadPlace {
 /** The time the user has read a stream up to, or undefined if never. */
 export function markerOf(markers: Marker[] | undefined, stream: string): number | undefined {
   return markers?.find((m) => m.stream === stream)?.read_at
+}
+
+/**
+ * The fetched marker list, keeping any cached marker that is further on. A list fetched before a read was saved can
+ * arrive after the save. A marker only moves forward, as on the server, so the older row is not used.
+ */
+export function newerMarkers(cached: Markers | undefined, fetched: Markers): Markers {
+  if (!cached) return fetched
+  const known = new Map(cached.markers.map((m) => [m.stream, m]))
+  return {
+    markers: fetched.markers.map((m) => {
+      const c = known.get(m.stream)
+      return c && c.read_at > m.read_at ? c : m
+    }),
+  }
 }
 
 /** Whether a stream has unread content. */

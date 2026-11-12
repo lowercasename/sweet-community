@@ -93,9 +93,7 @@ type GetChatMarkerRow struct {
 // notifications row has only an unread count, because a notification is
 // read by opening it. Unread counts the items newer than the user's read
 // position. These are other users' live messages or posts since the user's
-// marker, or since they joined if they have never read. A post has a row
-// only once the user has a marker for it, and its unread count is other
-// users' live comments since that marker.
+// marker, or since they joined if they have never read.
 func (q *Queries) GetChatMarker(ctx context.Context, arg GetChatMarkerParams) (GetChatMarkerRow, error) {
 	row := q.db.QueryRowContext(ctx, getChatMarker, arg.UserID, arg.GroupID)
 	var i GetChatMarkerRow
@@ -258,9 +256,9 @@ UNION ALL
 SELECT r.user_id, r.stream, r.read_at,
        (SELECT COUNT(*) FROM comments c WHERE c.post_id = p.id AND c.deleted_at IS NULL AND c.author_id != r.user_id
           AND c.created_at > r.read_at) AS unread
-FROM read_markers r JOIN posts p ON r.stream = 'post:' || p.id
+FROM read_markers r JOIN posts p ON p.id = substr(r.stream, 6)
 JOIN memberships m ON m.group_id = p.group_id AND m.user_id = r.user_id
-WHERE r.user_id = ?1 AND p.deleted_at IS NULL
+WHERE r.user_id = ?1 AND r.stream LIKE 'post:%' AND p.deleted_at IS NULL
 `
 
 type ListMarkersRow struct {
@@ -271,7 +269,10 @@ type ListMarkersRow struct {
 }
 
 // The notifications row has no marker time. Its unread count is the number
-// of notifications not yet opened.
+// of notifications not yet opened. A post has a row only once the user has a
+// marker for it. Its unread count is other users' live comments since that
+// marker. The post is found by its id, so the query reads only the user's
+// markers and not every post in their rooms.
 func (q *Queries) ListMarkers(ctx context.Context, userID string) ([]ListMarkersRow, error) {
 	rows, err := q.db.QueryContext(ctx, listMarkers, userID)
 	if err != nil {

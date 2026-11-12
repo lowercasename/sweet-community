@@ -1,4 +1,4 @@
-import { type QueryClient, useInfiniteQuery, useQuery, useQueryClient } from '@tanstack/react-query'
+import { type QueryClient, replaceEqualDeep, useInfiniteQuery, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   ApiError,
   getPostNotificationPreference,
@@ -84,7 +84,7 @@ import {
 } from '../api'
 import { applyEvent, applyFollowing, refetchForOwnRole, refreshIdentities } from './apply'
 import { ROOT_ID, keys } from './keys'
-import { hasUnread, NOTIFICATIONS, unreadPlaces, type UnreadPlace } from './notifications'
+import { hasUnread, type Markers, newerMarkers, NOTIFICATIONS, unreadPlaces, type UnreadPlace } from './notifications'
 
 /*
  * Queries hold server data. Stream events update the cache. Writes either apply
@@ -402,7 +402,11 @@ export function useClearNotifications() {
 
 /** The user's read markers for each stream. `loaded` is true once the query has data, as opposed to an empty default. */
 export function useMarkers() {
-  const q = useQuery({ queryKey: keys.markers, queryFn: listMarkers })
+  const q = useQuery({
+    queryKey: keys.markers,
+    queryFn: listMarkers,
+    structuralSharing: (old, next) => replaceEqualDeep(old, newerMarkers(old as Markers | undefined, next as Markers)),
+  })
   return { markers: q.data?.markers ?? [], loaded: q.data !== undefined }
 }
 
