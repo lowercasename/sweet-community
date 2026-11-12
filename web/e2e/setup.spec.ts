@@ -36,13 +36,13 @@ test.describe('a fresh instance', () => {
     await expect(page.getByText(/has not been set up yet/)).toBeVisible()
     await expect(page).toHaveTitle('Sweet')
     await page.goto(setupPath)
-    // The owner sets up their account with a username and an email address. There is no password. Then they set up the community.
-    await expect(page.getByRole('heading', { name: 'Set up your account' })).toBeVisible()
+    // The owner creates their account with a username and an email address. There is no password. Then they set up the community.
+    await expect(page.getByRole('heading', { name: 'Create your account' })).toBeVisible()
     await expect(page.getByLabel('Password')).toHaveCount(0)
     await shoot(page, 'account')
     await page.getByLabel('Username').fill('raphael')
     await page.getByLabel('Email address').fill('raphael@example.test')
-    await page.getByRole('button', { name: 'Set up' }).click()
+    await page.getByRole('button', { name: 'Create account' }).click()
 
     // Onboarding sets the community name and then creates an invite link.
     await expect(page.getByRole('heading', { name: 'Set up your community' })).toBeVisible()
@@ -89,7 +89,7 @@ test.describe('a fresh instance', () => {
       await p.goto(joinPath)
       await expect(p.getByText('raphael invited you to Knitting Circle.')).toBeVisible()
       await expect(p.getByText('Wool and gossip.')).toBeVisible()
-      await expect(p.getByRole('heading', { name: 'Set up your account' })).toBeVisible()
+      await expect(p.getByRole('heading', { name: 'Create your account' })).toBeVisible()
       await p.screenshot({ path: 'test-results/setup-join.png' })
       await p.getByLabel('Username').fill(name)
       await p.getByLabel('Email address').fill(emailOf(name))

@@ -1,7 +1,11 @@
 import { useState } from 'react'
 import { setup, type User } from '../api'
+import { AccountFields } from '../components/AccountFields'
 import { AuthFrame } from '../components/AuthFrame'
-import { Alert, Button, Field, Form, Heading, Input, Row } from '../ui'
+import { Alert, Button, Form, Heading, Row, Text } from '../ui'
+
+/** The number of steps in setting up a new community. The account is the first, and the welcome page has the others. */
+export const SETUP_STEPS = 3
 
 interface SetupProps {
   token: string
@@ -9,9 +13,10 @@ interface SetupProps {
 }
 
 /**
- * The setup link's page. A fresh instance has no owner until the holder of
- * the link sets up their account here. The email address is treated as verified, because holding the link proves
- * access to the server. There is no password, because a password is always the secondary way in. One can be added on Settings later. The next step is "Set up your community".
+ * The setup link's page. A fresh instance has no owner until the holder of the link creates their account here. The
+ * community has no name yet, so the page names its address. The email address is treated as verified, because holding
+ * the link proves access to the server. There is no password, because a password is always the secondary way in. One
+ * can be added on Settings later. The next step is "Set up your community".
  */
 export function Setup({ token, onSetUp }: SetupProps) {
   const [username, setUsername] = useState('')
@@ -35,18 +40,23 @@ export function Setup({ token, onSetUp }: SetupProps) {
 
   return (
     <AuthFrame>
-      <Heading level={2}>Set up your account</Heading>
+      <Heading level={2} step={{ number: 1, total: SETUP_STEPS }}>
+        Create your account
+      </Heading>
+      <Text variant="small">
+        You are setting up a new Sweet community at {window.location.host}. Sweet is a private social network for one
+        group of people, with a feed of posts and a live chat.
+      </Text>
+      <Text variant="small">
+        This is your own account. You post and chat with it like everyone else. It also makes you the community's owner.
+        The owner looks after the community's name, its rules and who can join.
+      </Text>
       <Form onSubmit={() => void submit()}>
-        <Field label="Username" hint="Letters, numbers, and underscores.">
-          <Input name="username" value={username} onChange={setUsername} autoComplete="username" autoFocus required />
-        </Field>
-        <Field label="Email address" hint="When you sign in later, a link and a code are sent here.">
-          <Input type="email" name="email" value={email} onChange={setEmail} autoComplete="email" required />
-        </Field>
+        <AccountFields username={username} onUsername={setUsername} email={email} onEmail={setEmail} />
         {error && <Alert tone="error">{error}</Alert>}
         <Row justify="end" align="center">
           <Button type="submit" disabled={!username || !email} busy={busy}>
-            Set up
+            Create account
           </Button>
         </Row>
       </Form>

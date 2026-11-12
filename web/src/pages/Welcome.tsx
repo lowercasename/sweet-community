@@ -3,6 +3,7 @@ import type { Settings } from '../api'
 import { AuthFrame } from '../components/AuthFrame'
 import { CommunityForm } from '../components/CommunityForm'
 import { useInviteActions, useInvites, useSettings } from '../data/hooks'
+import { SETUP_STEPS } from './Setup'
 import { Button, Heading, Input, Row, Stack, Text } from '../ui'
 
 interface WelcomeProps {
@@ -50,7 +51,9 @@ export function Welcome({ settings: initial, onDone }: WelcomeProps) {
     <AuthFrame name={settings.name}>
       {named ? (
         <Stack gap={3}>
-          <Heading level={2}>Invite people</Heading>
+          <Heading level={2} step={{ number: 3, total: SETUP_STEPS }}>
+            Invite people
+          </Heading>
           <Text variant="small">
             Anyone with this link can join {settings.name} for the next seven days. After that, you can create a new
             link from the People page. You will receive a notification each time someone joins.
@@ -80,7 +83,9 @@ export function Welcome({ settings: initial, onDone }: WelcomeProps) {
         </Stack>
       ) : (
         <Stack gap={3}>
-          <Heading level={2}>Set up your community</Heading>
+          <Heading level={2} step={{ number: 2, total: SETUP_STEPS }}>
+            Set up your community
+          </Heading>
           <Text variant="small">
             This is your community. Give it a name and a description to help your new arrivals feel at home.
           </Text>

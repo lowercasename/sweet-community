@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react'
 import { getInvite, register, type Settings, type User } from '../api'
+import { AccountFields } from '../components/AccountFields'
 import { AuthFrame } from '../components/AuthFrame'
 import { CheckEmail } from '../components/CheckEmail'
 import { Body } from '../components/Body'
-import { Alert, Button, Field, Form, Heading, Inset, Input, Row, Stack, Text } from '../ui'
+import { Alert, Button, Form, Heading, Inset, Row, Stack, Text } from '../ui'
 
 interface JoinProps {
   code: string
@@ -74,15 +75,10 @@ export function Join({ code, community, onSignedIn }: JoinProps) {
         />
       ) : (
         <Form onSubmit={() => void submit()}>
-          <Heading level={2}>Set up your account</Heading>
+          <Heading level={2}>Create your account</Heading>
           <Text>{invitedBy ? `${invitedBy} invited you to ${name}.` : 'Checking your invite…'}</Text>
           {community?.description && <Text variant="secondary">{community.description}</Text>}
-          <Field label="Username" hint="Letters, numbers, and underscores.">
-            <Input name="username" value={username} onChange={setUsername} autoComplete="username" autoFocus required />
-          </Field>
-          <Field label="Email address" hint="You will sign in with a link and a code sent here.">
-            <Input type="email" name="email" value={email} onChange={setEmail} autoComplete="email" required />
-          </Field>
+          <AccountFields username={username} onUsername={setUsername} email={email} onEmail={setEmail} />
           {rules && (
             <Stack gap={1}>
               <Text variant="small" weight="bold">

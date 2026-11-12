@@ -35,8 +35,9 @@ describe('Welcome', () => {
     const { qc } = renderWithQuery(<Welcome settings={unnamed} onDone={onDone} />)
     // The page also reads the live settings query. Wait for that first read to complete before saving over it.
     await vi.waitFor(() => expect(qc.getQueryData(['settings'])).toBeTruthy())
-    // The step after "Set up your account" is "Set up your community".
+    // The step after "Create your account" is "Set up your community", the second of three.
     expect(screen.getByRole('heading', { name: 'Set up your community' })).toBeTruthy()
+    expect(screen.getByText('2 of 3')).toBeTruthy()
     expect((screen.getByRole('button', { name: 'Next' }) as HTMLButtonElement).disabled).toBe(true)
     fireEvent.change(screen.getByLabelText('Community name'), { target: { value: 'Knitting Circle' } })
     fireEvent.change(screen.getByLabelText('Short community description'), { target: { value: 'Wool.' } })
@@ -47,6 +48,7 @@ describe('Welcome', () => {
       group_creation: 'anyone',
     })
     await screen.findByText('Invite people')
+    expect(screen.getByText('3 of 3')).toBeTruthy()
     // One primary button at a time. Before the link exists, the main action is Create
     // invite link, with Skip for now beside it. After, the main action is going to the community.
     const primaries = () =>

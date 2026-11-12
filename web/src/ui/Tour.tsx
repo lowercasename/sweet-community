@@ -93,13 +93,9 @@ function TourCardView({ step, index, size, controls, tooltipProps }: TooltipRend
       className="flex w-[calc(100vw-2rem)] min-[800px]:w-[24rem] flex-col gap-3 rounded-card border border-line bg-card p-4 text-ink shadow-sm"
     >
       <div className="flex flex-col gap-2">
-        {/* The card's number out of the total sits at the right of the heading, on the heading's first line. */}
-        <div className="flex items-baseline justify-between gap-3">
-          <Heading level={2}>{card.title}</Heading>
-          <span className="flex-none">
-            <Text as="span" variant="small">{`${index + 1} of ${size}`}</Text>
-          </span>
-        </div>
+        <Heading level={2} step={{ number: index + 1, total: size }}>
+          {card.title}
+        </Heading>
         {card.body.map((p) => (
           <Text key={p} variant="small">
             {p}
