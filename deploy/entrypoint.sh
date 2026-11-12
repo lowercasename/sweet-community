@@ -26,10 +26,9 @@ if [ -z "$SWEET_S3_ENDPOINT" ] || [ -z "$SWEET_S3_ACCESS_KEY" ] || [ -z "$SWEET_
   exit 1
 fi
 
-# Images go under images/ and the database under db/ in the same bucket. SWEET_S3_FOLDER puts both under one
-# folder, <folder>/images and <folder>/db, so several instances can share a bucket.
+# The database goes under db/ in the bucket, beside Sweet's images/. SWEET_S3_FOLDER puts both under one folder,
+# <folder>/db and <folder>/images, so several instances can share a bucket.
 folder=${SWEET_S3_FOLDER:+${SWEET_S3_FOLDER%/}/}
-export SWEET_S3_PREFIX=${SWEET_S3_PREFIX:-${folder}images}
 export SWEET_S3_DB_PATH=${folder}db
 export SWEET_S3_REGION=${SWEET_S3_REGION:-auto}
 if [ "$SWEET_S3_INSECURE" = 1 ]; then
@@ -38,7 +37,6 @@ else
   export SWEET_S3_URL="https://$SWEET_S3_ENDPOINT"
 fi
 export SWEET_DATA=$data
-export SWEET_LITESTREAM=1
 
 if [ "$1" = restore ]; then
   stage=$(mktemp -d "$data/.sweet-download-XXXXXX")
@@ -55,4 +53,4 @@ fi
 
 litestream restore -if-db-not-exists -if-replica-exists -config /etc/litestream.yml "$db"
 exec litestream replicate -config /etc/litestream.yml \
-  -exec "sweet -addr :8080 -db $db -images-dir $data/images -mail-dir $data/mail $*"
+  -exec "sweet -litestream -addr :8080 -db $db -images-dir $data/images -mail-dir $data/mail $*"

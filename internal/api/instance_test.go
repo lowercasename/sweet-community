@@ -103,14 +103,6 @@ func rootID(c *client) string {
 	return ""
 }
 
-// A scripted owner (the -owner-password path) needs no setup link.
-func TestScriptedOwnerNeedsNoSetup(t *testing.T) {
-	_, _, srv := newTestServerWith(t)
-	if needs, err := NeedsSetup(context.Background(), srv.DB); err != nil || needs {
-		t.Fatalf("needs setup with a scripted owner: %v %v", needs, err)
-	}
-}
-
 // Each user who joins through an invite link creates a notification for the
 // owner and every moderator, and for nobody else.
 func TestStaffHearOfEachArrival(t *testing.T) {

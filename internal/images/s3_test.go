@@ -23,7 +23,7 @@ func TestS3RoundTrip(t *testing.T) {
 	}
 	var nonce [6]byte
 	rand.Read(nonce[:])
-	prefix := strings.TrimSuffix(os.Getenv("SWEET_S3_PREFIX"), "/") + "/test-" + hex.EncodeToString(nonce[:])
+	prefix := strings.Trim(os.Getenv("SWEET_S3_FOLDER"), "/") + "/test-" + hex.EncodeToString(nonce[:])
 	st, err := NewS3(S3Config{
 		Endpoint:  ep,
 		Bucket:    bucket,

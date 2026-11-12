@@ -43,11 +43,20 @@ func imageStore(dir string) (images.Store, error) {
 			AccessKey: os.Getenv("SWEET_S3_ACCESS_KEY"),
 			SecretKey: os.Getenv("SWEET_S3_SECRET_KEY"),
 			Region:    os.Getenv("SWEET_S3_REGION"),
-			Prefix:    os.Getenv("SWEET_S3_PREFIX"),
+			Prefix:    s3Prefix(os.Getenv("SWEET_S3_FOLDER")),
 			Insecure:  os.Getenv("SWEET_S3_INSECURE") == "1",
 		})
 	}
 	return images.NewLocal(dir)
+}
+
+// s3Prefix is where images go in the bucket: <folder>/images, or images without a folder. The container's entrypoint
+// puts the database backup beside them, under <folder>/db.
+func s3Prefix(folder string) string {
+	if folder = strings.Trim(folder, "/"); folder != "" {
+		return folder + "/images"
+	}
+	return "images"
 }
 
 //go:embed migrations
@@ -69,9 +78,6 @@ func main() {
 	addr := flag.String("addr", ":8080", "listen address")
 	dbPath := flag.String("db", "data/sweet.db", "SQLite database path")
 	restoreFrom := flag.String("restore-from", "", "restore a standalone SQLite backup and exit. Stop Sweet and Litestream first")
-	owner := flag.String("owner", "owner", "username of the instance owner, when -owner-password makes one without the setup link")
-	ownerPassword := flag.String("owner-password", os.Getenv("SWEET_OWNER_PASSWORD"),
-		"the owner's password (or SWEET_OWNER_PASSWORD) for a scripted setup; without it a fresh instance prints a setup link")
 	imagesDir := flag.String("images-dir", "data/images", "directory for uploaded images when SWEET_S3_* is not set")
 	mailDir := flag.String("mail-dir", "data/mail", "directory that receives email as files when SWEET_SMTP_HOST is not set")
 	baseURL := flag.String("base-url", envOr("SWEET_BASE_URL", "http://localhost:8080"), "the address links in email point at (or SWEET_BASE_URL)")
@@ -80,8 +86,7 @@ func main() {
 	proxies, _ := strconv.Atoi(os.Getenv("SWEET_TRUST_PROXY"))
 	trustProxy := flag.Int("trust-proxy", proxies,
 		"the number of reverse proxies in front of Sweet that add the client's address to X-Forwarded-For, usually 1 (or SWEET_TRUST_PROXY)")
-	litestream := flag.Bool("litestream", os.Getenv("SWEET_LITESTREAM") == "1",
-		"Litestream replicates the database and owns its checkpoints (or SWEET_LITESTREAM=1)")
+	litestream := flag.Bool("litestream", false, "Litestream replicates the database and owns its checkpoints")
 	showVersion := flag.Bool("version", false, "print the version of this binary and exit")
 	flag.Parse()
 	if *showVersion {
@@ -124,13 +129,7 @@ func main() {
 	}
 
 	base := strings.TrimRight(*baseURL, "/")
-	// The owner is created from the password when one is given. Otherwise,
-	// on a new instance, the owner is whoever opens the setup link.
-	if *ownerPassword != "" {
-		if _, err := api.EnsureOwner(ctx, d, *owner, *ownerPassword); err != nil {
-			log.Fatalf("owner: %v", err)
-		}
-	}
+	// On a new instance, the owner is whoever opens the setup link.
 	if needs, err := api.NeedsSetup(ctx, d); err != nil {
 		log.Fatalf("owner: %v", err)
 	} else if needs {

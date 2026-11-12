@@ -101,7 +101,7 @@ Keep Sweet and Litestream stopped throughout a restore. Start Sweet only after t
 
 ### Without Docker
 
-`make build` produces `bin/sweet`, one file with the frontend and the migrations inside it. It takes the same settings from the environment, and `./bin/sweet -help` lists its flags. Put a reverse proxy in front of it and set `SWEET_TRUST_PROXY` to the number of proxies in front of Sweet, usually `1`. Sweet uses that number to find the visitor's address in `X-Forwarded-For` for its rate limits. If you run Litestream yourself, start Sweet with `SWEET_LITESTREAM=1` so it leaves checkpointing to Litestream.
+`make build` produces `bin/sweet`, one file with the frontend and the migrations inside it. It takes the same settings from the environment, and `./bin/sweet -help` lists its flags. Put a reverse proxy in front of it and set `SWEET_TRUST_PROXY` to the number of proxies in front of Sweet, usually `1`. Sweet uses that number to find the visitor's address in `X-Forwarded-For` for its rate limits. If you run Litestream yourself, start Sweet with `-litestream` so it leaves checkpointing to Litestream.
 
 ## Develop
 
@@ -123,7 +123,7 @@ make dev-backend
 
 Open `http://localhost:5173`. The frontend forwards API requests to the backend on port 8080.
 
-On a fresh database, the backend prints a `SETUP:` link. Open it to create your account. Leave `SWEET_OWNER_PASSWORD` unset to use this setup flow. Without SMTP settings, sign-in emails are saved in `data/mail`.
+On a fresh database, the backend prints a `SETUP:` link. Open it to create your account. Without SMTP settings, sign-in emails are saved in `data/mail`.
 
 For optional settings, copy `.env.example` to `.env` and edit it. The Make targets load this file. It is ignored by Git.
 

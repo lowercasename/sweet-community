@@ -15,7 +15,6 @@ import (
 
 	"github.com/google/uuid"
 
-	"sweet/internal/auth"
 	"sweet/internal/db"
 	"sweet/internal/events"
 	"sweet/internal/images"
@@ -175,52 +174,6 @@ func nullInt(v sql.NullInt64) *int64 {
 		return nil
 	}
 	return &v.Int64
-}
-
-// EnsureOwner makes sure the instance has its owner account. On first run it
-// creates the user. When the owner has no password yet and one is given, it
-// sets the password. A password given after that is ignored, and the owner
-// changes it in the app.
-func EnsureOwner(ctx context.Context, d *sql.DB, username, password string) (User, error) {
-	q := store.New(d)
-	u := User{Username: username}
-	now := db.Now()
-	row, err := q.GetUserByUsername(ctx, username)
-	switch {
-	case errors.Is(err, sql.ErrNoRows):
-		id, err := uuid.NewV7()
-		if err != nil {
-			return u, err
-		}
-		u.ID = id.String()
-		if err := q.CreateUser(ctx, store.CreateUserParams{ID: u.ID, Username: u.Username, CreatedAt: now}); err != nil {
-			return u, err
-		}
-	case err != nil:
-		return u, err
-	default:
-		u.ID = row.ID
-	}
-	// The owner is the root group's owner.
-	if _, err := q.GetMembership(ctx, store.GetMembershipParams{GroupID: perm.Root, UserID: u.ID}); errors.Is(err, sql.ErrNoRows) {
-		if err := q.CreateMembership(ctx, store.CreateMembershipParams{GroupID: perm.Root, UserID: u.ID, Role: perm.Owner, JoinedAt: now}); err != nil {
-			return u, err
-		}
-	} else if err != nil {
-		return u, err
-	} else if err := q.SetMembershipRole(ctx, store.SetMembershipRoleParams{Role: perm.Owner, GroupID: perm.Root, UserID: u.ID}); err != nil {
-		return u, err
-	}
-	if !row.PasswordHash.Valid && password != "" {
-		h, err := auth.HashPassword(password)
-		if err != nil {
-			return u, err
-		}
-		if err := q.SetUserPassword(ctx, store.SetUserPasswordParams{PasswordHash: sql.NullString{String: h, Valid: true}, ID: u.ID}); err != nil {
-			return u, err
-		}
-	}
-	return u, nil
 }
 
 func (s *Server) Routes(mux *http.ServeMux) {

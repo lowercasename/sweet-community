@@ -50,7 +50,7 @@ func newTestServerWith(t *testing.T) (*httptest.Server, *client, *Server) {
 	if err := db.Migrate(context.Background(), d, os.DirFS("../../migrations")); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := EnsureOwner(context.Background(), d, "raphael", "correct horse"); err != nil {
+	if err := makeOwner(context.Background(), d, "raphael", "correct horse"); err != nil {
 		t.Fatal(err)
 	}
 	imgs, err := images.NewLocal(filepath.Join(t.TempDir(), "images"))
@@ -283,36 +283,6 @@ func TestCrossSiteWritesAreRefused(t *testing.T) {
 	status, _ = owner.do("GET", rootPath+"/posts", nil, "Origin", "https://evil.example")
 	if status != 200 {
 		t.Fatalf("cross-origin GET: want 200, got %d", status)
-	}
-}
-
-func TestOwnerPasswordIsSetOnceOnly(t *testing.T) {
-	d, err := db.Open(filepath.Join(t.TempDir(), "o.db"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer d.Close()
-	ctx := context.Background()
-	if err := db.Migrate(ctx, d, os.DirFS("../../migrations")); err != nil {
-		t.Fatal(err)
-	}
-	if _, err := EnsureOwner(ctx, d, "o", ""); err != nil {
-		t.Fatal(err)
-	}
-	if needs, err := NeedsSetup(ctx, d); err != nil || !needs {
-		t.Fatalf("an owner without a password needs setup: %v %v", needs, err)
-	}
-	EnsureOwner(ctx, d, "o", "first one")
-	EnsureOwner(ctx, d, "o", "second one must not replace")
-	srv := &Server{DB: d, Hub: events.NewHub(d)}
-	mux := http.NewServeMux()
-	srv.Routes(mux)
-	ts := httptest.NewServer(mux)
-	defer ts.Close()
-	c := newClient(t, ts)
-	c.login("o", "first one")
-	if status, _ := newClient(t, ts).do("POST", "/api/login", map[string]string{"username": "o", "password": "second one must not replace"}); status != 401 {
-		t.Fatalf("later -owner-password must be ignored, got %d", status)
 	}
 }
 

@@ -17,15 +17,15 @@ build: cmd/sweet/migrations frontend
 
 # Backend only, serving whatever is in internal/web/dist (placeholder until
 # the frontend is built). Pair with `cd web && pnpm dev` for live reload.
-# Local settings (owner password, S3/R2 keys) live in a gitignored .env; see .env.example.
+# Local settings (email, S3/R2 keys) live in a gitignored .env; see .env.example.
 -include .env
 export
 
 dev-backend: cmd/sweet/migrations
-	go run -ldflags "$(LDFLAGS)" ./cmd/sweet -db data/sweet.db -owner raphael -base-url http://localhost:5173
+	go run -ldflags "$(LDFLAGS)" ./cmd/sweet -db data/sweet.db -base-url http://localhost:5173
 
 run: build
-	./bin/sweet -db data/sweet.db -owner raphael
+	./bin/sweet -db data/sweet.db
 
 generate:
 	go tool sqlc generate
