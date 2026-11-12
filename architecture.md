@@ -280,6 +280,7 @@ A user is notified of a comment on their post, a mention, being added to a room,
 - New posts and messages in rooms show as unread dots. A notification for every room message would duplicate what the room already shows.
 - A notification is read when the user opens it, not when they view the list.
 - The indicator is a dot, never a count, because a count invites the user to clear it.
+- Notification settings are available in Settings and below the notification list, so people can manage delivery where they read notifications.
 - A conversation message creates a notification, because notifications reach a user who is not in the app. Each conversation has at most one unread message notification.
 - One action never notifies the same person twice.
 

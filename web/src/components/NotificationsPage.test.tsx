@@ -12,6 +12,8 @@ import { ROOT, group, notification, renderWithQuery, user } from '../test-utils'
  */
 vi.mock('../api', () => ({
   listNotifications: vi.fn(),
+  getMySettings: vi.fn(() => Promise.resolve({ digest: 'weekly', welcomed: true })),
+  setMySettings: vi.fn(),
   listMarkers: vi.fn(() => Promise.resolve({ markers: [] })),
   readNotification: vi.fn(),
   clearNotifications: vi.fn(),
@@ -48,6 +50,14 @@ async function draw() {
 }
 
 describe('NotificationsPage', () => {
+  it('offers notification settings even when the list is empty', async () => {
+    const { listNotifications } = await import('../api')
+    vi.mocked(listNotifications).mockResolvedValue({ notifications: [], next_before: null })
+    await draw()
+    await screen.findByText('Nice and quiet in here.')
+    expect(screen.getByRole('heading', { name: 'Notifications settings' })).toBeTruthy()
+  })
+
   it('lists unopened ones under New and opened ones under Earlier, and viewing marks none read', async () => {
     const { readNotification } = await import('../api')
     await draw()
@@ -149,7 +159,7 @@ describe('NotificationsPage', () => {
       next_before: null,
     })
     const onGo = await draw()
-    const rows = within(await screen.findByRole('list')).getAllByRole('button')
+    const rows = await screen.findAllByRole('button', { name: /^mo mentioned you/ })
     expect(rows.map((b) => b.getAttribute('aria-label'))).toEqual([
       'mo mentioned you in a post, new',
       'mo mentioned you in Knitting, new',
@@ -166,8 +176,9 @@ describe('NotificationsPage', () => {
     const { listNotifications } = await import('../api')
     vi.mocked(listNotifications).mockResolvedValue({ notifications: [], next_before: null })
     await draw()
-    await screen.findByText(/No notifications yet/)
-    expect(screen.queryByRole('list')).toBeNull()
+    await screen.findByText(/Nice and quiet in here/)
+    expect(screen.queryByRole('heading', { name: 'New' })).toBeNull()
+    expect(screen.queryByRole('heading', { name: 'Earlier' })).toBeNull()
   })
 
   it('labels a group the user is no longer in as "a room"', async () => {
@@ -177,8 +188,6 @@ describe('NotificationsPage', () => {
       next_before: null,
     })
     await draw()
-    expect((await screen.findByRole('list')).querySelector('button')!.getAttribute('aria-label')).toBe(
-      'mo added you to a room, new',
-    )
+    expect(await screen.findByRole('button', { name: 'mo added you to a room, new' })).toBeTruthy()
   })
 })

@@ -2,6 +2,7 @@ import { useState } from 'react'
 import type { Group, Notification } from '../api'
 import { useAuthor, useClearNotifications, useNotifications, useReadNotification, useTopics } from '../data/hooks'
 import { describe, targetOf } from '../data/notifications'
+import { NotificationsCard } from './NotificationsCard'
 import {
   Alert,
   Avatar,
@@ -72,37 +73,40 @@ export function NotificationsPage({ groups, onGo }: NotificationsPageProps) {
     <Pane>
       <ScrollArea>
         <Measure>
-          <Card>
-            <Stack gap={2}>
-              {error && <Alert tone="error">{error.message}</Alert>}
-              {!loading && notifications.length === 0 && <Text variant="secondary">No notifications yet.</Text>}
-              {fresh.length > 0 && (
-                <Stack gap={1}>
-                  <Heading level={3}>New</Heading>
-                  {rows(fresh)}
-                </Stack>
-              )}
-              {earlier.length > 0 && (
-                <Stack gap={1}>
-                  <Row justify="between" align="center">
-                    <Heading level={3}>Earlier</Heading>
-                    <Button variant="ghost" icon="trash" busy={clearing} onClick={() => void clearSeen()}>
-                      Clear
+          <Stack gap={3}>
+            <Card>
+              <Stack gap={2}>
+                {error && <Alert tone="error">{error.message}</Alert>}
+                {!loading && notifications.length === 0 && <Text variant="secondary">Nice and quiet in here.</Text>}
+                {fresh.length > 0 && (
+                  <Stack gap={1}>
+                    <Heading level={3}>New</Heading>
+                    {rows(fresh)}
+                  </Stack>
+                )}
+                {earlier.length > 0 && (
+                  <Stack gap={1}>
+                    <Row justify="between" align="center">
+                      <Heading level={3}>Earlier</Heading>
+                      <Button variant="ghost" icon="trash" busy={clearing} onClick={() => void clearSeen()}>
+                        Clear
+                      </Button>
+                    </Row>
+                    {problem && <Alert tone="error">{problem}</Alert>}
+                    {rows(earlier)}
+                  </Stack>
+                )}
+                {hasMore && (
+                  <Row>
+                    <Button variant="secondary" busy={loading} onClick={loadMore}>
+                      Load more
                     </Button>
                   </Row>
-                  {problem && <Alert tone="error">{problem}</Alert>}
-                  {rows(earlier)}
-                </Stack>
-              )}
-              {hasMore && (
-                <Row>
-                  <Button variant="secondary" busy={loading} onClick={loadMore}>
-                    Load more
-                  </Button>
-                </Row>
-              )}
-            </Stack>
-          </Card>
+                )}
+              </Stack>
+            </Card>
+            <NotificationsCard title="Notifications settings" />
+          </Stack>
         </Measure>
       </ScrollArea>
     </Pane>

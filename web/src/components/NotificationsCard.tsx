@@ -10,7 +10,7 @@ import { ActionRow, ActionRows, Alert, Button, Card, Heading, Stack } from '../u
  * an action row. Each toggle shows its state,
  * and shows its action on hover.
  */
-export function NotificationsCard() {
+export function NotificationsCard({ title = 'Notifications' }: { title?: string }) {
   const { data: settings, error } = useMySettings()
   const setSettings = useSetMySettings()
   const [working, setWorking] = useState<'digest' | 'device' | null>(null)
@@ -59,7 +59,7 @@ export function NotificationsCard() {
   return (
     <Card>
       <Stack gap={2}>
-        <Heading level={2}>Notifications</Heading>
+        <Heading level={2}>{title}</Heading>
         {error && <Alert tone="error">{error.message}</Alert>}
         {problem && <Alert tone="error">{problem}</Alert>}
         <ActionRows>

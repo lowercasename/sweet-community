@@ -142,3 +142,26 @@ test.describe('notifications', () => {
     await mo.context.close()
   })
 })
+
+for (const suffix of ['', ' @phone']) {
+  test(`notification settings are available below the list and shared with Settings${suffix}`, async ({
+    browser,
+  }, info) => {
+    const kit = await member(browser, info)
+    await open(kit.page, '/notifications')
+    const empty = kit.page.getByText('Nice and quiet in here.')
+    const heading = kit.page.getByRole('heading', { name: 'Notifications settings' })
+    await expect(empty).toBeVisible()
+    await expect(heading).toBeVisible()
+    expect((await heading.boundingBox())!.y).toBeGreaterThan((await empty.boundingBox())!.y)
+    await expect(kit.page.getByText('Push notifications', { exact: true })).toBeVisible()
+    const digest = kit.page.getByRole('button', { name: 'Weekly digest on', exact: true })
+    await expect(digest).toBeVisible()
+    await kit.page.screenshot({ path: info.outputPath('notifications-settings.png') })
+    await digest.click()
+    await expect(kit.page.getByRole('button', { name: 'Send me a weekly digest', exact: true })).toBeVisible()
+    await open(kit.page, '/settings')
+    await expect(kit.page.getByRole('button', { name: 'Send me a weekly digest', exact: true })).toBeVisible()
+    await kit.context.close()
+  })
+}
