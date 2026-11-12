@@ -5,6 +5,22 @@
 self.addEventListener('install', () => self.skipWaiting())
 self.addEventListener('activate', (event) => event.waitUntil(self.clients.claim()))
 
+// Ask focused windows about the actual discussion and read position, not just their URL.
+function hasReached(window, data) {
+  if (!window.focused || !data.scope || !data.at) return Promise.resolve(false)
+  return new Promise((resolve) => {
+    const channel = new MessageChannel()
+    const finish = (reached) => {
+      clearTimeout(timeout)
+      channel.port1.close()
+      resolve(reached)
+    }
+    const timeout = setTimeout(() => finish(false), 300)
+    channel.port1.onmessage = (event) => finish(event.data === true)
+    window.postMessage({ type: 'reading', scope: data.scope, at: data.at }, [channel.port2])
+  })
+}
+
 self.addEventListener('push', (event) => {
   let data = { title: 'Sweet', body: '', url: '/', tag: undefined }
   try {
@@ -13,17 +29,42 @@ self.addEventListener('push', (event) => {
     // A push with no readable body still shows the title.
   }
   event.waitUntil(
-    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((windows) => {
-      // Do not show a notification for a page that is open in a focused window.
-      const path = new URL(data.url, self.location.origin).pathname
-      if (windows.some((w) => w.focused && new URL(w.url).pathname === path)) return
+    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then(async (windows) => {
+      if ((await Promise.all(windows.map((window) => hasReached(window, data)))).some(Boolean)) return
+      const shown = data.tag ? await self.registration.getNotifications({ tag: data.tag }) : []
+      if (
+        shown.some(
+          (n) =>
+            n.data?.at > data.at ||
+            (n.data?.at === data.at &&
+              (n.data?.id > data.id || (n.data?.id === data.id && n.data?.revision >= data.revision))),
+        )
+      )
+        return
       return self.registration.showNotification(data.title, {
         body: data.body,
         icon: '/icon-192.png',
         badge: '/icon-192.png',
         tag: data.tag,
-        data: { url: data.url },
+        renotify: Boolean(data.tag),
+        data: { id: data.id, revision: data.revision, url: data.url, scope: data.scope, at: data.at },
       })
+    }),
+  )
+})
+
+// Reading or clearing activity also closes matching alerts on this device.
+self.addEventListener('message', (event) => {
+  const data = event.data
+  if (data?.type !== 'read' && data?.type !== 'clear') return
+  event.waitUntil(
+    self.registration.getNotifications().then((notifications) => {
+      for (const notification of notifications) {
+        const item = notification.data
+        const sameVersion = !data.id || (item?.id === data.id && item.revision <= data.revision)
+        if (sameVersion && item?.at <= data.at && (data.type === 'clear' || item.scope === data.scope))
+          notification.close()
+      }
     }),
   )
 })

@@ -92,7 +92,8 @@ function Loaded({ profile, me, onGo }: { profile: Profile; me: User; onGo: (path
                   <Stack gap={0}>
                     <Heading level={2}>{profile.username}</Heading>
                     <Text as="span" variant="small">
-                      {ROLE_WORD[profile.role] && `${ROLE_WORD[profile.role]} · `}joined <Time at={profile.joined_at} />
+                      {ROLE_WORD[profile.role] && `${ROLE_WORD[profile.role]} · `}joined{' '}
+                      <Time at={profile.joined_at} format="date" />
                     </Text>
                   </Stack>
                 </Row>

@@ -1,6 +1,14 @@
 import { useState } from 'react'
 import type { Group, Notification } from '../api'
-import { useAuthor, useClearNotifications, useNotifications, useReadNotification, useTopics } from '../data/hooks'
+import {
+  useAuthor,
+  useClearNotifications,
+  useNotifications,
+  useReadNotification,
+  useReadAllNotifications,
+  useUnreadNotifications,
+  useTopics,
+} from '../data/hooks'
 import { describe, targetOf } from '../data/notifications'
 import { NotificationsCard } from './NotificationsCard'
 import {
@@ -31,27 +39,29 @@ interface NotificationsPageProps {
  * The user's notifications, newest first, in
  * two sections. Each notification is a sentence that opens its target when
  * clicked. New holds the unopened notifications. Opening one marks it read
- * and moves it to Earlier. Viewing the page marks nothing as read. Clear permanently deletes the notifications in Earlier.
+ * and moves it to Earlier. Viewing the page marks nothing as read. Bulk actions mark all read or clear both sections.
  */
 export function NotificationsPage({ groups, onGo }: NotificationsPageProps) {
   const { notifications, loading, error, hasMore, loadMore } = useNotifications()
   const read = useReadNotification()
   const clear = useClearNotifications()
-  const [clearing, setClearing] = useState(false)
+  const readAll = useReadAllNotifications()
+  const unread = useUnreadNotifications()
+  const [pending, setPending] = useState<'read' | 'clear' | null>(null)
   const [problem, setProblem] = useState<string | null>(null)
   const root = groups.find((g) => g.kind === 'root')
   const fresh = notifications.filter((n) => n.read_at == null)
   const earlier = notifications.filter((n) => n.read_at != null)
 
-  const clearSeen = async () => {
-    setClearing(true)
+  const bulk = async (kind: 'read' | 'clear', action: () => Promise<void>) => {
+    setPending(kind)
     setProblem(null)
     try {
-      await clear()
+      await action()
     } catch (e) {
-      setProblem(e instanceof Error ? e.message : 'Could not clear the notifications')
+      setProblem(e instanceof Error ? e.message : 'Could not update the notifications')
     } finally {
-      setClearing(false)
+      setPending(null)
     }
   }
   const rows = (list: Notification[]) => (
@@ -77,6 +87,8 @@ export function NotificationsPage({ groups, onGo }: NotificationsPageProps) {
             <Card>
               <Stack gap={2}>
                 {error && <Alert tone="error">{error.message}</Alert>}
+                {problem && <Alert tone="error">{problem}</Alert>}
+                {loading && notifications.length === 0 && <Text variant="secondary">Loading notifications…</Text>}
                 {!loading && notifications.length === 0 && <Text variant="secondary">Nice and quiet in here.</Text>}
                 {fresh.length > 0 && (
                   <Stack gap={1}>
@@ -86,15 +98,33 @@ export function NotificationsPage({ groups, onGo }: NotificationsPageProps) {
                 )}
                 {earlier.length > 0 && (
                   <Stack gap={1}>
-                    <Row justify="between" align="center">
-                      <Heading level={3}>Earlier</Heading>
-                      <Button variant="ghost" icon="trash" busy={clearing} onClick={() => void clearSeen()}>
-                        Clear
-                      </Button>
-                    </Row>
-                    {problem && <Alert tone="error">{problem}</Alert>}
+                    <Heading level={3}>Earlier</Heading>
                     {rows(earlier)}
                   </Stack>
+                )}
+                {notifications.length > 0 && (
+                  <Row justify="end">
+                    {unread && (
+                      <Button
+                        variant="secondary"
+                        icon="check"
+                        busy={pending === 'read'}
+                        disabled={pending !== null}
+                        onClick={() => void bulk('read', readAll)}
+                      >
+                        Mark all read
+                      </Button>
+                    )}
+                    <Button
+                      variant="danger"
+                      icon="trash"
+                      busy={pending === 'clear'}
+                      disabled={pending !== null}
+                      onClick={() => void bulk('clear', clear)}
+                    >
+                      Clear all
+                    </Button>
+                  </Row>
                 )}
                 {hasMore && (
                   <Row>
@@ -137,10 +167,11 @@ function NotificationRow({ notification: n, groups, onOpen }: NotificationRowPro
           <Text as="span" variant="body" weight={fresh ? 'bold' : 'normal'}>
             {sentence}
             {/* Only the owner and moderators get these, so they carry the shield. */}
-            {(n.kind === 'joined' || n.kind === 'report') && <ShieldMark />}
+            {(n.kind === 'joined' || n.kind === 'report') && <ShieldMark inline />}
           </Text>
           <Text as="span" variant="small">
             <Time at={n.created_at} />
+            {(n.activity_count ?? 1) > 1 && ` · ${n.activity_count} updates`}
           </Text>
         </Stack>
       </ListRow>

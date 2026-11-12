@@ -1,6 +1,12 @@
-import { useInfiniteQuery, useQuery, useQueryClient } from '@tanstack/react-query'
+import { type QueryClient, useInfiniteQuery, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   ApiError,
+  getPostNotificationPreference,
+  setPostNotificationPreference,
+  getRoomNotificationPreference,
+  setRoomNotificationPreference,
+  readAllNotifications,
+  type RoomNotificationMode,
   addMember,
   getLinkPreview,
   changeEmail,
@@ -77,9 +83,9 @@ import { ROOT_ID, keys } from './keys'
 import { NOTIFICATIONS, unreadPlaces, type UnreadPlace } from './notifications'
 
 /*
- * Reads are queries. Writes call the API and then pass the reply through
- * applyEvent, the same path the stream uses, so the cache has only one way
- * of changing. Components keep no server data of their own.
+ * Queries hold server data. Stream events update the cache. Writes either apply
+ * their response or refetch when a delayed response could overwrite newer state.
+ * Components keep no server data of their own.
  */
 
 /** The signed-in user, or null when nobody is. */
@@ -103,11 +109,15 @@ export function useSession() {
       // and then remove the rest. Clearing the whole cache first would leave
       // that observer holding the removed query and its old data.
       qc.setQueryData<User | null>(keys.me, null)
+      for (const pending of pendingMarks.values()) clearTimeout(pending.timer)
+      pendingMarks.clear()
       qc.removeQueries({ predicate: (q) => q.queryKey[0] !== 'me' })
     },
     /** The user's account was removed from the instance. The server has already ended the session. Clears the cache. */
     gone() {
       qc.setQueryData<User | null>(keys.me, null)
+      for (const pending of pendingMarks.values()) clearTimeout(pending.timer)
+      pendingMarks.clear()
       qc.removeQueries({ predicate: (q) => q.queryKey[0] !== 'me' })
     },
   }
@@ -358,23 +368,31 @@ export function useNotifications() {
   return { notifications: items, ...rest }
 }
 
-/** Marks a notification read when it is opened and applies the server's reply. */
+/** Marks the opened notification version read, then refreshes current notifications and counts. */
 export function useReadNotification() {
   const qc = useQueryClient()
   return (n: Notification) => {
     if (n.read_at != null) return
-    readNotification(n.id).then(
-      (read) => applyEvent(qc, 'notification', read),
+    readNotification(n.id, n.created_at, n.activity_count ?? 1).then(
+      () => refreshNotifications(qc),
       (e: unknown) => console.error('could not mark as read', e),
     )
   }
 }
 
-/** Clears the user's opened notifications. The reply goes through the cache's one write path. */
+function refreshNotifications(qc: QueryClient) {
+  return Promise.all([
+    qc.invalidateQueries({ queryKey: keys.notifications }),
+    qc.invalidateQueries({ queryKey: keys.markers }),
+  ])
+}
+
+/** Clears read and unread notifications, then fetches the current list and counts. */
 export function useClearNotifications() {
   const qc = useQueryClient()
   return async () => {
-    applyEvent(qc, 'notification_delete', await clearNotifications())
+    await clearNotifications()
+    await refreshNotifications(qc)
   }
 }
 
@@ -397,7 +415,7 @@ export function useUnreadPlaces(): Map<string, UnreadPlace> {
 }
 
 /** Debounced marker PUTs that have not been sent yet, one per stream. The latest time wins. */
-const pendingMarks = new Map<string, ReturnType<typeof setTimeout>>()
+const pendingMarks = new Map<string, { timer: ReturnType<typeof setTimeout>; readAt: number }>()
 
 /**
  * Marks a stream read up to a time and applies the server's reply. A chat marks with a
@@ -406,17 +424,18 @@ const pendingMarks = new Map<string, ReturnType<typeof setTimeout>>()
 export function useMarkRead() {
   const qc = useQueryClient()
   return (stream: string, readAt: number, debounceMs = 0) => {
+    const waiting = pendingMarks.get(stream)
+    const through = Math.max(readAt, waiting?.readAt ?? 0)
+    if (waiting) clearTimeout(waiting.timer)
     const send = () => {
       pendingMarks.delete(stream)
-      setMarker(stream, readAt).then(
+      setMarker(stream, through).then(
         (m) => applyEvent(qc, 'marker', m),
         (e: unknown) => console.error('could not mark as read', e),
       )
     }
-    const waiting = pendingMarks.get(stream)
-    if (waiting) clearTimeout(waiting)
     if (debounceMs <= 0) send()
-    else pendingMarks.set(stream, setTimeout(send, debounceMs))
+    else pendingMarks.set(stream, { timer: setTimeout(send, debounceMs), readAt: through })
   }
 }
 
@@ -507,7 +526,8 @@ export function useMySettings() {
 export function useSetMySettings() {
   const qc = useQueryClient()
   return async (s: MySettingsUpdate) => {
-    qc.setQueryData(keys.mySettings, await setMySettings(s))
+    await setMySettings(s)
+    await qc.invalidateQueries({ queryKey: keys.mySettings })
   }
 }
 export function useAccount() {
@@ -587,4 +607,38 @@ export function useLinkPreview(url: string) {
     staleTime: Infinity,
     retry: false,
   })
+}
+
+export function usePostNotificationPreference(id: string, enabled = true) {
+  const qc = useQueryClient()
+  const query = useQuery({
+    queryKey: keys.postNotifications(id),
+    queryFn: () => getPostNotificationPreference(id),
+    enabled,
+  })
+  return {
+    ...query,
+    set: async (following: boolean) => {
+      await setPostNotificationPreference(id, following)
+      await qc.invalidateQueries({ queryKey: keys.postNotifications(id) })
+    },
+  }
+}
+export function useRoomNotificationPreference(id: string) {
+  const qc = useQueryClient()
+  const query = useQuery({ queryKey: keys.roomNotifications(id), queryFn: () => getRoomNotificationPreference(id) })
+  return {
+    ...query,
+    set: async (mode: RoomNotificationMode) => {
+      await setRoomNotificationPreference(id, mode)
+      await qc.invalidateQueries({ queryKey: keys.roomNotifications(id) })
+    },
+  }
+}
+export function useReadAllNotifications() {
+  const qc = useQueryClient()
+  return async () => {
+    await readAllNotifications()
+    await refreshNotifications(qc)
+  }
 }

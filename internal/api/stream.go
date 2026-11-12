@@ -161,7 +161,7 @@ func filterEvent(viewer User, roles map[string]string, st *Settings, e events.Ev
 		}
 		a, _ := inGroup(rp.GroupID)
 		return encode(forViewer(a, &rp, *st))
-	case "notification", "notification_delete", "marker":
+	case "notification", "notification_delete", "marker", "my_settings", "post_notification_preference", "room_notification_preference":
 		// Sent to the owning user only. A notification belongs to its recipient, and a marker records how far its user has read.
 		var own struct {
 			UserID string `json:"user_id"`

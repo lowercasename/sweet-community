@@ -3,8 +3,8 @@ import { useEffect, useState } from 'react'
 interface TimeProps {
   /** Unix milliseconds UTC. */
   at: number
-  /** The surrounding chat divider already shows the date. */
-  clockOnly?: boolean
+  /** The surrounding surface decides how much detail is useful. */
+  format?: 'date-time' | 'date' | 'time'
 }
 
 /** Re-renders once a minute so calendar labels change after midnight. */
@@ -30,16 +30,22 @@ export function dayLabel(at: number, now: number): string {
 }
 
 /** A local timestamp. Chat omits the date supplied by its day divider. */
-export function Time({ at, clockOnly = false }: TimeProps) {
+export function Time({ at, format = 'date-time' }: TimeProps) {
   const now = useNow()
   const date = new Date(at)
-  const label = !clockOnly && !sameDay(at, now) ? dayLabel(at, now) : null
+  const label = format === 'date-time' && !sameDay(at, now) ? dayLabel(at, now) : null
   return (
     <time className="text-mute tabular-nums" dateTime={date.toISOString()} title={date.toLocaleString()}>
-      {label && `${label} at `}
-      <span className="whitespace-nowrap">
-        {date.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })}
-      </span>
+      {format === 'date' ? (
+        date.toLocaleDateString(undefined, { day: 'numeric', month: 'long', year: 'numeric' })
+      ) : (
+        <>
+          {label && `${label} at `}
+          <span className="whitespace-nowrap">
+            {date.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })}
+          </span>
+        </>
+      )}
     </time>
   )
 }

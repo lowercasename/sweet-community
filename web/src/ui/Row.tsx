@@ -15,8 +15,8 @@ interface RowProps {
   justify?: 'start' | 'between' | 'end'
   /** `end` aligns a control with the bottom of a labelled field beside it. */
   align?: 'baseline' | 'center' | 'start' | 'end'
-  /** Style as a bar across the top of a pane. Padded, with a hairline under it. */
-  pad?: boolean
+  /** True adds padding and a bottom rule. Compact uses less vertical padding and no rule. */
+  pad?: boolean | 'compact'
   /**
    * `always` wraps whenever the children's natural widths overflow, because
    * flex wraps before it shrinks. `narrow` stays on one line and lets the
@@ -59,7 +59,7 @@ export function Row({
         : align === 'end'
           ? 'items-end'
           : 'items-baseline',
-    pad ? 'border-b border-line bg-card px-4 py-2' : '',
+    pad === 'compact' ? 'px-4 py-1' : pad ? 'border-b border-line bg-card px-4 py-2' : '',
   ]
   return <div className={cls.join(' ')}>{children}</div>
 }

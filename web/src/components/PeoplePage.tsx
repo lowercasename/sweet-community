@@ -185,7 +185,8 @@ export function PeoplePage({ me, root, onOpenGroup }: PeoplePageProps) {
                         <Row gap={2} align="center">
                           <PersonName user={u} avatar="md" />
                           <Text as="span" variant="small">
-                            {ROLE_WORD[u.role] && `${ROLE_WORD[u.role]} · `}joined <Time at={u.joined_at} />
+                            {ROLE_WORD[u.role] && `${ROLE_WORD[u.role]} · `}joined{' '}
+                            <Time at={u.joined_at} format="date" />
                           </Text>
                         </Row>
                         <Row gap={1} align="center" shrink={false}>

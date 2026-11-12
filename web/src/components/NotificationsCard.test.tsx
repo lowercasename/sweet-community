@@ -21,13 +21,14 @@ beforeEach(() => vi.clearAllMocks())
 
 describe('NotificationsCard', () => {
   it('shows the digest as on, turns it off and on, and shows the action on hover', async () => {
-    const { setMySettings } = await import('../api')
+    const { getMySettings, setMySettings } = await import('../api')
     const { NotificationsCard } = await import('./NotificationsCard')
     renderWithQuery(<NotificationsCard />)
     const on = await screen.findByRole('button', { name: 'Weekly digest on' })
     expect(on.getAttribute('aria-pressed')).toBe('true')
     fireEvent.mouseEnter(on)
     expect(screen.getByRole('button', { name: 'Turn weekly digest off' })).toBeTruthy()
+    vi.mocked(getMySettings).mockResolvedValueOnce({ digest: 'off' } as Awaited<ReturnType<typeof getMySettings>>)
     fireEvent.click(screen.getByRole('button', { name: 'Turn weekly digest off' }))
     expect(setMySettings).toHaveBeenCalledWith({ digest: 'off' })
     const off = await screen.findByRole('button', { name: 'Send me a weekly digest' })
@@ -42,4 +43,15 @@ describe('NotificationsCard', () => {
     await screen.findByText('This browser cannot show notifications.')
     expect(screen.queryByRole('button', { name: 'Notify this device' })).toBeNull()
   })
+})
+
+it('labels each account-wide device preference and saves only that choice', async () => {
+  const { setMySettings } = await import('../api')
+  const { NotificationsCard } = await import('./NotificationsCard')
+  renderWithQuery(<NotificationsCard />)
+  const comments = await screen.findByRole('combobox', { name: 'Comments on followed posts' })
+  fireEvent.change(comments, { target: { value: 'off' } })
+  expect(setMySettings).toHaveBeenCalledWith({ push_comments: false })
+  expect(screen.getByRole('combobox', { name: 'Mentions and replies' })).toBeTruthy()
+  expect(screen.getByRole('combobox', { name: 'Private conversations' })).toBeTruthy()
 })

@@ -2,9 +2,13 @@ package api
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
+	"errors"
 	"log"
 	"net/http"
+	"net/url"
+	"sweet/internal/store"
 
 	"sweet/internal/db"
 	"sweet/internal/perm"
@@ -63,12 +67,7 @@ func (s *Server) unsubscribePush(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 }
 
-// pushWords returns the text, path and tag for a push notification, or ok
-// false for kinds that are not pushed. The kinds that are pushed are a
-// mention, a comment on the user's post, a reply to the user's message, a
-// message in a conversation, and a report, which opens the Community page.
-// A message is tagged by conversation so that a device shows one
-// notification per conversation.
+// pushWords describes the latest action without including user content.
 func pushWords(n Notification) (body, path, tag string, ok bool) {
 	if n.Kind == NotifyReport {
 		if n.ReportKind == nil {
@@ -82,23 +81,30 @@ func pushWords(n Notification) (body, path, tag string, ok bool) {
 	}
 	switch n.Kind {
 	case NotifyComment:
-		body = n.Actor.Username + " commented on your post"
+		body = n.Actor.Username + " commented in a discussion you follow"
 	case NotifyMention:
 		body = n.Actor.Username + " mentioned you"
 	case NotifyReply:
 		body = n.Actor.Username + " replied to your message"
 	case NotifyMessage:
-		return n.Actor.Username + " messaged you", "/r/" + n.GroupID, streamChatPrefix + n.GroupID, true
+		body = n.Actor.Username + " sent a message"
+		if n.GroupKind == perm.KindDM {
+			body = n.Actor.Username + " messaged you"
+		}
 	default:
 		return "", "", "", false
 	}
 	if n.PostID != nil {
-		return body, "/p/" + *n.PostID, "", true
+		return body, "/p/" + *n.PostID, "post:" + *n.PostID, true
 	}
+	path = "/r/" + n.GroupID
 	if n.GroupID == perm.Root {
-		return body, "/", "", true
+		path = "/"
 	}
-	return body, "/r/" + n.GroupID, "", true
+	if n.MessageID != nil {
+		path += "?message=" + url.QueryEscape(*n.MessageID)
+	}
+	return body, path, streamChatPrefix + n.GroupID, true
 }
 
 // pushAfterCommit sends a push for each notification among the events just
@@ -127,9 +133,117 @@ func (s *Server) pushAfterCommit(payloads []json.RawMessage, community string) {
 			title = "Sweet"
 		}
 		go func(uid string, p push.Payload) {
-			if err := s.Push.Tell(context.Background(), uid, p); err != nil {
+			if err := s.Push.Tell(context.Background(), uid, p, func(ctx context.Context) (bool, error) { return s.pushAllowed(ctx, n) }); err != nil {
 				log.Printf("push: %v", err)
 			}
-		}(n.UserID, push.Payload{Title: title, Body: body, URL: s.BaseURL + path, Tag: tag})
+		}(n.UserID, push.Payload{ID: n.ID, Revision: n.ActivityCount, Scope: n.Scope, At: n.CreatedAt, Title: title, Body: body, URL: s.BaseURL + path, Tag: tag})
+	}
+}
+
+// pushAllowed rechecks the recipient, content and preferences before each device delivery.
+func (s *Server) pushAllowed(ctx context.Context, n Notification) (bool, error) {
+	q := s.q()
+	row, err := q.GetNotification(ctx, n.ID)
+	if errors.Is(err, sql.ErrNoRows) {
+		return false, nil
+	}
+	if err != nil {
+		return false, err
+	}
+	if row.ReadAt.Valid {
+		return false, nil
+	}
+	if n.Scope != "" {
+		readAt, err := q.GetReadPosition(ctx, store.GetReadPositionParams{UserID: n.UserID, Stream: n.Scope})
+		if err != nil || readAt >= n.CreatedAt {
+			return false, err
+		}
+	}
+	u, err := q.GetUser(ctx, n.UserID)
+	if errors.Is(err, sql.ErrNoRows) {
+		return false, nil
+	}
+	if err != nil {
+		return false, err
+	}
+	if u.RemovedAt.Valid {
+		return false, nil
+	}
+	if n.Kind == NotifyReport {
+		author, err := q.GetNotificationReportAuthor(ctx, n.ID)
+		if errors.Is(err, sql.ErrNoRows) {
+			return false, nil
+		}
+		if err != nil {
+			return false, err
+		}
+		a, err := actorIn(ctx, q, User{ID: n.UserID}, perm.Root)
+		return perm.HandleReport(a, author), err
+	}
+	g, err := q.GetGroup(ctx, n.GroupID)
+	if errors.Is(err, sql.ErrNoRows) {
+		return false, nil
+	}
+	if err != nil {
+		return false, err
+	}
+	member, err := q.GetMembership(ctx, store.GetMembershipParams{GroupID: n.GroupID, UserID: n.UserID})
+	if errors.Is(err, sql.ErrNoRows) {
+		return false, nil
+	}
+	if err != nil {
+		return false, err
+	}
+	if !perm.CanSee(perm.Actor{ID: n.UserID, Role: member.Role}) {
+		return false, nil
+	}
+	if n.PostID != nil {
+		_, err := q.GetPostOwners(ctx, *n.PostID)
+		if errors.Is(err, sql.ErrNoRows) {
+			return false, nil
+		}
+		if err != nil {
+			return false, err
+		}
+		muted, err := q.IsPostMuted(ctx, store.IsPostMutedParams{UserID: n.UserID, PostID: *n.PostID})
+		if err != nil || muted {
+			return false, err
+		}
+	}
+	if n.MessageID != nil {
+		_, err := q.GetMessageOwners(ctx, *n.MessageID)
+		if errors.Is(err, sql.ErrNoRows) {
+			return false, nil
+		}
+		if err != nil {
+			return false, err
+		}
+	}
+	settings, err := q.ListUserSettings(ctx, n.UserID)
+	if err != nil {
+		return false, err
+	}
+	st := wireMySettings(n.UserID, settings)
+	if n.PostID == nil && (n.Kind == NotifyMessage || n.Kind == NotifyMention || n.Kind == NotifyReply) {
+		if g.Kind == perm.KindDM {
+			return st.PushConversations, nil
+		}
+		pref, err := q.GetRoomNotificationPreference(ctx, store.GetRoomNotificationPreferenceParams{GroupID: n.GroupID, UserID: n.UserID})
+		if err != nil {
+			return false, err
+		}
+		if pref.Mode == "off" || (pref.Mode == "mentions" && n.Kind == NotifyMessage) {
+			return false, nil
+		}
+	}
+	switch n.Kind {
+	case NotifyComment:
+		return st.PushComments, nil
+	case NotifyMention, NotifyReply:
+		return st.PushMentions, nil
+	case NotifyMessage:
+		return true, nil
+	default:
+		return false, nil
 	}
 }

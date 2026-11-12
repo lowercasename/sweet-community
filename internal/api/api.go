@@ -287,6 +287,11 @@ func (s *Server) Routes(mux *http.ServeMux) {
 	mux.HandleFunc("DELETE /api/comments/{id}", s.requireAuth(s.deleteComment))
 	mux.HandleFunc("DELETE /api/messages/{id}", s.requireAuth(s.deleteMessage))
 	mux.HandleFunc("GET /api/events", s.requireAuth(s.events))
+	mux.HandleFunc("PUT /api/notifications/read", s.requireAuth(s.readAllNotifications))
+	mux.HandleFunc("GET /api/posts/{id}/notifications", s.requireAuth(s.getPostNotificationPreference))
+	mux.HandleFunc("PUT /api/posts/{id}/notifications", s.requireAuth(s.setPostNotificationPreference))
+	mux.HandleFunc("GET /api/groups/{gid}/notifications", s.requireGroup(s.getRoomNotificationPreference))
+	mux.HandleFunc("PUT /api/groups/{gid}/notifications", s.requireGroup(s.setRoomNotificationPreference))
 	mux.HandleFunc("GET /api/notifications", s.requireAuth(s.listNotifications))
 	mux.HandleFunc("DELETE /api/notifications", s.requireAuth(s.clearNotifications))
 	mux.HandleFunc("PUT /api/notifications/{id}/read", s.requireAuth(s.readNotification))
@@ -585,7 +590,7 @@ func (s *Server) createPost(w http.ResponseWriter, r *http.Request) {
 		}
 		entries = append(entries, told...)
 		if topic.Valid {
-			followers, err := tellFollowers(r, qtx, topic.String, pid, author.ID, now)
+			followers, err := tellFollowers(r, qtx, topic.String, pid, author.ID, now, sanitize.Mentions(clean)...)
 			if err != nil {
 				return nil, nil, http.StatusInternalServerError, err
 			}

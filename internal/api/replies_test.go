@@ -63,25 +63,25 @@ func TestReplies(t *testing.T) {
 	if got := waitPushes(t, fake, 1); !strings.Contains(got[0], "kit-phone Thursday Group mo replied to your message http://sweet.test/") {
 		t.Fatalf("push: %q", got[0])
 	}
-	if len(notifications(mo)) != 0 {
+	if ns := notifications(mo); len(ns) != 1 || ns[0]["actor"].(map[string]any)["id"] != kitID {
 		t.Fatalf("mo notified of their own reply: %v", notifications(mo))
 	}
 
-	// A reply that also mentions kit makes one notification, the reply.
+	// A reply that also mentions kit makes one notification, the mention.
 	mo.mustStatus(201, "POST", rootPath+"/messages", map[string]any{"body_html": "<p>" + mentionOf(kitID, "kit") + " and the cable</p>", "reply_to": oid})
-	if ns = notifications(kit); len(ns) != 2 || ns[0]["kind"] != "reply" {
+	if ns = notifications(kit); len(ns) != 1 || ns[0]["kind"] != "mention" || ns[0]["activity_count"] != float64(2) {
 		t.Fatalf("a reply that mentions kit: %v", ns)
 	}
 
 	// A mention in chat names its message too, so the notification can open the chat at it.
 	said := mo.mustStatus(201, "POST", rootPath+"/messages", map[string]any{"body_html": "<p>" + mentionOf(kitID, "kit") + " look</p>"})
-	if ns = notifications(kit); len(ns) != 3 || ns[0]["kind"] != "mention" || ns[0]["message_id"] != said["id"] {
+	if ns = notifications(kit); len(ns) != 1 || ns[0]["kind"] != "mention" || ns[0]["activity_count"] != float64(3) || ns[0]["message_id"] != said["id"] {
 		t.Fatalf("a chat mention's notification: %v", ns)
 	}
 
 	// Replying to one's own message notifies nobody.
 	kit.mustStatus(201, "POST", rootPath+"/messages", map[string]any{"body_html": "<p>Thanks.</p>", "reply_to": oid})
-	if len(notifications(kit)) != 3 {
+	if len(notifications(kit)) != 1 {
 		t.Fatalf("kit notified of their own reply: %v", notifications(kit))
 	}
 

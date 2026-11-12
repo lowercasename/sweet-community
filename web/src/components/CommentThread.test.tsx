@@ -10,6 +10,7 @@ import { ROOT, comment, mine, nobody, renderWithQuery, reportable, user } from '
  */
 vi.mock('../api', () => ({
   getComments: vi.fn(),
+  listMarkers: vi.fn(() => Promise.resolve({ markers: [] })),
   createComment: vi.fn(),
   updateComment: vi.fn(),
   deleteComment: vi.fn(() => Promise.resolve()),
@@ -38,7 +39,7 @@ beforeEach(async () => {
 
 async function thread() {
   const { CommentThread } = await import('./CommentThread')
-  renderWithQuery(<CommentThread postId="p1" groupId={ROOT} replyTo="kit" disabled={false} />)
+  renderWithQuery(<CommentThread postAt={1} postId="p1" groupId={ROOT} replyTo="kit" disabled={false} />)
   await screen.findByText('c-jo says hi')
 }
 
@@ -85,7 +86,7 @@ describe('CommentThread', () => {
       .mockResolvedValueOnce({ comments: [comment('c-z', 'p1', mo, { created_at: 20 })], next_before: 'earlier' })
       .mockResolvedValueOnce({ comments: [comment('c-a', 'p1', kit, { created_at: 20 })], next_before: null })
     const { CommentThread } = await import('./CommentThread')
-    renderWithQuery(<CommentThread postId="p1" groupId={ROOT} replyTo="kit" disabled={false} />)
+    renderWithQuery(<CommentThread postAt={1} postId="p1" groupId={ROOT} replyTo="kit" disabled={false} />)
     await screen.findByText('c-z says hi')
     fireEvent.click(screen.getByRole('button', { name: 'Load earlier comments' }))
     await screen.findByText('c-a says hi')

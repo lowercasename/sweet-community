@@ -9,7 +9,15 @@ import { ROOT, group, paragraph, renderWithQuery, user } from '../test-utils'
  */
 vi.mock('../api', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../api')>()),
-  getMySettings: vi.fn(() => Promise.resolve({ digest: 'weekly', welcomed: false })),
+  getMySettings: vi.fn(() =>
+    Promise.resolve({
+      push_comments: true,
+      push_mentions: true,
+      push_conversations: true,
+      digest: 'weekly',
+      welcomed: false,
+    }),
+  ),
   setMySettings: vi.fn((s: { digest: string }) => Promise.resolve({ ...s, welcomed: true })),
   getSettings: vi.fn(() =>
     Promise.resolve({ group_creation: 'anyone', name: 'Knitting Circle', description: '', owner_set: true }),
@@ -66,7 +74,13 @@ describe('Welcome', () => {
 
   it('stays closed for a user who has been welcomed, and opens when asked from Settings', async () => {
     const { getMySettings, setMySettings } = await import('../api')
-    vi.mocked(getMySettings).mockResolvedValue({ digest: 'weekly', welcomed: true })
+    vi.mocked(getMySettings).mockResolvedValue({
+      push_comments: true,
+      push_mentions: true,
+      push_conversations: true,
+      digest: 'weekly',
+      welcomed: true,
+    })
     await render()
     await waitFor(() => expect(getMySettings).toHaveBeenCalled())
     expect(screen.queryByRole('heading', { name: 'Welcome to Knitting Circle' })).toBeNull()
@@ -78,7 +92,13 @@ describe('Welcome', () => {
 
   it('opens only on Home', async () => {
     const { getMySettings } = await import('../api')
-    vi.mocked(getMySettings).mockResolvedValue({ digest: 'weekly', welcomed: false })
+    vi.mocked(getMySettings).mockResolvedValue({
+      push_comments: true,
+      push_mentions: true,
+      push_conversations: true,
+      digest: 'weekly',
+      welcomed: false,
+    })
     await render({ atHome: false })
     await waitFor(() => expect(getMySettings).toHaveBeenCalled())
     expect(screen.queryByRole('heading', { name: 'Welcome to Knitting Circle' })).toBeNull()
@@ -86,7 +106,13 @@ describe('Welcome', () => {
 
   it('shows no message and no name when there is no welcome message', async () => {
     const { getMySettings, getWelcome } = await import('../api')
-    vi.mocked(getMySettings).mockResolvedValue({ digest: 'weekly', welcomed: false })
+    vi.mocked(getMySettings).mockResolvedValue({
+      push_comments: true,
+      push_mentions: true,
+      push_conversations: true,
+      digest: 'weekly',
+      welcomed: false,
+    })
     vi.mocked(getWelcome).mockResolvedValue({ body_html: '' })
     await render()
     await screen.findByRole('heading', { name: 'Welcome to Knitting Circle' })

@@ -1,8 +1,8 @@
 import { Fragment, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import type { Message as MessageData } from '../api'
-import { useGroups, useMarkRead, useMarkers, useMessageActions, useMessages } from '../data/hooks'
-import { chatStream, markerOf } from '../data/notifications'
-import { usePageVisible } from '../hooks/usePageVisible'
+import { useGroups, useMessageActions, useMessages } from '../data/hooks'
+import { chatStream } from '../data/notifications'
+import { useReadProgress } from '../hooks/useReadProgress'
 import { useStreamStatus } from '../hooks/StreamContext'
 import { Alert, Bar, Button, Card, DayDivider, Pane, ReplyStrip, Row, ScrollArea, Stack } from '../ui'
 import { sameDay } from '../ui/Time'
@@ -10,6 +10,7 @@ import { chatExtensions } from '../editor/extensions'
 import { BodyEditor } from './BodyEditor'
 import { ChatLine } from './ChatLine'
 import { MessageGroup } from './MessageGroup'
+import { RoomNotifications } from './RoomNotifications'
 
 interface ChatPaneProps {
   /** The group whose chat this pane shows. */
@@ -48,9 +49,6 @@ function group(list: MessageData[]): MessageData[][] {
   return groups
 }
 
-/** The delay after the last shown message before the chat is marked read, so a busy chat sends one PUT. */
-const READ_DEBOUNCE_MS = 800
-
 export function ChatPane({ groupId, side = 'full', watching, focusMessage = null, onFocused }: ChatPaneProps) {
   const status = useStreamStatus()
   const { messages, loading, error, hasEarlier, loadEarlier } = useMessages(groupId)
@@ -58,20 +56,8 @@ export function ChatPane({ groupId, side = 'full', watching, focusMessage = null
   // In a conversation, the report dialog says that moderators will see the reported message.
   const conversation = useGroups().groups.find((g) => g.id === groupId)?.kind === 'dm'
 
-  // A visible chat is marked read. While the
-  // pane is watched and the page is in the foreground, the user's read marker
-  // on this chat moves to its newest message.
-  const { markers, loaded } = useMarkers()
-  const markRead = useMarkRead()
-  const visible = usePageVisible()
-  const newest = messages[messages.length - 1]?.created_at
-  const readAt = markerOf(markers, chatStream(groupId))
-  useEffect(() => {
-    if (!watching || !visible || !loaded || newest === undefined) return
-    if (newest > (readAt ?? 0)) markRead(chatStream(groupId), newest, READ_DEBOUNCE_MS)
-  }, [watching, visible, loaded, newest, readAt, groupId, markRead])
-
   const scrollRef = useRef<HTMLDivElement>(null)
+  useReadProgress(scrollRef, chatStream(groupId), watching, `${messages.length}:${messages.at(-1)?.created_at}`)
   // Scroll to new messages only while the user is already at the bottom.
   const stickRef = useRef(true)
   // The scroll height before an older page was prepended, used to keep the view from jumping.
@@ -162,6 +148,7 @@ export function ChatPane({ groupId, side = 'full', watching, focusMessage = null
   return (
     <Pane side={side} flush tour="chat">
       <Card fill flush>
+        {!conversation && <RoomNotifications groupId={groupId} />}
         <ScrollArea ref={scrollRef} pad="inner" onScroll={onScroll}>
           <Stack gap={3}>
             {hasEarlier && (

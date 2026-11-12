@@ -144,6 +144,30 @@ func (q *Queries) DeleteUserPushSubscriptions(ctx context.Context, userID string
 	return err
 }
 
+const getCurrentPushSubscription = `-- name: GetCurrentPushSubscription :one
+SELECT id, user_id, endpoint, p256dh, auth, created_at FROM push_subscriptions
+WHERE id = ? AND user_id = ?
+`
+
+type GetCurrentPushSubscriptionParams struct {
+	ID     string
+	UserID string
+}
+
+func (q *Queries) GetCurrentPushSubscription(ctx context.Context, arg GetCurrentPushSubscriptionParams) (PushSubscription, error) {
+	row := q.db.QueryRowContext(ctx, getCurrentPushSubscription, arg.ID, arg.UserID)
+	var i PushSubscription
+	err := row.Scan(
+		&i.ID,
+		&i.UserID,
+		&i.Endpoint,
+		&i.P256dh,
+		&i.Auth,
+		&i.CreatedAt,
+	)
+	return i, err
+}
+
 const getUserSetting = `-- name: GetUserSetting :one
 
 SELECT value FROM user_settings WHERE user_id = ?1 AND key = ?2

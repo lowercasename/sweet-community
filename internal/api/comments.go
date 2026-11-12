@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"net/http"
+	"slices"
 
 	"github.com/google/uuid"
 
@@ -117,21 +118,27 @@ func (s *Server) createComment(w http.ResponseWriter, r *http.Request) {
 		}
 		c := wireComment(row)
 		entries := []events.Entry{{Kind: "comment", Payload: &c}}
-		told, err := notify(r, qtx, NotifyComment, owners.AuthorID, author.ID, owners.GroupID, &postID, now)
+		followers, err := qtx.ListPostFollowers(r.Context(), postID)
 		if err != nil {
-			return nil, nil, http.StatusInternalServerError, err
+			return nil, nil, 500, err
 		}
-		if told != nil {
-			entries = append(entries, *told)
+		mentions := sanitize.Mentions(clean)
+		for _, uid := range followers {
+			kind := NotifyComment
+			if slices.Contains(mentions, uid) {
+				kind = NotifyMention
+			}
+			told, err := notify(r, qtx, kind, uid, author.ID, owners.GroupID, &postID, now)
+			if err != nil {
+				return nil, nil, 500, err
+			}
+			if told != nil {
+				entries = append(entries, *told)
+			}
 		}
-		// Users mentioned in the comment are notified too. The post's author, already notified of the comment, is not notified twice.
-		skip := ""
-		if told != nil {
-			skip = owners.AuthorID
-		}
-		mentioned, err := mentionEvents(r, qtx, clean, author.ID, owners.GroupID, &postID, nil, now, skip)
+		mentioned, err := mentionEvents(r, qtx, clean, author.ID, owners.GroupID, &postID, nil, now, followers...)
 		if err != nil {
-			return nil, nil, http.StatusInternalServerError, err
+			return nil, nil, 500, err
 		}
 		return append(entries, mentioned...), &c, http.StatusCreated, nil
 	})

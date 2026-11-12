@@ -32,6 +32,7 @@ const ITEM_TONE = {
 
 export interface MenuItem {
   label: string
+  disabled?: boolean
   icon?: IconName
   /** A second, muted line under the label. Used for a topic's description. */
   detail?: string
@@ -45,6 +46,7 @@ export interface MenuItem {
 }
 
 interface MenuProps {
+  onOpenChange?: (open: boolean) => void
   /** Accessible name of the trigger, for example "Post options". */
   label: string
   icon?: IconName
@@ -85,6 +87,7 @@ interface MenuProps {
  */
 export function Menu({
   label,
+  onOpenChange,
   icon = 'more',
   items,
   reveal,
@@ -96,12 +99,16 @@ export function Menu({
   children,
 }: MenuProps) {
   const [open, setOpen] = useState(false)
+  const changeOpen = (value: boolean) => {
+    setOpen(value)
+    onOpenChange?.(value)
+  }
   const [activeIndex, setActiveIndex] = useState<number | null>(null)
   const listRef = useRef<(HTMLElement | null)[]>([])
 
   const { refs, floatingStyles, context } = useFloating({
     open,
-    onOpenChange: setOpen,
+    onOpenChange: changeOpen,
     placement: 'bottom-end',
     middleware: [offset(4), flip(), shift({ padding: 8 })],
     whileElementsMounted: autoUpdate,
@@ -162,14 +169,15 @@ export function Menu({
                     listRef.current[i] = el
                   }}
                   type="button"
+                  disabled={item.disabled}
                   role={item.checked === undefined ? 'menuitem' : 'menuitemradio'}
                   aria-checked={item.checked}
                   aria-description={item.shield}
                   tabIndex={activeIndex === i ? 0 : -1}
-                  className={`flex w-full cursor-pointer items-center gap-2 px-3 py-1.5 text-left text-[15px] leading-[22px] focus:outline-none ${ITEM_TONE[item.danger ? 'danger' : item.checked ? 'checked' : 'plain']}`}
+                  className={`flex w-full cursor-pointer disabled:text-mute disabled:cursor-default items-center gap-2 px-3 py-1.5 text-left text-[15px] leading-[22px] focus:outline-none ${ITEM_TONE[item.danger ? 'danger' : item.checked ? 'checked' : 'plain']}`}
                   {...getItemProps({
                     onClick() {
-                      setOpen(false)
+                      changeOpen(false)
                       item.onSelect()
                     },
                   })}

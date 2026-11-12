@@ -216,6 +216,9 @@ export interface ReplyTo {
  * for a comment, the post. Opening it marks it read.
  */
 export interface Notification {
+  scope?: string
+  activity_count?: number
+  group_kind?: Group['kind']
   id: string
   user_id: string
   kind: 'comment' | 'added' | 'mention' | 'joined' | 'topic_post' | 'message' | 'reply' | 'report'
@@ -532,18 +535,21 @@ export function listNotifications(before?: string | null, limit = 30): Promise<N
   return request<NotificationPage>(`/api/notifications?${params}`)
 }
 
-/** The result of clearing notifications. Clearing removed every opened notification of mine up to the time `before`. */
+/** The result of clearing notifications. Clearing removed every notification of mine up to the time `before`. */
 export interface Cleared {
   user_id: string
   before: number
 }
 
 /** Marks a notification read when it is opened. The response is the notification, now read. */
-export function readNotification(id: string): Promise<Notification> {
-  return request<Notification>(`/api/notifications/${encodeURIComponent(id)}/read`, { method: 'PUT' })
+export function readNotification(id: string, before?: number, revision?: number): Promise<Notification> {
+  return request<Notification>(
+    `/api/notifications/${encodeURIComponent(id)}/read${before === undefined ? '' : `?before=${before}${revision === undefined ? '' : `&revision=${revision}`}`}`,
+    { method: 'PUT' },
+  )
 }
 
-/** Permanently deletes the notifications I have opened. */
+/** Permanently deletes my read and unread notifications. */
 export function clearNotifications(): Promise<Cleared> {
   return request<Cleared>('/api/notifications', { method: 'DELETE' })
 }
@@ -642,11 +648,14 @@ export function confirmEmail(token: string): Promise<{ email: string }> {
  * have closed the welcome dialog. Sending it as true records that. The server never sets it back to false.
  */
 export interface MySettings {
+  push_comments: boolean
+  push_mentions: boolean
+  push_conversations: boolean
   digest: 'weekly' | 'off'
   welcomed: boolean
 }
 
-export type MySettingsUpdate = Pick<MySettings, 'digest'> & { welcomed?: true }
+export type MySettingsUpdate = Partial<Omit<MySettings, 'welcomed'>> & { welcomed?: true }
 
 export function getMySettings(): Promise<MySettings> {
   return request('/api/me/settings')
@@ -873,4 +882,35 @@ export async function getLinkPreview(url: string): Promise<LinkPreview | null> {
     if (e instanceof ApiError && e.status === 404) return null
     throw e
   }
+}
+
+export interface PostNotificationPreference {
+  user_id: string
+  post_id: string
+  following: boolean
+  muted: boolean
+}
+export type RoomNotificationMode = 'all' | 'mentions' | 'off'
+export interface RoomNotificationPreference {
+  user_id: string
+  group_id: string
+  mode: RoomNotificationMode
+}
+export function getPostNotificationPreference(id: string): Promise<PostNotificationPreference> {
+  return request(`/api/posts/${encodeURIComponent(id)}/notifications`)
+}
+export function setPostNotificationPreference(id: string, following: boolean): Promise<PostNotificationPreference> {
+  return request(`/api/posts/${encodeURIComponent(id)}/notifications`, json('PUT', { following }))
+}
+export function getRoomNotificationPreference(id: string): Promise<RoomNotificationPreference> {
+  return request(`/api/groups/${encodeURIComponent(id)}/notifications`)
+}
+export function setRoomNotificationPreference(
+  id: string,
+  mode: RoomNotificationMode,
+): Promise<RoomNotificationPreference> {
+  return request(`/api/groups/${encodeURIComponent(id)}/notifications`, json('PUT', { mode }))
+}
+export function readAllNotifications(): Promise<Marker> {
+  return request('/api/notifications/read', { method: 'PUT' })
 }

@@ -44,9 +44,9 @@ func TestMentions(t *testing.T) {
 		t.Fatalf("an edit mentioned mo again: %v", list(mo))
 	}
 
-	// A comment that mentions the post's author notifies them once, as a comment. A comment that mentions a third member notifies them as a mention.
+	// A comment that mentions the post's author notifies them once, as a mention. A comment that mentions a third member notifies them as a mention.
 	mo.mustStatus(201, "POST", "/api/posts/"+pid+"/comments", map[string]string{"body_html": "<p>" + mention(kitID, "kit") + " yes</p>"})
-	if got := list(kit); len(got) != 1 || got[0]["kind"] != "comment" {
+	if got := list(kit); len(got) != 1 || got[0]["kind"] != "mention" {
 		t.Fatalf("kit, mentioned in a comment on kit's own post: %v", got)
 	}
 	kit.mustStatus(201, "POST", "/api/groups/"+gid+"/members", map[string]string{"user_id": joID})

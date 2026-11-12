@@ -1,6 +1,7 @@
 // @vitest-environment happy-dom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { cleanup, fireEvent, screen, within } from '@testing-library/react'
+import { act, cleanup, fireEvent, screen, within } from '@testing-library/react'
+import { keys } from '../data/keys'
 import { ROOT, group, notification, renderWithQuery, user } from '../test-utils'
 
 /**
@@ -36,10 +37,18 @@ beforeEach(async () => {
     ],
     next_before: null,
   })
-  vi.mocked(readNotification).mockImplementation((id) =>
-    Promise.resolve(notification(id, 'added', mo, { group_id: 'knit', read_at: 30 })),
-  )
-  vi.mocked(clearNotifications).mockResolvedValue({ user_id: 'raphael', before: 40 })
+  vi.mocked(readNotification).mockImplementation(async (id) => {
+    const read = notification(id, 'added', mo, { group_id: 'knit', read_at: 30 })
+    vi.mocked(listNotifications).mockResolvedValue({
+      notifications: [read, notification('n10', 'comment', mo, { post_id: 'p1', read_at: 12 })],
+      next_before: null,
+    })
+    return read
+  })
+  vi.mocked(clearNotifications).mockImplementation(async () => {
+    vi.mocked(listNotifications).mockResolvedValue({ notifications: [], next_before: null })
+    return { user_id: 'raphael', before: 40 }
+  })
 })
 
 async function draw() {
@@ -73,7 +82,7 @@ describe('NotificationsPage', () => {
       within(lists[1])
         .getAllByRole('button')
         .map((b) => b.getAttribute('aria-label')),
-    ).toEqual(['mo commented on your post'])
+    ).toEqual(['mo commented in a discussion you follow'])
     await new Promise((r) => setTimeout(r, 20))
     expect(readNotification).not.toHaveBeenCalled()
   })
@@ -82,11 +91,11 @@ describe('NotificationsPage', () => {
     const { readNotification } = await import('../api')
     const onGo = await draw()
     fireEvent.click(await screen.findByRole('button', { name: 'mo added you to Knitting, new' }))
-    expect(readNotification).toHaveBeenCalledWith('n20')
+    expect(readNotification).toHaveBeenCalledWith('n20', 20, 1)
     expect(onGo).toHaveBeenCalledWith('/r/knit')
     await screen.findByRole('button', { name: 'mo added you to Knitting' })
     expect(screen.queryByRole('heading', { name: 'New' })).toBeNull()
-    fireEvent.click(screen.getByRole('button', { name: 'mo commented on your post' }))
+    fireEvent.click(screen.getByRole('button', { name: 'mo commented in a discussion you follow' }))
     expect(onGo).toHaveBeenCalledWith('/p/p1')
     expect(readNotification).toHaveBeenCalledTimes(1)
   })
@@ -126,26 +135,28 @@ describe('NotificationsPage', () => {
   it('shows "messaged you" for a message notification and opens the conversation', async () => {
     const { listNotifications, readNotification } = await import('../api')
     vi.mocked(listNotifications).mockResolvedValue({
-      notifications: [notification('n30', 'message', mo, { group_id: 'talk' })],
+      notifications: [notification('n30', 'message', mo, { group_id: 'talk', group_kind: 'dm' })],
       next_before: null,
     })
-    vi.mocked(readNotification).mockImplementation((id) =>
-      Promise.resolve(notification(id, 'message', mo, { group_id: 'talk', read_at: 31 })),
-    )
+    vi.mocked(readNotification).mockImplementation(async (id) => {
+      const read = notification(id, 'message', mo, { group_id: 'talk', group_kind: 'dm', read_at: 31 })
+      vi.mocked(listNotifications).mockResolvedValue({ notifications: [read], next_before: null })
+      return read
+    })
     const onGo = await draw()
     fireEvent.click(await screen.findByRole('button', { name: 'mo messaged you, new' }))
     expect(onGo).toHaveBeenCalledWith('/r/talk')
     await screen.findByRole('button', { name: 'mo messaged you' })
   })
 
-  it('permanently deletes the opened notifications and keeps the unopened ones', async () => {
+  it('permanently deletes read and unread notifications', async () => {
     const { clearNotifications } = await import('../api')
     await draw()
     await screen.findByRole('heading', { name: 'Earlier' })
-    fireEvent.click(screen.getByRole('button', { name: 'Clear' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Clear all' }))
     expect(clearNotifications).toHaveBeenCalled()
     await vi.waitFor(() => expect(screen.queryByRole('heading', { name: 'Earlier' })).toBeNull())
-    expect(screen.getByRole('button', { name: 'mo added you to Knitting, new' })).toBeTruthy()
+    expect(screen.queryByRole('button', { name: 'mo added you to Knitting, new' })).toBeNull()
   })
 
   it("describes a mention by its location, which is a post or a group's chat", async () => {
@@ -161,7 +172,7 @@ describe('NotificationsPage', () => {
     const onGo = await draw()
     const rows = await screen.findAllByRole('button', { name: /^mo mentioned you/ })
     expect(rows.map((b) => b.getAttribute('aria-label'))).toEqual([
-      'mo mentioned you in a post, new',
+      'mo mentioned you in a post discussion, new',
       'mo mentioned you in Knitting, new',
       'mo mentioned you in the chat, new',
     ])
@@ -190,4 +201,25 @@ describe('NotificationsPage', () => {
     await draw()
     expect(await screen.findByRole('button', { name: 'mo added you to a room, new' })).toBeTruthy()
   })
+})
+
+it('does not restore a cleared notification when an older read request finishes', async () => {
+  const { readNotification, listNotifications } = await import('../api')
+  let finishRead!: (value: Awaited<ReturnType<typeof readNotification>>) => void
+  vi.mocked(readNotification).mockImplementationOnce(
+    () =>
+      new Promise((resolve) => {
+        finishRead = resolve
+      }),
+  )
+  const { NotificationsPage } = await import('./NotificationsPage')
+  const { qc } = renderWithQuery(<NotificationsPage groups={[group(ROOT, 'member'), knitting]} onGo={() => {}} />)
+  fireEvent.click(await screen.findByRole('button', { name: 'mo added you to Knitting, new' }))
+  vi.mocked(listNotifications).mockResolvedValue({ notifications: [], next_before: null })
+  fireEvent.click(screen.getByRole('button', { name: 'Clear all' }))
+  await screen.findByText('Nice and quiet in here.')
+  await act(async () => {
+    finishRead(notification('n20', 'added', mo, { group_id: 'knit', read_at: 30 }))
+  })
+  expect(qc.getQueryData(keys.notifications)).toMatchObject({ pages: [{ notifications: [] }] })
 })

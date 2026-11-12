@@ -32,6 +32,7 @@ import { ApiError } from '../api'
 vi.mock('../api', async (importOriginal) => ({
   ApiError: (await importOriginal<typeof import('../api')>()).ApiError,
   getMe: vi.fn(() => Promise.resolve({ id: 'raphael', username: 'raphael', picture: null })),
+  getRoomNotificationPreference: vi.fn(() => Promise.resolve({ mode: 'all' })),
   getPosts: vi.fn(),
   getPost: vi.fn(),
   getProfile: vi.fn(),
@@ -324,12 +325,12 @@ describe('Home', () => {
     const bell = await nav().findByRole('button', { name: 'Notifications, unread' })
     fireEvent.click(bell)
     expect(window.location.pathname).toBe('/notifications')
-    await screen.findByRole('heading', { name: 'Notifications' })
-    const row = await screen.findByRole('button', { name: 'kit commented on your post, new' })
+    await screen.findByRole('heading', { name: /^Notifications$/ })
+    const row = await screen.findByRole('button', { name: 'kit commented in a discussion you follow, new' })
     expect(nav().getByRole('button', { name: 'Notifications, unread' }).getAttribute('aria-current')).toBe('page')
     vi.mocked(listMarkers).mockResolvedValue({ markers: [marker('notifications', 9, 0)] })
     fireEvent.click(row)
-    expect(readNotification).toHaveBeenCalledWith('n5')
+    expect(readNotification).toHaveBeenCalledWith('n5', fresh.created_at, 1)
     expect(window.location.pathname).toBe('/p/p1')
     await nav().findByRole('button', { name: 'Notifications' })
   })

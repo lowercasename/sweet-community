@@ -26,9 +26,9 @@ test.describe('roles', () => {
     await writePost(mo.page, text)
 
     await open(kit.page)
-    // A member's menu on another user's post holds only Report.
+    // A member can follow or report another user's post, but cannot edit or delete it.
     await article(kit.page, text).getByRole('button', { name: 'Post options' }).click()
-    await expect(kit.page.getByRole('menuitem')).toHaveText(['Report'])
+    await expect(kit.page.getByRole('menuitem')).toHaveText(['Follow discussion', 'Report'])
     await kit.page.keyboard.press('Escape')
 
     await open(o.page, '/people')
@@ -36,7 +36,7 @@ test.describe('roles', () => {
     await pick(o.page, row, `Options for ${kit.username}`, 'Make moderator')
     await expect(row).toContainText('moderator')
     // The membership keeps its joined time, and the menu button stays on the same line as the name at this width.
-    await expect(row.locator('time')).toContainText(/\d{1,2}:\d{2}/)
+    await expect(row.locator('time')).not.toContainText(/\d{1,2}:\d{2}/)
     await expect(row).not.toContainText('1970')
     const face = await row.getByRole('img').boundingBox()
     const action = await row.getByRole('button', { name: `Options for ${kit.username}` }).boundingBox()

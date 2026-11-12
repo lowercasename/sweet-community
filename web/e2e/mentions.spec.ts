@@ -24,7 +24,7 @@ test.describe('mentions', () => {
     // Mo gets a notification, and the notification opens the post.
     const nav = mo.page.getByRole('navigation', { name: 'Main' })
     await nav.getByRole('button', { name: 'Notifications, unread' }).click()
-    await mo.page.getByRole('button', { name: `${kit.username} mentioned you in a post, new` }).click()
+    await mo.page.getByRole('button', { name: `${kit.username} mentioned you in a post discussion, new` }).click()
     await expect(mo.page).toHaveURL(/\/p\/[0-9a-f-]+$/)
     await expect(mo.page.locator('article:visible').filter({ hasText: text })).toBeVisible()
     // The mention in the post body links to mo's page inside the app.

@@ -10,6 +10,7 @@ import { ROOT, marker, message, renderWithQuery, user } from '../test-utils'
  */
 vi.mock('../api', () => ({
   getMessages: vi.fn(),
+  getRoomNotificationPreference: vi.fn(() => Promise.resolve({ mode: 'all' })),
   listMarkers: vi.fn(),
   setMarker: vi.fn(),
   listMembers: vi.fn(() => Promise.resolve({ members: [] })),
@@ -59,7 +60,7 @@ describe('ChatPane lines', () => {
     expect(runs).toHaveLength(4)
     expect(runs[1].textContent).toContain('seven minutes later')
     expect(runs[1].textContent).toContain('fifteen minutes later')
-    expect(runs[1].querySelectorAll('time')).toHaveLength(3)
+    expect(runs[1].querySelectorAll('time')).toHaveLength(1)
     expect(screen.getAllByRole('separator')).toHaveLength(2)
   })
 
@@ -83,22 +84,6 @@ describe('ChatPane lines', () => {
     expect(screen.getAllByRole('button', { name: 'mo' })).toHaveLength(2)
     // Only the two messages can be replied to. The lines have no Reply.
     expect(screen.getAllByRole('button', { name: 'Reply to this message' })).toHaveLength(2)
-  })
-})
-
-describe('ChatPane read marker', () => {
-  it('moves the read marker to the newest message while watched', async () => {
-    const { setMarker } = await import('../api')
-    await draw(true)
-    await vi.waitFor(() => expect(setMarker).toHaveBeenCalledWith(`chat:${ROOT}`, 20), { timeout: 3000 })
-    expect(setMarker).toHaveBeenCalledTimes(1)
-  })
-
-  it('does not move the read marker while not watched', async () => {
-    const { setMarker } = await import('../api')
-    await draw(false)
-    await new Promise((r) => setTimeout(r, 1200))
-    expect(setMarker).not.toHaveBeenCalled()
   })
 })
 

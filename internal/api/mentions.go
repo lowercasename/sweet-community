@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"errors"
 	"net/http"
+	"slices"
 
 	"sweet/internal/events"
 	"sweet/internal/sanitize"
@@ -18,10 +19,10 @@ const NotifyMention = "mention"
 // `skip`, which is a user already notified of this write another way. It
 // returns the notification events. A mention of a user outside the group is left as text,
 // because that user could not see the body anyway.
-func mentionEvents(r *http.Request, qtx *store.Queries, body, author, groupID string, postID, messageID *string, now int64, skip string) ([]events.Entry, error) {
+func mentionEvents(r *http.Request, qtx *store.Queries, body, author, groupID string, postID, messageID *string, now int64, skip ...string) ([]events.Entry, error) {
 	var out []events.Entry
 	for _, uid := range sanitize.Mentions(body) {
-		if uid == author || uid == skip {
+		if uid == author || slices.Contains(skip, uid) {
 			continue
 		}
 		if _, err := qtx.GetMembership(r.Context(), store.GetMembershipParams{GroupID: groupID, UserID: uid}); errors.Is(err, sql.ErrNoRows) {

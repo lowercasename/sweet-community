@@ -118,13 +118,13 @@ func TestNotifications(t *testing.T) {
 	// A marker cannot be set on the notifications stream. Opening the notifications page does not mark anything read.
 	kit.mustStatus(400, "PUT", "/api/markers/notifications", map[string]any{"read_at": int64(n["created_at"].(float64))})
 
-	// Clearing permanently deletes the read notifications, and the event is sent to this user only. The unread one stays.
+	// Clearing permanently deletes read and unread notifications. The event is sent to this user only.
 	cleared := kit.mustStatus(200, "DELETE", "/api/notifications", nil)
 	if cleared["user_id"] != kitID || cleared["before"] == nil {
 		t.Fatalf("cleared: %v", cleared)
 	}
-	if left := list(kit); len(left) != 1 || left[0].(map[string]any)["id"] != added["id"] {
-		t.Fatalf("after clearing the opened one: %v", left)
+	if left := list(kit); len(left) != 0 {
+		t.Fatalf("after clearing all notifications: %v", left)
 	}
 	if evs := events(kit, "notification_delete"); len(evs) != 1 || !reflect.DeepEqual(evs[0], cleared) {
 		t.Fatalf("kit's clear events: %v", evs)
@@ -228,7 +228,7 @@ func TestChatUnread(t *testing.T) {
 	}
 	var fromStream map[string]any
 	for _, e := range kit.readEvents(80) {
-		if e["kind"] == "marker" {
+		if e["kind"] == "marker" && e["payload"].(map[string]any)["stream"] == rootChat {
 			fromStream = e["payload"].(map[string]any)
 		}
 	}
@@ -258,8 +258,8 @@ func TestChatUnread(t *testing.T) {
 	if n := unread(kit, "chat:"+gid); n != 1 {
 		t.Fatalf("a new message in the room: %v", n)
 	}
-	// The notifications unread count works the same way. Being added to the room is one unread notification.
-	if n := unread(kit, "notifications"); n != 1 {
+	// The unread entries cover the root chat, the room addition and the room chat.
+	if n := unread(kit, "notifications"); n != 3 {
 		t.Fatalf("notifications unread: %v", n)
 	}
 	// The feed has its own marker, counted the same way. It counts other users' posts that are not deleted, since the user's marker or join time. An edit is not a new post.
@@ -378,7 +378,7 @@ func TestPushForMentionsAndReplies(t *testing.T) {
 	mo.mustStatus(201, "POST", "/api/posts/"+pid+"/comments", map[string]string{"body_html": "<p>hi</p>"})
 	got := wait(2)
 	for _, s := range got {
-		if !strings.HasPrefix(s, "https://fcm.googleapis.com/fcm/send/kit-") || !strings.Contains(s, " Thursday Group mo commented on your post http://sweet.test/p/"+pid) {
+		if !strings.HasPrefix(s, "https://fcm.googleapis.com/fcm/send/kit-") || !strings.Contains(s, " Thursday Group mo commented in a discussion you follow http://sweet.test/p/"+pid) {
 			t.Fatalf("push: %q", s)
 		}
 	}
@@ -513,19 +513,15 @@ func TestMessageNotifications(t *testing.T) {
 	if ms := list(mo); len(ms) != 1 || ms[0]["read_at"] == nil || unreadBell(mo) != 0 {
 		t.Fatalf("after the bell door: %v", ms)
 	}
-	// A room's chat creates no notification. Kit is notified of being added to the room, not of the message.
+	// A room's message creates a grouped notification too.
 	room := owner.mustStatus(201, "POST", "/api/groups", map[string]any{"kind": "group", "name": "Knitting", "mode": "both"})
 	rid := room["id"].(string)
 	owner.mustStatus(201, "POST", "/api/groups/"+rid+"/members", map[string]string{"user_id": kitID})
 	owner.mustStatus(201, "POST", "/api/groups/"+rid+"/messages", map[string]string{"body_html": "<p>wool</p>"})
-	for _, n := range list(kit) {
-		if n["kind"] == "message" && n["group_id"] == rid {
-			t.Fatalf("a room's message became a notification: %v", n)
-		}
+	if ns = list(kit); len(ns) != 4 || ns[0]["kind"] != "message" {
+		t.Fatalf("room notification: %v", ns)
 	}
-	if ns = list(kit); len(ns) != 3 || ns[0]["kind"] != "added" {
-		t.Fatalf("kit's notifications after the room: %v", ns)
-	}
+
 }
 
 // A message in a conversation sends a push, once per unread notification row,
@@ -542,30 +538,24 @@ func TestPushForMessages(t *testing.T) {
 	dm := mo.mustStatus(201, "POST", "/api/groups", map[string]any{"kind": "dm", "members": []string{kitID}})
 	gid := dm["id"].(string)
 
-	mo.mustStatus(201, "POST", "/api/groups/"+gid+"/messages", map[string]string{"body_html": "<p>hello</p>"})
+	first := mo.mustStatus(201, "POST", "/api/groups/"+gid+"/messages", map[string]string{"body_html": "<p>hello</p>"})
 	got := waitPushes(t, fake, 1)
-	if want := "https://fcm.googleapis.com/fcm/send/kit-phone Thursday Group mo messaged you http://sweet.test/r/" + gid + " chat:" + gid; got[0] != want {
+	if want := "https://fcm.googleapis.com/fcm/send/kit-phone Thursday Group mo messaged you http://sweet.test/r/" + gid + "?message=" + first["id"].(string) + " chat:" + gid; got[0] != want {
 		t.Fatalf("push:\n got %q\nwant %q", got[0], want)
 	}
-	// A second message while the first row is unread sends no second push, because no second row is written.
+	// A second message updates the unread row and sends another alert.
 	mo.mustStatus(201, "POST", "/api/groups/"+gid+"/messages", map[string]string{"body_html": "<p>still there?</p>"})
-	time.Sleep(150 * time.Millisecond)
-	if len(fake.all()) != 1 {
-		t.Fatalf("pushed again for an unopened conversation: %v", fake.all())
-	}
+	waitPushes(t, fake, 2)
 	// After kit reads the conversation, the next message creates a new row and a new push.
 	kit.mustStatus(200, "PUT", "/api/markers/chat:"+gid, map[string]any{"read_at": db.Now()})
 	time.Sleep(2 * time.Millisecond)
 	mo.mustStatus(201, "POST", "/api/groups/"+gid+"/messages", map[string]string{"body_html": "<p>yes</p>"})
-	if got = waitPushes(t, fake, 2); !strings.HasSuffix(got[1], " chat:"+gid) {
+	if got = waitPushes(t, fake, 3); !strings.HasSuffix(got[2], " chat:"+gid) {
 		t.Fatalf("second push: %q", got[1])
 	}
-	// A message in a room's chat sends no push.
+	// Ordinary room messages also send device alerts.
 	room := owner.mustStatus(201, "POST", "/api/groups", map[string]any{"kind": "group", "name": "Knitting", "mode": "both"})
 	owner.mustStatus(201, "POST", "/api/groups/"+room["id"].(string)+"/members", map[string]string{"user_id": kitID})
 	owner.mustStatus(201, "POST", "/api/groups/"+room["id"].(string)+"/messages", map[string]string{"body_html": "<p>wool</p>"})
-	time.Sleep(150 * time.Millisecond)
-	if len(fake.all()) != 2 {
-		t.Fatalf("pushed for a room's message: %v", fake.all())
-	}
+	waitPushes(t, fake, 4)
 }

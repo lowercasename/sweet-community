@@ -115,12 +115,12 @@ test.describe('groups', () => {
     await pick(kit.page, moRow, `Options for ${mo.username}`, 'Make owner')
     await confirm(kit.page, 'Make owner')
     await expect(moRow).toContainText('owner')
-    await expect(moRow).toContainText(/joined (just now|\d+m ago)/)
+    await expect(moRow.locator('time')).not.toContainText(/\d{1,2}:\d{2}/)
     // Kit's own row shows the new role at once, without a reload.
     const kitRow = kit.page.getByRole('listitem').filter({ hasText: kit.username })
     await expect(kitRow).toContainText('moderator')
     await expect(kitRow).not.toContainText('owner')
-    await expect(kitRow).toContainText(/joined (just now|\d+m ago)/)
+    await expect(kitRow.locator('time')).not.toContainText(/\d{1,2}:\d{2}/)
     await expect(kit.page.getByRole('button', { name: 'Leave room' })).toBeVisible()
     await expect(kit.page.getByRole('heading', { name: 'Room settings' })).toHaveCount(0)
     // Mo is now the owner, sees the settings, and cannot leave.

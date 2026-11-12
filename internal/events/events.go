@@ -97,6 +97,7 @@ func Key(kind string, raw []byte) string {
 	var p struct {
 		ID      string `json:"id"`
 		GroupID string `json:"group_id"`
+		PostID  string `json:"post_id"`
 		UserID  string `json:"user_id"`
 		Stream  string `json:"stream"`
 		Kind    string `json:"kind"`
@@ -128,6 +129,18 @@ func Key(kind string, raw []byte) string {
 			return ""
 		}
 		return "membership:" + p.GroupID + ":" + uid
+	case "my_settings":
+		if p.UserID != "" {
+			return kind + ":" + p.UserID
+		}
+	case "post_notification_preference":
+		if p.UserID != "" && p.PostID != "" {
+			return kind + ":" + p.UserID + ":" + p.PostID
+		}
+	case "room_notification_preference":
+		if p.UserID != "" && p.GroupID != "" {
+			return kind + ":" + p.UserID + ":" + p.GroupID
+		}
 	case "marker":
 		if p.UserID == "" || p.Stream == "" {
 			return ""

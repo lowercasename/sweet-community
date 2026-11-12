@@ -206,10 +206,10 @@ describe('applyEvent', () => {
     applyEvent(qc, 'notification', notification('n2', 'added', mo))
     applyEvent(qc, 'notification', notification('n2', 'added', mo))
     expect(list().map((n) => n.id)).toEqual(['n2', 'n1'])
-    // A clear event carries a time. Opened notifications created before it are removed. An unopened one stays.
+    // A clear event carries a time. Read and unread notifications created before it are removed.
     applyEvent(qc, 'notification', notification('n1', 'comment', mo, { read_at: 3 }))
     applyEvent(qc, 'notification_delete', { user_id: 'raphael', before: 5 })
-    expect(list().map((n) => n.id)).toEqual(['n2'])
+    expect(list().map((n) => n.id)).toEqual([])
 
     qc.setQueryData(keys.markers, { markers: [marker('notifications', 5, 2)] })
     const markers = () => (qc.getQueryData(keys.markers) as { markers: Marker[] }).markers
@@ -540,4 +540,18 @@ describe('latest activity', () => {
     applyEvent(qc, 'message', message('m1', mo, { group_id: 'd1', created_at: 100 }))
     expect(groups().find((g) => g.id === 'd1')!.last_message_at).toBe(500)
   })
+})
+
+it('keeps newer grouped activity when an older read response arrives afterwards', () => {
+  const qc = makeQueryClient()
+  qc.setQueryData(keys.notifications, {
+    pages: [
+      { notifications: [notification('n1', 'comment', mo, { created_at: 10, activity_count: 3 })], next_before: null },
+    ],
+    pageParams: [null],
+  })
+  applyEvent(qc, 'notification', notification('n1', 'comment', mo, { created_at: 10, activity_count: 2, read_at: 11 }))
+  const data = qc.getQueryData<{ pages: { notifications: Notification[] }[] }>(keys.notifications)!
+  expect(data.pages[0].notifications[0].activity_count).toBe(3)
+  expect(data.pages[0].notifications[0].read_at).toBeNull()
 })

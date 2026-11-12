@@ -29,8 +29,8 @@ test.describe('notifications', () => {
     // after a reload.
     await nav.getByRole('button', { name: 'Notifications, unread' }).click()
     await expect(kit.page).toHaveURL(/\/notifications$/)
-    await expect(kit.page.getByRole('heading', { name: 'Notifications' })).toBeVisible()
-    const row = kit.page.getByRole('button', { name: `${mo.username} commented on your post, new` })
+    await expect(kit.page.getByRole('heading', { name: 'Notifications', exact: true })).toBeVisible()
+    const row = kit.page.getByRole('button', { name: `${mo.username} commented in a discussion you follow, new` })
     await expect(row).toBeVisible()
     await expect(nav.getByRole('button', { name: 'Notifications, unread' })).toBeVisible()
     await kit.page.reload()
@@ -46,7 +46,9 @@ test.describe('notifications', () => {
     await kit.page.goBack()
     await expect(kit.page.getByRole('heading', { name: 'Earlier' })).toBeVisible()
     await expect(kit.page.getByRole('heading', { name: 'New' })).toHaveCount(0)
-    await expect(kit.page.getByRole('button', { name: `${mo.username} commented on your post` })).toBeVisible()
+    await expect(
+      kit.page.getByRole('button', { name: `${mo.username} commented in a discussion you follow` }),
+    ).toBeVisible()
 
     // The notification for being added to a room arrives while the notifications page is open. It is listed under
     // New as unread, so the notifications button shows a dot even on this page.
@@ -60,20 +62,15 @@ test.describe('notifications', () => {
     await expect(kit.page.getByRole('heading', { name: 'New' })).toBeVisible()
     await expect(nav.getByRole('button', { name: 'Notifications, unread' })).toBeVisible()
 
-    // Clear permanently removes the opened notifications. The unopened one stays, and it is still there after a
-    // reload.
-    await kit.page.getByRole('button', { name: 'Clear' }).click()
-    await expect(kit.page.getByRole('heading', { name: 'Earlier' })).toHaveCount(0)
-    await expect(kit.page.getByRole('button', { name: `${mo.username} commented on your post` })).toHaveCount(0)
-    await expect(added).toBeVisible()
-    await kit.page.reload()
-    await expect(kit.page.getByRole('heading', { name: 'New' })).toBeVisible()
-    await expect(kit.page.getByRole('button', { name: `raphael added you to ${name}, new` })).toBeVisible()
-    await expect(kit.page.getByRole('button', { name: `${mo.username} commented on your post` })).toHaveCount(0)
-    await kit.page.getByRole('button', { name: `raphael added you to ${name}, new` }).click()
-    await expect(nav.getByRole('button', { name: 'Notifications', exact: true })).toBeVisible()
+    // The added notification opens the room. Clear removes the entire history.
+    await added.click()
     await expect(kit.page).toHaveURL(new RegExp(`/r/${gid}$`))
     await expect(kit.page.getByRole('heading', { name })).toBeVisible()
+    await kit.page.goBack()
+    await kit.page.getByRole('button', { name: 'Clear all' }).click()
+    await expect(kit.page.getByText('Nice and quiet in here.')).toBeVisible()
+    await kit.page.reload()
+    await expect(kit.page.getByText('Nice and quiet in here.')).toBeVisible()
     await kit.context.close()
     await mo.context.close()
     await boss.context.close()
@@ -133,8 +130,10 @@ test.describe('notifications', () => {
     await mo.context.request.post(`/api/posts/${pid}/comments`, { data: { body_html: '<p>yes</p>' } })
     await tabs.getByRole('button', { name: 'Notifications, unread' }).click()
     await expect(kit.page).toHaveURL(/\/notifications$/)
-    await expect(kit.page.getByRole('heading', { name: 'Notifications' })).toBeVisible()
-    await expect(kit.page.getByRole('button', { name: `${mo.username} commented on your post, new` })).toBeVisible()
+    await expect(kit.page.getByRole('heading', { name: 'Notifications', exact: true })).toBeVisible()
+    await expect(
+      kit.page.getByRole('button', { name: `${mo.username} commented in a discussion you follow, new` }),
+    ).toBeVisible()
     // Viewing the notifications page does not mark anything read. The tab keeps its dot until the notification is
     // opened.
     await expect(tabs.getByRole('button', { name: 'Notifications, unread' })).toHaveAttribute('aria-current', 'page')

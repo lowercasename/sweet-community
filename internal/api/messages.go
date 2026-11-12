@@ -117,27 +117,11 @@ func (s *Server) createMessage(w http.ResponseWriter, r *http.Request) {
 			return nil, nil, http.StatusInternalServerError, err
 		}
 		m := wireMessage(row)
-		// In a room's chat the author of the original gets a reply notification and
-		// no mention notification as well. In a conversation the message
-		// notification covers a reply.
-		replied, err := notifyReply(r, qtx, g, answered, author.ID, m.ID, now)
+		told, err := notifyMessage(r, qtx, g, author.ID, answered, m.ID, clean, now)
 		if err != nil {
-			return nil, nil, http.StatusInternalServerError, err
+			return nil, nil, 500, err
 		}
-		skip := ""
-		if len(replied) > 0 {
-			skip = answered
-		}
-		told, err := mentionEvents(r, qtx, clean, author.ID, g.ID, nil, &m.ID, now, skip)
-		if err != nil {
-			return nil, nil, http.StatusInternalServerError, err
-		}
-		told = append(replied, told...)
-		messaged, err := notifyMessage(r, qtx, g, author.ID, now)
-		if err != nil {
-			return nil, nil, http.StatusInternalServerError, err
-		}
-		return append(append([]events.Entry{{Kind: "message", Payload: &m}}, told...), messaged...), &m, http.StatusCreated, nil
+		return append([]events.Entry{{Kind: "message", Payload: &m}}, told...), &m, http.StatusCreated, nil
 	})
 }
 

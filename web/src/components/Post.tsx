@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import type { Post as PostData } from '../api'
-import { useAuthor, useTopics } from '../data/hooks'
+import { useAuthor, useTopics, usePostNotificationPreference } from '../data/hooks'
 import { ROOT_ID } from '../data/keys'
 import { postExtensions } from '../editor/extensions'
 import { groupPath, postPath, topicPath } from '../routes'
@@ -57,6 +57,21 @@ export function Post({
   onDelete,
   onSetTopic,
 }: PostProps) {
+  const [optionsOpen, setOptionsOpen] = useState(false)
+  const preference = usePostNotificationPreference(post.id, optionsOpen)
+  const [notificationError, setNotificationError] = useState<string | null>(null)
+  const [savingPreference, setSavingPreference] = useState(false)
+  const follow = async (following: boolean) => {
+    setSavingPreference(true)
+    setNotificationError(null)
+    try {
+      await preference.set(following)
+    } catch (e) {
+      setNotificationError(e instanceof Error ? e.message : 'Could not save your choice')
+    } finally {
+      setSavingPreference(false)
+    }
+  }
   const author = useAuthor(post.author)
   // The topic name is read from the topics cache, so a rename updates every pill at once.
   const { topics } = useTopics()
@@ -102,7 +117,21 @@ export function Post({
   }
 
   // The server decides what this user can do and sends it as the post's can flags.
-  const items: MenuItem[] = []
+  const items: MenuItem[] = preference.data
+    ? [
+        {
+          label: preference.data.following ? 'Mute discussion' : 'Follow discussion',
+          icon: preference.data.following ? 'bell-off' : 'bell',
+          onSelect: () => void follow(!preference.data!.following),
+        },
+      ]
+    : [
+        {
+          label: preference.error ? 'Could not load discussion settings' : 'Loading discussion settings…',
+          disabled: true,
+          onSelect: () => {},
+        },
+      ]
   if (post.can.edit) items.push({ label: 'Edit', icon: 'pencil', onSelect: startEditing })
   if (post.can.report) items.push({ label: 'Report', icon: 'flag', onSelect: () => setReporting(true) })
   if (post.can.delete)
@@ -116,14 +145,11 @@ export function Post({
 
   const when = (
     <>
-      <Time at={post.created_at} />
+      <Time at={post.created_at} format="date" />
       {post.edited_at != null && (
-        <>
-          <Text as="span" variant="small">
-            {' · edited '}
-          </Text>
-          <Time at={post.edited_at} />
-        </>
+        <Text as="span" variant="small">
+          {' · edited'}
+        </Text>
       )}
     </>
   )
@@ -157,7 +183,15 @@ export function Post({
               </Text>
               {!editing && pill}
             </Row>
-            {items.length > 0 && !editing && !disabled && <Menu label="Post options" items={items} reveal="post" />}
+            {items.length > 0 && !editing && !disabled && (
+              <Menu
+                label="Post options"
+                items={items}
+                reveal="post"
+                disabled={savingPreference}
+                onOpenChange={setOptionsOpen}
+              />
+            )}
           </Row>
           {editing ? (
             // The stored HTML is passed to the editor as its input. There is no separate document format.
@@ -181,6 +215,7 @@ export function Post({
           ) : (
             <Body html={post.body_html} />
           )}
+          {notificationError && <Alert tone="error">{notificationError}</Alert>}
           {deleteError && <Alert tone="error">{deleteError}</Alert>}
         </Stack>
         <Row>
@@ -194,7 +229,13 @@ export function Post({
           />
         </Row>
         {open && (
-          <CommentThread postId={post.id} groupId={post.group_id} replyTo={author.username} disabled={disabled} />
+          <CommentThread
+            postAt={post.created_at}
+            postId={post.id}
+            groupId={post.group_id}
+            replyTo={author.username}
+            disabled={disabled}
+          />
         )}
       </Stack>
       <ConfirmDialog

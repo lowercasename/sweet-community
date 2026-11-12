@@ -1,9 +1,7 @@
 package api
 
 import (
-	"database/sql"
 	"encoding/json"
-	"errors"
 	"net/http"
 	"strconv"
 
@@ -13,7 +11,11 @@ import (
 
 // MySettings holds a user's own settings. Digest is "weekly" or "off".
 type MySettings struct {
-	Digest string `json:"digest"`
+	UserID            string `json:"user_id"`
+	Digest            string `json:"digest"`
+	PushComments      bool   `json:"push_comments"`
+	PushMentions      bool   `json:"push_mentions"`
+	PushConversations bool   `json:"push_conversations"`
 	// Welcomed is true once the user has closed the welcome dialog. It is state rather than a setting. It only moves
 	// from false to true, so a request that leaves it out or sends false does not show the dialog again.
 	Welcomed bool `json:"welcomed"`
@@ -27,22 +29,11 @@ const (
 )
 
 func mySettingsOf(r *http.Request, q *store.Queries, userID string) (MySettings, error) {
-	st := MySettings{Digest: DigestWeekly}
-	v, err := q.GetUserSetting(r.Context(), store.GetUserSettingParams{UserID: userID, Key: "digest"})
-	switch {
-	case err == nil:
-		st.Digest = v
-	case !errors.Is(err, sql.ErrNoRows):
-		return st, err
+	rows, err := q.ListUserSettings(r.Context(), userID)
+	if err != nil {
+		return MySettings{}, err
 	}
-	_, err = q.GetUserSetting(r.Context(), store.GetUserSettingParams{UserID: userID, Key: welcomedKey})
-	switch {
-	case err == nil:
-		st.Welcomed = true
-	case !errors.Is(err, sql.ErrNoRows):
-		return st, err
-	}
-	return st, nil
+	return wireMySettings(userID, rows), nil
 }
 
 // getMySettings is `GET /api/me/settings`.
@@ -56,34 +47,45 @@ func (s *Server) getMySettings(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, st)
 }
 
-// setMySettings is `PUT /api/me/settings {digest, welcomed}`. The settings are the
-// user's own, so no event is logged.
+// setMySettings changes only supplied fields and synchronises them across the user's devices.
 func (s *Server) setMySettings(w http.ResponseWriter, r *http.Request) {
-	var in MySettings
+	var in struct {
+		Digest            *string `json:"digest"`
+		Welcomed          bool    `json:"welcomed"`
+		PushComments      *bool   `json:"push_comments"`
+		PushMentions      *bool   `json:"push_mentions"`
+		PushConversations *bool   `json:"push_conversations"`
+	}
 	r.Body = http.MaxBytesReader(w, r.Body, 4096)
-	if err := json.NewDecoder(r.Body).Decode(&in); err != nil {
-		writeErr(w, http.StatusBadRequest, "Bad request")
+	if json.NewDecoder(r.Body).Decode(&in) != nil {
+		writeErr(w, 400, "Bad request")
 		return
 	}
-	if in.Digest != DigestWeekly && in.Digest != DigestOff {
-		writeErr(w, http.StatusBadRequest, "Digest must be weekly or off")
+	if in.Digest != nil && *in.Digest != DigestWeekly && *in.Digest != DigestOff {
+		writeErr(w, 400, "Digest must be weekly or off")
 		return
 	}
 	me, _ := userFrom(r.Context())
-	if err := s.q().SetUserSetting(r.Context(), store.SetUserSettingParams{UserID: me.ID, Key: "digest", Value: in.Digest}); err != nil {
-		writeErr(w, http.StatusInternalServerError, err.Error())
-		return
-	}
-	if in.Welcomed {
-		if err := s.q().SetUserSetting(r.Context(), store.SetUserSettingParams{UserID: me.ID, Key: welcomedKey, Value: strconv.FormatInt(db.Now(), 10)}); err != nil {
-			writeErr(w, http.StatusInternalServerError, err.Error())
-			return
+	now := db.Now()
+	s.logged(w, r, "my_settings", now, func(q *store.Queries) (any, int, error) {
+		values := map[string]string{}
+		if in.Digest != nil {
+			values["digest"] = *in.Digest
 		}
-	}
-	st, err := mySettingsOf(r, s.q(), me.ID)
-	if err != nil {
-		writeErr(w, http.StatusInternalServerError, err.Error())
-		return
-	}
-	writeJSON(w, http.StatusOK, st)
+		if in.Welcomed {
+			values[welcomedKey] = strconv.FormatInt(now, 10)
+		}
+		for key, value := range map[string]*bool{"push_comments": in.PushComments, "push_mentions": in.PushMentions, "push_conversations": in.PushConversations} {
+			if value != nil {
+				values[key] = strconv.FormatBool(*value)
+			}
+		}
+		for key, value := range values {
+			if err := q.SetUserSetting(r.Context(), store.SetUserSettingParams{UserID: me.ID, Key: key, Value: value}); err != nil {
+				return nil, 500, err
+			}
+		}
+		st, err := mySettingsOf(r, q, me.ID)
+		return st, 200, err
+	})
 }

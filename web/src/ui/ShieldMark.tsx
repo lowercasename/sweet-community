@@ -36,7 +36,7 @@ interface ShieldMarkProps {
  */
 export function ShieldMark({ label, size = 16, inline = false }: ShieldMarkProps) {
   const tip = useTooltip(label ?? '', label !== undefined)
-  const place = inline ? 'inline-block align-[-0.2em]' : 'inline-flex flex-none translate-y-px'
+  const place = inline ? 'ml-1 inline-block align-[-0.2em]' : 'inline-flex flex-none translate-y-px'
   if (label === undefined) {
     return (
       <span data-shield aria-hidden className={`${place} text-mute`}>

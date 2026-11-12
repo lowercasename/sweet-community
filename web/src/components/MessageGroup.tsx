@@ -1,7 +1,20 @@
 import { useState } from 'react'
 import type { Message } from '../api'
 import { useAuthor } from '../data/hooks'
-import { Box, Button, Time, ConfirmDialog, Menu, MessageBlock, ReplyQuote, Row, shieldText, Stack, Text } from '../ui'
+import {
+  Box,
+  ReadPoint,
+  Button,
+  Time,
+  ConfirmDialog,
+  Menu,
+  MessageBlock,
+  ReplyQuote,
+  Row,
+  shieldText,
+  Stack,
+  Text,
+} from '../ui'
 import { Body } from './Body'
 import { PersonName } from './PersonName'
 import { ReportDialog } from './ReportDialog'
@@ -23,7 +36,7 @@ interface MessageGroupProps {
 
 /**
  * A run of messages by one user. The avatar and name are shown once,
- * followed by the message bodies and their clock times. A
+ * with the first message’s time, followed by the message bodies. A
  * message's menu is positioned at the top right of its own block. This
  * includes the first message, whose menu is never on the author's line. The
  * block gets the blush background while hovered.
@@ -58,13 +71,15 @@ export function MessageGroup({
       <Stack gap={0}>
         <Row gap={2} align="center">
           <PersonName user={author} avatar="sm" />
+          <Text as="span" variant="small">
+            <Time at={first.created_at} format="time" />
+          </Text>
         </Row>
         {messages.map((m) => (
           <MessageBlock
             key={m.id}
             id={`message-${m.id}`}
             highlight={highlight === m.id}
-            time={<Time at={m.created_at} clockOnly />}
             menu={
               onReply || m.can.delete || m.can.report ? (
                 <>
@@ -113,6 +128,7 @@ export function MessageGroup({
               />
             )}
             <Body html={m.body_html} />
+            <ReadPoint at={m.created_at} />
           </MessageBlock>
         ))}
       </Stack>

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
+	"slices"
 	"strings"
 	"unicode/utf8"
 
@@ -221,13 +222,16 @@ func topicExists(r *http.Request, q *store.Queries, topicID *string) (int, error
 
 // tellFollowers writes a topic_post notification to each follower of the
 // topic except the author, inside the caller's transaction.
-func tellFollowers(r *http.Request, qtx *store.Queries, topicID, postID, actor string, now int64) ([]events.Entry, error) {
+func tellFollowers(r *http.Request, qtx *store.Queries, topicID, postID, actor string, now int64, skip ...string) ([]events.Entry, error) {
 	followers, err := qtx.ListTopicFollowers(r.Context(), topicID)
 	if err != nil {
 		return nil, err
 	}
 	var out []events.Entry
 	for _, uid := range followers {
+		if slices.Contains(skip, uid) {
+			continue
+		}
 		entry, err := notifyIn(r, qtx, NotifyTopicPost, uid, actor, perm.Root, &postID, &topicID, now)
 		if err != nil {
 			return nil, err

@@ -109,6 +109,7 @@ func wireNotification(row store.GetNotificationRow) Notification {
 		pid = &p
 	}
 	return Notification{
+		Scope: row.Scope, ActivityCount: row.ActivityCount, GroupKind: row.GroupKind,
 		ID:         row.ID,
 		UserID:     row.UserID,
 		Kind:       row.Kind,
@@ -240,4 +241,31 @@ type LinkPreview struct {
 
 func wireLinkPreview(row store.LinkPreview) LinkPreview {
 	return LinkPreview{URL: row.Url, Title: row.Title, Description: row.Description, Image: pictureURL(row.ImageID)}
+}
+
+func wirePostNotificationPreference(userID string, row store.GetPostNotificationPreferenceRow) PostNotificationPreference {
+	return PostNotificationPreference{UserID: userID, PostID: row.PostID, Following: row.Enabled != 0, Muted: row.Muted != 0}
+}
+
+func wireRoomNotificationPreference(userID string, row store.GetRoomNotificationPreferenceRow) RoomNotificationPreference {
+	return RoomNotificationPreference{UserID: userID, GroupID: row.GroupID, Mode: row.Mode}
+}
+
+func wireMySettings(userID string, rows []store.ListUserSettingsRow) MySettings {
+	st := MySettings{UserID: userID, Digest: DigestWeekly, PushComments: true, PushMentions: true, PushConversations: true}
+	for _, row := range rows {
+		switch row.Key {
+		case "digest":
+			st.Digest = row.Value
+		case welcomedKey:
+			st.Welcomed = true
+		case "push_comments":
+			st.PushComments = row.Value != "false"
+		case "push_mentions":
+			st.PushMentions = row.Value != "false"
+		case "push_conversations":
+			st.PushConversations = row.Value != "false"
+		}
+	}
+	return st
 }

@@ -228,10 +228,17 @@
     border-color: var(--color-pink);
   }
   /* TipTap's placeholder: the text lives in a data attribute on the empty paragraph. */
+  .editor .ProseMirror p.is-editor-empty:first-child {
+    position: relative;
+  }
   .editor .ProseMirror p.is-editor-empty:first-child::before {
     content: attr(data-placeholder);
-    float: left;
-    height: 0;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    position: absolute;
+    inset: 0;
     color: var(--color-mute);
     pointer-events: none;
   }

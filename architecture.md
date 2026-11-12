@@ -135,7 +135,7 @@ A message uses part of the same schema and passes the same policy. Chat history 
 - The author or the group's staff may delete a message. Nobody can edit a sent message.
 - The chat shows a line when someone joins the community or is added to a room. A line is stored as a message, so it keeps its order. Notifying a whole room of each addition was rejected, because a room of twenty would get twenty notifications.
 - Consecutive messages from one person share a name and picture when the gap between messages is at most fifteen minutes. A different speaker, a membership notice or a new calendar day starts a new group. This keeps short pauses from repeating the same header.
-- Calendar days are separated by quiet date dividers with text between thin lines. These are distinct from membership notices.
+- Calendar days are separated by quiet date dividers with text between thin lines. These are distinct from membership notices. A message group shows its first message’s time beside the author, without a time on every message.
 - There is no offline posting. When the device is offline, the bar at the top of the view shows an Offline badge and sending is disabled. Connecting and reconnecting show nothing. A failed send keeps its text.
 
 ## Images
@@ -273,20 +273,21 @@ Three details were decided while building and remain open to change. They are on
 
 ## Notifications
 
-A notification records one action done to one person. The server writes it with the action, and nobody is notified of their own actions. Every delivery channel reads from the one list.
+Unread dots show where unread content exists. The Notifications page records activity relevant to the user. Device notifications alert the user outside Sweet. These have separate controls, but device delivery uses the same notification records.
 
-A user is notified of a comment on their post, a mention, being added to a room, a conversation message, a reply to their chat message, and a post in a subscribed topic. The owner and moderators are also notified of new members. Staff are notified of reports they may handle. A mention notifies only members of the group, because only they can see it.
+- Posting or commenting follows that discussion. Anyone who can see a post may follow it or mute it. Muting stops notifications about that post, including mentions. Commenting again does not undo an explicit mute.
+- Room chat and private conversation messages create notifications. Each chat or post discussion has at most one unread entry. Further activity updates that entry and can send another device alert.
+- A user is also notified of a mention, being added to a room and a post in a subscribed topic. The owner and moderators receive new-member notifications. Eligible staff receive report notifications without the reporter's identity.
+- Nobody receives notifications of their own actions. One action never notifies the same person twice. A mention takes precedence over a reply or an ordinary message or comment. An explicit post mute or room alert setting of Off also suppresses mentions.
+- Reading a discussion marks its notifications read through the content reached. Opening one notification marks that version read. Viewing the Notifications page marks nothing read.
+- Mark all read keeps notification history. Clear all removes read and unread notifications. Neither action marks the underlying content read.
+- Read positions and notification preferences are stored on the server and follow the user across devices. Read positions only move forward.
+- Indicators are dots rather than counts.
+- Notification settings are available in Settings and below the notification list. The post’s existing menu offers one action. Follow discussion appears when not following, and Mute discussion appears when following. The community chat and each room chat have a quiet menu for device alerts inside the chat. This control is hidden when chat is hidden or collapsed. The menu marks the current choice.
 
-- New posts and messages in rooms show as unread dots. A notification for every room message would duplicate what the room already shows.
-- A notification is read when the user opens it, not when they view the list.
-- The indicator is a dot, never a count, because a count invites the user to clear it.
-- Notification settings are available in Settings and below the notification list, so people can manage delivery where they read notifications.
-- A conversation message creates a notification, because notifications reach a user who is not in the app. Each conversation has at most one unread message notification.
-- One action never notifies the same person twice.
+**Device notifications** require permission on each device. Room chat offers All messages, Mentions and replies, or Off. All messages is the default. Account preferences separately control device alerts for comments, mentions and replies, and private conversations. These delivery settings do not hide entries in Notifications or unread content dots.
 
-Read markers record how far a person has read each chat and feed. They are stored on the server, so they follow the person across devices. A marker only moves forward, so a stale tab cannot undo another tab's reading.
-
-**Web push** sends mentions, comments, conversation messages, replies and reports. A push holds the community's name, one line and a link, and never any content.
+A device alert holds the community name, the actor's username where appropriate, an action and a link. It contains no message or post text. Current access and preferences are checked before delivery. A device showing the relevant discussion suppresses alerts only for activity it has reached. Repeated alerts for one discussion replace the device's existing alert.
 
 **The weekly digest** goes to people who have not visited for seven days (2026-11-08). It was built before push, because it brings back people who have stopped visiting. It holds only counts, with no content and no images. One click turns it off.
 
@@ -326,7 +327,7 @@ Comment and unread counts come from the server. The client refreshes them when c
 
 **One shape per concept.** A topic is always the same pill. A place is a tile or a picture. A feature is a line icon. A person is a profile picture. A notice is always the same alert box. Being offline is a red badge in the bar.
 
-- Timestamps use the viewer's local timezone and clock format throughout Sweet. Today shows the time. Yesterday shows Yesterday and the time. Other days show the date and time. Chat puts Today, Yesterday or the date in a divider and the time beside each message. This keeps dates consistent without repeating them on every message.
+- Timestamps use the viewer's local timezone and clock format throughout Sweet. Today shows the time. Yesterday shows Yesterday and the time. Other days show the date and time. Posts and membership details show only the date. Hovering a date shows the full date and time. Chat puts the day in a divider and the first message’s time beside the author of each message group. Edited posts and comments show only “edited”. This keeps dates consistent without repeating them on every message.
 
 ### Buttons
 
@@ -510,3 +511,4 @@ These decisions came from a security audit (2026-11-08).
 - Presence and typing indicators wait until chat feels inactive without them.
 - Post version history waits until moderation needs it.
 - Sorting the feed by latest comment was deferred by Raphael (2026-11-09). It first needs decisions about own comments, deleted comments and the unread dot.
+- **Discussion notifications.** Ordinary room messages now create grouped notifications and can alert devices. Authors and commenters follow discussions unless they mute them. Reading content clears its related unread notifications. This replaces the rule that room dots were sufficient and notifications had to be opened individually. Separate delivery controls keep these alerts optional.

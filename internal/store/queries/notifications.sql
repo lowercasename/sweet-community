@@ -2,45 +2,41 @@
 -- own notifications. The same applies to markers.
 
 -- name: CreateNotification :exec
-INSERT INTO notifications (id, user_id, kind, actor_id, group_id, post_id, topic_id, message_id, report_id, created_at)
-VALUES (sqlc.arg(id), sqlc.arg(user_id), sqlc.arg(kind), sqlc.arg(actor_id), sqlc.arg(group_id), sqlc.arg(post_id), sqlc.narg(topic_id), sqlc.narg(message_id), sqlc.narg(report_id), sqlc.arg(created_at));
+INSERT INTO notifications (id, user_id, kind, actor_id, group_id, post_id, topic_id, message_id, report_id, created_at, scope)
+VALUES (sqlc.arg(id), sqlc.arg(user_id), sqlc.arg(kind), sqlc.arg(actor_id), sqlc.arg(group_id), sqlc.arg(post_id), sqlc.narg(topic_id), sqlc.narg(message_id), sqlc.narg(report_id), sqlc.arg(created_at), sqlc.arg(scope))
+ON CONFLICT (user_id, scope) WHERE read_at IS NULL AND scope != '' DO UPDATE SET
+ kind = excluded.kind, actor_id = excluded.actor_id, topic_id = excluded.topic_id, message_id = excluded.message_id,
+ created_at = excluded.created_at, activity_count = notifications.activity_count + 1;
 
 -- name: GetNotification :one
 -- A report notification carries the kind of the reported item.
-SELECT n.id, n.user_id, n.kind, n.group_id, n.post_id, n.topic_id, n.message_id, n.created_at, n.read_at,
+SELECT n.id, n.user_id, n.kind, n.group_id, n.post_id, n.topic_id, n.message_id, n.created_at, n.read_at, n.scope, n.activity_count, g.kind AS group_kind,
        u.id AS actor_id, u.username AS actor_username, u.picture_id AS actor_picture_id, rp.kind AS report_kind
-FROM notifications n JOIN users u ON u.id = n.actor_id LEFT JOIN reports rp ON rp.id = n.report_id
+FROM notifications n JOIN users u ON u.id = n.actor_id JOIN groups g ON g.id = n.group_id LEFT JOIN reports rp ON rp.id = n.report_id
 WHERE n.id = sqlc.arg(id);
 
 -- name: ReadNotification :exec
 -- Opening a notification marks it read once. A second opening keeps the first read_at.
-UPDATE notifications SET read_at = sqlc.arg(read_at) WHERE id = sqlc.arg(id) AND user_id = sqlc.arg(user_id) AND read_at IS NULL;
+UPDATE notifications SET read_at = sqlc.arg(read_at) WHERE id = sqlc.arg(id) AND user_id = sqlc.arg(user_id) AND read_at IS NULL AND created_at <= sqlc.arg(before) AND (COALESCE(sqlc.narg(revision), 0) = 0 OR activity_count <= sqlc.narg(revision));
 
 -- name: ListNotifications :many
-SELECT n.id, n.user_id, n.kind, n.group_id, n.post_id, n.topic_id, n.message_id, n.created_at, n.read_at,
+SELECT n.id, n.user_id, n.kind, n.group_id, n.post_id, n.topic_id, n.message_id, n.created_at, n.read_at, n.scope, n.activity_count, g.kind AS group_kind,
        u.id AS actor_id, u.username AS actor_username, u.picture_id AS actor_picture_id, rp.kind AS report_kind
-FROM notifications n JOIN users u ON u.id = n.actor_id LEFT JOIN reports rp ON rp.id = n.report_id
+FROM notifications n JOIN users u ON u.id = n.actor_id JOIN groups g ON g.id = n.group_id LEFT JOIN reports rp ON rp.id = n.report_id
 WHERE n.user_id = sqlc.arg(user_id) AND n.created_at <= sqlc.arg(before)
   AND (n.created_at < sqlc.arg(before) OR n.id < sqlc.arg(before_id))
 ORDER BY n.created_at DESC, n.id DESC
 LIMIT sqlc.arg(page_size);
 
--- name: CountUnreadNotificationsInGroup :one
--- Counts the unread notifications of one kind for one group. A conversation's
--- message notification is written once and not again until it is read.
-SELECT COUNT(*) FROM notifications
-WHERE user_id = sqlc.arg(user_id) AND kind = sqlc.arg(kind) AND group_id = sqlc.arg(group_id) AND read_at IS NULL;
+-- name: GetUnreadNotificationInScope :one
+SELECT id FROM notifications WHERE user_id = ? AND scope = ? AND read_at IS NULL;
 
--- name: ListUnreadNotificationsInGroupUpTo :many
--- The unread notifications of one kind for one group, up to a time. Reading
--- the group's chat up to that time marks these notifications read.
-SELECT id FROM notifications
-WHERE user_id = sqlc.arg(user_id) AND kind = sqlc.arg(kind) AND group_id = sqlc.arg(group_id) AND read_at IS NULL AND created_at <= sqlc.arg(before)
-ORDER BY created_at;
+-- name: ListUnreadNotificationsUpTo :many
+SELECT id FROM notifications WHERE user_id = sqlc.arg(user_id) AND read_at IS NULL
+AND created_at <= sqlc.arg(before) AND (sqlc.arg(scope) = '' OR scope = sqlc.arg(scope));
 
--- name: DeleteReadNotifications :exec
--- Deletes the user's read notifications up to a time. An unread notification is never cleared.
-DELETE FROM notifications WHERE user_id = sqlc.arg(user_id) AND read_at IS NOT NULL AND created_at <= sqlc.arg(before);
+-- name: DeleteNotifications :exec
+DELETE FROM notifications WHERE user_id = sqlc.arg(user_id) AND created_at <= sqlc.arg(before);
 
 -- name: SetMarker :exec
 -- A marker only moves forward, so an outdated tab cannot mark unread what another tab has marked read.
@@ -97,4 +93,9 @@ SELECT m.user_id, CAST('feed:' || m.group_id AS TEXT) AS stream, CAST(COALESCE(r
           AND x.created_at > COALESCE(r.read_at, m.joined_at)) AS unread
 FROM memberships m JOIN groups g ON g.id = m.group_id AND g.deleted_at IS NULL
 LEFT JOIN read_markers r ON r.user_id = m.user_id AND r.stream = 'feed:' || m.group_id
-WHERE m.user_id = sqlc.arg(user_id) AND m.hidden_at IS NULL;
+WHERE m.user_id = sqlc.arg(user_id) AND m.hidden_at IS NULL
+UNION ALL
+SELECT r.user_id, r.stream, r.read_at, CAST(0 AS INTEGER) AS unread
+FROM read_markers r JOIN posts p ON r.stream = 'post:' || p.id
+JOIN memberships m ON m.group_id = p.group_id AND m.user_id = r.user_id
+WHERE r.user_id = sqlc.arg(user_id) AND p.deleted_at IS NULL;

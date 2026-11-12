@@ -4,6 +4,10 @@
 
 - Use clock times and calendar dates consistently throughout Sweet
 - Add chat day dividers and group messages across pauses of up to fifteen minutes
+- Follow post discussions automatically after posting or commenting, with individual mute controls
+- Group chat and discussion notifications and mark them read when their content is viewed
+- Add configurable device alerts for community chat, room chats, mentions, comments and private conversations
+- Add Mark all read and Clear all for notifications
 - Show notification settings below the notification list
 - Restore the original notification empty-state message
 - Fix push delivery to Firefox on Android

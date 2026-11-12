@@ -43,7 +43,7 @@ describe('Time', () => {
   it('omits the date when a chat divider supplies it', () => {
     vi.useFakeTimers().setSystemTime(now)
     const date = new Date(2026, 10, 10, 14, 32)
-    render(<Time at={date.getTime()} clockOnly />)
+    render(<Time at={date.getTime()} format="time" />)
     expect(screen.getByRole('time').textContent).toBe(
       date.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' }),
     )
@@ -57,4 +57,12 @@ describe('Time', () => {
     act(() => vi.advanceTimersByTime(60_000))
     expect(screen.getByRole('time').textContent).toContain('Yesterday at ')
   })
+})
+
+it('can show just the calendar date for membership details', () => {
+  const date = new Date(2026, 10, 3, 21, 29)
+  const { container } = render(<Time at={date.getTime()} format="date" />)
+  expect(container.querySelector('time')?.textContent).toBe(
+    date.toLocaleDateString(undefined, { day: 'numeric', month: 'long', year: 'numeric' }),
+  )
 })

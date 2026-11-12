@@ -61,11 +61,11 @@ for (const suffix of ['', ' @phone']) {
       await expect(feedCount).toHaveText('2')
       await expect(profileCount).toHaveText('2')
       await expect(kit.page.getByRole('button', { name: 'Notifications, unread', exact: true })).toBeVisible()
-      // Neither page has loaded the notifications list. Reading both notifications must still clear the dot.
+      // Neither page has loaded the notifications list. Reading the grouped notification must still clear the dot.
       const notifications = (
         (await (await kit.context.request.get('/api/notifications')).json()) as { notifications: { id: string }[] }
       ).notifications
-      expect(notifications).toHaveLength(2)
+      expect(notifications).toHaveLength(1)
       for (const n of notifications)
         expect((await kit.context.request.put(`/api/notifications/${n.id}/read`)).ok()).toBeTruthy()
       await expect(kit.page.getByRole('button', { name: 'Notifications', exact: true })).toBeVisible()

@@ -514,3 +514,41 @@ func TestReportPrivacyUpgrade(t *testing.T) {
 		t.Fatalf("after upgrade: author notifications %d, eligible %d, events %d, reports %d", own, eligible, events, reports)
 	}
 }
+
+func TestNotificationUpgradeGroupsUnreadAndReconcilesChatMarkers(t *testing.T) {
+	d, err := Open(filepath.Join(t.TempDir(), "upgrade.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer d.Close()
+	migratedTo(t, d, "013")
+	_, err = d.Exec(`
+ INSERT INTO users(id,username,created_at) VALUES('reader','reader',1),('writer','writer',1);
+ INSERT INTO groups(id,kind,name,mode,created_at) VALUES('room','group','Room','both',1);
+ INSERT INTO memberships(group_id,user_id,role,joined_at) VALUES('room','reader','member',1);
+ INSERT INTO posts(id,group_id,author_id,body_html,body_text,created_at) VALUES('post','room','writer','<p>Keep this text</p>','Keep this text',1);
+ INSERT INTO notifications(id,user_id,kind,actor_id,group_id,post_id,created_at) VALUES
+ ('c1','reader','comment','writer','room','post',10),('c2','reader','comment','writer','room','post',20),
+ ('m1','reader','mention','writer','room',NULL,10),('m2','reader','reply','writer','room',NULL,20);
+ INSERT INTO read_markers(user_id,stream,read_at) VALUES('reader','chat:room',20);
+ INSERT INTO events(kind,payload,created_at) VALUES('notification','{}',1),('notification_delete','{}',1),('marker','{"stream":"notifications"}',1),('post','{}',1);
+ `)
+	if err != nil {
+		t.Fatal(err)
+	}
+	migratedTo(t, d, "014")
+	var unread, count, events int
+	if err = d.QueryRow(`SELECT COUNT(*),COALESCE(SUM(activity_count),0) FROM notifications WHERE read_at IS NULL`).Scan(&unread, &count); err != nil {
+		t.Fatal(err)
+	}
+	if unread != 1 || count != 2 {
+		t.Fatalf("unread groups=%d, activities=%d", unread, count)
+	}
+	if err = d.QueryRow(`SELECT COUNT(*) FROM events`).Scan(&events); err != nil || events != 1 {
+		t.Fatalf("old replay events remain: %d %v", events, err)
+	}
+	var body string
+	if err = d.QueryRow(`SELECT body_html FROM posts WHERE id='post'`).Scan(&body); err != nil || body != "<p>Keep this text</p>" {
+		t.Fatalf("user content changed: %q %v", body, err)
+	}
+}

@@ -6,6 +6,7 @@ import { mine, nobody, post, renderWithQuery, reportable, user } from '../test-u
 
 /** A post's menu shows exactly the actions its can flags allow. The component makes no permission decisions. */
 vi.mock('../api', () => ({
+  getPostNotificationPreference: vi.fn(() => Promise.resolve({ post_id: 'p1', following: false, muted: false })),
   getMe: vi.fn(() => Promise.resolve({ id: 'kit', username: 'kit', picture: null })),
   listMembers: vi.fn(() => Promise.resolve({ members: [] })),
   listUsers: vi.fn(() => Promise.resolve({ users: [] })),
@@ -74,39 +75,48 @@ describe('Post menu', () => {
   it('offers both actions when both are allowed', async () => {
     await render(mine)
     fireEvent.click(screen.getByLabelText('Post options'))
-    expect(screen.getAllByRole('menuitem').map((b) => b.textContent)).toEqual(['Edit', 'Delete'])
+    await screen.findByRole('menuitem', { name: 'Follow discussion' })
+    expect(screen.getAllByRole('menuitem').map((b) => b.textContent)).toEqual(['Follow discussion', 'Edit', 'Delete'])
   })
   it('offers only Delete to a user who can delete but not edit', async () => {
     await render({ edit: false, delete: true, report: false })
     fireEvent.click(screen.getByLabelText('Post options'))
-    expect(screen.getAllByRole('menuitem').map((b) => b.textContent)).toEqual(['Delete'])
+    await screen.findByRole('menuitem', { name: 'Follow discussion' })
+    expect(screen.getAllByRole('menuitem').map((b) => b.textContent)).toEqual(['Follow discussion', 'Delete'])
   })
-  it('shows no menu when nothing is allowed', async () => {
+  it('offers discussion preferences even without content actions', async () => {
     await render(nobody)
-    expect(screen.queryByLabelText('Post options')).toBeNull()
+    fireEvent.click(screen.getByLabelText('Post options'))
+    await screen.findByRole('menuitem', { name: 'Follow discussion' })
+    expect(screen.queryByRole('menuitem', { name: 'Mute discussion' })).toBeNull()
+    expect(screen.getAllByRole('menuitem')).toHaveLength(1)
   })
   it("offers Report on another member's post, which opens the report dialog for the post", async () => {
     await render(reportable)
     fireEvent.click(screen.getByLabelText('Post options'))
-    expect(screen.getAllByRole('menuitem').map((b) => b.textContent)).toEqual(['Report'])
+    await screen.findByRole('menuitem', { name: 'Follow discussion' })
+    expect(screen.getAllByRole('menuitem').map((b) => b.textContent)).toEqual(['Follow discussion', 'Report'])
     fireEvent.click(screen.getByRole('menuitem', { name: 'Report' }))
     expect(screen.getByRole('heading', { name: 'Report this post?', hidden: true })).toBeTruthy()
   })
   it("marks Delete with the shield when only the viewer's role allows it, and not otherwise", async () => {
     await render({ edit: false, delete: true, report: true, delete_by_role: true })
     fireEvent.click(screen.getByLabelText('Post options'))
+    await screen.findByRole('menuitem', { name: 'Follow discussion' })
     const del = screen.getByRole('menuitem', { name: 'Delete' })
     expect(del.querySelector('[data-shield]')).toBeTruthy()
     expect(del.getAttribute('aria-description')).toBe('Only owners and moderators can do this')
     cleanup()
     await render(mine)
     fireEvent.click(screen.getByLabelText('Post options'))
+    await screen.findByRole('menuitem', { name: 'Follow discussion' })
     expect(screen.getByRole('menuitem', { name: 'Delete' }).querySelector('[data-shield]')).toBeNull()
   })
   it('puts Report before Delete, so the item that removes something is last', async () => {
     await render({ edit: false, delete: true, report: true })
     fireEvent.click(screen.getByLabelText('Post options'))
-    expect(screen.getAllByRole('menuitem').map((b) => b.textContent)).toEqual(['Report', 'Delete'])
+    await screen.findByRole('menuitem', { name: 'Follow discussion' })
+    expect(screen.getAllByRole('menuitem').map((b) => b.textContent)).toEqual(['Follow discussion', 'Report', 'Delete'])
   })
 })
 
@@ -141,6 +151,7 @@ describe('Post topic pill', () => {
     const onSetTopic = await drawFiled({ ...mine, set_topic: true })
     expect((await screen.findByRole('link', { name: 'Topic: Practice' })).getAttribute('href')).toBe('/?topic=t1')
     fireEvent.click(screen.getByLabelText('Post options'))
+    await screen.findByRole('menuitem', { name: 'Follow discussion' })
     fireEvent.click(screen.getByRole('menuitem', { name: 'Edit' }))
     const chooser = await screen.findByRole('button', { name: 'Topic' })
     expect(chooser.textContent).toContain('Practice')

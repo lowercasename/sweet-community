@@ -1,5 +1,8 @@
 import type { InfiniteData, QueryClient } from '@tanstack/react-query'
 import type {
+  MySettings,
+  PostNotificationPreference,
+  RoomNotificationPreference,
   Comment,
   CommentPage,
   Group,
@@ -19,6 +22,7 @@ import type {
   Topic,
   User,
 } from '../api'
+import { dismissDeviceNotifications } from '../reading'
 import { ROOT_ID, keys } from './keys'
 
 /**
@@ -40,6 +44,9 @@ export const EVENT_KINDS = [
   'settings',
   'rules',
   'welcome',
+  'my_settings',
+  'post_notification_preference',
+  'room_notification_preference',
   'notification',
   'notification_delete',
   'marker',
@@ -96,6 +103,19 @@ export function applyEvent(qc: QueryClient, kind: string, data: unknown): void {
     case 'membership_delete':
       if (isMembershipRef(data)) deleteMembership(qc, data.group_id, data.user_id)
       break
+    case 'my_settings':
+      qc.setQueryData(keys.mySettings, data as MySettings)
+      break
+    case 'post_notification_preference': {
+      const preference = data as PostNotificationPreference
+      qc.setQueryData(keys.postNotifications(preference.post_id), preference)
+      break
+    }
+    case 'room_notification_preference': {
+      const preference = data as RoomNotificationPreference
+      qc.setQueryData(keys.roomNotifications(preference.group_id), preference)
+      break
+    }
     case 'notification':
       if (isNotification(data)) upsertNotification(qc, data)
       break
@@ -269,6 +289,7 @@ function refreshCommentCount(qc: QueryClient, postId: string, groupId: string) {
 }
 
 function upsertComment(qc: QueryClient, c: Comment) {
+  void qc.invalidateQueries({ queryKey: keys.postNotifications(c.post_id) })
   qc.setQueryData<Thread>(keys.comments(c.post_id), (old) => upsertInPages(old, 'comments', c))
   refreshCommentCount(qc, c.post_id, c.group_id)
 }
@@ -339,14 +360,27 @@ function upsertUser(qc: QueryClient, u: User) {
 
 /** Upserts the notification and refreshes the server's unread count. */
 function upsertNotification(qc: QueryClient, n: Notification) {
+  const current = qc
+    .getQueryData<Notifications>(keys.notifications)
+    ?.pages.flatMap((p) => p.notifications)
+    .find((old) => old.id === n.id)
+  if (
+    current &&
+    ((current.activity_count ?? 1) > (n.activity_count ?? 1) ||
+      ((current.activity_count ?? 1) === (n.activity_count ?? 1) && current.read_at !== null && n.read_at === null))
+  )
+    return
+  if (n.read_at != null) dismissDeviceNotifications(n.created_at, n.scope ?? '', n.id, n.activity_count ?? 1)
   qc.setQueryData<Notifications>(keys.notifications, (old) => upsertInPages(old, 'notifications', n))
   void qc.invalidateQueries({ queryKey: keys.markers })
 }
 
-/** Removes the opened notifications created before a time. Unopened notifications stay. */
+/** Removes read and unread notifications through the server cutoff. */
 function clearNotifications(qc: QueryClient, before: number) {
+  dismissDeviceNotifications(before)
+  void qc.invalidateQueries({ queryKey: keys.markers })
   qc.setQueryData<Notifications>(keys.notifications, (old) =>
-    eachPage(old, 'notifications', (ns) => ns.filter((n) => n.read_at == null || n.created_at > before)),
+    eachPage(old, 'notifications', (ns) => ns.filter((n) => n.created_at > before)),
   )
 }
 
@@ -355,6 +389,7 @@ function clearNotifications(qc: QueryClient, before: number) {
  * marker only moves forward, as on the server, so a stale tab's marker changes nothing.
  */
 function upsertMarker(qc: QueryClient, m: Marker) {
+  if (m.stream !== 'notifications') dismissDeviceNotifications(m.read_at, m.stream)
   qc.setQueryData<Markers>(keys.markers, (old) => {
     const markers = old?.markers ?? []
     const known = markers.some((x) => x.stream === m.stream)

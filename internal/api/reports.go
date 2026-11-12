@@ -314,7 +314,7 @@ func closeReports(ctx context.Context, qtx *store.Queries, kind, id, by, outcome
 	var users []string
 	seen := map[string]bool{}
 	for _, n := range unread {
-		if err := qtx.ReadNotification(ctx, store.ReadNotificationParams{ReadAt: sql.NullInt64{Int64: now, Valid: true}, ID: n.ID, UserID: n.UserID}); err != nil {
+		if err := qtx.ReadNotification(ctx, store.ReadNotificationParams{ReadAt: sql.NullInt64{Int64: now, Valid: true}, ID: n.ID, UserID: n.UserID, Before: now}); err != nil {
 			return nil, err
 		}
 		row, err := qtx.GetNotification(ctx, n.ID)

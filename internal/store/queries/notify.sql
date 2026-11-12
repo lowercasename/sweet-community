@@ -78,3 +78,7 @@ DELETE FROM push_subscriptions WHERE push_subscriptions.user_id = sqlc.arg(user_
     SELECT newest.id FROM push_subscriptions AS newest WHERE newest.user_id = sqlc.arg(user_id)
     ORDER BY newest.created_at DESC, newest.id DESC LIMIT sqlc.arg(keep)
 );
+
+-- name: GetCurrentPushSubscription :one
+SELECT id, user_id, endpoint, p256dh, auth, created_at FROM push_subscriptions
+WHERE id = ? AND user_id = ?;

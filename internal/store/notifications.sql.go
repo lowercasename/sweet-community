@@ -10,30 +10,13 @@ import (
 	"database/sql"
 )
 
-const countUnreadNotificationsInGroup = `-- name: CountUnreadNotificationsInGroup :one
-SELECT COUNT(*) FROM notifications
-WHERE user_id = ?1 AND kind = ?2 AND group_id = ?3 AND read_at IS NULL
-`
-
-type CountUnreadNotificationsInGroupParams struct {
-	UserID  string
-	Kind    string
-	GroupID string
-}
-
-// Counts the unread notifications of one kind for one group. A conversation's
-// message notification is written once and not again until it is read.
-func (q *Queries) CountUnreadNotificationsInGroup(ctx context.Context, arg CountUnreadNotificationsInGroupParams) (int64, error) {
-	row := q.db.QueryRowContext(ctx, countUnreadNotificationsInGroup, arg.UserID, arg.Kind, arg.GroupID)
-	var count int64
-	err := row.Scan(&count)
-	return count, err
-}
-
 const createNotification = `-- name: CreateNotification :exec
 
-INSERT INTO notifications (id, user_id, kind, actor_id, group_id, post_id, topic_id, message_id, report_id, created_at)
-VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)
+INSERT INTO notifications (id, user_id, kind, actor_id, group_id, post_id, topic_id, message_id, report_id, created_at, scope)
+VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)
+ON CONFLICT (user_id, scope) WHERE read_at IS NULL AND scope != '' DO UPDATE SET
+ kind = excluded.kind, actor_id = excluded.actor_id, topic_id = excluded.topic_id, message_id = excluded.message_id,
+ created_at = excluded.created_at, activity_count = notifications.activity_count + 1
 `
 
 type CreateNotificationParams struct {
@@ -47,6 +30,7 @@ type CreateNotificationParams struct {
 	MessageID sql.NullString
 	ReportID  sql.NullString
 	CreatedAt int64
+	Scope     string
 }
 
 // Notifications are per user. The handler lists only the logged-in user's
@@ -63,22 +47,22 @@ func (q *Queries) CreateNotification(ctx context.Context, arg CreateNotification
 		arg.MessageID,
 		arg.ReportID,
 		arg.CreatedAt,
+		arg.Scope,
 	)
 	return err
 }
 
-const deleteReadNotifications = `-- name: DeleteReadNotifications :exec
-DELETE FROM notifications WHERE user_id = ?1 AND read_at IS NOT NULL AND created_at <= ?2
+const deleteNotifications = `-- name: DeleteNotifications :exec
+DELETE FROM notifications WHERE user_id = ?1 AND created_at <= ?2
 `
 
-type DeleteReadNotificationsParams struct {
+type DeleteNotificationsParams struct {
 	UserID string
 	Before int64
 }
 
-// Deletes the user's read notifications up to a time. An unread notification is never cleared.
-func (q *Queries) DeleteReadNotifications(ctx context.Context, arg DeleteReadNotificationsParams) error {
-	_, err := q.db.ExecContext(ctx, deleteReadNotifications, arg.UserID, arg.Before)
+func (q *Queries) DeleteNotifications(ctx context.Context, arg DeleteNotificationsParams) error {
+	_, err := q.db.ExecContext(ctx, deleteNotifications, arg.UserID, arg.Before)
 	return err
 }
 
@@ -155,9 +139,9 @@ func (q *Queries) GetFeedMarker(ctx context.Context, arg GetFeedMarkerParams) (G
 }
 
 const getNotification = `-- name: GetNotification :one
-SELECT n.id, n.user_id, n.kind, n.group_id, n.post_id, n.topic_id, n.message_id, n.created_at, n.read_at,
+SELECT n.id, n.user_id, n.kind, n.group_id, n.post_id, n.topic_id, n.message_id, n.created_at, n.read_at, n.scope, n.activity_count, g.kind AS group_kind,
        u.id AS actor_id, u.username AS actor_username, u.picture_id AS actor_picture_id, rp.kind AS report_kind
-FROM notifications n JOIN users u ON u.id = n.actor_id LEFT JOIN reports rp ON rp.id = n.report_id
+FROM notifications n JOIN users u ON u.id = n.actor_id JOIN groups g ON g.id = n.group_id LEFT JOIN reports rp ON rp.id = n.report_id
 WHERE n.id = ?1
 `
 
@@ -171,6 +155,9 @@ type GetNotificationRow struct {
 	MessageID      sql.NullString
 	CreatedAt      int64
 	ReadAt         sql.NullInt64
+	Scope          string
+	ActivityCount  int64
+	GroupKind      string
 	ActorID        string
 	ActorUsername  string
 	ActorPictureID sql.NullString
@@ -191,6 +178,9 @@ func (q *Queries) GetNotification(ctx context.Context, id string) (GetNotificati
 		&i.MessageID,
 		&i.CreatedAt,
 		&i.ReadAt,
+		&i.Scope,
+		&i.ActivityCount,
+		&i.GroupKind,
 		&i.ActorID,
 		&i.ActorUsername,
 		&i.ActorPictureID,
@@ -227,6 +217,22 @@ func (q *Queries) GetNotificationsMarker(ctx context.Context, userID string) (Ge
 	return i, err
 }
 
+const getUnreadNotificationInScope = `-- name: GetUnreadNotificationInScope :one
+SELECT id FROM notifications WHERE user_id = ? AND scope = ? AND read_at IS NULL
+`
+
+type GetUnreadNotificationInScopeParams struct {
+	UserID string
+	Scope  string
+}
+
+func (q *Queries) GetUnreadNotificationInScope(ctx context.Context, arg GetUnreadNotificationInScopeParams) (string, error) {
+	row := q.db.QueryRowContext(ctx, getUnreadNotificationInScope, arg.UserID, arg.Scope)
+	var id string
+	err := row.Scan(&id)
+	return id, err
+}
+
 const listMarkers = `-- name: ListMarkers :many
 SELECT u.id AS user_id, CAST('notifications' AS TEXT) AS stream, CAST(0 AS INTEGER) AS read_at,
        (SELECT COUNT(*) FROM notifications n WHERE n.user_id = u.id AND n.read_at IS NULL) AS unread
@@ -246,6 +252,11 @@ SELECT m.user_id, CAST('feed:' || m.group_id AS TEXT) AS stream, CAST(COALESCE(r
 FROM memberships m JOIN groups g ON g.id = m.group_id AND g.deleted_at IS NULL
 LEFT JOIN read_markers r ON r.user_id = m.user_id AND r.stream = 'feed:' || m.group_id
 WHERE m.user_id = ?1 AND m.hidden_at IS NULL
+UNION ALL
+SELECT r.user_id, r.stream, r.read_at, CAST(0 AS INTEGER) AS unread
+FROM read_markers r JOIN posts p ON r.stream = 'post:' || p.id
+JOIN memberships m ON m.group_id = p.group_id AND m.user_id = r.user_id
+WHERE r.user_id = ?1 AND p.deleted_at IS NULL
 `
 
 type ListMarkersRow struct {
@@ -286,9 +297,9 @@ func (q *Queries) ListMarkers(ctx context.Context, userID string) ([]ListMarkers
 }
 
 const listNotifications = `-- name: ListNotifications :many
-SELECT n.id, n.user_id, n.kind, n.group_id, n.post_id, n.topic_id, n.message_id, n.created_at, n.read_at,
+SELECT n.id, n.user_id, n.kind, n.group_id, n.post_id, n.topic_id, n.message_id, n.created_at, n.read_at, n.scope, n.activity_count, g.kind AS group_kind,
        u.id AS actor_id, u.username AS actor_username, u.picture_id AS actor_picture_id, rp.kind AS report_kind
-FROM notifications n JOIN users u ON u.id = n.actor_id LEFT JOIN reports rp ON rp.id = n.report_id
+FROM notifications n JOIN users u ON u.id = n.actor_id JOIN groups g ON g.id = n.group_id LEFT JOIN reports rp ON rp.id = n.report_id
 WHERE n.user_id = ?1 AND n.created_at <= ?2
   AND (n.created_at < ?2 OR n.id < ?3)
 ORDER BY n.created_at DESC, n.id DESC
@@ -312,6 +323,9 @@ type ListNotificationsRow struct {
 	MessageID      sql.NullString
 	CreatedAt      int64
 	ReadAt         sql.NullInt64
+	Scope          string
+	ActivityCount  int64
+	GroupKind      string
 	ActorID        string
 	ActorUsername  string
 	ActorPictureID sql.NullString
@@ -342,6 +356,9 @@ func (q *Queries) ListNotifications(ctx context.Context, arg ListNotificationsPa
 			&i.MessageID,
 			&i.CreatedAt,
 			&i.ReadAt,
+			&i.Scope,
+			&i.ActivityCount,
+			&i.GroupKind,
 			&i.ActorID,
 			&i.ActorUsername,
 			&i.ActorPictureID,
@@ -360,28 +377,19 @@ func (q *Queries) ListNotifications(ctx context.Context, arg ListNotificationsPa
 	return items, nil
 }
 
-const listUnreadNotificationsInGroupUpTo = `-- name: ListUnreadNotificationsInGroupUpTo :many
-SELECT id FROM notifications
-WHERE user_id = ?1 AND kind = ?2 AND group_id = ?3 AND read_at IS NULL AND created_at <= ?4
-ORDER BY created_at
+const listUnreadNotificationsUpTo = `-- name: ListUnreadNotificationsUpTo :many
+SELECT id FROM notifications WHERE user_id = ?1 AND read_at IS NULL
+AND created_at <= ?2 AND (?3 = '' OR scope = ?3)
 `
 
-type ListUnreadNotificationsInGroupUpToParams struct {
-	UserID  string
-	Kind    string
-	GroupID string
-	Before  int64
+type ListUnreadNotificationsUpToParams struct {
+	UserID string
+	Before int64
+	Scope  interface{}
 }
 
-// The unread notifications of one kind for one group, up to a time. Reading
-// the group's chat up to that time marks these notifications read.
-func (q *Queries) ListUnreadNotificationsInGroupUpTo(ctx context.Context, arg ListUnreadNotificationsInGroupUpToParams) ([]string, error) {
-	rows, err := q.db.QueryContext(ctx, listUnreadNotificationsInGroupUpTo,
-		arg.UserID,
-		arg.Kind,
-		arg.GroupID,
-		arg.Before,
-	)
+func (q *Queries) ListUnreadNotificationsUpTo(ctx context.Context, arg ListUnreadNotificationsUpToParams) ([]string, error) {
+	rows, err := q.db.QueryContext(ctx, listUnreadNotificationsUpTo, arg.UserID, arg.Before, arg.Scope)
 	if err != nil {
 		return nil, err
 	}
@@ -404,18 +412,26 @@ func (q *Queries) ListUnreadNotificationsInGroupUpTo(ctx context.Context, arg Li
 }
 
 const readNotification = `-- name: ReadNotification :exec
-UPDATE notifications SET read_at = ?1 WHERE id = ?2 AND user_id = ?3 AND read_at IS NULL
+UPDATE notifications SET read_at = ?1 WHERE id = ?2 AND user_id = ?3 AND read_at IS NULL AND created_at <= ?4 AND (COALESCE(?5, 0) = 0 OR activity_count <= ?5)
 `
 
 type ReadNotificationParams struct {
-	ReadAt sql.NullInt64
-	ID     string
-	UserID string
+	ReadAt   sql.NullInt64
+	ID       string
+	UserID   string
+	Before   int64
+	Revision interface{}
 }
 
 // Opening a notification marks it read once. A second opening keeps the first read_at.
 func (q *Queries) ReadNotification(ctx context.Context, arg ReadNotificationParams) error {
-	_, err := q.db.ExecContext(ctx, readNotification, arg.ReadAt, arg.ID, arg.UserID)
+	_, err := q.db.ExecContext(ctx, readNotification,
+		arg.ReadAt,
+		arg.ID,
+		arg.UserID,
+		arg.Before,
+		arg.Revision,
+	)
 	return err
 }
 

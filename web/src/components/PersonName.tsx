@@ -48,7 +48,8 @@ function PersonCard({ person, me }: { person: Member | User; me: User | null | u
           </Text>
           {standing && (
             <Text as="span" variant="small">
-              {ROLE_WORD[standing.role] && `${ROLE_WORD[standing.role]} · `}joined <Time at={standing.joined_at} />
+              {ROLE_WORD[standing.role] && `${ROLE_WORD[standing.role]} · `}joined{' '}
+              <Time at={standing.joined_at} format="date" />
             </Text>
           )}
         </Stack>

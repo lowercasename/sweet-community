@@ -20,7 +20,7 @@ test.describe('people', () => {
     await expect(card).toBeHidden()
     await name.hover()
     await expect(card).toBeVisible()
-    await expect(card).toContainText(/joined (just now|\d+m ago)/)
+    await expect(card.locator('time')).not.toContainText(/\d{1,2}:\d{2}/)
     // The card stays open while the pointer is in it. It closes when the pointer leaves both the name and the card.
     await card.getByRole('button', { name: 'Message' }).hover()
     await expect(card).toBeVisible()

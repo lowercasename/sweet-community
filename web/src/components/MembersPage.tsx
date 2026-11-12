@@ -231,7 +231,7 @@ export function MembersPage({ group, me, onLeft }: MembersPageProps) {
                             <PersonName user={m.user} avatar="md" />
                             <Text as="span" variant="small">
                               {ROLE_WORD[m.role] && `${ROLE_WORD[m.role]} · `}
-                              joined <Time at={m.joined_at} />
+                              joined <Time at={m.joined_at} format="date" />
                             </Text>
                           </Row>
                           {!self && m.role !== 'owner' && !busy && items(m).length > 0 && (

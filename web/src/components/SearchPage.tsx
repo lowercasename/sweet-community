@@ -107,7 +107,8 @@ function HitRow({ hit, place, onOpen }: { hit: Hit; place?: string; onOpen: () =
         <Stack gap={0}>
           <Text as="span" variant="small">
             {author.username} · {KIND_WORD[hit.kind]}
-            {place ? ` in ${place}` : ''} · <Time at={hit.created_at} />
+            {place ? ` in ${place}` : ''} ·{' '}
+            <Time at={hit.created_at} format={hit.kind === 'post' ? 'date' : 'date-time'} />
           </Text>
           <Text as="span" variant="body">
             {parts.map((p, i) =>

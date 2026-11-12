@@ -32,9 +32,13 @@ type Subscription struct {
 
 // Payload is the content the service worker shows. It has a title, a body line, and the URL opened on tap.
 type Payload struct {
-	Title string `json:"title"`
-	Body  string `json:"body"`
-	URL   string `json:"url"`
+	ID       string `json:"id"`
+	Revision int64  `json:"revision"`
+	Scope    string `json:"scope"`
+	At       int64  `json:"at"`
+	Title    string `json:"title"`
+	Body     string `json:"body"`
+	URL      string `json:"url"`
 	// Tag groups pushes on a device. A new push with the same tag replaces the
 	// one currently shown, so a conversation produces one notification rather
 	// than several.
@@ -130,7 +134,7 @@ type Pusher struct {
 // Tell sends the payload to every device of the user and deletes the
 // subscriptions that are gone. Every device is tried, and then the errors
 // from the push service are returned joined.
-func (p *Pusher) Tell(ctx context.Context, userID string, payload Payload) error {
+func (p *Pusher) Tell(ctx context.Context, userID string, payload Payload, allowed func(context.Context) (bool, error)) error {
 	q := store.New(p.DB)
 	subs, err := q.ListPushSubscriptions(ctx, userID)
 	if err != nil {
@@ -148,12 +152,28 @@ func (p *Pusher) Tell(ctx context.Context, userID string, payload Payload) error
 		timeout = 10 * time.Second
 	}
 	var errs []error
-	for _, s := range subs {
+	for _, candidate := range subs {
+		s, err := q.GetCurrentPushSubscription(ctx, store.GetCurrentPushSubscriptionParams{ID: candidate.ID, UserID: userID})
+		if errors.Is(err, sql.ErrNoRows) {
+			continue
+		}
+		if err != nil {
+			return err
+		}
+		if allowed != nil {
+			ok, err := allowed(ctx)
+			if err != nil {
+				return err
+			}
+			if !ok {
+				return nil
+			}
+		}
 		sctx, cancel := context.WithTimeout(ctx, timeout)
 		gone, err := p.Send.Send(sctx, Subscription{Endpoint: s.Endpoint, P256dh: s.P256dh, Auth: s.Auth}, data)
 		cancel()
 		if gone {
-			if err := q.DeletePushSubscription(ctx, store.DeletePushSubscriptionParams{Endpoint: s.Endpoint, UserID: ""}); err != nil {
+			if err := q.DeletePushSubscription(ctx, store.DeletePushSubscriptionParams{Endpoint: s.Endpoint, UserID: userID}); err != nil {
 				errs = append(errs, err)
 			}
 			continue

@@ -68,3 +68,5 @@ export { List, ListItem } from './List'
 export { Select } from './Select'
 export { Tour, type TourCard } from './Tour'
 export { Colophon } from './Colophon'
+
+export { ReadPoint } from './ReadPoint'

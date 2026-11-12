@@ -59,8 +59,9 @@ with sqlite3.connect('../data/e2e.db') as db:
     await expect(chat.getByRole('separator', { name: 'Today' })).toHaveCount(1)
     await expect(chat.getByRole('article')).toHaveCount(4)
     await expect(chat.getByText(`${kit.username} added ${mo.username} to the room`)).toBeVisible()
-    for (const row of rows) {
-      const block = chat.locator(`#message-${row.id}`)
+    for (const [group, index] of [0, 1, 4, 5].entries()) {
+      const row = rows[index]
+      const block = chat.getByRole('article').nth(group)
       const clock = await kit.page.evaluate(
         (at) => new Date(at).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' }),
         row.at,
@@ -71,9 +72,11 @@ with sqlite3.connect('../data/e2e.db') as db:
     const long = chat.locator(`#message-${rows[1].id}`)
     await long.scrollIntoViewIfNeeded()
     await long.hover()
-    const time = (await long.locator('time').boundingBox())!
-    const reply = (await long.getByRole('button', { name: 'Reply to this message' }).boundingBox())!
-    expect(time.x + time.width).toBeLessThanOrEqual(reply.x)
+    await expect(long.locator('time')).toHaveCount(0)
+    const headerTime = chat.getByRole('article').nth(1).locator('time')
+    await expect(headerTime).toBeInViewport()
+    const bounds = (await headerTime.boundingBox())!
+    expect(bounds.x + bounds.width).toBeLessThanOrEqual(kit.page.viewportSize()!.width)
     await kit.page.screenshot({ path: info.outputPath('chat-dates.png') })
     await kit.context.close()
     await mo.context.close()

@@ -5,7 +5,10 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
+	"slices"
+	"strconv"
 	"strings"
+	"sweet/internal/sanitize"
 
 	"github.com/google/uuid"
 
@@ -15,16 +18,15 @@ import (
 	"sweet/internal/store"
 )
 
-// Notification records one action that affects one user, such as a comment on their post or being added to a room.
-// The handler that writes the action writes the notification in the same
-// transaction, and the notification is sent to that user only. A
-// notification is marked read (read_at) when the user opens it, one at a
-// time. Opening the notifications page does not mark anything read.
+// Notification groups unread activity for one recipient and one discussion.
 type Notification struct {
-	ID     string `json:"id"`
-	UserID string `json:"user_id"`
-	Kind   string `json:"kind"`
-	Actor  *User  `json:"actor"` // Report notifications do not identify the reporter.
+	GroupKind     string `json:"group_kind"`
+	Scope         string `json:"scope"`
+	ActivityCount int64  `json:"activity_count"`
+	ID            string `json:"id"`
+	UserID        string `json:"user_id"`
+	Kind          string `json:"kind"`
+	Actor         *User  `json:"actor"` // Report notifications do not identify the reporter.
 	// GroupID is the group the action happened in. PostID is the post, for a comment.
 	GroupID string  `json:"group_id"`
 	PostID  *string `json:"post_id"`
@@ -35,7 +37,7 @@ type Notification struct {
 	// ReportKind is the kind of item reported (post, comment or message), for a report notification.
 	ReportKind *string `json:"report_kind"`
 	CreatedAt  int64   `json:"created_at"`
-	// ReadAt is when the user opened the notification. It is null until then.
+	// ReadAt is when the notification or its discussion was read.
 	ReadAt *int64 `json:"read_at"`
 }
 
@@ -46,10 +48,7 @@ const (
 	NotifyJoined = "joined"
 	// NotifyTopicPost notifies a topic's followers of a post in it.
 	NotifyTopicPost = "topic_post"
-	// NotifyMessage is a message in a conversation (DM). There is at most one
-	// unread row per conversation. It is marked read when the conversation's
-	// chat marker moves past it.
-	// Room chat does not produce notifications.
+	// NotifyMessage is a message in any chat.
 	NotifyMessage = "message"
 	// NotifyReply: a reply to the user's message in a room's chat.
 	NotifyReply = "reply"
@@ -86,69 +85,47 @@ func notify(r *http.Request, qtx *store.Queries, kind, to, actor, groupID string
 	return notifyIn(r, qtx, kind, to, actor, groupID, postID, nil, now)
 }
 
-// notifyMessage writes a message notification for each other member of a
-// conversation who does not already have an unread one for it. It writes
-// nothing for a room, and nothing for a member who has hidden the conversation.
-func notifyMessage(r *http.Request, qtx *store.Queries, g Group, author string, now int64) ([]events.Entry, error) {
-	if g.Kind != perm.KindDM {
-		return nil, nil
-	}
+// notifyMessage notifies each other visible member once, preferring a mention or reply over an ordinary message.
+func notifyMessage(r *http.Request, qtx *store.Queries, g Group, author, answered, messageID, body string, now int64) ([]events.Entry, error) {
 	members, err := qtx.ListMembers(r.Context(), g.ID)
 	if err != nil {
 		return nil, err
 	}
+	mentions := sanitize.Mentions(body)
 	var told []events.Entry
 	for _, m := range members {
 		if m.ID == author || m.HiddenAt.Valid {
 			continue
 		}
-		n, err := qtx.CountUnreadNotificationsInGroup(r.Context(), store.CountUnreadNotificationsInGroupParams{UserID: m.ID, Kind: NotifyMessage, GroupID: g.ID})
+		kind := NotifyMessage
+		if g.Kind != perm.KindDM {
+			if m.ID == answered {
+				kind = NotifyReply
+			}
+			if slices.Contains(mentions, m.ID) {
+				kind = NotifyMention
+			}
+		}
+		e, err := notifyAbout(r, qtx, kind, m.ID, author, g.ID, nil, nil, &messageID, now)
 		if err != nil {
 			return nil, err
 		}
-		if n > 0 {
-			continue
+		if e != nil {
+			told = append(told, *e)
 		}
-		e, err := notify(r, qtx, NotifyMessage, m.ID, author, g.ID, nil, now)
-		if err != nil {
-			return nil, err
-		}
-		told = append(told, *e)
 	}
 	return told, nil
 }
 
-// notifyReply writes a reply notification to the author of the message
-// replied to. It writes nothing in a conversation, where the message
-// notification covers a reply, nothing for a reply to one's own message, and
-// nothing when the author is no longer in the group.
-func notifyReply(r *http.Request, qtx *store.Queries, g Group, answered, author, messageID string, now int64) ([]events.Entry, error) {
-	if answered == "" || answered == author || g.Kind == perm.KindDM {
-		return nil, nil
-	}
-	if _, err := qtx.GetMembership(r.Context(), store.GetMembershipParams{GroupID: g.ID, UserID: answered}); errors.Is(err, sql.ErrNoRows) {
-		return nil, nil
-	} else if err != nil {
-		return nil, err
-	}
-	e, err := notifyAbout(r, qtx, NotifyReply, answered, author, g.ID, nil, nil, &messageID, now)
-	if err != nil || e == nil {
-		return nil, err
-	}
-	return []events.Entry{*e}, nil
-}
-
-// readMessageNotifications marks the user's unread message notifications for a
-// conversation as read, up to the chat marker's time, and returns each updated
-// row as a notification event.
-func readMessageNotifications(r *http.Request, qtx *store.Queries, me, groupID string, upTo, now int64) ([]events.Entry, error) {
-	ids, err := qtx.ListUnreadNotificationsInGroupUpTo(r.Context(), store.ListUnreadNotificationsInGroupUpToParams{UserID: me, Kind: NotifyMessage, GroupID: groupID, Before: upTo})
+// readNotifications marks activity through the supplied time and returns the changed rows.
+func readNotifications(r *http.Request, qtx *store.Queries, me, scope string, upTo, now int64) ([]events.Entry, error) {
+	ids, err := qtx.ListUnreadNotificationsUpTo(r.Context(), store.ListUnreadNotificationsUpToParams{UserID: me, Scope: scope, Before: upTo})
 	if err != nil {
 		return nil, err
 	}
 	var read []events.Entry
 	for _, id := range ids {
-		if err := qtx.ReadNotification(r.Context(), store.ReadNotificationParams{ReadAt: sql.NullInt64{Int64: now, Valid: true}, ID: id, UserID: me}); err != nil {
+		if err := qtx.ReadNotification(r.Context(), store.ReadNotificationParams{ReadAt: sql.NullInt64{Int64: now, Valid: true}, ID: id, UserID: me, Before: upTo}); err != nil {
 			return nil, err
 		}
 		row, err := qtx.GetNotification(r.Context(), id)
@@ -191,6 +168,27 @@ func insertNotification(r *http.Request, qtx *store.Queries, p store.CreateNotif
 	} else if err != nil {
 		return nil, err
 	}
+	if p.Kind != NotifyReport {
+		a, err := actorIn(r.Context(), qtx, User{ID: p.UserID}, p.GroupID)
+		if err != nil {
+			return nil, err
+		}
+		if !perm.CanSee(a) {
+			return nil, nil
+		}
+	}
+	if p.PostID.Valid && p.Kind != NotifyReport {
+		muted, err := qtx.IsPostMuted(r.Context(), store.IsPostMutedParams{UserID: p.UserID, PostID: p.PostID.String})
+		if err != nil {
+			return nil, err
+		}
+		if muted {
+			return nil, nil
+		}
+		p.Scope = "post:" + p.PostID.String
+	} else if p.Kind == NotifyMessage || p.Kind == NotifyMention || p.Kind == NotifyReply {
+		p.Scope = streamChatPrefix + p.GroupID
+	}
 	id, err := uuid.NewV7()
 	if err != nil {
 		return nil, err
@@ -199,7 +197,13 @@ func insertNotification(r *http.Request, qtx *store.Queries, p store.CreateNotif
 	if err := qtx.CreateNotification(r.Context(), p); err != nil {
 		return nil, err
 	}
-	row, err := qtx.GetNotification(r.Context(), id.String())
+	if p.Scope != "" {
+		p.ID, err = qtx.GetUnreadNotificationInScope(r.Context(), store.GetUnreadNotificationInScopeParams{UserID: p.UserID, Scope: p.Scope})
+		if err != nil {
+			return nil, err
+		}
+	}
+	row, err := qtx.GetNotification(r.Context(), p.ID)
 	if err != nil {
 		return nil, err
 	}
@@ -234,42 +238,77 @@ func (s *Server) readNotification(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
 	me, _ := userFrom(r.Context())
 	now := db.Now()
-	s.logged(w, r, "notification", now, func(qtx *store.Queries) (any, int, error) {
+	before := now
+	var revision int64
+	if value := r.URL.Query().Get("revision"); value != "" {
+		n, err := strconv.ParseInt(value, 10, 64)
+		if err != nil || n < 1 {
+			writeErr(w, 400, "Invalid notification revision")
+			return
+		}
+		revision = n
+	}
+	if v := r.URL.Query().Get("before"); v != "" {
+		n, err := strconv.ParseInt(v, 10, 64)
+		if err != nil || n <= 0 {
+			writeErr(w, 400, "Invalid notification time")
+			return
+		}
+		before = min(n, now)
+	}
+	s.loggedMany(w, r, now, func(qtx *store.Queries) ([]events.Entry, any, int, error) {
 		row, err := qtx.GetNotification(r.Context(), id)
 		if errors.Is(err, sql.ErrNoRows) || (err == nil && row.UserID != me.ID) {
-			return nil, http.StatusNotFound, errors.New("No such notification")
+			return nil, nil, http.StatusNotFound, errors.New("No such notification")
 		}
 		if err != nil {
-			return nil, http.StatusInternalServerError, err
+			return nil, nil, http.StatusInternalServerError, err
 		}
-		if err := qtx.ReadNotification(r.Context(), store.ReadNotificationParams{ReadAt: sql.NullInt64{Int64: now, Valid: true}, ID: id, UserID: me.ID}); err != nil {
-			return nil, http.StatusInternalServerError, err
+		if row.CreatedAt > before || (revision > 0 && row.ActivityCount > revision) || row.ReadAt.Valid {
+			n := wireNotification(row)
+			return nil, &n, http.StatusOK, nil
+		}
+		if err := qtx.ReadNotification(r.Context(), store.ReadNotificationParams{ReadAt: sql.NullInt64{Int64: now, Valid: true}, ID: id, UserID: me.ID, Before: before, Revision: revision}); err != nil {
+			return nil, nil, http.StatusInternalServerError, err
 		}
 		if row, err = qtx.GetNotification(r.Context(), id); err != nil {
-			return nil, http.StatusInternalServerError, err
+			return nil, nil, http.StatusInternalServerError, err
 		}
 		n := wireNotification(row)
-		return &n, http.StatusOK, nil
+		return []events.Entry{{Kind: "notification", Payload: &n}}, &n, http.StatusOK, nil
 	})
 }
 
-// Cleared is the payload of a notification_delete event. It says that every read notification of the user up to Before has been deleted.
+// Cleared identifies the notifications removed through Before.
 type Cleared struct {
 	UserID string `json:"user_id"`
 	Before int64  `json:"before"`
 }
 
-// clearNotifications permanently deletes the user's read notifications.
-// One event describes the deleted set, the
-// read notifications up to now, rather than one event per row.
+// clearNotifications deletes read and unread notifications without moving content markers.
 func (s *Server) clearNotifications(w http.ResponseWriter, r *http.Request) {
 	me, _ := userFrom(r.Context())
 	now := db.Now()
 	s.logged(w, r, "notification_delete", now, func(qtx *store.Queries) (any, int, error) {
-		if err := qtx.DeleteReadNotifications(r.Context(), store.DeleteReadNotificationsParams{UserID: me.ID, Before: now}); err != nil {
+		if err := qtx.DeleteNotifications(r.Context(), store.DeleteNotificationsParams{UserID: me.ID, Before: now}); err != nil {
 			return nil, http.StatusInternalServerError, err
 		}
 		return &Cleared{UserID: me.ID, Before: now}, http.StatusOK, nil
+	})
+}
+
+// readAllNotifications keeps notification history without marking the underlying content read.
+func (s *Server) readAllNotifications(w http.ResponseWriter, r *http.Request) {
+	me, _ := userFrom(r.Context())
+	now := db.Now()
+	s.loggedMany(w, r, now, func(qtx *store.Queries) ([]events.Entry, any, int, error) {
+		entries, err := readNotifications(r, qtx, me.ID, "", now, now)
+		if err != nil {
+			return nil, nil, 500, err
+		}
+		row, err := qtx.GetNotificationsMarker(r.Context(), me.ID)
+		m := wireMarker(store.ListMarkersRow(row))
+		return append(entries, events.Entry{Kind: "marker", Payload: &m}), &m, 200, err
 	})
 }
 
@@ -327,7 +366,7 @@ func (s *Server) setMarker(w http.ResponseWriter, r *http.Request) {
 				return nil, nil, http.StatusNotFound, errors.New("No such room")
 			}
 			if chat {
-				if read, err = readMessageNotifications(r, qtx, me.ID, gid, in.ReadAt, now); err != nil {
+				if read, err = readNotifications(r, qtx, me.ID, stream, in.ReadAt, now); err != nil {
 					return nil, nil, http.StatusInternalServerError, err
 				}
 			}
@@ -337,6 +376,20 @@ func (s *Server) setMarker(w http.ResponseWriter, r *http.Request) {
 					return store.ListMarkersRow(row), err
 				}
 				row, err := qtx.GetFeedMarker(r.Context(), store.GetFeedMarkerParams{UserID: me.ID, GroupID: gid})
+				return store.ListMarkersRow(row), err
+			}
+		case strings.HasPrefix(stream, "post:"):
+			pid := strings.TrimPrefix(stream, "post:")
+			if _, _, status, err := s.postActor(r, qtx, pid); err != nil {
+				return nil, nil, status, err
+			}
+			var err error
+			read, err = readNotifications(r, qtx, me.ID, stream, in.ReadAt, now)
+			if err != nil {
+				return nil, nil, 500, err
+			}
+			reread = func() (store.ListMarkersRow, error) {
+				row, err := qtx.GetPostMarker(r.Context(), store.GetPostMarkerParams{UserID: me.ID, PostID: pid})
 				return store.ListMarkersRow(row), err
 			}
 		default:

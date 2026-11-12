@@ -43,20 +43,23 @@ export function describe(n: Notification, groups: Group[], topics: Topic[] = [])
       return topic ? `posted in ${topic.name}` : 'posted in a topic'
     }
     case 'comment':
-      return 'commented on your post'
+      return 'commented in a discussion you follow'
     case 'added': {
       const room = groups.find((g) => g.id === n.group_id)
       return `added you to ${room ? room.name : 'a room'}`
     }
     case 'mention': {
-      if (n.post_id) return 'mentioned you in a post'
+      if (n.post_id) return 'mentioned you in a post discussion'
       const room = groups.find((g) => g.id === n.group_id)
       return `mentioned you in ${room ? (room.kind === 'root' ? 'the chat' : room.name) : 'a room'}`
     }
     case 'joined':
       return 'joined the community'
-    case 'message':
-      return 'messaged you'
+    case 'message': {
+      if (n.group_kind === 'dm') return 'messaged you'
+      const room = groups.find((g) => g.id === n.group_id)
+      return `sent a message in ${room?.kind === 'root' ? 'the chat' : (room?.name ?? 'a room')}`
+    }
     case 'reply': {
       const room = groups.find((g) => g.id === n.group_id)
       return `replied to your message in ${room ? (room.kind === 'root' ? 'the chat' : room.name) : 'a room'}`

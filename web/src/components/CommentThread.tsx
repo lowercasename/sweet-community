@@ -1,9 +1,10 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import type { Comment as CommentData } from '../api'
 import { useAuthor, useCommentActions, useComments } from '../data/hooks'
 import { commentExtensions } from '../editor/extensions'
 import {
   Alert,
+  ReadPoint,
   Box,
   Button,
   Card,
@@ -19,6 +20,7 @@ import {
 } from '../ui'
 import { Body } from './Body'
 import { BodyEditor } from './BodyEditor'
+import { useReadProgress } from '../hooks/useReadProgress'
 import { PersonName } from './PersonName'
 import { ReportDialog } from './ReportDialog'
 
@@ -28,6 +30,7 @@ interface CommentThreadProps {
   /** The post's author, shown as the user a reply is addressed to. */
   replyTo: string
   disabled: boolean
+  postAt: number
 }
 
 interface CommentItemProps {
@@ -83,12 +86,7 @@ function CommentItem({ comment, groupId, disabled, onEdit, onDelete }: CommentIt
             <PersonName user={author} avatar="xs" small />
             <Text as="span" variant="small">
               <Time at={comment.created_at} />
-              {comment.edited_at != null && (
-                <>
-                  {' · edited '}
-                  <Time at={comment.edited_at} />
-                </>
-              )}
+              {comment.edited_at != null && ' · edited'}
             </Text>
           </Row>
           {items.length > 0 && !editing && !disabled && <Menu label="Comment options" items={items} reveal="comment" />}
@@ -139,51 +137,57 @@ function CommentItem({ comment, groupId, disabled, onEdit, onDelete }: CommentIt
  * The reply editor is the only white element in the panel. A long thread
  * opens at its newest comments, with Load earlier comments above them.
  */
-export function CommentThread({ postId, groupId, replyTo, disabled }: CommentThreadProps) {
+export function CommentThread({ postId, groupId, replyTo, disabled, postAt }: CommentThreadProps) {
   const { comments, loading, error, hasEarlier, loadEarlier } = useComments(postId)
   const { create, edit, remove } = useCommentActions(postId, groupId)
+  const ref = useRef<HTMLDivElement>(null)
+  useReadProgress(ref, `post:${postId}`, !loading, `${comments.length}:${comments.at(-1)?.created_at}`)
 
   return (
-    <Card tone="field">
-      <Stack gap={3}>
-        {(loading || error || comments.length > 0) && (
-          <Stack gap={2}>
-            {hasEarlier && (
-              <Row>
-                <Button variant="secondary" busy={loading} onClick={() => void loadEarlier()}>
-                  Load earlier comments
-                </Button>
-              </Row>
-            )}
-            {loading && comments.length === 0 && <Text variant="secondary">Loading comments…</Text>}
-            {error && <Alert tone="error">{error.message}</Alert>}
-            {comments.map((c, i) => (
-              <Box key={c.id}>
-                <Stack gap={2}>
-                  {i > 0 && <Hairline />}
-                  <CommentItem
-                    groupId={groupId}
-                    comment={c}
-                    disabled={disabled}
-                    onEdit={(html) => edit(c.id, html)}
-                    onDelete={() => remove(c.id)}
-                  />
-                </Stack>
-              </Box>
-            ))}
-          </Stack>
-        )}
-        <BodyEditor
-          groupId={groupId}
-          extensions={commentExtensions}
-          size="line"
-          placeholder={`Reply to ${replyTo}…`}
-          submitLabel="Reply"
-          disabled={disabled}
-          onSubmit={create}
-          draft={`comment:${postId}`}
-        />
-      </Stack>
-    </Card>
+    <Box ref={ref}>
+      <Card tone="field">
+        <Stack gap={3}>
+          <ReadPoint at={postAt} />
+          {(loading || error || comments.length > 0) && (
+            <Stack gap={2}>
+              {hasEarlier && (
+                <Row>
+                  <Button variant="secondary" busy={loading} onClick={() => void loadEarlier()}>
+                    Load earlier comments
+                  </Button>
+                </Row>
+              )}
+              {loading && comments.length === 0 && <Text variant="secondary">Loading comments…</Text>}
+              {error && <Alert tone="error">{error.message}</Alert>}
+              {comments.map((c, i) => (
+                <Box key={c.id}>
+                  <Stack gap={2}>
+                    {i > 0 && <Hairline />}
+                    <CommentItem
+                      groupId={groupId}
+                      comment={c}
+                      disabled={disabled}
+                      onEdit={(html) => edit(c.id, html)}
+                      onDelete={() => remove(c.id)}
+                    />
+                    <ReadPoint at={c.created_at} />
+                  </Stack>
+                </Box>
+              ))}
+            </Stack>
+          )}
+          <BodyEditor
+            groupId={groupId}
+            extensions={commentExtensions}
+            size="line"
+            placeholder={`Reply to ${replyTo}…`}
+            submitLabel="Reply"
+            disabled={disabled}
+            onSubmit={create}
+            draft={`comment:${postId}`}
+          />
+        </Stack>
+      </Card>
+    </Box>
   )
 }
