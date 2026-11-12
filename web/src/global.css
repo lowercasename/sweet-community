@@ -79,6 +79,9 @@
     line-height: 1.5;
     color: var(--color-ink);
     -webkit-text-size-adjust: 100%;
+    /* Grayscale antialiasing on macOS. The default thickens each glyph, which makes Ubuntu look soft. */
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
     /* Sweet's dotted paper: a 12px grid of 2px dots. */
     background:
       linear-gradient(90deg, var(--color-paper) 10px, transparent 1%) center,
