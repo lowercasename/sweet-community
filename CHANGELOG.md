@@ -1,5 +1,14 @@
 # Changelog
 
+## v1.8.0 (2026-11-12)
+
+- Use clock times and calendar dates consistently throughout Sweet
+- Add chat day dividers and group messages across pauses of up to fifteen minutes
+- Show notification settings below the notification list
+- Restore the original notification empty-state message
+- Fix push delivery to Firefox on Android
+- Simplify installation and development instructions
+
 ## v1.7.3 (2026-11-11)
 
 - Clarify patch releases include security and privacy fixes
