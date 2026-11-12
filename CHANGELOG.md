@@ -1,5 +1,13 @@
 # Changelog
 
+## v1.9.1 (2026-11-12)
+
+- Comment dots on existing posts, and none on muted discussions
+- Fix review findings in the comment unread dot
+- Limit body images to 480px tall in their own shape
+- Show a dot on a post's comments button for unread comments
+- Use less space beside and inside cards on phones
+
 ## v1.9.0 (2026-11-12)
 
 - Update gitignore
