@@ -8,6 +8,10 @@ export const GALLERY_MAX = 8
  * global.css. Stored HTML never contains gallery markup, so the editor and the sanitiser only ever see <img>. A run
  * of 2 or more images becomes galleries of at most GALLERY_MAX images each. A single leftover image stays plain.
  *
+ * A single image with a width and height gets its shape, the width over the height, as the --ratio property. The
+ * .content img rules in global.css use it to keep the image under the height limit in its own shape, also before it
+ * loads. A gallery sizes its own images.
+ *
  * Each image loads lazily and decodes without holding up the page. An image that is not inside a link becomes a
  * focusable button named "Open image", which Body opens full size. Only these elements and attributes are added, so
  * the HTML stays safe for HtmlContent.
@@ -35,6 +39,8 @@ export function prepareImages(html: string): string {
   }
   flush()
   for (const img of Array.from(doc.querySelectorAll('img'))) {
+    const ratio = Number(img.getAttribute('width')) / Number(img.getAttribute('height'))
+    if (ratio > 0 && Number.isFinite(ratio) && !img.closest('.gallery')) img.setAttribute('style', `--ratio: ${ratio}`)
     img.setAttribute('loading', 'lazy')
     img.setAttribute('decoding', 'async')
     if (img.closest('a')) continue

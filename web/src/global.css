@@ -162,11 +162,21 @@
   }
   /* In the editor, images are EditorImage cards and style themselves. */
   .content img {
+    /* The tallest an image in a body is drawn. */
+    --image-max-height: 480px;
     display: block;
     max-width: 100%;
     height: auto;
+    max-height: var(--image-max-height);
     margin: 0 0 0.6em;
     border-radius: 4px;
+  }
+  /*
+   * prepareImages sets --ratio, the width over the height, on a single image with a width and height. The image is
+   * then no wider than its shape allows at the height limit, so its box has the photo's shape, also before it loads.
+   */
+  .content img[style*='--ratio'] {
+    max-width: min(100%, calc(var(--image-max-height) * var(--ratio)));
   }
   /* A body's images open full size. HtmlContent makes them focusable. */
   .content img[tabindex] {

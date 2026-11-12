@@ -1,4 +1,4 @@
-import { article, expect, member, open, png, test, uniq } from './helpers'
+import { article, expect, member, open, png, ROOT, test, uniq } from './helpers'
 
 test.describe('images', () => {
   test('images added to a post are shown as cards with alt text in the editor, then as a gallery in the post', async ({
@@ -68,5 +68,38 @@ test.describe('images', () => {
     await expect(article(mo.page, text).getByRole('img', { name: kit.username })).toHaveAttribute('src', /\/img\//)
     await kit.context.close()
     await mo.context.close()
+  })
+
+  test("a tall image is drawn no taller than 480px, in its own shape at the text's left edge, before and after it loads", async ({
+    browser,
+  }, testInfo) => {
+    const kit = await member(browser, testInfo)
+    const upload = await kit.context.request.post('/api/images', {
+      multipart: { file: { name: 'tall.png', mimeType: 'image/png', buffer: png(900, 1600) } },
+    })
+    const image = (await upload.json()) as { id: string }
+    const text = uniq('Tall ')
+    const created = await kit.context.request.post(`/api/groups/${ROOT}/posts`, {
+      data: {
+        body_html: `<p>${text}</p><img src="/img/${image.id}" data-image-id="${image.id}" alt="Tall" width="900" height="1600">`,
+      },
+    })
+    const post = (await created.json()) as { id: string }
+    const img = kit.page.getByRole('button', { name: 'Open image: Tall' })
+    const fits = async () => {
+      const box = (await img.boundingBox())!
+      expect([Math.round(box.width), Math.round(box.height)]).toEqual([270, 480])
+      expect(Math.round(box.x)).toBe(Math.round((await article(kit.page, text).getByText(text).boundingBox())!.x))
+    }
+    // At first the image does not load.
+    await kit.page.route('**/img/**', () => {})
+    await open(kit.page, `/p/${post.id}`)
+    await expect(img).toBeVisible()
+    await fits()
+    await kit.page.unroute('**/img/**')
+    await kit.page.reload()
+    await expect.poll(() => img.evaluate((e: HTMLImageElement) => e.naturalWidth)).toBeGreaterThan(0)
+    await fits()
+    await kit.context.close()
   })
 })

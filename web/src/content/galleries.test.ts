@@ -4,10 +4,11 @@ import { prepareImages } from './galleries'
 
 const img = (n: number) => `<img src="/img/${n}" alt="" width="10" height="10" data-image-id="${n}">`
 const imgs = (from: number, to: number) => Array.from({ length: to - from + 1 }, (_, i) => img(from + i)).join('')
-/** An image as prepared for display. */
-const shown = (n: number) =>
-  `<img src="/img/${n}" alt="" width="10" height="10" data-image-id="${n}" loading="lazy" decoding="async" tabindex="0" role="button" aria-label="Open image">`
-const shownRun = (from: number, to: number) => Array.from({ length: to - from + 1 }, (_, i) => shown(from + i)).join('')
+/** An image as prepared for display. A single image has its shape. An image in a gallery does not. */
+const shown = (n: number, single = true) =>
+  `<img src="/img/${n}" alt="" width="10" height="10" data-image-id="${n}"${single ? ' style="--ratio: 1"' : ''} loading="lazy" decoding="async" tabindex="0" role="button" aria-label="Open image">`
+const shownRun = (from: number, to: number) =>
+  Array.from({ length: to - from + 1 }, (_, i) => shown(from + i, false)).join('')
 
 describe('prepareImages', () => {
   it('leaves a body without images unchanged', () => {
@@ -17,6 +18,11 @@ describe('prepareImages', () => {
   it('makes each image load lazily and a button named for opening it', () => {
     expect(prepareImages(`<p>Hi</p>${img(1)}<p>Bye</p>`)).toBe(`<p>Hi</p>${shown(1)}<p>Bye</p>`)
     expect(prepareImages('<img src="/img/2" alt="A cat">')).toContain('aria-label="Open image: A cat"')
+  })
+
+  it('gives a single image its width over its height, which global.css uses to limit its height', () => {
+    expect(prepareImages('<img src="/img/1" alt="" width="900" height="1600">')).toContain('style="--ratio: 0.5625"')
+    expect(prepareImages('<img src="/img/2" alt="">')).not.toContain('style')
   })
 
   it('leaves an image inside a link a part of the link', () => {
