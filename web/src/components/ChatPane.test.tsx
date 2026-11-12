@@ -38,6 +38,31 @@ async function draw(watching: boolean) {
 }
 
 describe('ChatPane lines', () => {
+  it('groups messages up to fifteen minutes apart, but separates days, longer gaps and different authors', async () => {
+    const { getMessages } = await import('../api')
+    const at = (day: number, hour: number, minute: number) => new Date(2026, 10, day, hour, minute).getTime()
+    vi.mocked(getMessages).mockResolvedValue({
+      messages: [
+        message('yesterday', mo, { created_at: at(11, 23, 55) }),
+        message('midnight', mo, { created_at: at(12, 0, 5) }),
+        message('seven minutes later', mo, { created_at: at(12, 0, 12) }),
+        message('fifteen minutes later', mo, { created_at: at(12, 0, 27) }),
+        message('sixteen minutes later', mo, { created_at: at(12, 0, 43) }),
+        message('another author', user('kit'), { created_at: at(12, 0, 44) }),
+      ].reverse(),
+      next_before: null,
+    })
+    const { ChatPane } = await import('./ChatPane')
+    renderWithQuery(<ChatPane groupId={ROOT} watching={false} />)
+    await screen.findByText('another author')
+    const runs = screen.getAllByRole('article')
+    expect(runs).toHaveLength(4)
+    expect(runs[1].textContent).toContain('seven minutes later')
+    expect(runs[1].textContent).toContain('fifteen minutes later')
+    expect(runs[1].querySelectorAll('time')).toHaveLength(3)
+    expect(screen.getAllByRole('separator')).toHaveLength(2)
+  })
+
   it('shows joined and added lines on their own, between runs of messages', async () => {
     const { getMessages } = await import('../api')
     const kit = user('kit')

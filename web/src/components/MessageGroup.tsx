@@ -1,13 +1,25 @@
 import { useState } from 'react'
 import type { Message } from '../api'
 import { useAuthor } from '../data/hooks'
-import { Box, Button, ConfirmDialog, Menu, MessageBlock, ReplyQuote, Row, shieldText, Stack, Text, Time } from '../ui'
+import {
+  Box,
+  Button,
+  ClockTime,
+  ConfirmDialog,
+  Menu,
+  MessageBlock,
+  ReplyQuote,
+  Row,
+  shieldText,
+  Stack,
+  Text,
+} from '../ui'
 import { Body } from './Body'
 import { PersonName } from './PersonName'
 import { ReportDialog } from './ReportDialog'
 
 interface MessageGroupProps {
-  /** Consecutive messages from one user within a few minutes. Contains at least one message. */
+  /** Consecutive messages from one user on the same day. Contains at least one message. */
   messages: Message[]
   /** Resolves when the server has deleted the message. The message is then removed from the query cache. */
   onDelete: (id: string) => Promise<void>
@@ -22,8 +34,8 @@ interface MessageGroupProps {
 }
 
 /**
- * A run of messages by one user. The avatar, name and time are shown once,
- * followed by the message bodies close together, each in its own block. A
+ * A run of messages by one user. The avatar and name are shown once,
+ * followed by the message bodies and their clock times. A
  * message's menu is positioned at the top right of its own block. This
  * includes the first message, whose menu is never on the author's line. The
  * block gets the blush background while hovered.
@@ -58,15 +70,13 @@ export function MessageGroup({
       <Stack gap={0}>
         <Row gap={2} align="center">
           <PersonName user={author} avatar="sm" />
-          <Text as="span" variant="small">
-            <Time at={first.created_at} />
-          </Text>
         </Row>
         {messages.map((m) => (
           <MessageBlock
             key={m.id}
             id={`message-${m.id}`}
             highlight={highlight === m.id}
+            time={<ClockTime at={m.created_at} />}
             menu={
               onReply || m.can.delete || m.can.report ? (
                 <>

@@ -1,10 +1,11 @@
-import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { Fragment, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import type { Message as MessageData } from '../api'
 import { useGroups, useMarkRead, useMarkers, useMessageActions, useMessages } from '../data/hooks'
 import { chatStream, markerOf } from '../data/notifications'
 import { usePageVisible } from '../hooks/usePageVisible'
 import { useStreamStatus } from '../hooks/StreamContext'
-import { Alert, Bar, Button, Card, Pane, ReplyStrip, Row, ScrollArea, Stack } from '../ui'
+import { Alert, Bar, Button, Card, DayDivider, Pane, ReplyStrip, Row, ScrollArea, Stack } from '../ui'
+import { sameDay } from '../ui/Time'
 import { chatExtensions } from '../editor/extensions'
 import { BodyEditor } from './BodyEditor'
 import { ChatLine } from './ChatLine'
@@ -23,7 +24,7 @@ interface ChatPaneProps {
   onFocused?: () => void
 }
 
-const GROUP_WINDOW_MS = 5 * 60_000
+const GROUP_WINDOW_MS = 15 * 60_000
 const STICK_THRESHOLD_PX = 80
 
 /** Splits messages into runs by one user, each message within GROUP_WINDOW_MS of the previous one. */
@@ -38,7 +39,8 @@ function group(list: MessageData[]): MessageData[][] {
       m.kind === 'message' &&
       prev.kind === 'message' &&
       prev.author.id === m.author.id &&
-      m.created_at - prev.created_at < GROUP_WINDOW_MS
+      m.created_at - prev.created_at <= GROUP_WINDOW_MS &&
+      sameDay(m.created_at, prev.created_at)
     )
       last.push(m)
     else groups.push([m])
@@ -156,6 +158,7 @@ export function ChatPane({ groupId, side = 'full', watching, focusMessage = null
     // jump and earlier are recreated each render, and only these values decide whether to act again.
   }, [target, loading, hasEarlier, messages.length])
 
+  const runs = group(messages)
   return (
     <Pane side={side} flush tour="chat">
       <Card fill flush>
@@ -170,21 +173,25 @@ export function ChatPane({ groupId, side = 'full', watching, focusMessage = null
             )}
             {error && <Alert tone="error">{error.message}</Alert>}
             {!loading && messages.length === 0 && <Alert>Nobody has said anything yet. Say hello.</Alert>}
-            {group(messages).map((run) =>
-              run[0].kind === 'message' ? (
-                <MessageGroup
-                  key={run[0].id}
-                  messages={run}
-                  onDelete={remove}
-                  onReply={setReplying}
-                  onJump={quoted}
-                  highlight={highlight}
-                  conversation={conversation}
-                />
-              ) : (
-                <ChatLine key={run[0].id} line={run[0]} />
-              ),
-            )}
+            {runs.map((run, index) => (
+              <Fragment key={run[0].id}>
+                {(index === 0 || !sameDay(run[0].created_at, runs[index - 1][0].created_at)) && (
+                  <DayDivider at={run[0].created_at} />
+                )}
+                {run[0].kind === 'message' ? (
+                  <MessageGroup
+                    messages={run}
+                    onDelete={remove}
+                    onReply={setReplying}
+                    onJump={quoted}
+                    highlight={highlight}
+                    conversation={conversation}
+                  />
+                ) : (
+                  <ChatLine line={run[0]} />
+                )}
+              </Fragment>
+            ))}
           </Stack>
         </ScrollArea>
         <Bar as="footer" edge="footer">

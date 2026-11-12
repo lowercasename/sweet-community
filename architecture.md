@@ -134,6 +134,8 @@ A message uses part of the same schema and passes the same policy. Chat history 
 - A reply quotes the original and stays in the flat list. Threads were rejected, because they would make a chat into a second feed.
 - The author or the group's staff may delete a message. Nobody can edit a sent message.
 - The chat shows a line when someone joins the community or is added to a room. A line is stored as a message, so it keeps its order. Notifying a whole room of each addition was rejected, because a room of twenty would get twenty notifications.
+- Consecutive messages from one person share a name and picture when the gap between messages is at most fifteen minutes. A different speaker, a membership notice or a new calendar day starts a new group. This keeps short pauses from repeating the same header.
+- Each chat message shows its clock time in the viewer's local timezone. A quiet date divider shows Today, Yesterday or the date between thin lines. It is distinct from membership notices. Clock times and day dividers make conversation history easier to follow than changing relative times.
 - There is no offline posting. When the device is offline, the bar at the top of the view shows an Offline badge and sending is disabled. Connecting and reconnecting show nothing. A failed send keeps its text.
 
 ## Images

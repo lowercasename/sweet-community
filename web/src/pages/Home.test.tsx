@@ -135,13 +135,13 @@ describe('Home', () => {
     const editors = () => container.querySelectorAll('.ProseMirror').length
     expect(editors()).toBe(2)
 
-    fireEvent.keyDown(screen.getByRole('separator'), { key: 'End' })
-    expect(screen.queryByRole('separator')).toBeNull()
+    fireEvent.keyDown(screen.getByRole('separator', { name: 'Resize panes' }), { key: 'End' })
+    expect(screen.queryByRole('separator', { name: 'Resize panes' })).toBeNull()
     expect(editors()).toBe(2)
     fireEvent.click(screen.getByRole('button', { name: 'Show chat' }))
-    expect(screen.getByRole('separator')).toBeTruthy()
+    expect(screen.getByRole('separator', { name: 'Resize panes' })).toBeTruthy()
 
-    fireEvent.keyDown(screen.getByRole('separator'), { key: 'Home' })
+    fireEvent.keyDown(screen.getByRole('separator', { name: 'Resize panes' }), { key: 'Home' })
     fireEvent.click(screen.getByRole('button', { name: 'Show posts' }))
 
     fireEvent.click(nav().getByRole('button', { name: 'raphael' }))
@@ -153,7 +153,7 @@ describe('Home', () => {
     expect(container.querySelector('.ProseMirror')!.closest('.hidden')).not.toBeNull()
     fireEvent.click(nav().getByRole('button', { name: 'Home' }))
     expect(window.location.pathname).toBe('/')
-    expect(screen.getByRole('separator')).toBeTruthy()
+    expect(screen.getByRole('separator', { name: 'Resize panes' })).toBeTruthy()
 
     expect(editors()).toBe(2)
     expect(getPosts).toHaveBeenCalledTimes(1)
@@ -194,7 +194,7 @@ describe('Home', () => {
     expect(container.querySelector('.ProseMirror')!.closest('.hidden')).toBeNull()
     // The group is chat only. There is no divider and no post editor. The group's name and its Members button are
     // shown.
-    expect(screen.queryByRole('separator')).toBeNull()
+    expect(screen.queryByRole('separator', { name: 'Resize panes' })).toBeNull()
     expect(screen.getByRole('heading', { name: 'Knitting' })).toBeTruthy()
     expect(screen.getByRole('button', { name: 'Members and settings' })).toBeTruthy()
     expect(container.querySelectorAll('.ProseMirror').length).toBe(1)
@@ -288,7 +288,7 @@ describe('Home', () => {
     expect(within(shown[0]).queryByRole('link')).toBeNull()
     fireEvent.click(screen.getByRole('button', { name: 'Back to Home' }))
     expect(window.location.pathname).toBe('/')
-    expect(screen.getByRole('separator')).toBeTruthy()
+    expect(screen.getByRole('separator', { name: 'Resize panes' })).toBeTruthy()
   })
 
   it('opens a post by its URL, with its room mounted behind it', async () => {
@@ -337,14 +337,14 @@ describe('Home', () => {
   it("a collapsed pane's rail shows the server's unread count, and opening the pane marks it read", async () => {
     const { listMarkers } = await import('../api')
     await home()
-    fireEvent.keyDown(screen.getByRole('separator'), { key: 'Home' })
+    fireEvent.keyDown(screen.getByRole('separator', { name: 'Resize panes' }), { key: 'Home' })
     expect(screen.getByRole('button', { name: 'Show posts' })).toBeTruthy()
     vi.mocked(listMarkers).mockResolvedValue({ markers: [marker(`feed:${ROOT}`, 1, 1)] })
     FakeEventSource.last!.emit('post', post('p9', kit, { created_at: 99 }), 9)
     await screen.findByRole('button', { name: 'Show posts, unread' })
     fireEvent.click(screen.getByRole('button', { name: 'Show posts, unread' }))
-    await screen.findByRole('separator')
-    fireEvent.keyDown(screen.getByRole('separator'), { key: 'Home' })
+    await screen.findByRole('separator', { name: 'Resize panes' })
+    fireEvent.keyDown(screen.getByRole('separator', { name: 'Resize panes' }), { key: 'Home' })
     await screen.findByRole('button', { name: 'Show posts' })
     expect(screen.queryByRole('button', { name: 'Show posts, unread' })).toBeNull()
   })
