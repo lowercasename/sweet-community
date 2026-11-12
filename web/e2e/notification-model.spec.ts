@@ -69,6 +69,8 @@ for (const suffix of ['', ' @phone']) {
       'aria-checked',
       'true',
     )
+    await expect(kit.page.getByRole('menu').getByText('Notifications for this chat', { exact: true })).toBeVisible()
+    await expect(kit.page.getByRole('menuitemradio')).toHaveText(['All messages', 'Mentions and replies', 'Off'])
     await kit.page.screenshot({ path: info.outputPath('chat-alerts.png'), fullPage: true })
     await kit.page.keyboard.press('Escape')
     await open(kit.page, '/notifications')

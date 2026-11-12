@@ -49,6 +49,7 @@ interface MenuProps {
   onOpenChange?: (open: boolean) => void
   /** Accessible name of the trigger, for example "Post options". */
   label: string
+  heading?: string
   icon?: IconName
   items: MenuItem[]
   /**
@@ -87,6 +88,7 @@ interface MenuProps {
  */
 export function Menu({
   label,
+  heading,
   onOpenChange,
   icon = 'more',
   items,
@@ -162,6 +164,7 @@ export function Menu({
               className="z-50 max-h-80 min-w-40 max-w-80 overflow-y-auto rounded-[4px] border border-line bg-card py-1"
               {...getFloatingProps()}
             >
+              {heading && <div className="px-3 py-1.5 text-sm font-medium text-mute">{heading}</div>}
               {items.map((item, i) => (
                 <button
                   key={item.label}

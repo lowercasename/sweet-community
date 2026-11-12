@@ -20,10 +20,10 @@ export function RoomNotifications({ groupId }: { groupId: string }) {
       setBusy(false)
     }
   }
-  const choices: { mode: RoomNotificationMode; label: string; detail: string }[] = [
-    { mode: 'all', label: 'All messages', detail: 'Device alerts for every new chat message.' },
-    { mode: 'mentions', label: 'Mentions and replies', detail: 'Device alerts only when someone addresses you.' },
-    { mode: 'off', label: 'Off', detail: 'No device alerts from this chat, including mentions.' },
+  const choices: { mode: RoomNotificationMode; label: string }[] = [
+    { mode: 'all', label: 'All messages' },
+    { mode: 'mentions', label: 'Mentions and replies' },
+    { mode: 'off', label: 'Off' },
   ]
   const label = choices.find((choice) => choice.mode === data?.mode)?.label ?? 'Loading…'
   return (
@@ -31,11 +31,11 @@ export function RoomNotifications({ groupId }: { groupId: string }) {
       <Row pad="compact" justify="end" align="center" shrink={false}>
         <Menu
           label={`Chat device alerts: ${label}`}
+          heading="Device alerts for this chat"
           icon={data?.mode === 'off' ? 'bell-off' : 'bell'}
           disabled={disabled || busy || !data}
           items={choices.map((choice) => ({
             label: choice.label,
-            detail: choice.detail,
             checked: choice.mode === data?.mode,
             onSelect: () => void change(choice.mode),
           }))}
