@@ -24,6 +24,7 @@ import { Body } from './Body'
 import { BodyEditor } from './BodyEditor'
 import { CommentThread } from './CommentThread'
 import { PersonName } from './PersonName'
+import { AddReaction, Reactions, useToggleReaction } from './Reactions'
 import { ReportDialog } from './ReportDialog'
 
 interface PostProps {
@@ -82,6 +83,9 @@ export function Post({
   const [confirming, setConfirming] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const [deleteError, setDeleteError] = useState<string | null>(null)
+  const [reactionError, setReactionError] = useState<string | null>(null)
+  const toggleReaction = useToggleReaction()
+  const react = async (emoji: string) => setReactionError(await toggleReaction('post', post.id, post.reactions, emoji))
   const [reporting, setReporting] = useState(false)
 
   const save = async (bodyHtml: string) => {
@@ -187,7 +191,7 @@ export function Post({
               <Menu
                 label="Post options"
                 items={items}
-                reveal="post"
+                reveal
                 disabled={savingPreference}
                 onOpenChange={setOptionsOpen}
               />
@@ -218,7 +222,7 @@ export function Post({
           {notificationError && <Alert tone="error">{notificationError}</Alert>}
           {deleteError && <Alert tone="error">{deleteError}</Alert>}
         </Stack>
-        <Row>
+        <Row gap={1} align="center">
           <Button
             variant="ghost"
             icon="comment"
@@ -227,7 +231,10 @@ export function Post({
             pressed={open}
             onClick={() => setOpen((o) => !o)}
           />
+          <Reactions reactions={post.reactions} disabled={disabled} onToggle={(emoji) => void react(emoji)} />
+          <AddReaction disabled={disabled} onPick={(emoji) => void react(emoji)} />
         </Row>
+        {reactionError && <Alert tone="error">{reactionError}</Alert>}
         {open && (
           <CommentThread
             postAt={post.created_at}

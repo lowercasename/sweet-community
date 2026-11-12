@@ -141,7 +141,9 @@ test.describe('post page', () => {
 })
 
 test.describe('menus', () => {
-  test('a post, comment or message menu is hidden until its block is hovered', async ({ browser }, testInfo) => {
+  test("a post's menu and a comment's or message's action bar are hidden until the block is hovered", async ({
+    browser,
+  }, testInfo) => {
     const kit = await member(browser, testInfo)
     await open(kit.page)
     const text = uniq('Hover me ')
@@ -151,19 +153,20 @@ test.describe('menus', () => {
     await expect(menu).toHaveCSS('opacity', '0')
     await post.hover()
     await expect(menu).toHaveCSS('opacity', '1')
-    // When a comment is hovered, the comment's menu is shown instead of the post's.
+    // When a comment is hovered, the comment's action bar is shown instead of the post's menu.
     await post.getByRole('button', { name: 'Show comments' }).click()
     await post.locator('.editor-line .ProseMirror').click()
     await kit.page.keyboard.type('A reply')
     await kit.page.getByRole('button', { name: 'Reply', exact: true }).click()
     const comment = post.getByRole('article').filter({ hasText: 'A reply' })
+    const bar = comment.locator('[data-action-bar]')
     await comment.hover()
-    await expect(comment.getByRole('button', { name: 'Comment options' })).toHaveCSS('opacity', '1')
+    await expect(bar).toHaveCSS('opacity', '1')
     await expect(menu).toHaveCSS('opacity', '0')
-    // When the pointer is on the card but not on the comment, the comment's menu is hidden and the post's menu is
+    // When the pointer is on the card but not on the comment, the comment's bar is hidden and the post's menu is
     // shown again.
     await post.getByRole('button', { name: 'Hide comments' }).hover()
-    await expect(comment.getByRole('button', { name: 'Comment options' })).toHaveCSS('opacity', '0')
+    await expect(bar).toHaveCSS('opacity', '0')
     await expect(menu).toHaveCSS('opacity', '1')
     // The open menu stays open while the pointer is on it.
     await menu.click({ force: true })
@@ -174,9 +177,9 @@ test.describe('menus', () => {
     await post.getByRole('button', { name: 'Hide comments' }).click()
     const said = uniq('hover word ')
     await sendMessage(kit.page, said)
-    await expect(article(kit.page, said).getByRole('button', { name: 'Message options' })).toHaveCSS('opacity', '0')
-    await article(kit.page, said).hover()
-    await expect(article(kit.page, said).getByRole('button', { name: 'Message options' })).toHaveCSS('opacity', '1')
+    await expect(article(kit.page, said).locator('[data-action-bar]')).toHaveCSS('opacity', '0')
+    await article(kit.page, said).getByText(said).hover()
+    await expect(article(kit.page, said).locator('[data-action-bar]')).toHaveCSS('opacity', '1')
     await kit.context.close()
   })
 

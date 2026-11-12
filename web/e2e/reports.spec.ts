@@ -82,7 +82,7 @@ test.describe('reports', () => {
 
     // Mo reports the message. The dialog says that moderators will see it although they cannot read conversations.
     await open(mo.page, `/r/${dm.id}`)
-    const block = mo.page.getByText(text).locator('xpath=ancestor::div[contains(@class,"block-message")][1]')
+    const block = mo.page.getByText(text).locator('xpath=ancestor::div[contains(@class,"block-item")][1]')
     await block.hover()
     await block.getByRole('button', { name: 'Message options' }).click()
     await mo.page.getByRole('menuitem', { name: 'Report' }).click()

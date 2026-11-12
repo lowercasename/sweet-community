@@ -24,13 +24,14 @@ type Comment struct {
 	PostID  string `json:"post_id"`
 	GroupID string `json:"group_id"`
 	// PostAuthorID is needed by perm, because the post's author may delete any comment on the post.
-	PostAuthorID string `json:"post_author_id"`
-	Author       User   `json:"author"`
-	BodyHTML     string `json:"body_html"`
-	BodyText     string `json:"body_text"`
-	CreatedAt    int64  `json:"created_at"`
-	EditedAt     *int64 `json:"edited_at"`
-	Can          Can    `json:"can"`
+	PostAuthorID string     `json:"post_author_id"`
+	Author       User       `json:"author"`
+	BodyHTML     string     `json:"body_html"`
+	BodyText     string     `json:"body_text"`
+	CreatedAt    int64      `json:"created_at"`
+	EditedAt     *int64     `json:"edited_at"`
+	Reactions    []Reaction `json:"reactions"`
+	Can          Can        `json:"can"`
 }
 
 // postActor resolves a post's owners and the viewer's Actor in the post's
@@ -219,6 +220,9 @@ func (s *Server) deleteComment(w http.ResponseWriter, r *http.Request) {
 // handler, a report's Delete action and the removal of a user all use it.
 func removeComment(ctx context.Context, qtx *store.Queries, id, postID, groupID string, now int64) ([]events.Entry, error) {
 	if err := qtx.DeleteComment(ctx, store.DeleteCommentParams{DeletedAt: sql.NullInt64{Int64: now, Valid: true}, ID: id}); err != nil {
+		return nil, err
+	}
+	if err := forgetReactions(ctx, qtx, id); err != nil {
 		return nil, err
 	}
 	return []events.Entry{{Kind: "comment_delete", Payload: map[string]string{"id": id, "post_id": postID, "group_id": groupID}}}, nil

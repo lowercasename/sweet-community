@@ -7,7 +7,9 @@ SELECT m.id, m.group_id, m.body_html, m.body_text, m.created_at,
        u.id AS author_id, u.username AS author_username, u.picture_id AS author_picture_id,
        m.reply_to, r.body_text AS reply_text, r.deleted_at AS reply_deleted_at,
        ru.id AS reply_author_id, ru.username AS reply_author_username, ru.picture_id AS reply_author_picture_id,
-       m.kind, su.id AS subject_id, su.username AS subject_username, su.picture_id AS subject_picture_id
+       m.kind, su.id AS subject_id, su.username AS subject_username, su.picture_id AS subject_picture_id,
+       CAST((SELECT json_group_array(json_array(x.emoji, x.user_id))
+             FROM (SELECT emoji, user_id FROM reactions WHERE item_id = m.id ORDER BY rowid) x) AS TEXT) AS reactions
 FROM messages m JOIN users u ON u.id = m.author_id
 LEFT JOIN messages r ON r.id = m.reply_to
 LEFT JOIN users ru ON ru.id = r.author_id
@@ -22,7 +24,9 @@ SELECT m.id, m.group_id, m.body_html, m.body_text, m.created_at,
        u.id AS author_id, u.username AS author_username, u.picture_id AS author_picture_id,
        m.reply_to, r.body_text AS reply_text, r.deleted_at AS reply_deleted_at,
        ru.id AS reply_author_id, ru.username AS reply_author_username, ru.picture_id AS reply_author_picture_id,
-       m.kind, su.id AS subject_id, su.username AS subject_username, su.picture_id AS subject_picture_id
+       m.kind, su.id AS subject_id, su.username AS subject_username, su.picture_id AS subject_picture_id,
+       CAST((SELECT json_group_array(json_array(x.emoji, x.user_id))
+             FROM (SELECT emoji, user_id FROM reactions WHERE item_id = m.id ORDER BY rowid) x) AS TEXT) AS reactions
 FROM messages m JOIN users u ON u.id = m.author_id
 LEFT JOIN messages r ON r.id = m.reply_to
 LEFT JOIN users ru ON ru.id = r.author_id

@@ -23,7 +23,8 @@ import {
  * own handlers through `props` so they are merged), and renders `tooltip` next
  * to itself. Nothing happens while `enabled` is false.
  */
-export function useTooltip(label: string, enabled: boolean, placement: Placement = 'bottom') {
+// `wide` lets a long label, such as the people who chose a reaction, wrap at 16rem.
+export function useTooltip(label: string, enabled: boolean, placement: Placement = 'bottom', wide = false) {
   const [open, setOpen] = useState(false)
   const { refs, floatingStyles, context } = useFloating({
     open: open && enabled,
@@ -42,7 +43,7 @@ export function useTooltip(label: string, enabled: boolean, placement: Placement
       <div
         ref={refs.setFloating}
         style={floatingStyles}
-        className="z-50 rounded-[4px] bg-ink px-2 py-1 text-xs font-medium whitespace-nowrap text-paper"
+        className={`z-50 rounded-[4px] bg-ink px-2 py-1 text-xs font-medium text-paper ${wide ? 'max-w-64' : 'whitespace-nowrap'}`}
         {...getFloatingProps()}
       >
         {label}
@@ -53,5 +54,7 @@ export function useTooltip(label: string, enabled: boolean, placement: Placement
     ref: refs.setReference,
     props: (own?: HTMLProps<HTMLElement>) => getReferenceProps(own),
     tooltip,
+    /** Opens the tooltip, for a press and hold on a touch screen. */
+    show: () => setOpen(true),
   }
 }

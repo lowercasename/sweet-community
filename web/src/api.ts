@@ -168,7 +168,33 @@ export interface Post {
   /** Unix ms of the last edit, or null if never edited. */
   edited_at: number | null
   comment_count: number
+  reactions: Reaction[]
   can: Can
+}
+
+/** One emoji on a post, comment or message, with the ids of the users who chose it, in the order they did. */
+export interface Reaction {
+  emoji: string
+  user_ids: string[]
+}
+
+/** An item's reactions after a change, as the reactions event carries them. A comment's has its post's id. */
+export interface Reactions {
+  id: string
+  kind: 'post' | 'comment' | 'message'
+  group_id: string
+  post_id?: string
+  reactions: Reaction[]
+}
+
+/** The emoji the signed-in user reacts with most, at most six, the most used first. */
+export function getFrequentReactions(): Promise<{ emoji: string[] }> {
+  return request('/api/me/reactions')
+}
+
+/** Adds or removes the signed-in user's emoji on a post, comment or message. */
+export function setReaction(kind: Reactions['kind'], id: string, emoji: string, reacted: boolean): Promise<Reactions> {
+  return request<Reactions>(`/api/${kind}s/${id}/reactions`, json('PUT', { emoji, reacted }))
 }
 
 export interface Comment {
@@ -182,6 +208,7 @@ export interface Comment {
   body_text: string
   created_at: number
   edited_at: number | null
+  reactions: Reaction[]
   can: Can
 }
 
@@ -197,6 +224,7 @@ export interface Message {
   /** A message, or a joined or added line in the chat. A line has no body. Its author joined, or added the subject. */
   kind: 'message' | 'joined' | 'added'
   subject: User | null
+  reactions: Reaction[]
   can: Can
 }
 

@@ -5,6 +5,7 @@ import { ROOT, marker, post, renderWithQuery, user } from '../test-utils'
 
 /** A visible feed is marked read, as with a group's chat. */
 vi.mock('../api', () => ({
+  getFrequentReactions: vi.fn(() => Promise.resolve({ emoji: [] })),
   getPosts: vi.fn(),
   listMarkers: vi.fn(),
   setMarker: vi.fn(),

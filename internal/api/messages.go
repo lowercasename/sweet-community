@@ -27,9 +27,10 @@ type Message struct {
 	ReplyTo *ReplyTo `json:"reply_to"`
 	// Kind is "message", or "joined" or "added" for a line in the chat. A line has no body. Its author joined, or
 	// added Subject.
-	Kind    string `json:"kind"`
-	Subject *User  `json:"subject"`
-	Can     Can    `json:"can"`
+	Kind      string     `json:"kind"`
+	Subject   *User      `json:"subject"`
+	Reactions []Reaction `json:"reactions"`
+	Can       Can        `json:"can"`
 }
 
 // ReplyTo is a snippet of the message a reply answers, built from the
@@ -126,24 +127,34 @@ func (s *Server) createMessage(w http.ResponseWriter, r *http.Request) {
 }
 
 // deleteMessage deletes a message. perm.DeleteMessage decides who may. removeMessage does the deletion.
+// messageActor resolves a message's owners and the viewer's Actor in the message's group. A message the viewer cannot
+// see returns 404.
+func (s *Server) messageActor(r *http.Request, q *store.Queries, id string) (store.GetMessageOwnersRow, perm.Actor, int, error) {
+	owners, err := q.GetMessageOwners(r.Context(), id)
+	if errors.Is(err, sql.ErrNoRows) {
+		return owners, perm.Actor{}, http.StatusNotFound, errors.New("No such message")
+	}
+	if err != nil {
+		return owners, perm.Actor{}, http.StatusInternalServerError, err
+	}
+	me, _ := userFrom(r.Context())
+	a, err := actorIn(r.Context(), q, me, owners.GroupID)
+	if err != nil {
+		return owners, a, http.StatusInternalServerError, err
+	}
+	if !perm.CanSee(a) {
+		return owners, a, http.StatusNotFound, errors.New("No such message")
+	}
+	return owners, a, 0, nil
+}
+
 func (s *Server) deleteMessage(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
-	me, _ := userFrom(r.Context())
 	now := db.Now()
 	s.loggedMany(w, r, now, func(qtx *store.Queries) ([]events.Entry, any, int, error) {
-		owners, err := qtx.GetMessageOwners(r.Context(), id)
-		if errors.Is(err, sql.ErrNoRows) {
-			return nil, nil, http.StatusNotFound, errors.New("No such message")
-		}
+		owners, a, status, err := s.messageActor(r, qtx, id)
 		if err != nil {
-			return nil, nil, http.StatusInternalServerError, err
-		}
-		a, err := actorIn(r.Context(), qtx, me, owners.GroupID)
-		if err != nil {
-			return nil, nil, http.StatusInternalServerError, err
-		}
-		if !perm.CanSee(a) {
-			return nil, nil, http.StatusNotFound, errors.New("No such message")
+			return nil, nil, status, err
 		}
 		if owners.Kind != MessageKind || !perm.DeleteMessage(a, perm.Message{AuthorID: owners.AuthorID}) {
 			return nil, nil, http.StatusForbidden, errors.New("Not your message")
@@ -161,6 +172,9 @@ func (s *Server) deleteMessage(w http.ResponseWriter, r *http.Request) {
 // longer holds its text. The delete handler, a report's Delete action and the removal of a user all use it.
 func removeMessage(ctx context.Context, qtx *store.Queries, id, groupID string, now int64) ([]events.Entry, error) {
 	if err := qtx.DeleteMessage(ctx, store.DeleteMessageParams{DeletedAt: sql.NullInt64{Int64: now, Valid: true}, ID: id}); err != nil {
+		return nil, err
+	}
+	if err := forgetReactions(ctx, qtx, id); err != nil {
 		return nil, err
 	}
 	replies, err := replyEvents(ctx, qtx, id)

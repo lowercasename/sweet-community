@@ -14,7 +14,7 @@ import {
   useRole,
 } from '@floating-ui/react'
 import type { ReactNode } from 'react'
-import { REVEAL, buttonClass } from './Button'
+import { REVEAL_POST, buttonClass } from './Button'
 import { Icon, type IconName } from './Icon'
 import { ShieldMark } from './ShieldMark'
 import { PILL_ICON, pillClass, type PillSize } from './Pill'
@@ -65,14 +65,12 @@ interface MenuProps {
   disabled?: boolean
   children?: ReactNode
   /**
-   * Hide the trigger until its block is hovered or contains focus, on devices
-   * with a pointer. On a touch screen it is always shown. It is also shown
-   * while the menu is open. The value names the level of block, because a post
-   * contains its comments. A post's menu shows while its card is hovered and no
-   * comment inside it is hovered. A comment's menu shows while its own article
-   * is hovered. A message's menu shows while its own row is hovered.
+   * Hide the trigger until its post is hovered or focused, on devices with a pointer, and show it while the menu is
+   * open. A post's menu shows while its card is hovered and no comment inside it is hovered.
    */
-  reveal?: 'post' | 'comment' | 'message'
+  reveal?: boolean
+  /** The 26px trigger, for a menu in an item's action bar. */
+  compact?: boolean
   /** Names the trigger for the welcome tour, which points at it (src/tour/steps.ts). */
   tour?: string
 }
@@ -92,7 +90,8 @@ export function Menu({
   onOpenChange,
   icon = 'more',
   items,
-  reveal,
+  reveal = false,
+  compact = false,
   trigger = 'icon',
   quiet = false,
   size = 'md',
@@ -124,7 +123,7 @@ export function Menu({
   const triggerRef = useMergeRefs([refs.setReference, tip.ref])
   const triggerClass =
     trigger === 'icon'
-      ? `${buttonClass('ghost', true, false, reveal === 'message')} ${reveal && !open ? REVEAL[reveal] : ''}`
+      ? `${buttonClass('ghost', true, false, compact)} ${reveal && !open ? REVEAL_POST : ''}`
       : pillClass(quiet ? 'quiet' : 'topic', size)
 
   return (

@@ -8,6 +8,7 @@ import { mine, nobody, post, renderWithQuery, reportable, user } from '../test-u
 vi.mock('../api', () => ({
   getPostNotificationPreference: vi.fn(() => Promise.resolve({ post_id: 'p1', following: false, muted: false })),
   getMe: vi.fn(() => Promise.resolve({ id: 'kit', username: 'kit', picture: null })),
+  getFrequentReactions: vi.fn(() => Promise.resolve({ emoji: [] })),
   listMembers: vi.fn(() => Promise.resolve({ members: [] })),
   listUsers: vi.fn(() => Promise.resolve({ users: [] })),
   listTopics: vi.fn(() =>

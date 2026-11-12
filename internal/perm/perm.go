@@ -70,6 +70,9 @@ func DeleteComment(a Actor, c Comment) bool {
 // DeleteMessage allows the author and the group's staff. A sent message cannot be edited.
 func DeleteMessage(a Actor, m Message) bool { return a.member() && (a.ID == m.AuthorID || a.staff()) }
 
+// React allows any member of an item's group to add and remove their own reactions on it.
+func React(a Actor) bool { return a.member() }
+
 // Write allows any member of the group to post and to send messages in it.
 func Write(a Actor) bool { return a.member() }
 

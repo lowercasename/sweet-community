@@ -10,6 +10,7 @@ import { ROOT, marker, message, paragraph, renderWithQuery, user } from '../test
  * cleared. A pane that is closed or behind another page marks nothing as read.
  */
 vi.mock('../api', () => ({
+  getFrequentReactions: vi.fn(() => Promise.resolve({ emoji: [] })),
   getMessages: vi.fn(),
   createMessage: vi.fn(),
   getRoomNotificationPreference: vi.fn(() => Promise.resolve({ mode: 'all' })),

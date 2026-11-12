@@ -125,7 +125,7 @@ The editor is TipTap. **The body is the HTML that TipTap produces.** The server 
 
 ### How a post is drawn
 
-Raphael chose the layout from three drawings (2026-11-06). An open thread sits on a warm grey panel inside the card, with a white reply box. The panel shows where the post ends, and the white box shows where to type. On a device with a pointer, a block's menu shows only on hover or focus, so a chat does not show a column of dots. Touch screens always show menus, because users cannot discover a long press.
+Raphael chose the layout from three drawings (2026-11-06). An open thread sits on a warm grey panel inside the card, with a white reply box. The panel shows where the post ends, and the white box shows where to type. A post's menu shows only on hover or focus on a device with a pointer, and always on a touch screen, because users cannot discover a long press. A chat message's and a comment's actions are in a small toolbar that floats over the item's top right corner. It holds Add reaction, Reply for a message, and a menu with the rest. It opens on hover or keyboard focus on a device with a pointer, and on a tap on a touch screen, so a chat on a phone shows no column of icons. A tap on a link or an image opens it, so on a touch screen pressing and holding a link or an image opens the toolbar instead. On a touch screen the toolbar's buttons are large enough for a finger, and the toolbar sits wholly above the item so that it covers none of it. The toolbar is plain icons in a small bubble, after Discord's.
 
 ## Chat
 
@@ -137,6 +137,18 @@ A message uses part of the same schema and passes the same policy. Chat history 
 - Consecutive messages from one person share a name and picture when the gap between messages is at most fifteen minutes. A different speaker, a membership notice or a new calendar day starts a new group. This keeps short pauses from repeating the same header.
 - Calendar days are separated by quiet date dividers with text between thin lines. These are distinct from membership notices. A message group shows its first message’s time beside the author, without a time on every message.
 - There is no offline posting. When the device is offline, the bar at the top of the view shows an Offline badge and sending is disabled. Connecting and reconnecting show nothing. A failed send keeps its text.
+
+## Reactions
+
+A member reacts to a post, a comment or a chat message with an emoji. Each emoji shows under the item with the number of people who chose it. A reaction answers without adding a comment or a message.
+
+- Any emoji can be a reaction. The picker opens as a row of six emoji, with a button that opens the full picker. The row starts with the emoji the member reacts with most, and common emoji fill the rest. The server counts these, so the row is the same on every device. A post has Add reaction in the row with its comments button, after its reactions. A comment and a message have it in their toolbar.
+- A member may add several different emoji to one item. Each emoji is a toggle, so choosing it again removes it.
+- An item holds at most 20 different emoji. A plain limit keeps an item's reactions to a short row.
+- Hovering an emoji lists the people who chose it, and so does pressing and holding it on a touch screen. Their names are the current names, because a reaction refers to the user's id.
+- A reaction notifies nobody. This keeps the first version simple, and a notification can be added later.
+- Reactions follow the visibility of their item. Deleting an item deletes its reactions, and removing a user deletes theirs. Chat lines take no reactions.
+- Touch screens get the reaction picker too, although they have no picker in composers. A reaction needs a picker, because there is no text field to type an emoji into.
 
 ## Images
 
@@ -453,6 +465,8 @@ These decisions came from a security audit (2026-11-08).
 ## Record
 
 ### Reversed
+
+- **Actions on touch screens.** A tap on a chat message or a comment now opens its actions in a floating toolbar, as hover does with a pointer. Touch screens showed the menu and Reply button of every message, which cluttered the chat. A tap is not a long press, so the reason for always showing them does not apply. A post's menu still shows on touch screens.
 
 - **Patch releases.** Patch releases may include noticeable corrections to security, privacy and other bugs. The earlier rule excluded all noticeable changes and would classify corrective fixes as new features.
 

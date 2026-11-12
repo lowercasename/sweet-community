@@ -5,7 +5,9 @@
 -- name: ListPosts :many
 SELECT p.id, p.group_id, p.topic_id, p.body_html, p.body_text, p.created_at, p.edited_at,
        u.id AS author_id, u.username AS author_username, u.picture_id AS author_picture_id,
-       (SELECT COUNT(*) FROM comments c WHERE c.post_id = p.id AND c.deleted_at IS NULL) AS comment_count
+       (SELECT COUNT(*) FROM comments c WHERE c.post_id = p.id AND c.deleted_at IS NULL) AS comment_count,
+       CAST((SELECT json_group_array(json_array(x.emoji, x.user_id))
+             FROM (SELECT emoji, user_id FROM reactions WHERE item_id = p.id ORDER BY rowid) x) AS TEXT) AS reactions
 FROM posts p JOIN users u ON u.id = p.author_id
 WHERE p.group_id = sqlc.arg(group_id) AND p.deleted_at IS NULL AND p.created_at <= sqlc.arg(before)
   AND (p.created_at < sqlc.arg(before) OR p.id < sqlc.arg(before_id))
@@ -16,7 +18,9 @@ LIMIT sqlc.arg(page_size);
 -- name: GetPost :one
 SELECT p.id, p.group_id, p.topic_id, p.body_html, p.body_text, p.created_at, p.edited_at,
        u.id AS author_id, u.username AS author_username, u.picture_id AS author_picture_id,
-       (SELECT COUNT(*) FROM comments c WHERE c.post_id = p.id AND c.deleted_at IS NULL) AS comment_count
+       (SELECT COUNT(*) FROM comments c WHERE c.post_id = p.id AND c.deleted_at IS NULL) AS comment_count,
+       CAST((SELECT json_group_array(json_array(x.emoji, x.user_id))
+             FROM (SELECT emoji, user_id FROM reactions WHERE item_id = p.id ORDER BY rowid) x) AS TEXT) AS reactions
 FROM posts p JOIN users u ON u.id = p.author_id
 WHERE p.id = sqlc.arg(id) AND p.deleted_at IS NULL;
 
@@ -47,7 +51,9 @@ WHERE group_id = sqlc.arg(group_id) AND deleted_at IS NULL;
 -- viewer is in, and has not hidden, are returned.
 SELECT p.id, p.group_id, p.topic_id, p.body_html, p.body_text, p.created_at, p.edited_at,
        u.id AS author_id, u.username AS author_username, u.picture_id AS author_picture_id,
-       (SELECT COUNT(*) FROM comments c WHERE c.post_id = p.id AND c.deleted_at IS NULL) AS comment_count
+       (SELECT COUNT(*) FROM comments c WHERE c.post_id = p.id AND c.deleted_at IS NULL) AS comment_count,
+       CAST((SELECT json_group_array(json_array(x.emoji, x.user_id))
+             FROM (SELECT emoji, user_id FROM reactions WHERE item_id = p.id ORDER BY rowid) x) AS TEXT) AS reactions
 FROM posts p JOIN users u ON u.id = p.author_id
 JOIN memberships v ON v.group_id = p.group_id AND v.user_id = sqlc.arg(viewer_id) AND v.hidden_at IS NULL
 JOIN groups g ON g.id = p.group_id AND g.deleted_at IS NULL

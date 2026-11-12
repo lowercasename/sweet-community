@@ -14,6 +14,7 @@ test.describe('chat', () => {
     await expect(kit.page.locator('.editor-line .ProseMirror').first()).toHaveText('')
 
     // Another member's menu on the message holds only Report. Delete is for the author and staff.
+    await article(mo.page, text).hover()
     await article(mo.page, text).getByRole('button', { name: 'Message options' }).click()
     await expect(mo.page.getByRole('menuitem')).toHaveText(['Report'])
     await mo.page.keyboard.press('Escape')
@@ -39,7 +40,7 @@ test.describe('chat', () => {
     await kit.context.close()
   })
 
-  test("each message's menu is at the top right of its own block, including the first message, and a hovered message has a pink background", async ({
+  test("a message's actions float over the top right of its own block while it is hovered, and take no space", async ({
     browser,
   }, testInfo) => {
     const kit = await member(browser, testInfo)
@@ -51,38 +52,34 @@ test.describe('chat', () => {
       .setInputFiles({ name: 'wide.png', mimeType: 'image/png', buffer: png(1200, 300) })
     await expect(chat.locator('textarea')).toHaveCount(1)
     await sendMessage(kit.page, text)
-    const msg = article(kit.page, text)
-    const author = (await msg.getByRole('button', { name: kit.username }).boundingBox())!
-    const block = msg.locator('.content').first()
-    const b1 = (await block.boundingBox())!
-    const menu = (await msg.getByRole('button', { name: 'Message options' }).first().boundingBox())!
-    // The menu is below the author line and at the top right of the message's own block, whatever the image height.
-    expect(menu.y).toBeGreaterThanOrEqual(author.y + author.height - 1)
-    expect(Math.abs(menu.y - b1.y)).toBeLessThan(6)
-    expect(menu.x).toBeGreaterThan(b1.x + b1.width - 1)
-    // A second message by the same user is added to the same run. Its menu is also at the top right of its own block.
     const more = uniq('and this ')
     await sendMessage(kit.page, more)
-    const line = (await msg.getByText(more).boundingBox())!
-    const menu2 = (await msg.getByRole('button', { name: 'Message options' }).nth(1).boundingBox())!
-    expect(Math.abs(menu2.y - line.y)).toBeLessThan(6)
-    expect(menu2.x).toBeGreaterThan(line.x + line.width - 1)
-    // A third message. The lines of a run keep a 4px gap between them, and a menu never makes its block taller.
     const third = uniq('and that ')
     await sendMessage(kit.page, third)
+    const msg = article(kit.page, text)
+    const block = (t: string) => msg.getByText(t).locator('xpath=ancestor::div[contains(@class,"block-item")][1]')
+    const bar = (t: string) => block(t).locator('[data-action-bar]')
+    // A bar is hidden, and takes no clicks, until its block is hovered.
+    await expect(bar(more)).toHaveCSS('opacity', '0')
+    await expect(bar(more)).toHaveCSS('pointer-events', 'none')
+    // Hovering a message gives it a light pink background and shows its own bar only.
+    for (const t of [text, more]) {
+      await msg.getByText(t).hover()
+      await expect(block(t)).toHaveCSS('background-color', 'rgb(253, 242, 242)')
+      await expect(bar(t)).toHaveCSS('opacity', '1')
+      await expect(bar(third)).toHaveCSS('opacity', '0')
+      // The bar sits at the block's top right, above its top edge, whatever the height of an image in the message.
+      const b = (await block(t).boundingBox())!
+      const r = (await bar(t).boundingBox())!
+      expect(Math.abs(r.x + r.width - (b.x + b.width))).toBeLessThan(10)
+      expect(r.y).toBeLessThan(b.y)
+    }
+    // Its buttons are the compact 26px size.
+    expect((await bar(more).getByRole('button', { name: 'Message options' }).boundingBox())!.height).toBe(26)
+    // The lines of a run keep a 4px gap between them, because the bar takes no space.
     const l2 = (await msg.getByText(more).boundingBox())!
     const l3 = (await msg.getByText(third).boundingBox())!
     expect(Math.round(l3.y - (l2.y + l2.height))).toBe(4)
-    // Hovering a message gives it a light pink background.
-    await msg.getByText(third).hover()
-    const hovered = msg.getByText(third).locator('xpath=ancestor::div[contains(@class,"block-message")][1]')
-    await expect(hovered).toHaveCSS('background-color', 'rgb(253, 242, 242)')
-    // The menu button fits inside the message's row: it is the compact 26px size, not the 34px one.
-    const menuBox = (await hovered.getByRole('button', { name: 'Message options' }).boundingBox())!
-    const blockBox = (await hovered.boundingBox())!
-    expect(menuBox.height).toBe(26)
-    expect(menuBox.y).toBeGreaterThanOrEqual(blockBox.y)
-    expect(menuBox.y + menuBox.height).toBeLessThanOrEqual(blockBox.y + blockBox.height)
     await kit.context.close()
   })
 })

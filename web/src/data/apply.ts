@@ -16,6 +16,8 @@ import type {
   Post,
   PostPage,
   Profile,
+  Reaction,
+  Reactions,
   Report,
   CommunityText,
   Settings,
@@ -36,6 +38,7 @@ export const EVENT_KINDS = [
   'comment_delete',
   'message',
   'message_delete',
+  'reactions',
   'user',
   'group',
   'group_delete',
@@ -84,6 +87,9 @@ export function applyEvent(qc: QueryClient, kind: string, data: unknown): void {
       break
     case 'message_delete':
       if (hasId(data) && typeof data.group_id === 'string') deleteMessage(qc, data.id, data.group_id)
+      break
+    case 'reactions':
+      if (isReactions(data)) setReactions(qc, data)
       break
     case 'user':
       if (isUser(data)) upsertUser(qc, data)
@@ -279,6 +285,21 @@ function deletePost(qc: QueryClient, id: string, groupId: string) {
   qc.removeQueries({ queryKey: keys.comments(id) })
   qc.removeQueries({ queryKey: keys.post(id) })
   qc.setQueriesData<Posts>({ queryKey: ['userPosts'] }, without)
+}
+
+/** Puts an item's new reactions on every loaded copy of the item. */
+function setReactions(qc: QueryClient, r: Reactions) {
+  const set = <T extends { id: string; reactions: Reaction[] }>(items: T[]) =>
+    items.map((x) => (x.id === r.id ? { ...x, reactions: r.reactions } : x))
+  if (r.kind === 'post') {
+    qc.setQueriesData<Posts>({ queryKey: keys.posts(r.group_id) }, (old) => eachPage(old, 'posts', set))
+    qc.setQueriesData<Posts>({ queryKey: ['userPosts'] }, (old) => eachPage(old, 'posts', set))
+    qc.setQueryData<Post>(keys.post(r.id), (old) => old && { ...old, reactions: r.reactions })
+  } else if (r.kind === 'comment' && r.post_id) {
+    qc.setQueryData<Thread>(keys.comments(r.post_id), (old) => eachPage(old, 'comments', set))
+  } else if (r.kind === 'message') {
+    qc.setQueryData<Messages>(keys.messages(r.group_id), (old) => eachPage(old, 'messages', set))
+  }
 }
 
 /** Refetches the server's comment count everywhere the post is shown. */
@@ -578,6 +599,16 @@ function hasId(data: unknown): data is { id: string; post_id?: unknown; group_id
 function isUser(data: unknown): data is User {
   return hasId(data) && typeof (data as User).username === 'string'
 }
+function isReactions(data: unknown): data is Reactions {
+  const r = data as Reactions
+  return (
+    hasId(data) &&
+    (r.kind === 'post' || r.kind === 'comment' || r.kind === 'message') &&
+    typeof r.group_id === 'string' &&
+    Array.isArray(r.reactions)
+  )
+}
+
 function isPost(data: unknown): data is Post {
   return (
     hasId(data) &&

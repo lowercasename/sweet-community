@@ -9,6 +9,7 @@ import { ROOT, comment, mine, nobody, renderWithQuery, reportable, user } from '
  * confirmation, then removes the comment from the thread.
  */
 vi.mock('../api', () => ({
+  getFrequentReactions: vi.fn(() => Promise.resolve({ emoji: [] })),
   getComments: vi.fn(),
   listMarkers: vi.fn(() => Promise.resolve({ markers: [] })),
   createComment: vi.fn(),

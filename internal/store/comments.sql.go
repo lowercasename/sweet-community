@@ -125,7 +125,9 @@ func (q *Queries) EraseAuthorComments(ctx context.Context, arg EraseAuthorCommen
 
 const getComment = `-- name: GetComment :one
 SELECT c.id, c.post_id, c.body_html, c.body_text, c.created_at, c.edited_at, p.author_id AS post_author_id, p.group_id,
-       u.id AS author_id, u.username AS author_username, u.picture_id AS author_picture_id
+       u.id AS author_id, u.username AS author_username, u.picture_id AS author_picture_id,
+       CAST((SELECT json_group_array(json_array(x.emoji, x.user_id))
+             FROM (SELECT emoji, user_id FROM reactions WHERE item_id = c.id ORDER BY rowid) x) AS TEXT) AS reactions
 FROM comments c JOIN users u ON u.id = c.author_id JOIN posts p ON p.id = c.post_id
 WHERE c.id = ?1 AND c.deleted_at IS NULL
 `
@@ -142,6 +144,7 @@ type GetCommentRow struct {
 	AuthorID        string
 	AuthorUsername  string
 	AuthorPictureID sql.NullString
+	Reactions       string
 }
 
 func (q *Queries) GetComment(ctx context.Context, id string) (GetCommentRow, error) {
@@ -159,6 +162,7 @@ func (q *Queries) GetComment(ctx context.Context, id string) (GetCommentRow, err
 		&i.AuthorID,
 		&i.AuthorUsername,
 		&i.AuthorPictureID,
+		&i.Reactions,
 	)
 	return i, err
 }
@@ -191,7 +195,9 @@ func (q *Queries) GetCommentOwners(ctx context.Context, id string) (GetCommentOw
 const listComments = `-- name: ListComments :many
 
 SELECT c.id, c.post_id, c.body_html, c.body_text, c.created_at, c.edited_at, p.author_id AS post_author_id, p.group_id,
-       u.id AS author_id, u.username AS author_username, u.picture_id AS author_picture_id
+       u.id AS author_id, u.username AS author_username, u.picture_id AS author_picture_id,
+       CAST((SELECT json_group_array(json_array(x.emoji, x.user_id))
+             FROM (SELECT emoji, user_id FROM reactions WHERE item_id = c.id ORDER BY rowid) x) AS TEXT) AS reactions
 FROM comments c JOIN users u ON u.id = c.author_id JOIN posts p ON p.id = c.post_id
 WHERE c.post_id = ?1 AND c.deleted_at IS NULL AND c.created_at <= ?2
   AND (c.created_at < ?2 OR c.id < ?3)
@@ -218,6 +224,7 @@ type ListCommentsRow struct {
 	AuthorID        string
 	AuthorUsername  string
 	AuthorPictureID sql.NullString
+	Reactions       string
 }
 
 // A comment belongs to a group through its post. The handler checks
@@ -249,6 +256,7 @@ func (q *Queries) ListComments(ctx context.Context, arg ListCommentsParams) ([]L
 			&i.AuthorID,
 			&i.AuthorUsername,
 			&i.AuthorPictureID,
+			&i.Reactions,
 		); err != nil {
 			return nil, err
 		}

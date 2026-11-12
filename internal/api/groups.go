@@ -540,8 +540,9 @@ func (s *Server) deleteGroup(w http.ResponseWriter, r *http.Request) {
 }
 
 // removeGroup deletes a room and returns its deletion and each member’s removal. The room's row stays with its name emptied, so the
-// rows that point at it stay valid. Its posts, comments and messages are deleted and their text is emptied. Its
-// memberships, notifications and read markers are deleted, and so are their events in the event log. The owner's
+// rows that point at it stay valid. Its posts, comments and messages are deleted and their text is emptied. Their
+// reactions, and the room's memberships, notifications and read markers, are deleted, and so are their events in the
+// event log. The owner's
 // delete, a last member leaving and the removal of a room's only member all use it.
 func removeGroup(ctx context.Context, qtx *store.Queries, id string, now int64) ([]events.Entry, error) {
 	members, err := qtx.ListMembers(ctx, id)
@@ -550,6 +551,9 @@ func removeGroup(ctx context.Context, qtx *store.Queries, id string, now int64) 
 	}
 	at := sql.NullInt64{Int64: now, Valid: true}
 	if err := qtx.ForgetGroupEvents(ctx, id); err != nil {
+		return nil, err
+	}
+	if err := qtx.DeleteGroupReactions(ctx, id); err != nil {
 		return nil, err
 	}
 	if err := qtx.DeleteGroup(ctx, store.DeleteGroupParams{DeletedAt: at, ID: id}); err != nil {

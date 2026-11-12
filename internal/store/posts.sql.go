@@ -112,7 +112,9 @@ func (q *Queries) EraseAuthorPosts(ctx context.Context, arg EraseAuthorPostsPara
 const getPost = `-- name: GetPost :one
 SELECT p.id, p.group_id, p.topic_id, p.body_html, p.body_text, p.created_at, p.edited_at,
        u.id AS author_id, u.username AS author_username, u.picture_id AS author_picture_id,
-       (SELECT COUNT(*) FROM comments c WHERE c.post_id = p.id AND c.deleted_at IS NULL) AS comment_count
+       (SELECT COUNT(*) FROM comments c WHERE c.post_id = p.id AND c.deleted_at IS NULL) AS comment_count,
+       CAST((SELECT json_group_array(json_array(x.emoji, x.user_id))
+             FROM (SELECT emoji, user_id FROM reactions WHERE item_id = p.id ORDER BY rowid) x) AS TEXT) AS reactions
 FROM posts p JOIN users u ON u.id = p.author_id
 WHERE p.id = ?1 AND p.deleted_at IS NULL
 `
@@ -129,6 +131,7 @@ type GetPostRow struct {
 	AuthorUsername  string
 	AuthorPictureID sql.NullString
 	CommentCount    int64
+	Reactions       string
 }
 
 func (q *Queries) GetPost(ctx context.Context, id string) (GetPostRow, error) {
@@ -146,6 +149,7 @@ func (q *Queries) GetPost(ctx context.Context, id string) (GetPostRow, error) {
 		&i.AuthorUsername,
 		&i.AuthorPictureID,
 		&i.CommentCount,
+		&i.Reactions,
 	)
 	return i, err
 }
@@ -204,7 +208,9 @@ const listPosts = `-- name: ListPosts :many
 
 SELECT p.id, p.group_id, p.topic_id, p.body_html, p.body_text, p.created_at, p.edited_at,
        u.id AS author_id, u.username AS author_username, u.picture_id AS author_picture_id,
-       (SELECT COUNT(*) FROM comments c WHERE c.post_id = p.id AND c.deleted_at IS NULL) AS comment_count
+       (SELECT COUNT(*) FROM comments c WHERE c.post_id = p.id AND c.deleted_at IS NULL) AS comment_count,
+       CAST((SELECT json_group_array(json_array(x.emoji, x.user_id))
+             FROM (SELECT emoji, user_id FROM reactions WHERE item_id = p.id ORDER BY rowid) x) AS TEXT) AS reactions
 FROM posts p JOIN users u ON u.id = p.author_id
 WHERE p.group_id = ?1 AND p.deleted_at IS NULL AND p.created_at <= ?2
   AND (p.created_at < ?2 OR p.id < ?3)
@@ -233,6 +239,7 @@ type ListPostsRow struct {
 	AuthorUsername  string
 	AuthorPictureID sql.NullString
 	CommentCount    int64
+	Reactions       string
 }
 
 // Posts belong to a group. The handler has already checked the viewer's
@@ -265,6 +272,7 @@ func (q *Queries) ListPosts(ctx context.Context, arg ListPostsParams) ([]ListPos
 			&i.AuthorUsername,
 			&i.AuthorPictureID,
 			&i.CommentCount,
+			&i.Reactions,
 		); err != nil {
 			return nil, err
 		}
@@ -282,7 +290,9 @@ func (q *Queries) ListPosts(ctx context.Context, arg ListPostsParams) ([]ListPos
 const listPostsByAuthor = `-- name: ListPostsByAuthor :many
 SELECT p.id, p.group_id, p.topic_id, p.body_html, p.body_text, p.created_at, p.edited_at,
        u.id AS author_id, u.username AS author_username, u.picture_id AS author_picture_id,
-       (SELECT COUNT(*) FROM comments c WHERE c.post_id = p.id AND c.deleted_at IS NULL) AS comment_count
+       (SELECT COUNT(*) FROM comments c WHERE c.post_id = p.id AND c.deleted_at IS NULL) AS comment_count,
+       CAST((SELECT json_group_array(json_array(x.emoji, x.user_id))
+             FROM (SELECT emoji, user_id FROM reactions WHERE item_id = p.id ORDER BY rowid) x) AS TEXT) AS reactions
 FROM posts p JOIN users u ON u.id = p.author_id
 JOIN memberships v ON v.group_id = p.group_id AND v.user_id = ?1 AND v.hidden_at IS NULL
 JOIN groups g ON g.id = p.group_id AND g.deleted_at IS NULL
@@ -312,6 +322,7 @@ type ListPostsByAuthorRow struct {
 	AuthorUsername  string
 	AuthorPictureID sql.NullString
 	CommentCount    int64
+	Reactions       string
 }
 
 // One user's posts that a viewer can see. Only posts in groups that the
@@ -343,6 +354,7 @@ func (q *Queries) ListPostsByAuthor(ctx context.Context, arg ListPostsByAuthorPa
 			&i.AuthorUsername,
 			&i.AuthorPictureID,
 			&i.CommentCount,
+			&i.Reactions,
 		); err != nil {
 			return nil, err
 		}

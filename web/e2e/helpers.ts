@@ -167,6 +167,8 @@ export const article = (page: Page, text: string) => page.getByRole('article').f
 
 /** Opens the three-dot menu on an article and selects an item. */
 export async function pick(page: Page, scope: ReturnType<Page['locator']>, menu: string, item: string) {
+  // A message's or comment's menu is in its action bar, which shows while the item is hovered.
+  await scope.hover()
   await scope.getByRole('button', { name: menu }).click()
   await page.getByRole('menuitem', { name: item }).click()
 }

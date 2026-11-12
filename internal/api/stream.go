@@ -173,6 +173,15 @@ func filterEvent(viewer User, roles map[string]string, st *Settings, e events.Ev
 			return e, false
 		}
 		return encode(forViewer(perm.Actor{ID: viewer.ID}, &p, *st))
+	case "reactions":
+		// Sent to the members of the item's group. The reactions name user ids only, and every member can see every
+		// user.
+		var rs Reactions
+		if json.Unmarshal(e.Payload, &rs) != nil {
+			return e, false
+		}
+		_, ok := inGroup(rs.GroupID)
+		return e, ok
 	case "user", "settings", "rules", "welcome", "topic", "topic_delete":
 		return e, true
 	default:

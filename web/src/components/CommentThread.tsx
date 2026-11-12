@@ -10,6 +10,7 @@ import {
   Card,
   ConfirmDialog,
   Hairline,
+  ItemBlock,
   Menu,
   type MenuItem,
   Row,
@@ -22,6 +23,7 @@ import { Body } from './Body'
 import { BodyEditor } from './BodyEditor'
 import { useReadProgress } from '../hooks/useReadProgress'
 import { PersonName } from './PersonName'
+import { AddReaction, Reactions, useToggleReaction } from './Reactions'
 import { ReportDialog } from './ReportDialog'
 
 interface CommentThreadProps {
@@ -48,6 +50,10 @@ function CommentItem({ comment, groupId, disabled, onEdit, onDelete }: CommentIt
   const [deleting, setDeleting] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [reporting, setReporting] = useState(false)
+  // True while the action bar's menu or picker is open, which keeps the bar shown.
+  const [opened, setOpened] = useState(false)
+  const toggleReaction = useToggleReaction()
+  const react = async (emoji: string) => setError(await toggleReaction('comment', comment.id, comment.reactions, emoji))
 
   const save = async (bodyHtml: string) => {
     await onEdit(bodyHtml)
@@ -80,8 +86,18 @@ function CommentItem({ comment, groupId, disabled, onEdit, onDelete }: CommentIt
 
   return (
     <Box as="article">
-      <Stack gap={1}>
-        <Row justify="between" align="start" wrap="never">
+      <ItemBlock
+        actionsOpen={opened && !editing && !disabled}
+        actions={
+          !editing && !disabled ? (
+            <>
+              <AddReaction compact onPick={(emoji) => void react(emoji)} onOpenChange={setOpened} />
+              {items.length > 0 && <Menu label="Comment options" compact items={items} onOpenChange={setOpened} />}
+            </>
+          ) : undefined
+        }
+      >
+        <Stack gap={1}>
           <Row gap={2} align="center">
             <PersonName user={author} avatar="xs" small />
             <Text as="span" variant="small">
@@ -89,25 +105,27 @@ function CommentItem({ comment, groupId, disabled, onEdit, onDelete }: CommentIt
               {comment.edited_at != null && ' · edited'}
             </Text>
           </Row>
-          {items.length > 0 && !editing && !disabled && <Menu label="Comment options" items={items} reveal="comment" />}
-        </Row>
-        {editing ? (
-          <BodyEditor
-            groupId={groupId}
-            extensions={commentExtensions}
-            size="line"
-            submitLabel="Save"
-            initialHtml={comment.body_html}
-            draft={`comment-edit:${comment.id}`}
-            disabled={disabled}
-            onSubmit={save}
-            onCancel={() => setEditing(false)}
-          />
-        ) : (
-          <Body html={comment.body_html} size="small" />
-        )}
-        {error && <Alert tone="error">{error}</Alert>}
-      </Stack>
+          {editing ? (
+            <BodyEditor
+              groupId={groupId}
+              extensions={commentExtensions}
+              size="line"
+              submitLabel="Save"
+              initialHtml={comment.body_html}
+              draft={`comment-edit:${comment.id}`}
+              disabled={disabled}
+              onSubmit={save}
+              onCancel={() => setEditing(false)}
+            />
+          ) : (
+            <Body html={comment.body_html} size="small" />
+          )}
+          {!editing && (
+            <Reactions reactions={comment.reactions} disabled={disabled} onToggle={(emoji) => void react(emoji)} />
+          )}
+          {error && <Alert tone="error">{error}</Alert>}
+        </Stack>
+      </ItemBlock>
       <ConfirmDialog
         open={confirming}
         title="Delete this comment?"

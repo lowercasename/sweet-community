@@ -88,6 +88,14 @@ func (s *Server) removeUser(w http.ResponseWriter, r *http.Request) {
 			return nil, nil, http.StatusInternalServerError, err
 		}
 		entries := []events.Entry{{Kind: "user", Payload: wireUser(u.ID, u.Username, u.PictureID)}}
+		// Their reactions go, with the logged reactions events that name them. Open pages refetch the items after the
+		// user event above.
+		if err := qtx.ForgetUserReactionEvents(ctx, uid); err != nil {
+			return nil, nil, http.StatusInternalServerError, err
+		}
+		if err := qtx.DeleteUserReactions(ctx, uid); err != nil {
+			return nil, nil, http.StatusInternalServerError, err
+		}
 		// A removed account has no profile, so its profile events leave the log. The user event above replaces the
 		// earlier user events, which held the old name and picture.
 		if err := events.Forget(ctx, qtx, "profile:"+uid); err != nil {

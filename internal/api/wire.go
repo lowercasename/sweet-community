@@ -43,6 +43,7 @@ func wirePost(row store.GetPostRow) Post {
 		CreatedAt:    row.CreatedAt,
 		EditedAt:     nullInt(row.EditedAt),
 		CommentCount: row.CommentCount,
+		Reactions:    reactionsOf(row.Reactions),
 	}
 }
 
@@ -57,6 +58,7 @@ func wireComment(row store.GetCommentRow) Comment {
 		BodyText:     row.BodyText,
 		CreatedAt:    row.CreatedAt,
 		EditedAt:     nullInt(row.EditedAt),
+		Reactions:    reactionsOf(row.Reactions),
 	}
 }
 
@@ -69,6 +71,7 @@ func wireMessage(row store.GetMessageRow) Message {
 		BodyText:  row.BodyText,
 		CreatedAt: row.CreatedAt,
 		Kind:      row.Kind,
+		Reactions: reactionsOf(row.Reactions),
 	}
 	if row.SubjectID.Valid {
 		u := wireUser(row.SubjectID.String, row.SubjectUsername.String, row.SubjectPictureID)

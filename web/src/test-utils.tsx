@@ -113,6 +113,7 @@ export const post = (id: string, author: User, extra: Partial<Post> = {}): Post 
   created_at: Number.parseInt(id.replace(/\D/g, ''), 10) || 1,
   edited_at: null,
   comment_count: 0,
+  reactions: [],
   can: nobody,
   ...extra,
 })
@@ -127,6 +128,7 @@ export const comment = (id: string, postId: string, author: User, extra: Partial
   body_text: `${id} says hi`,
   created_at: Number.parseInt(id.replace(/\D/g, ''), 10) || 1,
   edited_at: null,
+  reactions: [],
   can: nobody,
   ...extra,
 })
@@ -162,6 +164,7 @@ export const message = (id: string, author: User, extra: Partial<Message> = {}):
   body_html: `<p>${id}</p>`,
   body_text: id,
   created_at: Number.parseInt(id.replace(/\D/g, ''), 10) || 1,
+  reactions: [],
   can: nobody,
   reply_to: null,
   kind: 'message',

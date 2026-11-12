@@ -5,6 +5,7 @@ import { message, nobody, renderWithQuery, reportable, user } from '../test-util
 
 /** A chat message offers Delete only when its can flag allows it, and asks for confirmation first. */
 vi.mock('../api', () => ({
+  getFrequentReactions: vi.fn(() => Promise.resolve({ emoji: [] })),
   getMe: vi.fn(() => Promise.resolve({ id: 'kit', username: 'kit', picture: null })),
   listMembers: vi.fn(() => Promise.resolve({ members: [] })),
   listUsers: vi.fn(() => Promise.resolve({ users: [] })),

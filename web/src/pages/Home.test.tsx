@@ -30,6 +30,7 @@ import { ApiError } from '../api'
  * group's flag.
  */
 vi.mock('../api', async (importOriginal) => ({
+  getFrequentReactions: vi.fn(() => Promise.resolve({ emoji: [] })),
   ApiError: (await importOriginal<typeof import('../api')>()).ApiError,
   getMe: vi.fn(() => Promise.resolve({ id: 'raphael', username: 'raphael', picture: null })),
   getRoomNotificationPreference: vi.fn(() => Promise.resolve({ mode: 'all' })),

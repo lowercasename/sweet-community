@@ -27,6 +27,7 @@ export const keys = {
   markers: ['markers'] as const,
   settings: ['settings'] as const,
   account: ['account'] as const,
+  frequentReactions: ['frequentReactions'] as const,
   mySettings: ['mySettings'] as const,
   version: ['version'] as const,
   rules: ['rules'] as const,

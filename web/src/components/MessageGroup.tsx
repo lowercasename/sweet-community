@@ -1,14 +1,16 @@
 import { useState } from 'react'
 import type { Message } from '../api'
 import { useAuthor } from '../data/hooks'
+import { useStreamStatus } from '../hooks/StreamContext'
 import {
+  Alert,
   Box,
+  ItemBlock,
   ReadPoint,
   Button,
   Time,
   ConfirmDialog,
   Menu,
-  MessageBlock,
   ReplyQuote,
   Row,
   shieldText,
@@ -17,6 +19,7 @@ import {
 } from '../ui'
 import { Body } from './Body'
 import { PersonName } from './PersonName'
+import { AddReaction, Reactions, useToggleReaction } from './Reactions'
 import { ReportDialog } from './ReportDialog'
 
 interface MessageGroupProps {
@@ -35,11 +38,9 @@ interface MessageGroupProps {
 }
 
 /**
- * A run of messages by one user. The avatar and name are shown once,
- * with the first message’s time, followed by the message bodies. A
- * message's menu is positioned at the top right of its own block. This
- * includes the first message, whose menu is never on the author's line. The
- * block gets the blush background while hovered.
+ * A run of messages by one user. The avatar and name are shown once, with the first message’s time, followed by the
+ * message bodies. Each message has its reactions under its body, and its actions (Add reaction, Reply and a menu) in
+ * the bar of its block (ItemBlock).
  */
 export function MessageGroup({
   messages,
@@ -54,6 +55,16 @@ export function MessageGroup({
   const [confirming, setConfirming] = useState<string | null>(null)
   const [deleting, setDeleting] = useState(false)
   const [reporting, setReporting] = useState<string | null>(null)
+  // The message whose action bar has a menu or picker open, which keeps the bar shown.
+  const [opened, setOpened] = useState<string | null>(null)
+  const [reactionError, setReactionError] = useState<{ id: string; text: string } | null>(null)
+  const toggleReaction = useToggleReaction()
+  const offline = useStreamStatus() === 'offline'
+  const react = async (m: Message, emoji: string) => {
+    const error = await toggleReaction('message', m.id, m.reactions, emoji)
+    setReactionError(error ? { id: m.id, text: error } : null)
+  }
+  const openChange = (id: string) => (open: boolean) => setOpened((now) => (open ? id : now === id ? null : now))
 
   const remove = async () => {
     if (!confirming) return
@@ -76,47 +87,52 @@ export function MessageGroup({
           </Text>
         </Row>
         {messages.map((m) => (
-          <MessageBlock
+          <ItemBlock
             key={m.id}
             id={`message-${m.id}`}
             highlight={highlight === m.id}
-            menu={
-              onReply || m.can.delete || m.can.report ? (
-                <>
-                  {onReply && (
-                    <Button
-                      variant="ghost"
-                      icon="reply"
-                      label="Reply to this message"
-                      compact
-                      reveal="message"
-                      onClick={() => onReply(m)}
-                    />
-                  )}
-                  {(m.can.delete || m.can.report) && (
-                    <Menu
-                      label="Message options"
-                      items={[
-                        ...(m.can.report
-                          ? [{ label: 'Report', icon: 'flag' as const, onSelect: () => setReporting(m.id) }]
-                          : []),
-                        ...(m.can.delete
-                          ? [
-                              {
-                                label: 'Delete',
-                                icon: 'trash' as const,
-                                danger: true,
-                                shield: m.can.delete_by_role ? shieldText.rolesDo : undefined,
-                                onSelect: () => setConfirming(m.id),
-                              },
-                            ]
-                          : []),
-                      ]}
-                      reveal="message"
-                    />
-                  )}
-                </>
-              ) : undefined
+            actionsOpen={opened === m.id}
+            actions={
+              <>
+                <AddReaction
+                  compact
+                  disabled={offline}
+                  onPick={(emoji) => void react(m, emoji)}
+                  onOpenChange={openChange(m.id)}
+                />
+                {onReply && (
+                  <Button
+                    variant="ghost"
+                    icon="reply"
+                    label="Reply to this message"
+                    compact
+                    onClick={() => onReply(m)}
+                  />
+                )}
+                {(m.can.delete || m.can.report) && (
+                  <Menu
+                    label="Message options"
+                    compact
+                    onOpenChange={openChange(m.id)}
+                    items={[
+                      ...(m.can.report
+                        ? [{ label: 'Report', icon: 'flag' as const, onSelect: () => setReporting(m.id) }]
+                        : []),
+                      ...(m.can.delete
+                        ? [
+                            {
+                              label: 'Delete',
+                              icon: 'trash' as const,
+                              danger: true,
+                              shield: m.can.delete_by_role ? shieldText.rolesDo : undefined,
+                              onSelect: () => setConfirming(m.id),
+                            },
+                          ]
+                        : []),
+                    ]}
+                  />
+                )}
+              </>
             }
           >
             {m.reply_to && (
@@ -128,8 +144,10 @@ export function MessageGroup({
               />
             )}
             <Body html={m.body_html} />
+            <Reactions reactions={m.reactions} disabled={offline} onToggle={(emoji) => void react(m, emoji)} />
+            {reactionError?.id === m.id && <Alert tone="error">{reactionError.text}</Alert>}
             <ReadPoint at={m.created_at} />
-          </MessageBlock>
+          </ItemBlock>
         ))}
       </Stack>
       <ConfirmDialog

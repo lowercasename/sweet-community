@@ -13,10 +13,8 @@ interface ButtonProps {
   disabled?: boolean
   /** True while the action runs. The button is disabled, shows a spinner and keeps its label and colour. */
   busy?: boolean
-  /** The 26px icon-only size, for a control inside a chat message line. */
+  /** The 26px size, for a control in an item's action bar. It is 44px on a touch screen, to be easy to tap. */
   compact?: boolean
-  /** Hide the button until its block is hovered or focused, on devices with a pointer, like a revealed menu. */
-  reveal?: 'post' | 'comment' | 'message'
   /** For a toggle button. Whether the toggle is on (aria-pressed). */
   pressed?: boolean
   /** Whether this button opens the page being viewed (aria-current). Used for a nav section's action control. */
@@ -47,17 +45,12 @@ const BASE =
   'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-pink disabled:cursor-default'
 
 /**
- * The classes that hide a revealed control (a menu trigger or a reply button) until its block is hovered or focused, on devices with a pointer only. The
- * blocks have the classes `block-post` (Card as article), `block-comment` (Box as article) and `block-message`
- * (MessageBlock).
+ * The classes that hide a post's menu until the post is hovered or focused, on devices with a pointer only. A post is
+ * a Card as article, with the class `block-post`. Its comments are articles with the class `block-comment`, and
+ * hovering one of them does not show the post's menu.
  */
-export const REVEAL: Record<'post' | 'comment' | 'message', string> = {
-  post: 'pointer-fine:opacity-0 pointer-fine:[.block-post:hover:not(:has(.block-comment:hover))_&]:opacity-100 pointer-fine:[.block-post:focus-within:not(:has(.block-comment:focus-within))_&]:opacity-100',
-  comment:
-    'pointer-fine:opacity-0 pointer-fine:[.block-comment:hover_&]:opacity-100 pointer-fine:[.block-comment:focus-within_&]:opacity-100',
-  message:
-    'pointer-fine:opacity-0 pointer-fine:[.block-message:hover_&]:opacity-100 pointer-fine:[.block-message:focus-within_&]:opacity-100',
-}
+export const REVEAL_POST =
+  'pointer-fine:opacity-0 pointer-fine:[.block-post:hover:not(:has(.block-comment:hover))_&]:opacity-100 pointer-fine:[.block-post:focus-within:not(:has(.block-comment:focus-within))_&]:opacity-100'
 
 /**
  * The ghost hover and current classes, shared by the nav items and list rows that are drawn like ghost buttons. The
@@ -103,8 +96,15 @@ export function buttonClass(
         .filter((c) => !c.startsWith('disabled:'))
         .join(' ') + ' cursor-progress'
     : VARIANTS[variant]
-  // A compact icon-only button is 26px, to fit inside a 28px chat message line.
-  const pad = iconOnly ? (compact ? 'p-[3px]' : 'p-[7px]') : 'px-3 py-[5px]'
+  // A compact button is 26px tall, to fit in an item's action bar and in a row of reactions. On a touch screen an
+  // icon-only one is 44px and a text one is 34px, because a 26px target is too small for a finger.
+  const pad = iconOnly
+    ? compact
+      ? 'p-[3px] pointer-coarse:p-[12px]'
+      : 'p-[7px]'
+    : compact
+      ? 'px-1.5 py-px pointer-coarse:px-2 pointer-coarse:py-[5px]'
+      : 'px-3 py-[5px]'
   return `${BASE} ${look} ${pad}`
 }
 
@@ -114,7 +114,6 @@ export function Button({
   disabled,
   busy = false,
   compact = false,
-  reveal,
   pressed,
   current,
   label,
@@ -135,7 +134,7 @@ export function Button({
     <>
       <button
         ref={tip.ref}
-        className={`${buttonClass(variant, iconOnly, busy, compact)} ${reveal ? REVEAL[reveal] : ''}`}
+        className={buttonClass(variant, iconOnly, busy, compact)}
         type={type}
         disabled={disabled || busy}
         aria-busy={busy || undefined}

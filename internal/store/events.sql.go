@@ -35,6 +35,10 @@ DELETE FROM events WHERE key IN (
     SELECT 'post:' || p.id FROM posts p WHERE p.group_id = ?1
     UNION ALL SELECT 'comment:' || c.id FROM comments c JOIN posts p ON p.id = c.post_id WHERE p.group_id = ?1
     UNION ALL SELECT 'message:' || m.id FROM messages m WHERE m.group_id = ?1
+    UNION ALL SELECT 'reactions:' || r.item_id FROM reactions r WHERE r.item_id IN (
+        SELECT p.id FROM posts p WHERE p.group_id = ?1
+        UNION ALL SELECT c.id FROM comments c JOIN posts p ON p.id = c.post_id WHERE p.group_id = ?1
+        UNION ALL SELECT m.id FROM messages m WHERE m.group_id = ?1)
     UNION ALL SELECT 'membership:' || ms.group_id || ':' || ms.user_id FROM memberships ms WHERE ms.group_id = ?1
     UNION ALL SELECT 'marker:' || rm.user_id || ':' || rm.stream FROM read_markers rm
         WHERE rm.stream IN ('chat:' || ?1, 'feed:' || ?1)
@@ -42,7 +46,8 @@ DELETE FROM events WHERE key IN (
 )
 `
 
-// Deletes the logged events of a group's posts, comments, messages, memberships, read markers and notifications.
+// Deletes the logged events of a group's posts, comments, messages, reactions, memberships, read markers and
+// notifications.
 // removeGroup calls it before it deletes those rows. The keys are those that events.Key makes.
 func (q *Queries) ForgetGroupEvents(ctx context.Context, groupID string) error {
 	_, err := q.db.ExecContext(ctx, forgetGroupEvents, groupID)

@@ -10,6 +10,7 @@ import type { Member, Profile } from '../api'
  * from the groups the viewer shares with them.
  */
 vi.mock('../api', async (importOriginal) => ({
+  getFrequentReactions: vi.fn(() => Promise.resolve({ emoji: [] })),
   ApiError: (await importOriginal<typeof import('../api')>()).ApiError,
   getProfile: vi.fn(),
   getUserPosts: vi.fn(),

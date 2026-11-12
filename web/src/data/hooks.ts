@@ -62,6 +62,8 @@ import {
   setMarker,
   setMemberRole,
   setPicture,
+  getFrequentReactions,
+  setReaction,
   setSettings,
   setUsername,
   updateComment,
@@ -70,6 +72,7 @@ import {
   type Group,
   type GroupMode,
   type Invite,
+  type Reactions,
   type Member,
   type MySettingsUpdate,
   type Notification,
@@ -520,6 +523,24 @@ function useIdentityChange<T>(write: (value: T) => Promise<User>) {
     await write(value)
     refreshIdentities(qc, true)
   }
+}
+
+/**
+ * Adds or removes the signed-in user's emoji on a post, comment or message. The reply is not applied to the cache. Several
+ * people's reactions can arrive close together, and the stream delivers their events in the order they were saved,
+ * while a reply can arrive after a newer event and put back older reactions.
+ */
+export function useReact() {
+  const qc = useQueryClient()
+  return async (kind: Reactions['kind'], id: string, emoji: string, reacted: boolean) => {
+    await setReaction(kind, id, emoji, reacted)
+    void qc.invalidateQueries({ queryKey: keys.frequentReactions })
+  }
+}
+
+/** The emoji the signed-in user reacts with most, at most six, the most used first. */
+export function useFrequentReactions() {
+  return useQuery({ queryKey: keys.frequentReactions, queryFn: getFrequentReactions, select: (d) => d.emoji })
 }
 
 export function useSetUsername() {

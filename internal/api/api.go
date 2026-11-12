@@ -55,14 +55,15 @@ type Post struct {
 	ID      string `json:"id"`
 	GroupID string `json:"group_id"`
 	// TopicID is the id of the post's topic, or null.
-	TopicID      *string `json:"topic_id"`
-	Author       User    `json:"author"`
-	BodyHTML     string  `json:"body_html"`
-	BodyText     string  `json:"body_text"`
-	CreatedAt    int64   `json:"created_at"`
-	EditedAt     *int64  `json:"edited_at"`
-	CommentCount int64   `json:"comment_count"`
-	Can          Can     `json:"can"`
+	TopicID      *string    `json:"topic_id"`
+	Author       User       `json:"author"`
+	BodyHTML     string     `json:"body_html"`
+	BodyText     string     `json:"body_text"`
+	CreatedAt    int64      `json:"created_at"`
+	EditedAt     *int64     `json:"edited_at"`
+	CommentCount int64      `json:"comment_count"`
+	Reactions    []Reaction `json:"reactions"`
+	Can          Can        `json:"can"`
 }
 
 // forViewer fills in the viewer's can flags on a post, comment, message, group,
@@ -240,6 +241,10 @@ func (s *Server) Routes(mux *http.ServeMux) {
 	mux.HandleFunc("PUT /api/comments/{id}", s.requireAuth(s.editComment))
 	mux.HandleFunc("DELETE /api/comments/{id}", s.requireAuth(s.deleteComment))
 	mux.HandleFunc("DELETE /api/messages/{id}", s.requireAuth(s.deleteMessage))
+	mux.HandleFunc("GET /api/me/reactions", s.requireAuth(s.frequentReactions))
+	mux.HandleFunc("PUT /api/posts/{id}/reactions", s.requireAuth(s.react("post")))
+	mux.HandleFunc("PUT /api/comments/{id}/reactions", s.requireAuth(s.react("comment")))
+	mux.HandleFunc("PUT /api/messages/{id}/reactions", s.requireAuth(s.react("message")))
 	mux.HandleFunc("GET /api/events", s.requireAuth(s.events))
 	mux.HandleFunc("PUT /api/notifications/read", s.requireAuth(s.readAllNotifications))
 	mux.HandleFunc("GET /api/posts/{id}/notifications", s.requireAuth(s.getPostNotificationPreference))
@@ -640,6 +645,9 @@ func removePost(ctx context.Context, qtx *store.Queries, id, groupID string, now
 		return nil, err
 	}
 	if err := qtx.ForgetPostCommentEvents(ctx, id); err != nil {
+		return nil, err
+	}
+	if err := forgetReactions(ctx, qtx, id); err != nil {
 		return nil, err
 	}
 	return []events.Entry{{Kind: "post_delete", Payload: map[string]string{"id": id, "group_id": groupID}}}, nil

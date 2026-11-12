@@ -393,6 +393,28 @@ describe('applyEvent', () => {
     expect(thread('p2')).toHaveLength(0)
   })
 
+  it('puts new reactions on every loaded copy of a post, comment or message, and on nothing else', () => {
+    const thumbs = [{ emoji: '👍', user_ids: ['kit'] }]
+    qc.setQueryData(keys.post('p2'), post('p2', mo))
+    qc.setQueryData(keys.userPosts('mo'), {
+      pages: [{ posts: [post('p2', mo)], next_before: null }],
+      pageParams: [null],
+    })
+    applyEvent(qc, 'reactions', { id: 'p2', kind: 'post', group_id: ROOT, reactions: thumbs })
+    expect(posts().find((p) => p.id === 'p2')!.reactions).toEqual(thumbs)
+    expect((qc.getQueryData(keys.post('p2')) as Post).reactions).toEqual(thumbs)
+    expect((qc.getQueryData(keys.userPosts('mo')) as { pages: PostPage[] }).pages[0].posts[0].reactions).toEqual(thumbs)
+    expect(posts().find((p) => p.id === 'p3')!.reactions).toEqual([])
+
+    applyEvent(qc, 'reactions', { id: 'c1', kind: 'comment', group_id: ROOT, post_id: 'p2', reactions: thumbs })
+    expect(thread('p2')[0].reactions).toEqual(thumbs)
+
+    applyEvent(qc, 'reactions', { id: 'm1', kind: 'message', group_id: ROOT, reactions: thumbs })
+    const messages = (qc.getQueryData(keys.messages(ROOT)) as { pages: { messages: Message[] }[] }).pages[0].messages
+    expect(messages.find((m) => m.id === 'm1')!.reactions).toEqual(thumbs)
+    expect(messages.find((m) => m.id === 'm2')!.reactions).toEqual([])
+  })
+
   it('appends a new message to its room, replaces a known one, removes a deleted one', () => {
     const ids = () =>
       (qc.getQueryData(keys.messages(ROOT)) as { pages: { messages: { id: string }[] }[] }).pages.flatMap((p) =>

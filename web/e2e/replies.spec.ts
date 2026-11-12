@@ -17,7 +17,7 @@ test.describe('replies', () => {
     await kit.context.request.post(`/api/groups/${ROOT}/messages`, { data: { body_html: `<p>${original}</p>` } })
 
     // Mo hovers the message and replies. The message is attached above the editor until the reply is sent.
-    const block = mo.page.getByText(original).locator('xpath=ancestor::div[contains(@class,"block-message")][1]')
+    const block = mo.page.getByText(original).locator('xpath=ancestor::div[contains(@class,"block-item")][1]')
     await block.hover()
     await block.getByRole('button', { name: 'Reply to this message' }).click()
     await expect(mo.page.getByText('Replying to')).toBeVisible()
@@ -45,14 +45,14 @@ test.describe('replies', () => {
     await open(kit.page, '/notifications')
     // Opening the notification opens the chat at the reply, and the address loses its message parameter.
     await kit.page.getByRole('button', { name: `${mo.username} replied to your message in the chat, new` }).click()
-    await expect(kit.page.locator('.block-message .content').getByText(answer, { exact: true })).toBeInViewport()
+    await expect(kit.page.locator('.block-item .content').getByText(answer, { exact: true })).toBeInViewport()
     await expect(kit.page).toHaveURL(/\/$/)
 
     // One click on the quote scrolls to the original, even from the bottom of the chat.
     await open(kit.page)
     await kit.page.getByRole('button', { name: quote }).click()
     // The original's own body, not the quote, which repeats its text.
-    await expect(kit.page.locator('.block-message .content').getByText(original, { exact: true })).toBeInViewport()
+    await expect(kit.page.locator('.block-item .content').getByText(original, { exact: true })).toBeInViewport()
     await kit.context.close()
     await mo.context.close()
   })
@@ -76,13 +76,11 @@ test.describe('replies', () => {
     await kit.context.request.post(messages, { data: { body_html: '<p>Answer</p>', reply_to: first.id } })
     await open(kit.page, `/r/${room.id}`)
     await kit.page.getByRole('button', { name: `${kit.username}: ${original}` }).click()
-    await expect(kit.page.locator('.block-message .content').getByText(original, { exact: true })).toBeInViewport()
+    await expect(kit.page.locator('.block-item .content').getByText(original, { exact: true })).toBeInViewport()
     await kit.context.close()
   })
 
-  test('@phone Reply is shown without hovering, because a touch screen has no pointer', async ({
-    browser,
-  }, testInfo) => {
+  test("@phone Reply is in a message's action bar, which a tap on the message shows", async ({ browser }, testInfo) => {
     const kit = await member(browser, testInfo, 'kit')
     await open(kit.page)
     const text = uniq('On a phone ')
@@ -90,9 +88,10 @@ test.describe('replies', () => {
       data: { body_html: `<p>${text}</p>` },
     })
     const original = (await sent.json()) as { id: string }
-    const block = kit.page.getByText(text).locator('xpath=ancestor::div[contains(@class,"block-message")][1]')
+    const block = kit.page.getByText(text).locator('xpath=ancestor::div[contains(@class,"block-item")][1]')
     const reply = block.getByRole('button', { name: 'Reply to this message' })
-    await expect(reply).toBeVisible()
+    await expect(reply).toBeHidden()
+    await block.getByText(text).tap()
     await reply.tap()
     await expect(kit.page.getByText('Replying to')).toBeVisible()
     kit.username = uniq('renamed')

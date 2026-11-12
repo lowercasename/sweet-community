@@ -9,7 +9,7 @@ interface BoxProps {
 
 /**
  * An unstyled block container. The only place a bare div, section, article and so on is written. An article (a
- * comment) has the `block-comment` class, so a revealed Menu inside it shows while it is hovered (ui/Menu).
+ * comment) has the `block-comment` class, so hovering a comment does not show its post's menu (REVEAL_POST).
  */
 export const Box = forwardRef<HTMLDivElement, BoxProps>(function Box({ as = 'div', children }, ref) {
   const Tag: ElementType = as
