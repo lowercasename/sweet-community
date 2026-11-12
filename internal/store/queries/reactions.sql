@@ -40,9 +40,11 @@ DELETE FROM reactions WHERE item_id IN (
 );
 
 -- name: ForgetUserReactionEvents :exec
--- Deletes the logged reactions events of every item a user reacted to, so that no event names the user after their
--- removal. Open pages refetch these items after the removal's user event.
-DELETE FROM events WHERE key IN (SELECT 'reactions:' || item_id FROM reactions WHERE user_id = sqlc.arg(user_id));
+-- Deletes snapshots that contain the user's reactions, including reactions withdrawn since the snapshot was saved.
+-- Open pages refetch these items after the removal's user event.
+DELETE FROM events
+WHERE kind IN ('reactions', 'post', 'comment', 'message')
+  AND instr(json_extract(payload, '$.reactions'), json_quote(CAST(sqlc.arg(user_id) AS TEXT))) > 0;
 
 -- name: DeleteUserReactions :exec
 DELETE FROM reactions WHERE user_id = sqlc.arg(user_id);

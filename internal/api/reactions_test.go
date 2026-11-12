@@ -95,7 +95,7 @@ func TestReactionRules(t *testing.T) {
 	path := "/api/posts/" + post + "/reactions"
 
 	refused := []string{"", "a", "👍👍", "👍 ", strings.Repeat("🏳️‍🌈", 5), "\x00", "a\u20e3", "\u20e3", "👍\ufe0e",
-		"☺" + strings.Repeat("\u0301", 14)}
+		"☺" + strings.Repeat("\u0301", 14), "a\ufe0f", "\ufe0f", "☃\ufe0f\ufe0f", "👍‍👍"}
 	for _, emoji := range refused {
 		if status, _ := kit.do("PUT", path, map[string]any{"emoji": emoji, "reacted": true}); status != 400 {
 			t.Errorf("reacting with %q: %d, want 400", emoji, status)
@@ -229,4 +229,50 @@ func TestFrequentReactions(t *testing.T) {
 		t.Fatalf("kit's frequent reactions: %v", got)
 	}
 	newClient(t, ts).mustStatus(401, "GET", "/api/me/reactions", nil)
+}
+
+func TestReactionPresentationFormsShareOneToggle(t *testing.T) {
+	_, owner := newTestServer(t)
+	post := owner.mustStatus(201, "POST", rootPath+"/posts", map[string]string{"body_html": "<p>a post</p>"})["id"].(string)
+	for _, forms := range [][2]string{{"❤", "❤️"}, {"1⃣", "1️⃣"}, {"🏳‍🌈", "🏳️‍🌈"}} {
+		react(owner, "post", post, forms[0], true)
+		by, order := reactionsOn(t, react(owner, "post", post, forms[1], true))
+		if len(order) != 1 || len(by[forms[1]]) != 1 {
+			t.Fatalf("equivalent forms made separate reactions: %v", by)
+		}
+		_, order = reactionsOn(t, react(owner, "post", post, forms[0], false))
+		if len(order) != 0 {
+			t.Fatalf("removing the other presentation form left reactions: %v", order)
+		}
+	}
+}
+
+func TestRemovedUserReactionsLeaveNoContentSnapshots(t *testing.T) {
+	for _, withdrawn := range []bool{false, true} {
+		t.Run(map[bool]string{false: "current reaction", true: "withdrawn reaction"}[withdrawn], func(t *testing.T) {
+			ts, owner := newTestServer(t)
+			kit, kitID := registerMember(t, ts, owner, "kit")
+			post := owner.mustStatus(201, "POST", rootPath+"/posts", map[string]string{"body_html": "<p>kept</p>"})["id"].(string)
+			comment := owner.mustStatus(201, "POST", "/api/posts/"+post+"/comments", map[string]string{"body_html": "<p>kept comment</p>"})["id"].(string)
+			for kind, id := range map[string]string{"post": post, "comment": comment} {
+				react(kit, kind, id, "👍", true)
+				react(owner, kind, id, "🧶", true)
+				owner.mustStatus(200, "PUT", "/api/"+kind+"s/"+id, map[string]string{"body_html": "<p>edited</p>"})
+				if withdrawn {
+					react(kit, kind, id, "👍", false)
+				}
+			}
+			owner.mustStatus(204, "DELETE", "/api/users/"+kitID, nil)
+			for _, e := range owner.readEvents(200) {
+				p, _ := e["payload"].(map[string]any)
+				if (e["kind"] == "post" && p["id"] == post) || (e["kind"] == "comment" && p["id"] == comment) {
+					t.Errorf("a saved content event still contains the removed user's reaction: %s", e["kind"])
+				}
+			}
+			by, _ := reactionsOn(t, owner.mustStatus(200, "GET", "/api/posts/"+post, nil))
+			if len(by) != 1 || len(by["🧶"]) != 1 {
+				t.Fatalf("removal changed the remaining member's reaction: %v", by)
+			}
+		})
+	}
 }

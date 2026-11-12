@@ -88,7 +88,7 @@ func (s *Server) removeUser(w http.ResponseWriter, r *http.Request) {
 			return nil, nil, http.StatusInternalServerError, err
 		}
 		entries := []events.Entry{{Kind: "user", Payload: wireUser(u.ID, u.Username, u.PictureID)}}
-		// Their reactions go, with the logged reactions events that name them. Open pages refetch the items after the
+		// Their reactions go, with saved events that contain them. Open pages refetch the items after the
 		// user event above.
 		if err := qtx.ForgetUserReactionEvents(ctx, uid); err != nil {
 			return nil, nil, http.StatusInternalServerError, err

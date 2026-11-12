@@ -531,16 +531,19 @@ function useIdentityChange<T>(write: (value: T) => Promise<User>) {
  * while a reply can arrive after a newer event and put back older reactions.
  */
 export function useReact() {
-  const qc = useQueryClient()
   return async (kind: Reactions['kind'], id: string, emoji: string, reacted: boolean) => {
     await setReaction(kind, id, emoji, reacted)
-    void qc.invalidateQueries({ queryKey: keys.frequentReactions })
   }
 }
 
-/** The emoji the signed-in user reacts with most, at most six, the most used first. */
+/** The picker fetches the member's most used emoji each time it opens. */
 export function useFrequentReactions() {
-  return useQuery({ queryKey: keys.frequentReactions, queryFn: getFrequentReactions, select: (d) => d.emoji })
+  return useQuery({
+    queryKey: keys.frequentReactions,
+    queryFn: getFrequentReactions,
+    select: (d) => d.emoji,
+    enabled: false,
+  })
 }
 
 export function useSetUsername() {

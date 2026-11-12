@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type MouseEvent, type ReactNode, type TouchEvent } from 'react'
+import { autoUpdate, flip, hide, offset, shift, useFloating, useMergeRefs } from '@floating-ui/react'
 
 interface ItemBlockProps {
   /** The element id, so a reply's quote can scroll to this message. */
@@ -12,21 +13,21 @@ interface ItemBlockProps {
   children?: ReactNode
 }
 
-// The bar is hidden until the block is hovered or holds the focus on a device with a pointer, and until the block is
-// tapped on a touch screen. A hidden bar takes no pointer events, because it covers the end of the line above. On a
-// touch screen its buttons are larger, so the bar sits wholly above the block and covers none of the message.
+// CSS follows hover and keyboard focus even when a focused reaction button is removed.
+// Hidden bars keep their dimensions so Floating UI can position them before they appear.
 const HIDDEN =
-  'pointer-fine:pointer-events-none pointer-fine:opacity-0 ' +
+  'pointer-events-none pointer-fine:opacity-0 ' +
   'pointer-fine:[.block-item:hover_&]:pointer-events-auto pointer-fine:[.block-item:hover_&]:opacity-100 ' +
-  'pointer-fine:[.block-item:focus-within_&]:pointer-events-auto pointer-fine:[.block-item:focus-within_&]:opacity-100 ' +
-  'pointer-coarse:hidden pointer-coarse:[.block-item[data-selected]_&]:flex'
+  'pointer-fine:[.block-item:has(:focus-visible)_&]:pointer-events-auto pointer-fine:[.block-item:has(:focus-visible)_&]:opacity-100 ' +
+  'pointer-coarse:invisible pointer-coarse:[.block-item[data-selected]_&]:visible ' +
+  'pointer-coarse:[.block-item[data-selected]_&]:pointer-events-auto'
 
 /** How long a press on a touch screen lasts before it counts as pressing and holding, in milliseconds. */
 export const HOLD = 500
 
 /**
  * One chat message or one comment, with its actions in a small bar that floats over the block's top right corner, as
- * in Discord. With a pointer, the bar shows while the block is hovered or holds the focus. On a touch screen, a tap on
+ * in Discord. With a pointer, the bar shows on hover or keyboard focus. On a touch screen, a tap on
  * the block selects it and shows the bar. A tap on a link, a button or an image in the block does what it does
  * instead, so pressing and holding a link or an image selects the block. A second tap on the block, or a press
  * anywhere outside it, clears the selection. A visually hidden Actions button does the same for a screen reader on a
@@ -34,8 +35,22 @@ export const HOLD = 500
  */
 export function ItemBlock({ id, actions, actionsOpen = false, highlight = false, children }: ItemBlockProps) {
   const [selected, setSelected] = useState(false)
+  const { refs, elements, floatingStyles, middlewareData, update } = useFloating({
+    placement: 'top-end',
+    middleware: [
+      offset(({ rects }) => (window.matchMedia('(pointer: coarse)').matches ? 4 : -rects.floating.height / 2)),
+      flip({ padding: 4 }),
+      shift({ padding: 4, crossAxis: true }),
+      hide(),
+    ],
+  })
   const ref = useRef<HTMLDivElement>(null)
+  const setRef = useMergeRefs([ref, refs.setReference])
   const timer = useRef<number | undefined>(undefined)
+  useEffect(() => {
+    if (!elements.reference || !elements.floating) return
+    return autoUpdate(elements.reference, elements.floating, update)
+  }, [elements.reference, elements.floating, update])
   // True after pressing and holding selected the block. The click that ends the press is then dropped, so the link
   // or image does not open.
   const held = useRef(false)
@@ -76,7 +91,7 @@ export function ItemBlock({ id, actions, actionsOpen = false, highlight = false,
   }
   return (
     <div
-      ref={ref}
+      ref={setRef}
       id={id}
       data-selected={selected || undefined}
       onClick={tap}
@@ -104,7 +119,9 @@ export function ItemBlock({ id, actions, actionsOpen = false, highlight = false,
       {actions && (
         <div
           data-action-bar
-          className={`absolute -top-4 right-1 z-10 flex pointer-coarse:top-auto pointer-coarse:bottom-full pointer-coarse:mb-1 items-center gap-px rounded-[6px] border border-line bg-card p-px shadow-sm ${actionsOpen ? '' : HIDDEN}`}
+          ref={refs.setFloating}
+          style={{ ...floatingStyles, visibility: middlewareData.hide?.referenceHidden ? 'hidden' : undefined }}
+          className={`absolute z-10 flex items-center gap-px rounded-[6px] border border-line bg-card p-px shadow-sm ${actionsOpen ? '' : HIDDEN}`}
         >
           {actions}
         </div>

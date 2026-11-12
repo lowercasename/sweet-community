@@ -19,9 +19,18 @@ interface AddReactionProps {
 }
 
 /** The Add reaction button. Its picker offers the viewer's most used emoji first (quickReactions). */
-export function AddReaction(props: AddReactionProps) {
-  const { data: frequent } = useFrequentReactions()
-  return <EmojiButton {...props} reactions={quickReactions(frequent ?? [])} />
+export function AddReaction({ onOpenChange, ...props }: AddReactionProps) {
+  const { data: frequent, refetch } = useFrequentReactions()
+  return (
+    <EmojiButton
+      {...props}
+      reactions={quickReactions(frequent ?? [])}
+      onOpenChange={(open) => {
+        if (open) void refetch()
+        onOpenChange?.(open)
+      }}
+    />
+  )
 }
 
 /** Who chose an emoji, as its tooltip says it: "You, kit and jo reacted with 👍". At most ten names are listed. */

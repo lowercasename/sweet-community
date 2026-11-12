@@ -92,7 +92,7 @@ func Log(ctx context.Context, tx *sql.Tx, kind string, payload any, now int64) (
 
 // Key names the resource that an event describes, such as "post:<id>". A resource's event and its delete event share a
 // key. A kind that describes no single resource, such as notification_delete, has no key, and its events are never
-// replaced. The queries ForgetPostCommentEvents, ForgetGroupEvents, ForgetReactionEvents and ForgetUserReactionEvents
+// replaced. The queries ForgetPostCommentEvents, ForgetGroupEvents and ForgetReactionEvents
 // spell the same keys in SQL.
 func Key(kind string, raw []byte) string {
 	var p struct {

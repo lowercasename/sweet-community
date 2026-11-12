@@ -99,11 +99,13 @@ func (q *Queries) ForgetReactionEvents(ctx context.Context, itemID string) error
 }
 
 const forgetUserReactionEvents = `-- name: ForgetUserReactionEvents :exec
-DELETE FROM events WHERE key IN (SELECT 'reactions:' || item_id FROM reactions WHERE user_id = ?1)
+DELETE FROM events
+WHERE kind IN ('reactions', 'post', 'comment', 'message')
+  AND instr(json_extract(payload, '$.reactions'), json_quote(CAST(?1 AS TEXT))) > 0
 `
 
-// Deletes the logged reactions events of every item a user reacted to, so that no event names the user after their
-// removal. Open pages refetch these items after the removal's user event.
+// Deletes snapshots that contain the user's reactions, including reactions withdrawn since the snapshot was saved.
+// Open pages refetch these items after the removal's user event.
 func (q *Queries) ForgetUserReactionEvents(ctx context.Context, userID string) error {
 	_, err := q.db.ExecContext(ctx, forgetUserReactionEvents, userID)
 	return err

@@ -61,8 +61,8 @@ interface EmojiButtonProps {
  * form that holds the button, such as a composer, so that it never covers the
  * text being written. It opens above the form, or below it when there is no
  * room above. The picker is portalled to the body so that no pane clips it.
- * Escape closes it and returns focus to the button. Choosing an emoji closes
- * it and calls onPick, which puts the cursor back where the emoji went.
+ * Escape returns focus to the button. Choosing a reaction also returns focus to the button.
+ * Choosing a composer emoji calls onPick, which restores the editor's cursor.
  */
 export function EmojiButton({ onPick, reactions, compact = false, disabled, onOpenChange }: EmojiButtonProps) {
   const reaction = reactions !== undefined
@@ -75,8 +75,7 @@ export function EmojiButton({ onPick, reactions, compact = false, disabled, onOp
     open,
     onOpenChange: (next, _event, reason) => {
       setOpen(next)
-      // Escape returns focus to the button. A pick has already put focus in the editor, and a click elsewhere
-      // leaves focus where the click was, so the focus manager does not return focus by itself.
+      // Escape returns focus to the button. Composer picks restore the editor's cursor through onPick.
       if (!next && reason === 'escape-key') (refs.domReference.current as HTMLElement | null)?.focus()
     },
     placement: reaction ? 'top-end' : 'top-start',
@@ -119,7 +118,7 @@ export function EmojiButton({ onPick, reactions, compact = false, disabled, onOp
       {open && (
         <FloatingPortal>
           {/* The picker focuses its own search box when it has loaded. */}
-          <FloatingFocusManager context={context} modal={false} initialFocus={-1} returnFocus={false}>
+          <FloatingFocusManager context={context} modal={false} initialFocus={-1} returnFocus={reaction}>
             <div
               ref={refs.setFloating}
               style={floatingStyles}
@@ -131,7 +130,7 @@ export function EmojiButton({ onPick, reactions, compact = false, disabled, onOp
                 fallback={
                   <div
                     className="flex items-center justify-center rounded-card border border-line bg-card text-sm text-mute"
-                    style={{ width: WIDTH, height: HEIGHT }}
+                    style={{ width: WIDTH, height: reaction ? 56 : HEIGHT }}
                   >
                     Loading…
                   </div>

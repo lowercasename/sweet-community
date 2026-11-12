@@ -6,13 +6,12 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
-	"unicode"
 
 	"sweet/internal/db"
 	"sweet/internal/perm"
 	"sweet/internal/store"
 
-	"github.com/rivo/uniseg"
+	"github.com/forPelevin/gomoji"
 )
 
 // MaxReactionEmoji is the most different emoji that one post, comment or message holds.
@@ -53,26 +52,17 @@ func reactionsOf(pairs string) []Reaction {
 	return out
 }
 
-// isEmoji reports whether s is one emoji: one grapheme of at most 64 bytes. It holds a symbol, as most emoji do, or
-// the emoji presentation selector U+FE0F, as ‼️ and ℹ️ do. Its only combining marks are U+FE0F and the keycap U+20E3,
-// so a stack of marks is refused. The text presentation selector U+FE0E is refused too, because it would give a
-// second reaction that looks the same as the first. Text such as "a", and several emoji such as "👍👍", are refused.
-func isEmoji(s string) bool {
-	if s == "" || len(s) > 64 || uniseg.GraphemeClusterCount(s) != 1 {
-		return false
-	}
-	pictured := false
-	for _, r := range s {
-		switch {
-		case r == 0xfe0f || unicode.Is(unicode.So, r):
-			pictured = true
-		case r == 0x20e3:
-		case unicode.In(r, unicode.Mn, unicode.Me):
-			return false
+// Presentation variants share a slug in gomoji's Unicode data. The longest variant includes all emoji presentation
+// selectors, so equivalent inputs use one toggle and are displayed as emoji.
+var reactionEmoji = func() map[string]string {
+	bySlug := map[string]string{}
+	for _, e := range gomoji.AllEmojis() {
+		if len(e.Character) > len(bySlug[e.Slug]) {
+			bySlug[e.Slug] = e.Character
 		}
 	}
-	return pictured
-}
+	return bySlug
+}()
 
 // react is `PUT /api/{posts,comments,messages}/{id}/reactions {emoji, reacted}`. It adds or removes the viewer's emoji
 // on an item, and sends the item's reactions to the members of its group.
@@ -87,10 +77,12 @@ func (s *Server) react(kind string) http.HandlerFunc {
 			writeErr(w, http.StatusBadRequest, "Bad request")
 			return
 		}
-		if !isEmoji(in.Emoji) {
+		emoji, err := gomoji.GetInfo(in.Emoji)
+		if err != nil {
 			writeErr(w, http.StatusBadRequest, "A reaction is one emoji")
 			return
 		}
+		in.Emoji = reactionEmoji[emoji.Slug]
 		id := r.PathValue("id")
 		me, _ := userFrom(r.Context())
 		s.logged(w, r, "reactions", db.Now(), func(qtx *store.Queries) (any, int, error) {
