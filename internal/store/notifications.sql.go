@@ -255,7 +255,8 @@ WHERE m.user_id = ?1 AND m.hidden_at IS NULL
 UNION ALL
 SELECT r.user_id, r.stream, r.read_at,
        (SELECT COUNT(*) FROM comments c WHERE c.post_id = p.id AND c.deleted_at IS NULL AND c.author_id != r.user_id
-          AND c.created_at > r.read_at) AS unread
+          AND c.created_at > r.read_at
+          AND NOT EXISTS (SELECT 1 FROM post_notification_preferences n WHERE n.user_id = r.user_id AND n.post_id = p.id AND n.enabled = 0)) AS unread
 FROM read_markers r JOIN posts p ON p.id = substr(r.stream, 6)
 JOIN memberships m ON m.group_id = p.group_id AND m.user_id = r.user_id
 WHERE r.user_id = ?1 AND r.stream LIKE 'post:%' AND p.deleted_at IS NULL
@@ -271,7 +272,7 @@ type ListMarkersRow struct {
 // The notifications row has no marker time. Its unread count is the number
 // of notifications not yet opened. A post has a row only once the user has a
 // marker for it. Its unread count is other users' live comments since that
-// marker. The post is found by its id, so the query reads only the user's
+// marker, and none if the user muted the discussion. The post is found by its id, so the query reads only the user's
 // markers and not every post in their rooms.
 func (q *Queries) ListMarkers(ctx context.Context, userID string) ([]ListMarkersRow, error) {
 	rows, err := q.db.QueryContext(ctx, listMarkers, userID)

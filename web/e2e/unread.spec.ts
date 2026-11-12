@@ -1,4 +1,4 @@
-import { expect, member, open, owner, test, uniq, view, ROOT } from './helpers'
+import { expect, member, open, owner, pick, test, uniq, view, ROOT } from './helpers'
 
 test.describe('chat unread', () => {
   test('unseen messages mark their room as unread in the nav, and the mark is cleared when the messages are viewed', async ({
@@ -131,6 +131,24 @@ test.describe('comment unread', () => {
     await card.getByRole('button', { name: 'Hide comments', exact: true }).click()
     await expect(card.getByRole('button', { name: 'Show comments', exact: true })).toBeVisible()
     await kit.page.reload()
+    await expect(card.getByRole('button', { name: 'Show comments', exact: true })).toBeVisible()
+    await kit.context.close()
+    await mo.context.close()
+  })
+
+  test('muting a discussion takes the dot off its comments button', async ({ browser }, testInfo) => {
+    const kit = await member(browser, testInfo, 'kit')
+    const mo = await member(browser, testInfo, 'mo')
+    const text = uniq('An argument ')
+    const created = await kit.context.request.post(`/api/groups/${ROOT}/posts`, {
+      data: { body_html: `<p>${text}</p>` },
+    })
+    const post = (await created.json()) as { id: string }
+    await open(kit.page)
+    const card = kit.page.getByRole('article').filter({ hasText: text })
+    await mo.context.request.post(`/api/posts/${post.id}/comments`, { data: { body_html: '<p>No.</p>' } })
+    await expect(card.getByRole('button', { name: 'Show comments, unread' })).toBeVisible()
+    await pick(kit.page, card, 'Post options', 'Mute discussion')
     await expect(card.getByRole('button', { name: 'Show comments', exact: true })).toBeVisible()
     await kit.context.close()
     await mo.context.close()

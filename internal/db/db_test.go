@@ -43,6 +43,47 @@ func TestMigrationClearsRemovedAccountEmails(t *testing.T) {
 	}
 }
 
+// Each author gets a read position at the upgrade on every live post they wrote and had no position for, so other
+// users' comments from then on show as unread. A position the author already had is kept.
+func TestMigrationGivesAuthorsAReadPositionOnTheirPosts(t *testing.T) {
+	d, err := Open(filepath.Join(t.TempDir(), "sweet.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer d.Close()
+	migratedTo(t, d, "015")
+	const root = "00000000-0000-7000-8000-000000000000"
+	for _, q := range []string{
+		`INSERT INTO users (id, username, created_at) VALUES ('u', 'kit', 1), ('v', 'mo', 1)`,
+		`INSERT INTO posts (id, group_id, author_id, body_html, body_text, created_at) VALUES
+			('new', '` + root + `', 'u', '<p>a</p>', 'a', 1), ('read', '` + root + `', 'u', '<p>b</p>', 'b', 1)`,
+		`INSERT INTO posts (id, group_id, author_id, body_html, body_text, created_at, deleted_at) VALUES
+			('gone', '` + root + `', 'u', '<p>c</p>', 'c', 1, 2)`,
+		`INSERT INTO read_markers (user_id, stream, read_at) VALUES ('u', 'post:read', 5)`,
+	} {
+		if _, err := d.Exec(q); err != nil {
+			t.Fatal(err)
+		}
+	}
+	before := Now()
+	migratedTo(t, d, "016")
+	positions := map[string]int64{}
+	rows, err := d.Query(`SELECT user_id || ' ' || stream, read_at FROM read_markers`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for rows.Next() {
+		var k string
+		var at int64
+		rows.Scan(&k, &at)
+		positions[k] = at
+	}
+	rows.Close()
+	if len(positions) != 2 || positions["u post:new"] < before || positions["u post:read"] != 5 {
+		t.Fatalf("read positions after the migration: %v (upgrade at %d)", positions, before)
+	}
+}
+
 // A migration on a database that has been migrated before is an upgrade,
 // and an upgrade copies the database first.
 func TestMigrateCopiesTheDatabaseBeforeAnUpgrade(t *testing.T) {

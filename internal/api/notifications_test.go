@@ -216,6 +216,16 @@ func TestPostUnread(t *testing.T) {
 	if read["unread"] != float64(1) || !reflect.DeepEqual(marker(kit, stream), read) {
 		t.Fatalf("after reading the first comment: reply %v, listed %v", read, marker(kit, stream))
 	}
+
+	// A muted discussion has nothing unread. Following it again counts its unread comments again.
+	kit.mustStatus(200, "PUT", "/api/posts/"+id+"/notifications", map[string]bool{"following": false})
+	if m := marker(kit, stream); m["unread"] != float64(0) {
+		t.Fatalf("unread in a muted discussion: %v", m)
+	}
+	kit.mustStatus(200, "PUT", "/api/posts/"+id+"/notifications", map[string]bool{"following": true})
+	if m := marker(kit, stream); m["unread"] != float64(1) {
+		t.Fatalf("unread after following again: %v", m)
+	}
 }
 
 // Chat unread counts. There is a marker row

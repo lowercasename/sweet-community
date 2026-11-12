@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"testing"
+	"time"
 
 	"sweet/internal/db"
 	"sweet/internal/perm"
@@ -130,6 +131,8 @@ func TestMentionTakesPriorityOverFollowedComment(t *testing.T) {
 	kit, kitID := registerMember(t, ts, owner, "kit")
 	post := kit.mustStatus(201, "POST", rootPath+"/posts", map[string]string{"body_html": "<p>Question</p>"})
 	kit.mustStatus(200, "PUT", "/api/me/settings", map[string]bool{"push_comments": false})
+	// Writing the post set kit's read position to its time. A comment in the same millisecond would count as read.
+	time.Sleep(2 * time.Millisecond)
 	owner.mustStatus(201, "POST", "/api/posts/"+post["id"].(string)+"/comments", map[string]string{"body_html": fmt.Sprintf(`<p><span data-type="mention" data-mention-id="%s">@kit</span> reply</p>`, kitID)})
 	ns := notificationList(t, kit)
 	if len(ns) != 1 || ns[0]["kind"] != NotifyMention || ns[0]["activity_count"] != float64(1) {

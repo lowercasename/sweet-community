@@ -116,6 +116,8 @@ export function applyEvent(qc: QueryClient, kind: string, data: unknown): void {
     case 'post_notification_preference': {
       const preference = data as PostNotificationPreference
       qc.setQueryData(keys.postNotifications(preference.post_id), preference)
+      // A muted discussion has no unread comments, so the post's marker changes.
+      void qc.invalidateQueries({ queryKey: keys.markers })
       break
     }
     case 'room_notification_preference': {

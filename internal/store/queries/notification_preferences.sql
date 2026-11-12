@@ -31,11 +31,12 @@ ON CONFLICT(user_id, group_id) DO UPDATE SET mode = excluded.mode;
 SELECT key, value FROM user_settings WHERE user_id = ?;
 
 -- name: GetPostMarker :one
--- Without a marker the post has no read position, so nothing in it is unread.
+-- Without a marker the post has no read position, so nothing in it is unread. A muted discussion has nothing unread.
 SELECT u.id AS user_id, CAST('post:' || p.id AS TEXT) AS stream,
 CAST(COALESCE(r.read_at, 0) AS INTEGER) AS read_at,
 CAST(CASE WHEN r.read_at IS NULL THEN 0 ELSE (SELECT COUNT(*) FROM comments c WHERE c.post_id = p.id AND c.deleted_at IS NULL
-    AND c.author_id != u.id AND c.created_at > r.read_at) END AS INTEGER) AS unread
+    AND c.author_id != u.id AND c.created_at > r.read_at
+    AND NOT EXISTS (SELECT 1 FROM post_notification_preferences n WHERE n.user_id = u.id AND n.post_id = p.id AND n.enabled = 0)) END AS INTEGER) AS unread
 FROM posts p JOIN users u ON u.id = sqlc.arg(user_id) LEFT JOIN read_markers r ON r.user_id = sqlc.arg(user_id) AND r.stream = 'post:' || p.id
 WHERE p.id = sqlc.arg(post_id);
 
