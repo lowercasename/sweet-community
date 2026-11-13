@@ -94,11 +94,19 @@
     background-attachment: fixed;
   }
 
-  /* App shell: header on top, panes fill the rest and scroll internally. */
+  /* App shell: header on top, panes fill the rest and scroll internally. The page covers the whole screen
+     (viewport-fit=cover in index.html), so the shell keeps clear of the status bar, the notch and the home indicator.
+     The strip under the status bar has the card colour, so it reads as part of the top bar. On phones the tab bar
+     keeps clear of the home indicator itself, so it can colour that area. */
   #root {
     height: 100dvh;
     display: flex;
     flex-direction: column;
+    padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+    background: linear-gradient(var(--color-card), var(--color-card)) top / 100% env(safe-area-inset-top) no-repeat;
+    @variant phone {
+      padding-bottom: 0;
+    }
   }
 }
 
