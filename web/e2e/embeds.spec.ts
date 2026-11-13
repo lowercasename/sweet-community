@@ -41,7 +41,7 @@ async function previews(page: Page) {
     } else if (url === LOGO) {
       await route.fulfill({ json: { url, title: 'Weald Stray Allotments', description: '', image: logo } })
     } else {
-      await route.fulfill({ status: 404, json: { error: 'No preview' } })
+      await route.fulfill({ contentType: 'application/json', body: 'null' })
     }
   })
 }

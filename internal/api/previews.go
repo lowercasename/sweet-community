@@ -27,8 +27,8 @@ const maxPreviewURL = 2048
 var defaultPreviewClient = sync.OnceValue(preview.Client)
 
 // linkPreview returns the preview of the link in ?url=. A kept preview is returned as it is. Otherwise the server
-// fetches the page, keeps the preview with a copy of its picture, and returns it. A page with no preview gets 404,
-// and is kept as such for a day.
+// fetches the page, keeps the preview with a copy of its picture, and returns it. A page with no preview gets null,
+// and is kept as such for a day. Having no preview is an ordinary answer, so it is not an error status.
 func (s *Server) linkPreview(w http.ResponseWriter, r *http.Request) {
 	raw := strings.TrimSpace(r.URL.Query().Get("url"))
 	u, err := url.Parse(raw)
@@ -54,7 +54,7 @@ func (s *Server) linkPreview(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	if row.Found != 1 {
-		writeErr(w, http.StatusNotFound, "No preview")
+		writeJSON(w, http.StatusOK, nil)
 		return
 	}
 	writeJSON(w, http.StatusOK, wireLinkPreview(row))

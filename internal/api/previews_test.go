@@ -38,7 +38,8 @@ func previewSite(t *testing.T) (*httptest.Server, *atomic.Int32) {
 
 // GET /api/previews?url= returns a link's preview. The first request fetches the page and keeps the preview with a
 // copy of its picture. Later requests, by anyone, read the kept preview without fetching the page again. Every
-// signed-in user can see the picture, because it comes from a public page. A page with no title gives 404.
+// signed-in user can see the picture, because it comes from a public page. A page with no title has no preview, which
+// is an ordinary answer, so it gives 200 with null.
 func TestLinkPreviews(t *testing.T) {
 	ts, owner, srv := newTestServerWith(t)
 	kit, _ := registerMember(t, ts, owner, "kit")
@@ -59,7 +60,9 @@ func TestLinkPreviews(t *testing.T) {
 		t.Fatalf("second request: %v, page fetched %d times", again, fetches.Load())
 	}
 
-	owner.mustStatus(404, "GET", ask(site.URL+"/no-title"), nil)
+	if none := owner.mustStatus(200, "GET", ask(site.URL+"/no-title"), nil); none != nil {
+		t.Fatalf("a page with no title: %v", none)
+	}
 	owner.mustStatus(400, "GET", "/api/previews", nil)
 	owner.mustStatus(400, "GET", ask("ftp://plots.test/"), nil)
 	if status, _ := newClient(t, ts).do("GET", ask(site.URL+"/open-day"), nil); status != 401 {

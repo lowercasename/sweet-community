@@ -911,13 +911,8 @@ export interface LinkPreview {
 }
 
 /** The preview of a link, or null when the page gives none. The server fetches the page the first time it is asked. */
-export async function getLinkPreview(url: string): Promise<LinkPreview | null> {
-  try {
-    return await request<LinkPreview>(`/api/previews?url=${encodeURIComponent(url)}`)
-  } catch (e) {
-    if (e instanceof ApiError && e.status === 404) return null
-    throw e
-  }
+export function getLinkPreview(url: string): Promise<LinkPreview | null> {
+  return request<LinkPreview | null>(`/api/previews?url=${encodeURIComponent(url)}`)
 }
 
 export interface PostNotificationPreference {
