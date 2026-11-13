@@ -13,8 +13,11 @@ interface InputProps {
   label?: string
   placeholder?: string
   maxLength?: number
-  /** The keyboard a phone shows. `numeric` is for a code made of digits. */
-  inputMode?: 'text' | 'numeric' | 'email'
+  /**
+   * The keyboard a phone shows. `numeric` is for a code made of digits. `url` is for a web address typed without
+   * its https://, which a `type="url"` input would refuse.
+   */
+  inputMode?: 'text' | 'numeric' | 'email' | 'url'
 }
 
 /** A single-line text input in the editor's style. */

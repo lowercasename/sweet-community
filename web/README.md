@@ -35,3 +35,15 @@ Run the backend from the repository root with `make dev-backend` alongside `pnpm
 ## Buttons
 
 There are four variants: `primary` (filled red, the main action), `secondary` (outlined), `ghost` (no border, also used for toggles with `pressed`) and `danger` (outlined in red, for removing things). The rules for when to use each, and the eight layout patterns every surface follows, are in the Interface section of `architecture.md`.
+
+## Store apps
+
+The iOS and Android apps are the Capacitor projects in `ios/` and `android/`, configured by `capacitor.config.json`. The apps' own page is `app.html` (code in `src/storeapp/`). It lists the communities on the device and is built into `dist-app/`. Each community is loaded from its own instance, so the apps run the web app that the community's server serves.
+
+```
+pnpm app:build                  # builds the app page and copies it into both apps
+pnpm exec cap run ios           # needs Xcode
+pnpm exec cap run android       # needs Android Studio and JDK 21
+```
+
+Capacitor 8's Gradle does not run on the JDK 25 that Android Studio includes, so set `JAVA_HOME` to JDK 21 and choose it as the Gradle JDK in Android Studio.

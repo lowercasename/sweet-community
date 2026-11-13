@@ -1,9 +1,8 @@
 {
   "appId": "community.sweet.app",
   "appName": "Sweet",
-  "webDir": "../internal/web/dist",
+  "webDir": "dist-app",
   "server": {
-    "url": "http://localhost:5173",
     "cleartext": true
   }
 }

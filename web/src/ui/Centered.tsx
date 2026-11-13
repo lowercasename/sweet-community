@@ -12,11 +12,12 @@ interface CenteredProps {
 /**
  * A narrow column centred on the page, for sign-in and join. The head and foot
  * are inset by the card's side padding, so the heading, the card's text and
- * the foot share one left edge.
+ * the foot share one left edge. A column taller than the screen starts at the top and scrolls, so nothing is
+ * pushed out of reach above it.
  */
 export function Centered({ head, foot, children }: CenteredProps) {
   return (
-    <main className="flex min-h-0 flex-1 items-center justify-center p-4">
+    <main className="flex min-h-0 flex-1 items-center-safe justify-center overflow-y-auto p-4">
       <div className="flex w-full max-w-[380px] flex-col gap-4">
         {head && <div className={CARD_INSET}>{head}</div>}
         {children}
