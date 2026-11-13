@@ -5,6 +5,7 @@
   "version": "0.0.1",
   "type": "module",
   "dependencies": {
+    "@capacitor/android": "^8.6.0",
     "@capacitor/core": "^8.6.0",
     "@capacitor/ios": "^8.6.0"
   },
