@@ -1,7 +1,9 @@
 import { article, confirm, expect, member, open, pick, png, sendMessage, test, uniq } from './helpers'
 
 test.describe('chat', () => {
-  test('a message appears live for the other user, and its author can delete it', async ({ browser }, testInfo) => {
+  test('a message appears live for the other user, and its author can delete it @dev', async ({
+    browser,
+  }, testInfo) => {
     const kit = await member(browser, testInfo, 'kit')
     const mo = await member(browser, testInfo, 'mo')
     await open(kit.page)

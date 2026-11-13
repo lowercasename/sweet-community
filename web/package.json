@@ -14,7 +14,7 @@
     "format": "prettier --write src",
     "format:check": "prettier --check src",
     "e2e": "playwright test",
-    "e2e:release": "playwright test --grep @release --project built --project phone --project dev",
+    "e2e:release": "playwright test --grep @release --project built --project phone",
     "e2e:built": "playwright test --project built --project phone"
   },
   "dependencies": {

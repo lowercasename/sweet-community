@@ -5,7 +5,7 @@ import { defineConfig, devices } from '@playwright/test'
  * the built binary on a fresh database, the Vite dev server in front of it
  * (with React StrictMode and hot reload), and
  * a new instance with no owner, used only by the setup test. Four projects:
- * built desktop, built phone, dev desktop, and fresh for the test tagged @fresh.
+ * built desktop, built phone, dev desktop for the tests tagged @dev, and fresh for the test tagged @fresh.
  */
 const BUILT = 'http://127.0.0.1:8098'
 const DEV = 'http://127.0.0.1:5199'
@@ -56,7 +56,10 @@ export default defineConfig({
     { name: 'built', use: { ...devices['Desktop Chrome'], baseURL: BUILT }, grepInvert: /@phone|@fresh/ },
     // A phone-sized Chromium: WebKit is not installed, and the layout is what matters here.
     { name: 'phone', use: { ...devices['Pixel 7'], baseURL: BUILT }, grep: /@phone/ },
-    { name: 'dev', use: { ...devices['Desktop Chrome'], baseURL: DEV }, grepInvert: /@phone|@fresh/ },
+    // The dev server differs from the binary only in its proxy and in React StrictMode. The tests tagged @dev cover
+    // each proxied route (sign-in cookies, the event stream, uploads, images, the health check) and the stream's live
+    // updates. The built project runs them too.
+    { name: 'dev', use: { ...devices['Desktop Chrome'], baseURL: DEV }, grep: /@dev/, grepInvert: /@phone|@fresh/ },
     // The instance that has never been set up: one flow, once.
     { name: 'fresh', use: { ...devices['Desktop Chrome'], baseURL: FRESH }, grep: /@fresh/ },
   ],

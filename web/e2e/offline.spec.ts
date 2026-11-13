@@ -21,7 +21,13 @@ async function badgeInBar(page: Page) {
 }
 
 test.describe('offline', () => {
-  test('going offline shows an Offline badge in the bar, disables sending, and moves nothing', async ({
+  // The page checks that the server is reachable by fetching /healthz. Through the dev server the request must reach
+  // the backend, which answers ok, and not get the app's page.
+  test('the health check that the page uses to test the server reaches the backend @dev', async ({ request }) => {
+    expect(await (await request.get('/healthz')).text()).toBe('ok')
+  })
+
+  test('going offline shows an Offline badge in the bar, disables sending, and moves nothing @dev', async ({
     browser,
   }, testInfo) => {
     const kit = await member(browser, testInfo, 'kit')

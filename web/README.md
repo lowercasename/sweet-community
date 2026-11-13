@@ -14,8 +14,8 @@ pnpm typecheck      # tsc --noEmit
 pnpm check:atomic   # fails if raw HTML tags, className or style appear outside src/ui/
 pnpm format:check   # Prettier: two spaces, single quotes, no semicolons
 pnpm test           # Vitest with happy-dom and Testing Library
-pnpm e2e            # Playwright, against the built binary and the dev server (run make e2e from the root)
-pnpm e2e:release    # Selected sign-in and privacy checks on desktop, phone and the dev server
+pnpm e2e            # Playwright, against the built binary, and the tests tagged @dev against the dev server (run make e2e from the root)
+pnpm e2e:release    # Selected sign-in and privacy checks on desktop and phone
 ```
 
 The image workflow runs `e2e:release` before publishing. It selects existing tests marked `@release`. A failure blocks publication and saves browser traces and screenshots for seven days. Use this command locally when changing these flows. Other development changes can run the tests they affect. Before tagging or pushing a release, run the complete `pnpm e2e` suite as part of the release checks in the root README.

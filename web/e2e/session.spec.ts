@@ -5,7 +5,9 @@ import { expect, member, open, sendMessage, test, uniq } from './helpers'
  * page without being touched. The server ends the page's event stream instead of sending it anything more.
  */
 test.describe('session', () => {
-  test('a page whose session ends elsewhere shows sign-in and receives nothing more', async ({ browser }, testInfo) => {
+  test('a page whose session ends elsewhere shows sign-in and receives nothing more @dev', async ({
+    browser,
+  }, testInfo) => {
     const kit = await member(browser, testInfo, 'kit')
     const mo = await member(browser, testInfo, 'mo')
     await open(kit.page)

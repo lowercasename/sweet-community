@@ -8,7 +8,7 @@ import { expect, open, owner, test } from './helpers'
  * stream that sends an older version. The real server's response on
  * reconnection then acts as the upgrade.
  */
-test('a tab that loaded a different version reloads when the stream reports a different version', async ({
+test('a tab that loaded a different version reloads when the stream reports a different version @dev', async ({
   browser,
 }, info) => {
   const o = await owner(browser, info)

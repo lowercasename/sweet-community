@@ -7,7 +7,9 @@ import { emailOf, expect, mailCode, mailLink, member, open, owner, test, uniq } 
  * ask for few.
  */
 test.describe('signing in and joining', () => {
-  test('a password is the other way in: a wrong one is refused, and the right one opens Home', async ({ page }) => {
+  test('a password is the other way in: a wrong one is refused, and the right one opens Home @dev', async ({
+    page,
+  }) => {
     await page.goto('/')
     await expect(page.getByLabel('Password')).toHaveCount(0)
     await page.getByRole('button', { name: 'Use a password instead' }).click()
@@ -197,7 +199,7 @@ test.describe('signing in and joining', () => {
     await m.context.close()
   })
 
-  test('Sign out returns to the sign-in page, and a reload stays on the sign-in page', async ({
+  test('Sign out returns to the sign-in page, and a reload stays on the sign-in page @dev', async ({
     browser,
   }, testInfo) => {
     const m = await member(browser, testInfo)

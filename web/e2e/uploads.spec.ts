@@ -66,7 +66,7 @@ function uploadedWidth(body: Buffer): number {
 }
 
 test.describe('image uploads', () => {
-  test('an image shows at once with its upload, and Post waits for the upload to finish', async ({
+  test('an image shows at once with its upload, and Post waits for the upload to finish @dev', async ({
     browser,
   }, testInfo) => {
     const kit = await member(browser, testInfo)
@@ -220,7 +220,7 @@ test.describe('image uploads', () => {
     await kit.context.close()
   })
 
-  test('removing an attached image in chat stops its upload, and an image attached while a message sends stays', async ({
+  test('removing an attached image in chat stops its upload, and an image attached while a message sends stays @dev', async ({
     browser,
   }, testInfo) => {
     const kit = await member(browser, testInfo)

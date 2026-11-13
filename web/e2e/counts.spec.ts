@@ -1,7 +1,9 @@
 import { anyView, article, expect, member, open, prepare, ROOT, test, uniq } from './helpers'
 
 for (const suffix of ['', ' @phone']) {
-  test(`repeated updates keep comment counts and unread indicators correct${suffix}`, async ({ browser }, info) => {
+  test(`repeated updates keep comment counts and unread indicators correct @dev${suffix}`, async ({
+    browser,
+  }, info) => {
     const kit = await member(browser, info, 'counts')
     const mo = await member(browser, info, 'writer')
     try {

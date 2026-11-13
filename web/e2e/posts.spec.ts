@@ -2,7 +2,9 @@ import { execFileSync } from 'node:child_process'
 import { article, confirm, expect, member, open, pick, ROOT, sendMessage, test, uniq, view, writePost } from './helpers'
 
 test.describe('posts and comments', () => {
-  test('write, edit, comment and delete, and another user sees each change live', async ({ browser }, testInfo) => {
+  test('write, edit, comment and delete, and another user sees each change live @dev', async ({
+    browser,
+  }, testInfo) => {
     const kit = await member(browser, testInfo, 'kit')
     const mo = await member(browser, testInfo, 'mo')
     // Create enough posts for the pane to scroll. A menu opened from a button that

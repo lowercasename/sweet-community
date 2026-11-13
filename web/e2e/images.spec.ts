@@ -1,7 +1,7 @@
 import { article, expect, member, open, png, ROOT, test, uniq } from './helpers'
 
 test.describe('images', () => {
-  test('images added to a post are shown as cards with alt text in the editor, then as a gallery in the post', async ({
+  test('images added to a post are shown as cards with alt text in the editor, then as a gallery in the post @dev', async ({
     browser,
   }, testInfo) => {
     const kit = await member(browser, testInfo)
