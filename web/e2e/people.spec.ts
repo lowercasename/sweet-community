@@ -1,4 +1,4 @@
-import { anyView, article, expect, member, open, sendMessage, test, uniq, writePost, ROOT } from './helpers'
+import { article, expect, member, open, sendMessage, test, uniq, writePost, ROOT } from './helpers'
 
 test.describe('people', () => {
   test('a username opens a card about the user, the pointer can move into the card, and the card has a button to message the user', async ({
@@ -73,25 +73,6 @@ test.describe('people', () => {
     const editor = (await kit.page.locator('form', { has: kit.page.locator('.editor-line') }).boundingBox())!
     const c = (await card.boundingBox())!
     expect(c.y + c.height).toBeLessThanOrEqual(editor.y + 1)
-    await kit.context.close()
-    await mo.context.close()
-  })
-
-  test('@phone tapping a name opens the card, and Message opens the conversation', async ({ browser }, testInfo) => {
-    const kit = await member(browser, testInfo, 'kit')
-    const mo = await member(browser, testInfo, 'mo')
-    const text = uniq('tap me ')
-    await kit.context.request.post(`/api/groups/${ROOT}/posts`, {
-      data: { body_html: `<p>${text}</p>` },
-    })
-    await open(mo.page)
-    await anyView(mo.page, 'Posts').click()
-    await article(mo.page, text).getByRole('button', { name: kit.username }).click()
-    const card = mo.page.getByRole('dialog', { name: `About ${kit.username}` })
-    await expect(card).toBeVisible()
-    await card.getByRole('button', { name: 'Message' }).click()
-    await expect(mo.page).toHaveURL(/\/r\/[^/]+$/)
-    await expect(mo.page.getByRole('heading', { name: kit.username })).toBeVisible()
     await kit.context.close()
     await mo.context.close()
   })

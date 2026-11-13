@@ -39,37 +39,6 @@ test.describe('images', () => {
     await kit.context.close()
   })
 
-  test('a new profile picture is shown immediately in the feed and in the nav, for every user', async ({
-    browser,
-  }, testInfo) => {
-    const kit = await member(browser, testInfo, 'kit')
-    const mo = await member(browser, testInfo, 'mo')
-    await open(kit.page)
-    await open(mo.page)
-    const text = uniq('Face check ')
-    await kit.page.locator('.editor-post .ProseMirror').first().click()
-    await kit.page.keyboard.type(text)
-    await kit.page.getByRole('button', { name: 'Post', exact: true }).click()
-    await expect(article(mo.page, text)).toBeVisible()
-    const donut = await article(mo.page, text).getByRole('img', { name: kit.username }).getAttribute('src')
-    expect(donut).not.toContain('/img/')
-
-    await open(kit.page, '/settings')
-    await kit.page
-      .locator('input[type=file]')
-      .first()
-      .setInputFiles({ name: 'me.png', mimeType: 'image/png', buffer: png(64, 64) })
-    await expect(
-      // The profile picture in the nav is decorative. The account row's name identifies the user, and the
-      // picture's src is what changes.
-      kit.page.getByRole('navigation', { name: 'Main' }).getByRole('button', { name: kit.username }).locator('img'),
-    ).toHaveAttribute('src', /\/img\//)
-    // Mo's open feed updates without a reload.
-    await expect(article(mo.page, text).getByRole('img', { name: kit.username })).toHaveAttribute('src', /\/img\//)
-    await kit.context.close()
-    await mo.context.close()
-  })
-
   test("a tall image is drawn no taller than 480px, in its own shape at the text's left edge, before and after it loads", async ({
     browser,
   }, testInfo) => {

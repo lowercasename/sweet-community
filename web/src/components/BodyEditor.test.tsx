@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { QueryClientProvider } from '@tanstack/react-query'
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import type { Editor } from '@tiptap/react'
-import { postExtensions } from '../editor/extensions'
+import { chatExtensions, postExtensions } from '../editor/extensions'
 import { ROOT, member, mentionSpan, paragraph, user } from '../test-utils'
 import { makeQueryClient } from '../data/client'
 import { keys } from '../data/keys'
@@ -204,4 +204,49 @@ it('updates visible mentions from community identities without replacing the edi
   expect(container.querySelector('.ProseMirror')).toBe(element)
   expect(element.editor.state.selection.from).toBe(selection)
   expect(element.editor.getHTML()).toContain('@josephine')
+})
+
+/** The keys that send. A chat sends on Enter and breaks the line on Shift+Enter. A post sends on Mod+Enter. */
+describe('sending from the keyboard', () => {
+  async function editor(chat: boolean) {
+    const { BodyEditor } = await import('./BodyEditor')
+    const onSubmit = vi.fn(() => Promise.resolve())
+    const { container } = render(
+      <QueryClientProvider client={makeQueryClient()}>
+        <BodyEditor
+          groupId={ROOT}
+          extensions={chat ? chatExtensions : postExtensions}
+          size={chat ? 'line' : 'post'}
+          enterSubmits={chat}
+          submitLabel={chat ? 'Send' : 'Post'}
+          disabled={false}
+          onSubmit={onSubmit}
+          initialHtml={paragraph('line one')}
+        />
+      </QueryClientProvider>,
+    )
+    await waitFor(() => expect(container.querySelector('.ProseMirror')).not.toBeNull())
+    const element = container.querySelector('.ProseMirror') as HTMLElement & { editor: Editor }
+    element.editor.commands.focus('end')
+    return { element, onSubmit }
+  }
+
+  it('in a chat, Shift+Enter breaks the line and Enter sends the message', async () => {
+    const { element, onSubmit } = await editor(true)
+    fireEvent.keyDown(element, { key: 'Enter', shiftKey: true })
+    element.editor.commands.insertContent('line two')
+    expect(onSubmit).not.toHaveBeenCalled()
+    fireEvent.keyDown(element, { key: 'Enter' })
+    await waitFor(() => expect(onSubmit).toHaveBeenCalledWith(paragraph('line one<br>line two')))
+  })
+
+  it('in a post, Enter starts a new paragraph and Mod+Enter sends the post', async () => {
+    const { element, onSubmit } = await editor(false)
+    fireEvent.keyDown(element, { key: 'Enter' })
+    expect(onSubmit).not.toHaveBeenCalled()
+    fireEvent.keyDown(element, { key: 'Enter', metaKey: true })
+    await waitFor(() => expect(onSubmit).toHaveBeenCalled())
+    fireEvent.keyDown(element, { key: 'Enter', ctrlKey: true })
+    await waitFor(() => expect(onSubmit).toHaveBeenCalledTimes(2))
+  })
 })

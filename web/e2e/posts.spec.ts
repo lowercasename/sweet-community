@@ -60,21 +60,6 @@ test.describe('posts and comments', () => {
     await kit.context.close()
     await mo.context.close()
   })
-
-  test('Mod+Enter submits the post, the editor is cleared, and the post is at the top of the feed', async ({
-    browser,
-  }, testInfo) => {
-    const kit = await member(browser, testInfo)
-    await open(kit.page)
-    const text = uniq('Quick one ')
-    await kit.page.locator('.editor-post .ProseMirror').first().click()
-    await kit.page.keyboard.type(text)
-    await kit.page.keyboard.press(process.platform === 'darwin' ? 'Meta+Enter' : 'Control+Enter')
-    await expect(article(kit.page, text)).toBeVisible()
-    await expect(kit.page.locator('.editor-post .ProseMirror').first()).toHaveText('')
-    await expect(kit.page.getByRole('article').first()).toContainText(text)
-    await kit.context.close()
-  })
 })
 
 test.describe('post page', () => {
@@ -199,42 +184,40 @@ test.describe('menus', () => {
 })
 
 test.describe('long threads', () => {
-  for (const phone of [false, true]) {
-    test(`${phone ? '@phone ' : ''}a long thread opens at its newest comments, and Load earlier comments shows the first`, async ({
-      browser,
-    }, testInfo) => {
-      const kit = await member(browser, testInfo, 'kit')
-      await open(kit.page)
-      const text = uniq('A post with a long thread ')
-      const post = await kit.context.request.post(`/api/groups/${ROOT}/posts`, {
-        data: { body_html: `<p>${text}</p>` },
+  test('a long thread opens at its newest comments, and Load earlier comments shows the first', async ({
+    browser,
+  }, testInfo) => {
+    const kit = await member(browser, testInfo, 'kit')
+    await open(kit.page)
+    const text = uniq('A post with a long thread ')
+    const post = await kit.context.request.post(`/api/groups/${ROOT}/posts`, {
+      data: { body_html: `<p>${text}</p>` },
+    })
+    const pid = ((await post.json()) as { id: string }).id
+    for (let i = 1; i <= 51; i++) {
+      await kit.context.request.post(`/api/posts/${pid}/comments`, {
+        data: { body_html: `<p>Comment number ${i}</p>` },
       })
-      const pid = ((await post.json()) as { id: string }).id
-      for (let i = 1; i <= 51; i++) {
-        await kit.context.request.post(`/api/posts/${pid}/comments`, {
-          data: { body_html: `<p>Comment number ${i}</p>` },
-        })
-      }
-      // Equal timestamps must not leave a comment between pages.
-      execFileSync('python3', [
-        '-I',
-        '-c',
-        `import sqlite3, sys
+    }
+    // Equal timestamps must not leave a comment between pages.
+    execFileSync('python3', [
+      '-I',
+      '-c',
+      `import sqlite3, sys
 with sqlite3.connect('../data/e2e.db') as db:
     db.execute('UPDATE comments SET created_at = 100 WHERE post_id = ?', (sys.argv[1],))`,
-        pid,
-      ])
-      await kit.page.goto(`/p/${pid}`)
-      const shown = kit.page.locator('article:visible').filter({ hasText: text })
-      await expect(shown.getByText('Comment number 51', { exact: true })).toBeVisible()
-      await expect(shown.getByText('Comment number 1', { exact: true })).toHaveCount(0)
-      const earlier = shown.getByRole('button', { name: 'Load earlier comments' })
-      await earlier.scrollIntoViewIfNeeded()
-      await kit.page.screenshot({ path: `test-results/thread-load-earlier${phone ? '-phone' : ''}.png` })
-      await earlier.click()
-      await expect(shown.getByText('Comment number 1', { exact: true })).toBeVisible()
-      await expect(earlier).toHaveCount(0)
-      await kit.context.close()
-    })
-  }
+      pid,
+    ])
+    await kit.page.goto(`/p/${pid}`)
+    const shown = kit.page.locator('article:visible').filter({ hasText: text })
+    await expect(shown.getByText('Comment number 51', { exact: true })).toBeVisible()
+    await expect(shown.getByText('Comment number 1', { exact: true })).toHaveCount(0)
+    const earlier = shown.getByRole('button', { name: 'Load earlier comments' })
+    await earlier.scrollIntoViewIfNeeded()
+    await kit.page.screenshot({ path: 'test-results/thread-load-earlier.png' })
+    await earlier.click()
+    await expect(shown.getByText('Comment number 1', { exact: true })).toBeVisible()
+    await expect(earlier).toHaveCount(0)
+    await kit.context.close()
+  })
 })

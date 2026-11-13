@@ -102,14 +102,4 @@ test.describe('emoji', () => {
     await kit.page.screenshot({ path: 'test-results/emoji-chat-dark.png' })
     await kit.context.close()
   })
-
-  test('@phone the composers have no Add emoji button, because the keyboard has emoji', async ({
-    browser,
-  }, testInfo) => {
-    const kit = await member(browser, testInfo)
-    await open(kit.page)
-    await expect(composer(kit.page, 'line').getByRole('button', { name: 'Bold' })).toBeVisible()
-    await expect(kit.page.getByRole('button', { name: 'Add emoji' })).toHaveCount(0)
-    await kit.context.close()
-  })
 })

@@ -28,20 +28,6 @@ test.describe('chat', () => {
     await mo.context.close()
   })
 
-  test('Shift+Enter inserts a new line, and Enter sends the message', async ({ browser }, testInfo) => {
-    const kit = await member(browser, testInfo)
-    await open(kit.page)
-    const a = uniq('line one ')
-    await kit.page.locator('.editor-line .ProseMirror').first().click()
-    await kit.page.keyboard.type(a)
-    await kit.page.keyboard.press('Shift+Enter')
-    await kit.page.keyboard.type('line two')
-    await expect(article(kit.page, a)).toHaveCount(0)
-    await kit.page.keyboard.press('Enter')
-    await expect(article(kit.page, a)).toContainText('line two')
-    await kit.context.close()
-  })
-
   test("a message's actions float over the top right of its own block while it is hovered, and take no space", async ({
     browser,
   }, testInfo) => {

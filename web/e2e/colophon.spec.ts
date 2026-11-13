@@ -5,8 +5,7 @@ import { anyView, expect, member, open, owner, test, uniq, writePost } from './h
  * The line at the bottom of Home's feed: the release, a link to Sweet's
  * website, and a link to the source code. When the feed is shorter than its
  * pane, the line sits at the bottom of the pane. When the feed is longer, it
- * follows the last post. The nav no longer names the release. A room's feed
- * has no such line.
+ * follows the last post.
  */
 // A footer inside the pane's section has no landmark role, so it is found as an element.
 const colophon = (page: Page) => page.locator('footer').filter({ hasText: 'Source code' })
@@ -50,24 +49,6 @@ async function emptyTopic(browser: Parameters<typeof owner>[0], testInfo: Parame
 }
 
 test.describe('colophon', () => {
-  test("Home's feed ends with the release, About and the source code link, and a room's feed does not", async ({
-    browser,
-  }, testInfo) => {
-    const kit = await member(browser, testInfo)
-    await open(kit.page)
-    await checkLine(kit.page)
-    await expect(kit.page.getByText('Built with')).toHaveCount(0)
-    await expect(kit.page.getByRole('navigation', { name: 'Main' })).not.toContainText('Sweet dev')
-    const res = await kit.context.request.post('/api/groups', {
-      data: { kind: 'group', name: uniq('Wool'), mode: 'both' },
-    })
-    const room = (await res.json()) as { id: string }
-    await open(kit.page, `/r/${room.id}`)
-    await expect(kit.page.getByRole('navigation', { name: 'Main' })).toBeVisible()
-    await expect(colophon(kit.page)).toHaveCount(0)
-    await kit.context.close()
-  })
-
   test('the line sits at the bottom of a short feed, and follows the last post of a long one', async ({
     browser,
   }, testInfo) => {

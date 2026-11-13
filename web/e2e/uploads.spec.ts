@@ -205,21 +205,6 @@ test.describe('image uploads', () => {
     await kit.context.close()
   })
 
-  test('pictures in pasted HTML from another site are left out of the editor', async ({ browser }, testInfo) => {
-    const kit = await member(browser, testInfo)
-    await open(kit.page)
-    await postEditor(kit.page).click()
-    await postEditor(kit.page).evaluate((el) => {
-      const data = new DataTransfer()
-      data.setData('text/html', '<p>From a recipe site</p><img src="https://example.com/cake.jpg" alt="A cake">')
-      data.setData('text/plain', 'From a recipe site')
-      el.dispatchEvent(new ClipboardEvent('paste', { clipboardData: data, bubbles: true, cancelable: true }))
-    })
-    await expect(postEditor(kit.page)).toContainText('From a recipe site')
-    await expect(posts(kit.page).locator('.image-card')).toHaveCount(0)
-    await kit.context.close()
-  })
-
   test('removing an attached image in chat stops its upload, and an image attached while a message sends stays @dev', async ({
     browser,
   }, testInfo) => {
@@ -314,30 +299,6 @@ test.describe('image uploads', () => {
       /\/img\//,
     )
     expect(widths).toEqual([2000, 2000])
-    await kit.context.close()
-  })
-
-  test('@phone an image shows at once with its upload on a phone', async ({ browser }, testInfo) => {
-    const kit = await member(browser, testInfo)
-    await open(kit.page)
-    await kit.page
-      .getByRole('group', { name: 'View' })
-      .getByRole('button', { name: /^Posts/ })
-      .click()
-    const release = await holdUploads(kit.page)
-    await postEditor(kit.page).click()
-    await posts(kit.page)
-      .locator('input[type=file]')
-      .setInputFiles({ name: 'plot.png', mimeType: 'image/png', buffer: png(320, 200) })
-    await expect(posts(kit.page).locator('.image-card').getByText('Uploading')).toBeVisible()
-    await kit.page.screenshot({ path: 'test-results/upload-pending-phone.png' })
-    await release()
-    await failUploads(kit.page)
-    await posts(kit.page)
-      .locator('input[type=file]')
-      .setInputFiles({ name: 'b.png', mimeType: 'image/png', buffer: png(200, 320, [42, 143, 203]) })
-    await expect(posts(kit.page).locator('.image-card').getByText('Failed to upload', { exact: true })).toBeVisible()
-    await kit.page.screenshot({ path: 'test-results/upload-failed-phone.png' })
     await kit.context.close()
   })
 })

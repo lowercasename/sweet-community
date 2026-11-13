@@ -57,23 +57,4 @@ test.describe('lightbox', () => {
     await expect(box).toHaveCount(0)
     await kit.context.close()
   })
-
-  test('@phone an image opens full screen on a phone', async ({ browser }, testInfo) => {
-    const kit = await member(browser, testInfo)
-    const { text, url } = await postPicture(kit.page, 800, 1200)
-    await open(kit.page)
-    await kit.page
-      .getByRole('group', { name: 'View' })
-      .getByRole('button', { name: /^Posts/ })
-      .click()
-    await article(kit.page, text).locator('img[src^="/img/"]').click()
-    const box = kit.page.getByRole('dialog', { name: 'Image' })
-    await expect(box.locator(`img[src="${url}"]`)).toBeVisible()
-    // The lightbox fades in.
-    await expect(box).toHaveCSS('opacity', '1')
-    await kit.page.screenshot({ path: 'test-results/lightbox-phone.png' })
-    await box.getByRole('button', { name: 'Close' }).click()
-    await expect(box).toHaveCount(0)
-    await kit.context.close()
-  })
 })

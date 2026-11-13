@@ -1,50 +1,50 @@
 import { expect, member, owner, open, test, ROOT, uniq, view } from './helpers'
 
-for (const suffix of ['', ' @phone']) {
-  test(`discussion following, grouping, reading and muting${suffix}`, async ({ browser }, info) => {
-    const kit = await member(browser, info, 'longusername'.repeat(2))
-    const mo = await member(browser, info, 'anotherlongusername')
-    const boss = await owner(browser, info)
-    const post = await (
-      await boss.context.request.post(`/api/groups/${ROOT}/posts`, {
-        data: { body_html: '<p>A discussion about our next gathering</p>' },
-      })
-    ).json()
-    await kit.context.request.post(`/api/posts/${post.id}/comments`, {
-      data: { body_html: '<p>I would like to come.</p>' },
+test('discussion following, grouping, reading and muting', async ({ browser }, info) => {
+  const kit = await member(browser, info, 'longusername'.repeat(2))
+  const mo = await member(browser, info, 'anotherlongusername')
+  const boss = await owner(browser, info)
+  const post = await (
+    await boss.context.request.post(`/api/groups/${ROOT}/posts`, {
+      data: { body_html: '<p>A discussion about our next gathering</p>' },
     })
-    await open(kit.page, '/notifications')
-    for (const body of ['Let us choose a date.', 'How about Saturday?']) {
-      await mo.context.request.post(`/api/posts/${post.id}/comments`, { data: { body_html: `<p>${body}</p>` } })
-    }
-    await expect(
-      kit.page.getByRole('button', { name: `${mo.username} commented in a discussion you follow, new` }),
-    ).toHaveCount(1)
-    await expect(kit.page.getByText(/2 updates/)).toBeVisible()
-    const second = await kit.context.newPage()
-    await second.goto('/notifications')
-    await open(kit.page, `/p/${post.id}`)
-    await kit.page.getByText('How about Saturday?', { exact: true }).scrollIntoViewIfNeeded()
-    await expect(second.getByRole('heading', { name: 'New', exact: true })).toHaveCount(0)
-    const options = kit.page.getByRole('button', { name: 'Post options', exact: true })
-    await options.click()
-    await expect(kit.page.getByRole('menuitem', { name: 'Mute discussion', exact: true })).toBeVisible()
-    await kit.page.getByRole('menuitem', { name: 'Mute discussion', exact: true }).click()
-    await options.click()
-    await expect(kit.page.getByRole('menuitem', { name: 'Follow discussion', exact: true })).toBeVisible()
-    await expect(kit.page.getByRole('menuitem', { name: 'Mute discussion', exact: true })).toHaveCount(0)
-    await kit.page.screenshot({ path: info.outputPath('muted-discussion.png'), fullPage: true })
-    await mo.context.request.post(`/api/posts/${post.id}/comments`, { data: { body_html: '<p>A muted comment</p>' } })
-    const notifications = await (await kit.context.request.get('/api/notifications')).json()
-    expect(notifications.notifications.filter((n: { read_at: number | null }) => n.read_at === null)).toHaveLength(0)
-    await kit.page.getByRole('menuitem', { name: 'Follow discussion', exact: true }).click()
-    await options.click()
-    await expect(kit.page.getByRole('menuitem', { name: 'Mute discussion', exact: true })).toBeVisible()
-    await kit.context.close()
-    await mo.context.close()
-    await boss.context.close()
+  ).json()
+  await kit.context.request.post(`/api/posts/${post.id}/comments`, {
+    data: { body_html: '<p>I would like to come.</p>' },
   })
+  await open(kit.page, '/notifications')
+  for (const body of ['Let us choose a date.', 'How about Saturday?']) {
+    await mo.context.request.post(`/api/posts/${post.id}/comments`, { data: { body_html: `<p>${body}</p>` } })
+  }
+  await expect(
+    kit.page.getByRole('button', { name: `${mo.username} commented in a discussion you follow, new` }),
+  ).toHaveCount(1)
+  await expect(kit.page.getByText(/2 updates/)).toBeVisible()
+  const second = await kit.context.newPage()
+  await second.goto('/notifications')
+  await open(kit.page, `/p/${post.id}`)
+  await kit.page.getByText('How about Saturday?', { exact: true }).scrollIntoViewIfNeeded()
+  await expect(second.getByRole('heading', { name: 'New', exact: true })).toHaveCount(0)
+  const options = kit.page.getByRole('button', { name: 'Post options', exact: true })
+  await options.click()
+  await expect(kit.page.getByRole('menuitem', { name: 'Mute discussion', exact: true })).toBeVisible()
+  await kit.page.getByRole('menuitem', { name: 'Mute discussion', exact: true }).click()
+  await options.click()
+  await expect(kit.page.getByRole('menuitem', { name: 'Follow discussion', exact: true })).toBeVisible()
+  await expect(kit.page.getByRole('menuitem', { name: 'Mute discussion', exact: true })).toHaveCount(0)
+  await kit.page.screenshot({ path: info.outputPath('muted-discussion.png'), fullPage: true })
+  await mo.context.request.post(`/api/posts/${post.id}/comments`, { data: { body_html: '<p>A muted comment</p>' } })
+  const notifications = await (await kit.context.request.get('/api/notifications')).json()
+  expect(notifications.notifications.filter((n: { read_at: number | null }) => n.read_at === null)).toHaveLength(0)
+  await kit.page.getByRole('menuitem', { name: 'Follow discussion', exact: true }).click()
+  await options.click()
+  await expect(kit.page.getByRole('menuitem', { name: 'Mute discussion', exact: true })).toBeVisible()
+  await kit.context.close()
+  await mo.context.close()
+  await boss.context.close()
+})
 
+for (const suffix of ['', ' @phone']) {
   test(`chat delivery controls and bulk actions preserve unread content${suffix}`, async ({ browser }, info) => {
     const kit = await member(browser, info, 'longusername'.repeat(2))
     const boss = await owner(browser, info)

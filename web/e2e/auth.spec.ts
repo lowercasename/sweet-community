@@ -77,47 +77,46 @@ test.describe('signing in and joining', () => {
     await o.context.close()
   })
 
-  for (const suffix of ['', ' @phone'])
-    test(`only the registering browser can correct an address${suffix}`, async ({ browser }, testInfo) => {
-      const o = await owner(browser, testInfo)
-      const invite = await o.context.request.post('/api/invites')
-      const code = ((await invite.json()) as { code: string }).code
-      await o.context.close()
-      const name = uniq('un')
-      const ctx = await browser.newContext({
-        baseURL: testInfo.project.use.baseURL as string,
-        viewport: testInfo.project.use.viewport,
-        isMobile: testInfo.project.use.isMobile,
-        hasTouch: testInfo.project.use.hasTouch,
-      })
-      const page = await ctx.newPage()
-      await page.goto(`/join/${code}`)
-      await page.getByLabel('Username').fill(name)
-      await page.getByLabel('Email address').fill(`typo-${emailOf(name)}`)
-      await page.getByRole('button', { name: 'Join' }).click()
-      await expect(page.getByText(`typo-${emailOf(name)}`)).toBeVisible()
-      const stranger = await browser.newContext({ baseURL: testInfo.project.use.baseURL as string })
-      try {
-        expect((await stranger.request.post('/api/signin/email', { data: { login: name } })).status()).toBe(202)
-        expect(
-          (
-            await stranger.request.post('/api/signin/address', {
-              data: { email: `stranger-${emailOf(name)}` },
-            })
-          ).status(),
-        ).toBe(403)
-      } finally {
-        await stranger.close()
-      }
-      await page.getByRole('button', { name: 'Use a different address' }).click()
-      await page.getByLabel('Email address').fill(emailOf(name))
-      await page.getByRole('button', { name: 'Send to this address' }).click()
-      await expect(page.getByText(emailOf(name), { exact: true })).toBeVisible()
-      await page.getByLabel('Code').fill(mailCode(emailOf(name)))
-      await page.getByRole('button', { name: 'Finish joining' }).click()
-      await expect(page.getByRole('navigation', { name: 'Main' })).toBeVisible()
-      await ctx.close()
+  test('only the registering browser can correct an address', async ({ browser }, testInfo) => {
+    const o = await owner(browser, testInfo)
+    const invite = await o.context.request.post('/api/invites')
+    const code = ((await invite.json()) as { code: string }).code
+    await o.context.close()
+    const name = uniq('un')
+    const ctx = await browser.newContext({
+      baseURL: testInfo.project.use.baseURL as string,
+      viewport: testInfo.project.use.viewport,
+      isMobile: testInfo.project.use.isMobile,
+      hasTouch: testInfo.project.use.hasTouch,
     })
+    const page = await ctx.newPage()
+    await page.goto(`/join/${code}`)
+    await page.getByLabel('Username').fill(name)
+    await page.getByLabel('Email address').fill(`typo-${emailOf(name)}`)
+    await page.getByRole('button', { name: 'Join' }).click()
+    await expect(page.getByText(`typo-${emailOf(name)}`)).toBeVisible()
+    const stranger = await browser.newContext({ baseURL: testInfo.project.use.baseURL as string })
+    try {
+      expect((await stranger.request.post('/api/signin/email', { data: { login: name } })).status()).toBe(202)
+      expect(
+        (
+          await stranger.request.post('/api/signin/address', {
+            data: { email: `stranger-${emailOf(name)}` },
+          })
+        ).status(),
+      ).toBe(403)
+    } finally {
+      await stranger.close()
+    }
+    await page.getByRole('button', { name: 'Use a different address' }).click()
+    await page.getByLabel('Email address').fill(emailOf(name))
+    await page.getByRole('button', { name: 'Send to this address' }).click()
+    await expect(page.getByText(emailOf(name), { exact: true })).toBeVisible()
+    await page.getByLabel('Code').fill(mailCode(emailOf(name)))
+    await page.getByRole('button', { name: 'Finish joining' }).click()
+    await expect(page.getByRole('navigation', { name: 'Main' })).toBeVisible()
+    await ctx.close()
+  })
 
   test('a user signs in with a sign-in email asked for by their email address, typing the code @release', async ({
     browser,

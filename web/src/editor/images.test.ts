@@ -75,3 +75,22 @@ describe('an image brought back with undo', () => {
     editor.destroy()
   })
 })
+
+/** Pictures pasted from another site are left out. Only pictures this server stores can be in a body. */
+it('keeps the text of pasted HTML and leaves out a picture from another site', () => {
+  const editor = new Editor({
+    extensions: [
+      StarterKit.configure({ link: false, trailingNode: false }),
+      SweetImage.extend({ addNodeView: () => null }),
+    ],
+    content: '',
+  })
+  editor.view.pasteHTML('<p>From a recipe site</p><img src="https://example.com/cake.jpg" alt="A cake">')
+  expect(editor.getText()).toContain('From a recipe site')
+  const images: PMNode[] = []
+  editor.state.doc.descendants((n) => {
+    if (n.type.name === 'image') images.push(n)
+  })
+  expect(images).toEqual([])
+  editor.destroy()
+})

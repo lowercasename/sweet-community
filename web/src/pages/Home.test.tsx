@@ -183,6 +183,24 @@ describe('Home', () => {
     expect(navAvatar()).toBe('/img/new-face')
   })
 
+  it("Home's feed ends with the line about Sweet, and a room's feed does not", async () => {
+    const { listGroups, getVersion } = await import('../api')
+    vi.mocked(getVersion).mockResolvedValue({
+      release: 'dev',
+      build: 'abcdef123456',
+      source_url: 'https://source.test',
+    })
+    vi.mocked(listGroups).mockResolvedValue({
+      groups: [group(ROOT, 'owner'), group('wool', 'member', { name: 'Wool', mode: 'both' })],
+    })
+    await home()
+    await screen.findByRole('link', { name: 'Source code' })
+    cleanup()
+    await home('/r/wool')
+    await screen.findByText('g1')
+    expect(screen.queryByRole('link', { name: 'Source code' })).toBeNull()
+  })
+
   it('lists my rooms and conversations in the nav, and opens a chat-only room with one pane', async () => {
     const { getMessages } = await import('../api')
     const { container } = await home()
