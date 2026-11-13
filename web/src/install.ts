@@ -35,12 +35,19 @@ export function listenForInstall() {
   })
 }
 
-/** Whether the page is running as the app added to the home screen. */
+/** Whether the page is running as an installed app: added to the home screen, or inside the store app. */
 export function isInstalled(): boolean {
   return (
     window.matchMedia?.('(display-mode: standalone)').matches === true ||
-    (navigator as Navigator & { standalone?: boolean }).standalone === true
+    (navigator as Navigator & { standalone?: boolean }).standalone === true ||
+    isStoreApp()
   )
+}
+
+/** Whether the page is running inside the iOS or Android store app. Capacitor's bridge adds `Capacitor` to the page. */
+export function isStoreApp(): boolean {
+  const cap = (window as Window & { Capacitor?: { isNativePlatform?: () => boolean } }).Capacitor
+  return cap?.isNativePlatform?.() === true
 }
 
 /** Whether this is an iPhone or iPad. An iPad reports itself as a Mac, and only its touch screen tells them apart. */

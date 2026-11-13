@@ -75,6 +75,14 @@ describe('install', () => {
     expect(mod.installWay()).toBe('installed')
   })
 
+  it('the store app counts as installed, so it is never offered installation', async () => {
+    setDevice(IPHONE)
+    vi.stubGlobal('Capacitor', { isNativePlatform: () => true })
+    const { installWay, isInstalled } = await import('./install')
+    expect(isInstalled()).toBe(true)
+    expect(installWay()).toBe('installed')
+  })
+
   it('an iPad that reports itself as a Mac is an iPad', async () => {
     setDevice(
       'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Safari/605.1.15',
