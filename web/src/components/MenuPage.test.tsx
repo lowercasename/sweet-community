@@ -19,6 +19,7 @@ vi.mock('../api', () => ({
   getVersion: vi.fn(() => Promise.resolve({ release: 'v1.2.3', build: 'abcdef123456' })),
   getRules: vi.fn(() => Promise.resolve({ body_html: '' })),
 }))
+vi.mock('../storeapp/native', () => ({ showCommunityList: vi.fn(() => Promise.resolve()) }))
 
 const raphael = user('raphael')
 const kit = user('kit')
@@ -41,6 +42,25 @@ describe('MenuPage', () => {
     expect(names.slice(-2)).toEqual(['Rules', 'Sign out'])
     fireEvent.click(rules)
     expect(onGo).toHaveBeenCalledWith('/rules')
+  })
+
+  it('in the store app has Your communities just before Sign out, which goes back to the list', async () => {
+    vi.stubGlobal('Capacitor', { isNativePlatform: () => true })
+    const { MenuPage } = await import('./MenuPage')
+    const { showCommunityList } = await import('../storeapp/native')
+    renderWithQuery(<MenuPage me={raphael} groups={[group(ROOT, 'member')]} onGo={() => {}} onLogout={() => {}} />)
+    const item = await screen.findByRole('button', { name: 'Your communities' })
+    expect(screen.getAllByRole('button').map(nameOf).slice(-2)).toEqual(['Your communities', 'Sign out'])
+    fireEvent.click(item)
+    expect(showCommunityList).toHaveBeenCalled()
+    vi.unstubAllGlobals()
+  })
+
+  it('in a browser has no Your communities', async () => {
+    const { MenuPage } = await import('./MenuPage')
+    renderWithQuery(<MenuPage me={raphael} groups={[group(ROOT, 'member')]} onGo={() => {}} onLogout={() => {}} />)
+    await screen.findByRole('button', { name: 'Sign out' })
+    expect(screen.queryByRole('button', { name: 'Your communities' })).toBeNull()
   })
 
   it('marks Community with the shield for the owner', async () => {

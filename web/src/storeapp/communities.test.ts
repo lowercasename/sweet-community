@@ -10,8 +10,9 @@ const prefs = vi.hoisted(() => {
     remove: vi.fn(async ({ key }: { key: string }) => void values.delete(key)),
   }
 })
-const cookies = vi.hoisted(() => ({ clearCookies: vi.fn(async () => undefined) }))
-vi.mock('@capacitor/core', () => ({ CapacitorHttp: http, CapacitorCookies: cookies }))
+const native = vi.hoisted(() => ({ forgetCommunity: vi.fn(async () => undefined) }))
+vi.mock('@capacitor/core', () => ({ CapacitorHttp: http }))
+vi.mock('./native', () => native)
 vi.mock('@capacitor/preferences', () => ({ Preferences: prefs }))
 
 import {
@@ -93,7 +94,7 @@ describe('the list on this device', () => {
     await setLastCommunity('https://a.example.org')
     await removeCommunity('https://a.example.org')
     expect(await loadCommunities()).toEqual([{ url: 'https://b.example.org', name: 'B' }])
-    expect(cookies.clearCookies).toHaveBeenCalledWith({ url: 'https://a.example.org' })
+    expect(native.forgetCommunity).toHaveBeenCalledWith('https://a.example.org')
     expect(await lastCommunity()).toBeNull()
   })
 

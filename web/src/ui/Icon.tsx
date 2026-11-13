@@ -1,5 +1,6 @@
 import {
   ArrowLeft,
+  ArrowLeftRight,
   Bell,
   BellOff,
   BellRing,
@@ -81,6 +82,7 @@ export type IconName =
   | 'offline'
   | 'smile'
   | 'smile-plus'
+  | 'switch'
 
 const ICONS: Record<IconName, LucideIcon> = {
   bold: Bold,
@@ -99,6 +101,7 @@ const ICONS: Record<IconName, LucideIcon> = {
   chat: MessagesSquare,
   menu: Menu,
   logout: LogOut,
+  switch: ArrowLeftRight,
   mail: Mail,
   comment: MessageCircle,
   image: ImageIcon,

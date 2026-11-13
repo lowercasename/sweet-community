@@ -5,6 +5,8 @@ import { anyUnread } from '../data/notifications'
 import { COMMUNITY, NEW_ROOM, NOTIFICATIONS, SEARCH, groupPath, profilePath } from '../routes'
 import { Avatar, Hairline, NavBar, NavItem, NavSection, shieldText, Tile, Wordmark } from '../ui'
 import { ConversationsSection } from './ConversationsSection'
+import { isStoreApp } from '../install'
+import { showCommunityList } from '../storeapp/native'
 
 interface SidebarProps {
   me: User
@@ -30,7 +32,8 @@ function at(location: string, path: string): boolean {
  * The third block has the community items. These are People, then Community
  * for the owner, then the user's own profile page, where Settings is reached.
  * Community is in the nav because a page about the community does not belong
- * under the owner's own page. The top of the nav shows
+ * under the owner's own page. In the store app the block ends with Your communities, which goes back to the app's
+ * list of communities. The top of the nav shows
  * the community's name.
  */
 export function Sidebar({ me, groups, location, expanded, onGo, onToggle }: SidebarProps) {
@@ -143,6 +146,9 @@ export function Sidebar({ me, groups, location, expanded, onGo, onToggle }: Side
           current={at(location, COMMUNITY)}
           onClick={() => onGo(COMMUNITY)}
         />
+      )}
+      {isStoreApp() && (
+        <NavItem icon="switch" label="Your communities" expanded={expanded} onClick={() => void showCommunityList()} />
       )}
     </NavBar>
   )

@@ -8,35 +8,33 @@ import { CommunityList } from '../components/CommunityList'
 import {
   addCommunity,
   findCommunity,
-  lastCommunity,
   loadCommunities,
   removeCommunity,
   setLastCommunity,
   toAddress,
   type Community,
 } from './communities'
+import { openCommunity, unreachableCommunity } from './native'
 
 /**
- * The store app's own page. At start it opens the community used last. It shows the list when there is none, or
- * when the address has ?list, which the community's "Your communities" menu item uses.
+ * The store app's own page, with the list of communities on this device. The app opens the community used last by
+ * itself at start, so this page shows when no community is open, when Your communities is chosen in a community, or
+ * in place of a community that could not be loaded.
  */
 function StoreApp() {
   const [communities, setCommunities] = useState<Community[] | null>(null)
+  const [unreachable, setUnreachable] = useState<Community | null>(null)
 
   const open = async (url: string) => {
     await setLastCommunity(url)
-    window.location.assign(url)
+    await openCommunity(url)
   }
 
   useEffect(() => {
     void (async () => {
       const list = await loadCommunities()
-      const last = await lastCommunity()
-      const wantsList = new URLSearchParams(window.location.search).has('list')
-      if (!wantsList && last && list.some((c) => c.url === last)) {
-        await open(last)
-        return
-      }
+      const failed = await unreachableCommunity()
+      setUnreachable(list.find((c) => c.url === failed) ?? null)
       setCommunities(list)
     })()
   }, [])
@@ -45,6 +43,7 @@ function StoreApp() {
   return (
     <CommunityList
       communities={communities}
+      unreachable={unreachable}
       onOpen={(c) => void open(c.url)}
       onAdd={async (typed) => {
         const url = toAddress(typed)

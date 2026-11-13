@@ -1,5 +1,6 @@
-import { CapacitorCookies, CapacitorHttp } from '@capacitor/core'
+import { CapacitorHttp } from '@capacitor/core'
 import { Preferences } from '@capacitor/preferences'
+import { forgetCommunity } from './native'
 
 /**
  * The communities the store app knows on this device. The list is kept in the app's native storage, because the
@@ -105,7 +106,7 @@ export async function removeCommunity(url: string): Promise<Community[]> {
   const next = (await loadCommunities()).filter((c) => c.url !== url)
   await save(next)
   if ((await lastCommunity()) === url) await setLastCommunity(null)
-  await CapacitorCookies.clearCookies({ url })
+  await forgetCommunity(url)
   return next
 }
 

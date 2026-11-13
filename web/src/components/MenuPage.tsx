@@ -5,6 +5,8 @@ import { anyUnread } from '../data/notifications'
 import { NEW_ROOM, RULES, groupPath, profilePath, COMMUNITY } from '../routes'
 import { Avatar, Card, Hairline, NavItem, NavSection, Pane, shieldText, Stack, Tile } from '../ui'
 import { ConversationsSection } from './ConversationsSection'
+import { isStoreApp } from '../install'
+import { showCommunityList } from '../storeapp/native'
 
 interface MenuPageProps {
   me: User
@@ -15,7 +17,8 @@ interface MenuPageProps {
 
 /**
  * The phone menu. It contains the same items as the nav column, in the same
- * sections, with the account first and Sign out last. Search and
+ * sections, with the account first and Sign out last. In the store app, Your
+ * communities comes just before Sign out. Search and
  * Notifications are tabs, so they are not repeated here. The menu fills the
  * whole screen with no inset and no bar above it, because a menu is not a
  * view that needs a title.
@@ -78,6 +81,9 @@ export function MenuPage({ me, groups, onGo, onLogout }: MenuPageProps) {
           )}
           {/* On the phone the rules are here, at the end of the menu, not in Home's bar. */}
           {rules && <NavItem icon="rules" label="Rules" expanded onClick={() => onGo(RULES)} />}
+          {isStoreApp() && (
+            <NavItem icon="switch" label="Your communities" expanded onClick={() => void showCommunityList()} />
+          )}
           <Hairline />
           <NavItem icon="logout" label="Sign out" expanded onClick={onLogout} />
         </Stack>

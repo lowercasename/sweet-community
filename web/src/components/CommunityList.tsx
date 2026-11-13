@@ -22,6 +22,8 @@ import {
 
 interface CommunityListProps {
   communities: Community[]
+  /** A community that could not be loaded, shown here in its place. The list says so above its rows. */
+  unreachable?: Community | null
   onOpen: (c: Community) => void
   /** Checks and adds the address the person typed. Rejects with a sentence to show when it cannot. */
   onAdd: (typed: string) => Promise<void>
@@ -33,7 +35,7 @@ interface CommunityListProps {
  * the list a community is added by its address. The page uses the sign-in pages' narrow column, with Sweet's wordmark
  * above the cards.
  */
-export function CommunityList({ communities, onOpen, onAdd, onRemove }: CommunityListProps) {
+export function CommunityList({ communities, unreachable, onOpen, onAdd, onRemove }: CommunityListProps) {
   const [typed, setTyped] = useState('')
   const [adding, setAdding] = useState(false)
   const [problem, setProblem] = useState<string | null>(null)
@@ -70,6 +72,11 @@ export function CommunityList({ communities, onOpen, onAdd, onRemove }: Communit
         <Card>
           <Stack gap={2}>
             <Heading level={2}>Your communities</Heading>
+            {unreachable && (
+              <Alert tone="error">
+                Could not reach {unreachable.name}. Check your connection, then tap it to try again.
+              </Alert>
+            )}
             <List>
               {communities.map((c) => (
                 <ListItem key={c.url}>
