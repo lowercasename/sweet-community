@@ -6,9 +6,11 @@ INSERT INTO notifications (id, user_id, kind, actor_id, group_id, post_id, topic
 VALUES (sqlc.arg(id), sqlc.arg(user_id), sqlc.arg(kind), sqlc.arg(actor_id), sqlc.arg(group_id), sqlc.arg(post_id), sqlc.narg(topic_id), sqlc.narg(message_id), sqlc.narg(report_id), sqlc.arg(created_at), sqlc.arg(scope));
 
 -- name: GetNotificationInScope :one
--- A discussion has one notification. Older notifications from before that rule are history, so the newest is the one.
+-- A discussion has one notification. A database from before that rule can hold several, of which at most one is
+-- unread. The unread one is chosen first, so the discussion never gets a second unread notification. Otherwise the
+-- newest is chosen.
 SELECT id FROM notifications WHERE user_id = sqlc.arg(user_id) AND scope = sqlc.arg(scope)
-ORDER BY created_at DESC, id DESC LIMIT 1;
+ORDER BY read_at IS NULL DESC, created_at DESC, id DESC LIMIT 1;
 
 -- name: AddNotificationActivity :exec
 -- Adds activity to a discussion's notification and makes it unread. activity_count only grows, because clients use

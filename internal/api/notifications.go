@@ -202,34 +202,16 @@ func insertNotification(r *http.Request, qtx *store.Queries, p store.CreateNotif
 	return &events.Entry{Kind: "notification", Payload: wireNotification(row)}, nil
 }
 
-// rank orders the kinds of activity in a discussion. While a notification is unread, activity of a lower rank does
-// not replace its kind, actor or message, so a mention stays a mention.
-func rank(kind string) int {
-	switch kind {
-	case NotifyMention:
-		return 2
-	case NotifyReply:
-		return 1
-	}
-	return 0
-}
-
 // saveNotification writes p and sets p.ID to the row written. A discussion (p.Scope) has one notification, read or
 // unread. New activity updates it and makes it unread again.
 func saveNotification(r *http.Request, qtx *store.Queries, p *store.CreateNotificationParams) error {
 	if p.Scope != "" {
 		id, err := qtx.GetNotificationInScope(r.Context(), store.GetNotificationInScopeParams{UserID: p.UserID, Scope: p.Scope})
 		if err == nil {
-			old, err := qtx.GetNotification(r.Context(), id)
-			if err != nil {
-				return err
-			}
-			a := store.AddNotificationActivityParams{ID: id, Kind: p.Kind, ActorID: p.ActorID, TopicID: p.TopicID, MessageID: p.MessageID, CreatedAt: p.CreatedAt}
-			if !old.ReadAt.Valid && rank(old.Kind) > rank(p.Kind) {
-				a.Kind, a.ActorID, a.TopicID, a.MessageID = old.Kind, old.ActorID, old.TopicID, old.MessageID
-			}
 			p.ID = id
-			return qtx.AddNotificationActivity(r.Context(), a)
+			return qtx.AddNotificationActivity(r.Context(), store.AddNotificationActivityParams{
+				ID: id, Kind: p.Kind, ActorID: p.ActorID, TopicID: p.TopicID, MessageID: p.MessageID, CreatedAt: p.CreatedAt,
+			})
 		}
 		if !errors.Is(err, sql.ErrNoRows) {
 			return err

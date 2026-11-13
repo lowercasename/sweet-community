@@ -268,24 +268,46 @@ func TestReadEntryReopensOnNewActivity(t *testing.T) {
 	}
 }
 
-// While an entry is unread, an ordinary message does not replace a mention in it. The entry still names who mentioned
-// the user and the message to open at. Once the entry is read, the next activity replaces the mention.
-func TestUnreadEntryKeepsMention(t *testing.T) {
-	ts, owner := newTestServer(t)
+// The entry and its device alert describe the latest activity. In a chat set to mentions and replies, an ordinary
+// message after a mention is not sent as an alert.
+func TestOrdinaryMessageAfterMentionIsNotAMentionAlert(t *testing.T) {
+	ts, owner, srv := newTestServerWith(t)
 	kit, kitID := registerMember(t, ts, owner, "kit")
-	mo, moID := registerMember(t, ts, owner, "mo")
-	said := mo.mustStatus(201, "POST", rootPath+"/messages", map[string]string{"body_html": "<p>" + mentionOf(kitID, "kit") + " look</p>"})
+	mo, _ := registerMember(t, ts, owner, "mo")
+	kit.mustStatus(200, "PUT", rootPath+"/notifications", map[string]string{"mode": "mentions"})
+	mo.mustStatus(201, "POST", rootPath+"/messages", map[string]string{"body_html": "<p>" + mentionOf(kitID, "kit") + " look</p>"})
 	owner.mustStatus(201, "POST", rootPath+"/messages", map[string]string{"body_html": "<p>Ordinary</p>"})
-	ns := notificationList(t, kit)
-	if len(ns) != 1 || ns[0]["kind"] != NotifyMention || ns[0]["actor"].(map[string]any)["id"] != moID ||
-		ns[0]["message_id"] != said["id"] || ns[0]["updates"] != float64(2) {
-		t.Fatalf("an ordinary message replaced the unread mention: %v", ns)
+	raw, _ := json.Marshal(notificationList(t, kit)[0])
+	var n Notification
+	json.Unmarshal(raw, &n)
+	if n.Kind != NotifyMessage {
+		t.Fatalf("entry after an ordinary message: %+v", n)
+	}
+	if ok, err := srv.pushAllowed(context.Background(), n); ok || err != nil {
+		t.Fatalf("ordinary message alerted in a mentions-only chat: %v %v", ok, err)
+	}
+}
+
+// A database from before one entry per discussion can hold an older unread entry and a newer read one for the same
+// post. New activity goes to the unread entry, so it does not make a second unread entry.
+func TestActivityGoesToTheUnreadEntry(t *testing.T) {
+	ts, owner, srv := newTestServerWith(t)
+	kit, kitID := registerMember(t, ts, owner, "kit")
+	post := kit.mustStatus(201, "POST", rootPath+"/posts", map[string]string{"body_html": "<p>Old post</p>"})
+	me := owner.mustStatus(200, "GET", "/api/me", nil)
+	insert := `INSERT INTO notifications (id, user_id, kind, actor_id, group_id, post_id, created_at, read_at, scope)
+		VALUES (?, ?, 'comment', ?, ?, ?, ?, ?, ?)`
+	scope := "post:" + post["id"].(string)
+	if _, err := srv.DB.Exec(insert, "01000000-0000-7000-8000-000000000001", kitID, me["id"], perm.Root, post["id"], 1000, nil, scope); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := srv.DB.Exec(insert, "01000000-0000-7000-8000-000000000002", kitID, me["id"], perm.Root, post["id"], 2000, 2001, scope); err != nil {
+		t.Fatal(err)
 	}
 	time.Sleep(2 * time.Millisecond)
-	kit.mustStatus(200, "PUT", "/api/markers/chat:"+perm.Root, map[string]int64{"read_at": db.Now()})
-	time.Sleep(2 * time.Millisecond)
-	later := owner.mustStatus(201, "POST", rootPath+"/messages", map[string]string{"body_html": "<p>Later</p>"})
-	if ns = notificationList(t, kit); len(ns) != 1 || ns[0]["kind"] != NotifyMessage || ns[0]["message_id"] != later["id"] {
-		t.Fatalf("activity after reading kept the old mention: %v", ns)
+	owner.mustStatus(201, "POST", "/api/posts/"+post["id"].(string)+"/comments", map[string]string{"body_html": "<p>New</p>"})
+	ns := notificationList(t, kit)
+	if len(ns) != 2 || ns[0]["id"] != "01000000-0000-7000-8000-000000000001" || ns[0]["read_at"] != nil {
+		t.Fatalf("activity did not go to the unread entry: %v", ns)
 	}
 }

@@ -221,7 +221,7 @@ func (q *Queries) GetNotification(ctx context.Context, id string) (GetNotificati
 
 const getNotificationInScope = `-- name: GetNotificationInScope :one
 SELECT id FROM notifications WHERE user_id = ?1 AND scope = ?2
-ORDER BY created_at DESC, id DESC LIMIT 1
+ORDER BY read_at IS NULL DESC, created_at DESC, id DESC LIMIT 1
 `
 
 type GetNotificationInScopeParams struct {
@@ -229,7 +229,9 @@ type GetNotificationInScopeParams struct {
 	Scope  string
 }
 
-// A discussion has one notification. Older notifications from before that rule are history, so the newest is the one.
+// A discussion has one notification. A database from before that rule can hold several, of which at most one is
+// unread. The unread one is chosen first, so the discussion never gets a second unread notification. Otherwise the
+// newest is chosen.
 func (q *Queries) GetNotificationInScope(ctx context.Context, arg GetNotificationInScopeParams) (string, error) {
 	row := q.db.QueryRowContext(ctx, getNotificationInScope, arg.UserID, arg.Scope)
 	var id string
