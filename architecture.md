@@ -404,6 +404,8 @@ There must never be a second codebase. The web app is a progressive web app (PWA
 - A store app opens each community from the community's own instance, which serves the web app. The app therefore always runs the same version as the server. Bundling the web app inside the store app was rejected, because instances upgrade at different times, and a bundled app would run against servers of other versions.
 - The store app uses the same cookie session as a browser, because each community is the page's own site.
 - The store app keeps a list of communities on the device and opens the one the user picks. Each community keeps its own account and session. No server knows the list. The list shows no unread counts. One account across communities is a separate question.
+- The store app opens the community used last. A community is added by its address, and the app first checks that a Sweet community answers there. Removing a community from the list signs the device out of it.
+- The store apps support only communities on releases made since the apps. No self-hosted community existed when the apps were made, so older releases are not handled (2026-11-13).
 - The store app gives its pages only native features that are safe for any page to use, because a user can add any address to the list.
 - Apple and Google accept pushes for an app only from the app's publisher, so an instance cannot push to the store apps directly. Instances send the same encrypted web push that they send to browsers to a relay run by the app's publisher. The relay forwards it to Apple or Google and cannot read it. Instances accept the publisher's relay by default, and an operator can turn it off or name another relay.
 
