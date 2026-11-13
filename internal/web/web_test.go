@@ -29,3 +29,28 @@ func TestServesFilesAndTheAppForEverythingElse(t *testing.T) {
 		}
 	}
 }
+
+// Built files under /assets/ have a content hash in their names, so a browser may keep them for good. Every other
+// response is checked again each time, so a new release loads at once. A missing asset gets the app, which is not
+// kept either.
+func TestCacheHeaders(t *testing.T) {
+	h := serve(fstest.MapFS{
+		"index.html":       {Data: []byte("the app")},
+		"sw.js":            {Data: []byte("the worker")},
+		"assets/app-1a.js": {Data: []byte("the script")},
+	})
+	for path, want := range map[string]string{
+		"/assets/app-1a.js":  "public, max-age=31536000, immutable",
+		"/":                  "no-cache",
+		"/r/some-room":       "no-cache",
+		"/sw.js":             "no-cache",
+		"/assets/missing.js": "no-cache",
+		"/assets/":           "no-cache",
+	} {
+		rec := httptest.NewRecorder()
+		h.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, path, nil))
+		if got := rec.Header().Get("Cache-Control"); got != want {
+			t.Errorf("GET %s: Cache-Control %q, want %q", path, got, want)
+		}
+	}
+}

@@ -33,15 +33,22 @@ func Handler() http.Handler {
 }
 
 // serve serves the files of the built frontend. Any path that is not a file, a directory included, gets index.html,
-// so a directory is never listed.
+// so a directory is never listed. Built files under assets/ have a content hash in their names, so browsers may keep
+// them for a year. Every other response is checked again on each use, so a new release loads at once.
 func serve(sub fs.FS) http.Handler {
 	fileServer := http.FileServer(http.FS(sub))
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		p := strings.TrimPrefix(path.Clean(r.URL.Path), "/")
 		if info, err := fs.Stat(sub, p); err == nil && !info.IsDir() {
+			if strings.HasPrefix(p, "assets/") {
+				w.Header().Set("Cache-Control", "public, max-age=31536000, immutable")
+			} else {
+				w.Header().Set("Cache-Control", "no-cache")
+			}
 			fileServer.ServeHTTP(w, r)
 			return
 		}
+		w.Header().Set("Cache-Control", "no-cache")
 		r.URL.Path = "/"
 		fileServer.ServeHTTP(w, r)
 	})
