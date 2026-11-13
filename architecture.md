@@ -201,7 +201,7 @@ An account has a username and an email address. A password is optional, and the 
 - The old name is free for anyone at once. Links using that name stop finding the account and lead to another person if they take the name. An open profile page follows the original account to its new address. It never switches to a different account. Holding old names back was rejected, because a community is small and joins by invitation, and staff can deal with impersonation.
 - The server never reveals whether an address has an account. It emails the account's owner about the attempt instead.
 
-Sessions are stored in the database and last 180 days, extended while used. The web app holds the session in an httpOnly cookie. The server also accepts the session id in a header, for a future store app. Sign out everywhere ends every session. It replaces a list of sessions, because the real cases are a lost phone and a compromised account.
+Sessions are stored in the database and last 180 days, extended while used. The web app holds the session in an httpOnly cookie. The server also accepts the session id in a header. Sign out everywhere ends every session. It replaces a list of sessions, because the real cases are a lost phone and a compromised account.
 
 ### Profiles
 
@@ -398,11 +398,14 @@ Conversations accumulate, so their list has a stated limit and not a hidden rule
 
 ## Mobile
 
-There is no separate mobile app, and there must never be a second codebase. The web app is a progressive web app (PWA), and the PWA is the phone app.
+There must never be a second codebase. The web app is a progressive web app (PWA). Store apps for iOS and Android show the same web app inside Capacitor (2026-11-13). Bubblewrap was rejected, because it supports only Android.
 
-- iPhones allow web push only for apps on the home screen. Home therefore offers installation on touch screens.
-- A store app may come later. It would wrap the same build with Capacitor. Bubblewrap was rejected, because it supports only Android.
-- A store app cannot use the cookie session, because iOS blocks cross-site cookies. It will send the session id in a header instead. Sessions do not depend on how the id arrives, so this needs no redesign.
+- iPhones allow web push only for apps on the home screen. Home therefore offers installation on touch screens. The store apps do not offer it.
+- A store app opens each community from the community's own instance, which serves the web app. The app therefore always runs the same version as the server. Bundling the web app inside the store app was rejected, because instances upgrade at different times, and a bundled app would run against servers of other versions.
+- The store app uses the same cookie session as a browser, because each community is the page's own site.
+- The store app keeps a list of communities on the device and opens the one the user picks. Each community keeps its own account and session. No server knows the list. The list shows no unread counts. One account across communities is a separate question.
+- The store app gives its pages only native features that are safe for any page to use, because a user can add any address to the list.
+- Apple and Google accept pushes for an app only from the app's publisher, so an instance cannot push to the store apps directly. Instances send the same encrypted web push that they send to browsers to a relay run by the app's publisher. The relay forwards it to Apple or Google and cannot read it. Instances accept the publisher's relay by default, and an operator can turn it off or name another relay.
 
 ## Data
 
@@ -482,6 +485,10 @@ These decisions came from a security audit (2026-11-08).
 
 - **Email details after removal.** Removed accounts no longer retain their email addresses or email metadata. Retaining them kept removed accounts identifiable and blocked new registration with the same address. Existing removed accounts are included in the cleanup.
 
+- **Sessions in the store app.** A store app was to bundle the web app, so every request would have gone to another site. iOS blocks cross-site cookies, so the session id was to travel in a header. The store app now opens each community from its instance and uses the cookie session (2026-11-13).
+
+- **Discussion notifications.** Ordinary room messages now create grouped notifications and can alert devices. Authors and commenters follow discussions unless they mute them. Reading content clears its related unread notifications. This replaces the rule that room dots were sufficient and notifications had to be opened individually. Separate delivery controls keep these alerts optional.
+
 - **Sign-in links after an address change.** Address confirmation now invalidates outstanding sign-in links and codes. Checking the current address alone allowed an old link to work again if the account changed back to that address.
 
 - **Reporter identities.** Reports and report notifications no longer identify the reporter to staff. Reported authors cannot see or resolve reports about their content. The previous behaviour exposed reporters to staff authors despite the confidentiality promise.
@@ -525,9 +532,7 @@ These decisions came from a security audit (2026-11-08).
 
 ### Deferred
 
-- A store app waits until store presence matters.
 - Self-serve community creation waits until there are more communities than one person can track.
 - Presence and typing indicators wait until chat feels inactive without them.
 - Post version history waits until moderation needs it.
 - Sorting the feed by latest comment was deferred by Raphael (2026-11-09). It first needs decisions about own comments, deleted comments and the unread dot.
-- **Discussion notifications.** Ordinary room messages now create grouped notifications and can alert devices. Authors and commenters follow discussions unless they mute them. Reading content clears its related unread notifications. This replaces the rule that room dots were sufficient and notifications had to be opened individually. Separate delivery controls keep these alerts optional.
