@@ -3,14 +3,25 @@
 
 -- name: CreateNotification :exec
 INSERT INTO notifications (id, user_id, kind, actor_id, group_id, post_id, topic_id, message_id, report_id, created_at, scope)
-VALUES (sqlc.arg(id), sqlc.arg(user_id), sqlc.arg(kind), sqlc.arg(actor_id), sqlc.arg(group_id), sqlc.arg(post_id), sqlc.narg(topic_id), sqlc.narg(message_id), sqlc.narg(report_id), sqlc.arg(created_at), sqlc.arg(scope))
-ON CONFLICT (user_id, scope) WHERE read_at IS NULL AND scope != '' DO UPDATE SET
- kind = excluded.kind, actor_id = excluded.actor_id, topic_id = excluded.topic_id, message_id = excluded.message_id,
- created_at = excluded.created_at, activity_count = notifications.activity_count + 1;
+VALUES (sqlc.arg(id), sqlc.arg(user_id), sqlc.arg(kind), sqlc.arg(actor_id), sqlc.arg(group_id), sqlc.arg(post_id), sqlc.narg(topic_id), sqlc.narg(message_id), sqlc.narg(report_id), sqlc.arg(created_at), sqlc.arg(scope));
+
+-- name: GetNotificationInScope :one
+-- A discussion has one notification. Older notifications from before that rule are history, so the newest is the one.
+SELECT id FROM notifications WHERE user_id = sqlc.arg(user_id) AND scope = sqlc.arg(scope)
+ORDER BY created_at DESC, id DESC LIMIT 1;
+
+-- name: AddNotificationActivity :exec
+-- Adds activity to a discussion's notification and makes it unread. activity_count only grows, because clients use
+-- it as the notification's version. A read notification keeps the count already read in seen_count.
+UPDATE notifications SET kind = sqlc.arg(kind), actor_id = sqlc.arg(actor_id), topic_id = sqlc.narg(topic_id),
+ message_id = sqlc.narg(message_id), created_at = sqlc.arg(created_at),
+ seen_count = CASE WHEN read_at IS NULL THEN seen_count ELSE activity_count END,
+ activity_count = activity_count + 1, read_at = NULL
+WHERE id = sqlc.arg(id);
 
 -- name: GetNotification :one
 -- A report notification carries the kind of the reported item.
-SELECT n.id, n.user_id, n.kind, n.group_id, n.post_id, n.topic_id, n.message_id, n.created_at, n.read_at, n.scope, n.activity_count, g.kind AS group_kind,
+SELECT n.id, n.user_id, n.kind, n.group_id, n.post_id, n.topic_id, n.message_id, n.created_at, n.read_at, n.scope, n.activity_count, CAST(n.activity_count - n.seen_count AS INTEGER) AS updates, g.kind AS group_kind,
        u.id AS actor_id, u.username AS actor_username, u.picture_id AS actor_picture_id, rp.kind AS report_kind
 FROM notifications n JOIN users u ON u.id = n.actor_id JOIN groups g ON g.id = n.group_id LEFT JOIN reports rp ON rp.id = n.report_id
 WHERE n.id = sqlc.arg(id);
@@ -20,16 +31,13 @@ WHERE n.id = sqlc.arg(id);
 UPDATE notifications SET read_at = sqlc.arg(read_at) WHERE id = sqlc.arg(id) AND user_id = sqlc.arg(user_id) AND read_at IS NULL AND created_at <= sqlc.arg(before) AND (COALESCE(sqlc.narg(revision), 0) = 0 OR activity_count <= sqlc.narg(revision));
 
 -- name: ListNotifications :many
-SELECT n.id, n.user_id, n.kind, n.group_id, n.post_id, n.topic_id, n.message_id, n.created_at, n.read_at, n.scope, n.activity_count, g.kind AS group_kind,
+SELECT n.id, n.user_id, n.kind, n.group_id, n.post_id, n.topic_id, n.message_id, n.created_at, n.read_at, n.scope, n.activity_count, CAST(n.activity_count - n.seen_count AS INTEGER) AS updates, g.kind AS group_kind,
        u.id AS actor_id, u.username AS actor_username, u.picture_id AS actor_picture_id, rp.kind AS report_kind
 FROM notifications n JOIN users u ON u.id = n.actor_id JOIN groups g ON g.id = n.group_id LEFT JOIN reports rp ON rp.id = n.report_id
 WHERE n.user_id = sqlc.arg(user_id) AND n.created_at <= sqlc.arg(before)
   AND (n.created_at < sqlc.arg(before) OR n.id < sqlc.arg(before_id))
 ORDER BY n.created_at DESC, n.id DESC
 LIMIT sqlc.arg(page_size);
-
--- name: GetUnreadNotificationInScope :one
-SELECT id FROM notifications WHERE user_id = ? AND scope = ? AND read_at IS NULL;
 
 -- name: ListUnreadNotificationsUpTo :many
 SELECT id FROM notifications WHERE user_id = sqlc.arg(user_id) AND read_at IS NULL

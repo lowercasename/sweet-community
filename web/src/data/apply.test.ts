@@ -642,3 +642,25 @@ it('keeps newer grouped activity when an older read response arrives afterwards'
   expect(data.pages[0].notifications[0].activity_count).toBe(3)
   expect(data.pages[0].notifications[0].read_at).toBeNull()
 })
+
+it("moves a discussion's notification to the top when new activity makes it unread again", () => {
+  const qc = makeQueryClient()
+  qc.setQueryData(keys.notifications, {
+    pages: [
+      {
+        notifications: [
+          notification('n2', 'added', mo, { created_at: 20 }),
+          notification('n1', 'message', mo, { created_at: 10, activity_count: 2, read_at: 15 }),
+        ],
+        next_before: null,
+      },
+    ],
+    pageParams: [null],
+  })
+  applyEvent(qc, 'notification', notification('n1', 'message', mo, { created_at: 30, activity_count: 3, updates: 1 }))
+  const data = qc.getQueryData<{ pages: { notifications: Notification[] }[] }>(keys.notifications)!
+  expect(data.pages[0].notifications.map((n) => [n.id, n.read_at])).toEqual([
+    ['n1', null],
+    ['n2', null],
+  ])
+})

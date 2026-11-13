@@ -227,3 +227,65 @@ func TestMentionSurvivesOrdinaryActivity(t *testing.T) {
 		t.Fatalf("read mention was delivered: %v %v", ok, err)
 	}
 }
+
+// A discussion keeps one entry. Activity after the entry was read makes it unread again with the activity's time, so
+// it moves to the top, and its updates count again from one. The activity count still grows, because clients use it
+// as the entry's version.
+func TestReadEntryReopensOnNewActivity(t *testing.T) {
+	ts, owner := newTestServer(t)
+	kit, _ := registerMember(t, ts, owner, "kit")
+	post := kit.mustStatus(201, "POST", rootPath+"/posts", map[string]string{"body_html": "<p>Discussion</p>"})
+	for _, c := range []struct{ name, send, stream string }{
+		{"chat", rootPath + "/messages", "chat:" + perm.Root},
+		{"post", "/api/posts/" + post["id"].(string) + "/comments", "post:" + post["id"].(string)},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			kit.mustStatus(200, "DELETE", "/api/notifications", nil)
+			say := func(text string) {
+				time.Sleep(2 * time.Millisecond)
+				owner.mustStatus(201, "POST", c.send, map[string]string{"body_html": "<p>" + text + "</p>"})
+			}
+			say("One")
+			say("Two")
+			first := notificationList(t, kit)
+			if len(first) != 1 || first[0]["updates"] != float64(2) {
+				t.Fatalf("unread activity was not grouped: %v", first)
+			}
+			time.Sleep(2 * time.Millisecond)
+			kit.mustStatus(200, "PUT", "/api/markers/"+c.stream, map[string]int64{"read_at": db.Now()})
+			say("Three")
+			ns := notificationList(t, kit)
+			if len(ns) != 1 || ns[0]["id"] != first[0]["id"] || ns[0]["read_at"] != nil ||
+				ns[0]["created_at"].(float64) <= first[0]["created_at"].(float64) ||
+				ns[0]["updates"] != float64(1) || ns[0]["activity_count"] != float64(3) {
+				t.Fatalf("activity after reading did not reopen the entry: %v", ns)
+			}
+			say("Four")
+			if ns = notificationList(t, kit); len(ns) != 1 || ns[0]["updates"] != float64(2) || ns[0]["activity_count"] != float64(4) {
+				t.Fatalf("reopened entry did not count on: %v", ns)
+			}
+		})
+	}
+}
+
+// While an entry is unread, an ordinary message does not replace a mention in it. The entry still names who mentioned
+// the user and the message to open at. Once the entry is read, the next activity replaces the mention.
+func TestUnreadEntryKeepsMention(t *testing.T) {
+	ts, owner := newTestServer(t)
+	kit, kitID := registerMember(t, ts, owner, "kit")
+	mo, moID := registerMember(t, ts, owner, "mo")
+	said := mo.mustStatus(201, "POST", rootPath+"/messages", map[string]string{"body_html": "<p>" + mentionOf(kitID, "kit") + " look</p>"})
+	owner.mustStatus(201, "POST", rootPath+"/messages", map[string]string{"body_html": "<p>Ordinary</p>"})
+	ns := notificationList(t, kit)
+	if len(ns) != 1 || ns[0]["kind"] != NotifyMention || ns[0]["actor"].(map[string]any)["id"] != moID ||
+		ns[0]["message_id"] != said["id"] || ns[0]["updates"] != float64(2) {
+		t.Fatalf("an ordinary message replaced the unread mention: %v", ns)
+	}
+	time.Sleep(2 * time.Millisecond)
+	kit.mustStatus(200, "PUT", "/api/markers/chat:"+perm.Root, map[string]int64{"read_at": db.Now()})
+	time.Sleep(2 * time.Millisecond)
+	later := owner.mustStatus(201, "POST", rootPath+"/messages", map[string]string{"body_html": "<p>Later</p>"})
+	if ns = notificationList(t, kit); len(ns) != 1 || ns[0]["kind"] != NotifyMessage || ns[0]["message_id"] != later["id"] {
+		t.Fatalf("activity after reading kept the old mention: %v", ns)
+	}
+}

@@ -289,7 +289,7 @@ Three details were decided while building and remain open to change. They are on
 Unread dots show where unread content exists. The Notifications page records activity relevant to the user. Device notifications alert the user outside Sweet. These have separate controls, but device delivery uses the same notification records.
 
 - Posting or commenting follows that discussion. Anyone who can see a post may follow it or mute it. Muting stops notifications about that post, including mentions. Commenting again does not undo an explicit mute.
-- Room chat and private conversation messages create notifications. Each chat or post discussion has at most one unread entry. Further activity updates that entry and can send another device alert.
+- Room chat and private conversation messages create notifications. Each chat or post discussion has one entry, read or unread. Further activity updates that entry, makes it unread, moves it to the top and can send another device alert. The entry counts the updates since it was last read. While the entry is unread, an ordinary message or comment does not replace a mention or reply in it.
 - A user is also notified of a mention, being added to a room and a post in a subscribed topic. The owner and moderators receive new-member notifications. Eligible staff receive report notifications without the reporter's identity.
 - Nobody receives notifications of their own actions. One action never notifies the same person twice. A mention takes precedence over a reply or an ordinary message or comment. An explicit post mute or room alert setting of Off also suppresses mentions.
 - Reading a discussion marks its notifications read through the content reached. Opening one notification marks that version read. Viewing the Notifications page marks nothing read.
@@ -469,6 +469,8 @@ These decisions came from a security audit (2026-11-08).
 ## Record
 
 ### Reversed
+
+- **One notification per discussion.** A discussion now has one entry, and new activity makes it unread again. Before, it had at most one unread entry, and activity after reading created a new one. A user reading a chat as messages arrived got one entry for every message.
 
 - **Actions on touch screens.** A tap on a chat message or a comment now opens its actions in a floating toolbar, as hover does with a pointer. Touch screens showed the menu and Reply button of every message, which cluttered the chat. A tap is not a long press, so the reason for always showing them does not apply. A post's menu still shows on touch screens.
 

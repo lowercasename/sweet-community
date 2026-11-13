@@ -183,6 +183,22 @@ describe('NotificationsPage', () => {
     expect(onGo).toHaveBeenCalledWith('/r/knit')
   })
 
+  it('counts the updates since the notification was last read, not all its activity', async () => {
+    const { listNotifications } = await import('../api')
+    vi.mocked(listNotifications).mockResolvedValue({
+      notifications: [
+        notification('n30', 'message', mo, { activity_count: 5, updates: 2 }),
+        notification('n20', 'comment', mo, { activity_count: 4, updates: 1, read_at: 25 }),
+      ],
+      next_before: null,
+    })
+    await draw()
+    await screen.findByRole('heading', { name: 'New' })
+    expect(screen.getByText(/2 updates/)).toBeTruthy()
+    expect(screen.queryByText(/[45] updates/)).toBeNull()
+    expect(screen.getAllByText(/updates/)).toHaveLength(1)
+  })
+
   it('shows an empty state that says what will appear when there are no notifications', async () => {
     const { listNotifications } = await import('../api')
     vi.mocked(listNotifications).mockResolvedValue({ notifications: [], next_before: null })

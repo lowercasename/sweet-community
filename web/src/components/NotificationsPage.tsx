@@ -171,7 +171,7 @@ function NotificationRow({ notification: n, groups, onOpen }: NotificationRowPro
           </Text>
           <Text as="span" variant="small">
             <Time at={n.created_at} />
-            {(n.activity_count ?? 1) > 1 && ` · ${n.activity_count} updates`}
+            {(n.updates ?? 1) > 1 && ` · ${n.updates} updates`}
           </Text>
         </Stack>
       </ListRow>

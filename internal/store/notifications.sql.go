@@ -10,13 +10,41 @@ import (
 	"database/sql"
 )
 
+const addNotificationActivity = `-- name: AddNotificationActivity :exec
+UPDATE notifications SET kind = ?1, actor_id = ?2, topic_id = ?3,
+ message_id = ?4, created_at = ?5,
+ seen_count = CASE WHEN read_at IS NULL THEN seen_count ELSE activity_count END,
+ activity_count = activity_count + 1, read_at = NULL
+WHERE id = ?6
+`
+
+type AddNotificationActivityParams struct {
+	Kind      string
+	ActorID   string
+	TopicID   sql.NullString
+	MessageID sql.NullString
+	CreatedAt int64
+	ID        string
+}
+
+// Adds activity to a discussion's notification and makes it unread. activity_count only grows, because clients use
+// it as the notification's version. A read notification keeps the count already read in seen_count.
+func (q *Queries) AddNotificationActivity(ctx context.Context, arg AddNotificationActivityParams) error {
+	_, err := q.db.ExecContext(ctx, addNotificationActivity,
+		arg.Kind,
+		arg.ActorID,
+		arg.TopicID,
+		arg.MessageID,
+		arg.CreatedAt,
+		arg.ID,
+	)
+	return err
+}
+
 const createNotification = `-- name: CreateNotification :exec
 
 INSERT INTO notifications (id, user_id, kind, actor_id, group_id, post_id, topic_id, message_id, report_id, created_at, scope)
 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)
-ON CONFLICT (user_id, scope) WHERE read_at IS NULL AND scope != '' DO UPDATE SET
- kind = excluded.kind, actor_id = excluded.actor_id, topic_id = excluded.topic_id, message_id = excluded.message_id,
- created_at = excluded.created_at, activity_count = notifications.activity_count + 1
 `
 
 type CreateNotificationParams struct {
@@ -139,7 +167,7 @@ func (q *Queries) GetFeedMarker(ctx context.Context, arg GetFeedMarkerParams) (G
 }
 
 const getNotification = `-- name: GetNotification :one
-SELECT n.id, n.user_id, n.kind, n.group_id, n.post_id, n.topic_id, n.message_id, n.created_at, n.read_at, n.scope, n.activity_count, g.kind AS group_kind,
+SELECT n.id, n.user_id, n.kind, n.group_id, n.post_id, n.topic_id, n.message_id, n.created_at, n.read_at, n.scope, n.activity_count, CAST(n.activity_count - n.seen_count AS INTEGER) AS updates, g.kind AS group_kind,
        u.id AS actor_id, u.username AS actor_username, u.picture_id AS actor_picture_id, rp.kind AS report_kind
 FROM notifications n JOIN users u ON u.id = n.actor_id JOIN groups g ON g.id = n.group_id LEFT JOIN reports rp ON rp.id = n.report_id
 WHERE n.id = ?1
@@ -157,6 +185,7 @@ type GetNotificationRow struct {
 	ReadAt         sql.NullInt64
 	Scope          string
 	ActivityCount  int64
+	Updates        int64
 	GroupKind      string
 	ActorID        string
 	ActorUsername  string
@@ -180,6 +209,7 @@ func (q *Queries) GetNotification(ctx context.Context, id string) (GetNotificati
 		&i.ReadAt,
 		&i.Scope,
 		&i.ActivityCount,
+		&i.Updates,
 		&i.GroupKind,
 		&i.ActorID,
 		&i.ActorUsername,
@@ -187,6 +217,24 @@ func (q *Queries) GetNotification(ctx context.Context, id string) (GetNotificati
 		&i.ReportKind,
 	)
 	return i, err
+}
+
+const getNotificationInScope = `-- name: GetNotificationInScope :one
+SELECT id FROM notifications WHERE user_id = ?1 AND scope = ?2
+ORDER BY created_at DESC, id DESC LIMIT 1
+`
+
+type GetNotificationInScopeParams struct {
+	UserID string
+	Scope  string
+}
+
+// A discussion has one notification. Older notifications from before that rule are history, so the newest is the one.
+func (q *Queries) GetNotificationInScope(ctx context.Context, arg GetNotificationInScopeParams) (string, error) {
+	row := q.db.QueryRowContext(ctx, getNotificationInScope, arg.UserID, arg.Scope)
+	var id string
+	err := row.Scan(&id)
+	return id, err
 }
 
 const getNotificationsMarker = `-- name: GetNotificationsMarker :one
@@ -215,22 +263,6 @@ func (q *Queries) GetNotificationsMarker(ctx context.Context, userID string) (Ge
 		&i.Unread,
 	)
 	return i, err
-}
-
-const getUnreadNotificationInScope = `-- name: GetUnreadNotificationInScope :one
-SELECT id FROM notifications WHERE user_id = ? AND scope = ? AND read_at IS NULL
-`
-
-type GetUnreadNotificationInScopeParams struct {
-	UserID string
-	Scope  string
-}
-
-func (q *Queries) GetUnreadNotificationInScope(ctx context.Context, arg GetUnreadNotificationInScopeParams) (string, error) {
-	row := q.db.QueryRowContext(ctx, getUnreadNotificationInScope, arg.UserID, arg.Scope)
-	var id string
-	err := row.Scan(&id)
-	return id, err
 }
 
 const listMarkers = `-- name: ListMarkers :many
@@ -303,7 +335,7 @@ func (q *Queries) ListMarkers(ctx context.Context, userID string) ([]ListMarkers
 }
 
 const listNotifications = `-- name: ListNotifications :many
-SELECT n.id, n.user_id, n.kind, n.group_id, n.post_id, n.topic_id, n.message_id, n.created_at, n.read_at, n.scope, n.activity_count, g.kind AS group_kind,
+SELECT n.id, n.user_id, n.kind, n.group_id, n.post_id, n.topic_id, n.message_id, n.created_at, n.read_at, n.scope, n.activity_count, CAST(n.activity_count - n.seen_count AS INTEGER) AS updates, g.kind AS group_kind,
        u.id AS actor_id, u.username AS actor_username, u.picture_id AS actor_picture_id, rp.kind AS report_kind
 FROM notifications n JOIN users u ON u.id = n.actor_id JOIN groups g ON g.id = n.group_id LEFT JOIN reports rp ON rp.id = n.report_id
 WHERE n.user_id = ?1 AND n.created_at <= ?2
@@ -331,6 +363,7 @@ type ListNotificationsRow struct {
 	ReadAt         sql.NullInt64
 	Scope          string
 	ActivityCount  int64
+	Updates        int64
 	GroupKind      string
 	ActorID        string
 	ActorUsername  string
@@ -364,6 +397,7 @@ func (q *Queries) ListNotifications(ctx context.Context, arg ListNotificationsPa
 			&i.ReadAt,
 			&i.Scope,
 			&i.ActivityCount,
+			&i.Updates,
 			&i.GroupKind,
 			&i.ActorID,
 			&i.ActorUsername,

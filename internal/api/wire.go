@@ -112,7 +112,7 @@ func wireNotification(row store.GetNotificationRow) Notification {
 		pid = &p
 	}
 	return Notification{
-		Scope: row.Scope, ActivityCount: row.ActivityCount, GroupKind: row.GroupKind,
+		Scope: row.Scope, ActivityCount: row.ActivityCount, Updates: row.Updates, GroupKind: row.GroupKind,
 		ID:         row.ID,
 		UserID:     row.UserID,
 		Kind:       row.Kind,

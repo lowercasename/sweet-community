@@ -421,7 +421,15 @@ function upsertNotification(qc: QueryClient, n: Notification) {
   )
     return
   if (n.read_at != null) dismissDeviceNotifications(n.created_at, n.scope ?? '', n.id, n.activity_count ?? 1)
-  qc.setQueryData<Notifications>(keys.notifications, (old) => upsertInPages(old, 'notifications', n))
+  // New activity gives a discussion's notification a later time, so it moves to the top of the list.
+  const moved = current !== undefined && current.created_at !== n.created_at
+  qc.setQueryData<Notifications>(keys.notifications, (old) =>
+    upsertInPages(
+      moved ? eachPage(old, 'notifications', (ns) => ns.filter((x) => x.id !== n.id)) : old,
+      'notifications',
+      n,
+    ),
+  )
   void qc.invalidateQueries({ queryKey: keys.markers })
 }
 

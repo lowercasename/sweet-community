@@ -101,11 +101,14 @@ test.describe('notifications', () => {
     await expect(kit.page.getByRole('button', { name: `${mo.username} messaged you` })).toBeVisible()
     await expect(kit.page.getByRole('heading', { name: 'New' })).toHaveCount(0)
 
-    // The other path. A new message creates a new notification. Opening it from the notifications page opens the
-    // conversation and marks it read.
+    // The other path. A new message makes the same notification unread again, so it moves from Earlier to New and
+    // the list still has one row for the conversation. Opening it from the notifications page opens the conversation
+    // and marks it read.
     await mo.context.request.post(`/api/groups/${gid}/messages`, { data: { body_html: '<p>still there?</p>' } })
     const row = kit.page.getByRole('button', { name: `${mo.username} messaged you, new` })
     await expect(row).toBeVisible()
+    await expect(kit.page.getByRole('heading', { name: 'Earlier' })).toHaveCount(0)
+    await expect(kit.page.getByRole('button', { name: new RegExp(`^${mo.username} messaged you`) })).toHaveCount(1)
     await expect(nav.getByRole('button', { name: 'Notifications, unread' })).toBeVisible()
     await row.click()
     await expect(kit.page).toHaveURL(new RegExp(`/r/${gid}$`))

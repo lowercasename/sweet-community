@@ -245,7 +245,10 @@ export interface ReplyTo {
  */
 export interface Notification {
   scope?: string
+  /** All the activity the notification holds. It only grows, so it is the notification's version. */
   activity_count?: number
+  /** The activity since the notification was last made unread, which the list shows. */
+  updates?: number
   group_kind?: Group['kind']
   id: string
   user_id: string

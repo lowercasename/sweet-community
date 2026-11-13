@@ -203,6 +203,7 @@ func TestPostUnread(t *testing.T) {
 	// Other users' comments after the read position are unread. The user's own comments and deleted comments are not.
 	time.Sleep(2 * time.Millisecond) // times are in milliseconds, and a comment in the same millisecond as the post is not after it
 	first := mo.mustStatus(201, "POST", "/api/posts/"+id+"/comments", map[string]string{"body_html": "<p>teeth?</p>"})
+	time.Sleep(2 * time.Millisecond) // reading up to the first comment must not reach the second
 	mo.mustStatus(201, "POST", "/api/posts/"+id+"/comments", map[string]string{"body_html": "<p>a boat?</p>"})
 	kit.mustStatus(201, "POST", "/api/posts/"+id+"/comments", map[string]string{"body_html": "<p>mine</p>"})
 	gone := owner.mustStatus(201, "POST", "/api/posts/"+id+"/comments", map[string]string{"body_html": "<p>oops</p>"})
@@ -489,10 +490,9 @@ func waitPushes(t *testing.T, fake *fakePush, n int) []string {
 	return nil
 }
 
-// A message in a conversation creates a notification. There is at most one unread row per
-// conversation. It is marked read either by opening it from the
-// notifications page or by reading the conversation. A message in a room's
-// chat creates no notification.
+// A message in a conversation creates a notification. There is one row per conversation. It is marked read either by
+// opening it from the notifications page or by reading the conversation. A message in a room's chat creates a
+// notification too.
 func TestMessageNotifications(t *testing.T) {
 	ts, owner := newTestServer(t)
 	kit, kitID := registerMember(t, ts, owner, "kit")
@@ -556,11 +556,11 @@ func TestMessageNotifications(t *testing.T) {
 	if !told || !counted {
 		t.Fatalf("the read row and the bell's count did not both go out (row %v, count %v)", told, counted)
 	}
-	// The next message creates a new row, and kit's reply creates one for mo.
+	// The next message makes the same row unread again, and kit's reply creates one for mo.
 	time.Sleep(2 * time.Millisecond)
 	mo.mustStatus(201, "POST", "/api/groups/"+gid+"/messages", map[string]string{"body_html": "<p>three</p>"})
-	if ns = list(kit); len(ns) != 2 || ns[0]["read_at"] != nil || ns[1]["read_at"] == nil {
-		t.Fatalf("after a message once read: %v", ns)
+	if again := list(kit); len(again) != 1 || again[0]["id"] != ns[0]["id"] || again[0]["read_at"] != nil {
+		t.Fatalf("after a message once read: %v", again)
 	}
 	kit.mustStatus(201, "POST", "/api/groups/"+gid+"/messages", map[string]string{"body_html": "<p>back</p>"})
 	if ms := list(mo); len(ms) != 1 || ms[0]["kind"] != "message" || ms[0]["actor"].(map[string]any)["id"] != kitID {
@@ -577,7 +577,8 @@ func TestMessageNotifications(t *testing.T) {
 	rid := room["id"].(string)
 	owner.mustStatus(201, "POST", "/api/groups/"+rid+"/members", map[string]string{"user_id": kitID})
 	owner.mustStatus(201, "POST", "/api/groups/"+rid+"/messages", map[string]string{"body_html": "<p>wool</p>"})
-	if ns = list(kit); len(ns) != 4 || ns[0]["kind"] != "message" {
+	// Kit now has the conversation's row, the room addition and the room's message.
+	if ns = list(kit); len(ns) != 3 || ns[0]["kind"] != "message" {
 		t.Fatalf("room notification: %v", ns)
 	}
 
@@ -605,7 +606,7 @@ func TestPushForMessages(t *testing.T) {
 	// A second message updates the unread row and sends another alert.
 	mo.mustStatus(201, "POST", "/api/groups/"+gid+"/messages", map[string]string{"body_html": "<p>still there?</p>"})
 	waitPushes(t, fake, 2)
-	// After kit reads the conversation, the next message creates a new row and a new push.
+	// After kit reads the conversation, the next message makes the row unread again and sends a new push.
 	kit.mustStatus(200, "PUT", "/api/markers/chat:"+gid, map[string]any{"read_at": db.Now()})
 	time.Sleep(2 * time.Millisecond)
 	mo.mustStatus(201, "POST", "/api/groups/"+gid+"/messages", map[string]string{"body_html": "<p>yes</p>"})
