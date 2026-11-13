@@ -1,5 +1,13 @@
 # Changelog
 
+## v1.9.3 (2026-11-13)
+
+- Remove browser tests that repeat other tests
+- Run only the tests tagged @dev against the dev server
+- Answer 200 with null for a link with no preview
+- Fix review findings in one notification per discussion
+- Keep one notification per discussion
+
 ## v1.9.2 (2026-11-13)
 
 - Let browsers keep the hashed web app files
