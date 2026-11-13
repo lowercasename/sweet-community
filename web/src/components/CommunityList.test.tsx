@@ -1,10 +1,10 @@
 // @vitest-environment happy-dom
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { CommunityList } from './CommunityList'
 
 /**
- * The store app's list of communities on this device. A row opens its community, its menu removes it after a
+ * The store app's list of communities on this device. A row opens its community, its Remove button removes it after a
  * confirmation, and the form adds a community by its address.
  */
 
@@ -23,10 +23,10 @@ function show(props: Partial<Parameters<typeof CommunityList>[0]> = {}) {
 }
 
 describe('CommunityList', () => {
-  it('with no communities shows only the form, which explains what an address is', () => {
+  it('with no communities shows only the form to add one', () => {
     show({ communities: [] })
     expect(screen.queryByRole('heading', { name: 'Your communities' })).toBeNull()
-    expect(screen.getByText(/Each Sweet community has its own address/)).toBeTruthy()
+    expect(screen.getByRole('heading', { name: 'Add a community' })).toBeTruthy()
   })
 
   it('opens a community from its row, and shows its address under its name', () => {
@@ -51,11 +51,11 @@ describe('CommunityList', () => {
       this.open = true
     }
     const { onRemove } = show()
-    fireEvent.click(screen.getByRole('button', { name: 'Options for Book club' }))
-    fireEvent.click(await screen.findByRole('menuitem', { name: 'Remove' }))
-    expect(onRemove).not.toHaveBeenCalled()
-    expect(screen.getByText(/Book club leaves this list, and this device is signed out of it/)).toBeTruthy()
     fireEvent.click(screen.getByRole('button', { name: 'Remove' }))
+    expect(onRemove).not.toHaveBeenCalled()
+    const dialog = screen.getByRole('dialog')
+    expect(within(dialog).getByText(/This device will be signed out of this community/)).toBeTruthy()
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Remove' }))
     await waitFor(() => expect(onRemove).toHaveBeenCalledWith(club))
   })
 })

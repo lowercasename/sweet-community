@@ -14,7 +14,6 @@ import {
   List,
   ListItem,
   ListRow,
-  Menu,
   Row,
   Stack,
   Text,
@@ -30,7 +29,7 @@ interface CommunityListProps {
 }
 
 /**
- * The store app's list of communities on this device. Each row opens its community, and its menu removes it. Below
+ * The store app's list of communities on this device. Each row opens its community, and its button removes it. Below
  * the list a community is added by its address. The page uses the sign-in pages' narrow column, with Sweet's wordmark
  * above the cards.
  */
@@ -85,10 +84,9 @@ export function CommunityList({ communities, onOpen, onAdd, onRemove }: Communit
                         </Text>
                       </Stack>
                     </ListRow>
-                    <Menu
-                      label={`Options for ${c.name}`}
-                      items={[{ label: 'Remove', icon: 'trash', danger: true, onSelect: () => setRemoving(c) }]}
-                    />
+                    <Button variant="danger" icon="trash" onClick={() => setRemoving(c)}>
+                      Remove
+                    </Button>
                   </Row>
                 </ListItem>
               ))}
@@ -100,12 +98,10 @@ export function CommunityList({ communities, onOpen, onAdd, onRemove }: Communit
         <Stack gap={3}>
           <Stack gap={1}>
             <Heading level={2}>Add a community</Heading>
-            <Text variant="small">
-              Each Sweet community has its own address. Enter the address of one you belong to.
-            </Text>
+            <Text variant="small">Enter the address of the Sweet community you belong to.</Text>
           </Stack>
           <Form onSubmit={() => void add()}>
-            <Field label="Address" hint="For example, sweet.example.org">
+            <Field label="Address" hint="For example, example.sweet.community">
               <Input name="address" inputMode="url" value={typed} onChange={setTyped} autoComplete="url" required />
             </Field>
             {problem && <Alert tone="error">{problem}</Alert>}
@@ -126,7 +122,7 @@ export function CommunityList({ communities, onOpen, onAdd, onRemove }: Communit
         onConfirm={() => void remove()}
         onClose={() => setRemoving(null)}
       >
-        {removing?.name} leaves this list, and this device is signed out of it. You can add it again at any time.
+        This device will be signed out of this community. You can add it again at any time.
       </ConfirmDialog>
     </Centered>
   )

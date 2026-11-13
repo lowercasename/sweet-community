@@ -48,7 +48,7 @@ function StoreApp() {
       onOpen={(c) => void open(c.url)}
       onAdd={async (typed) => {
         const url = toAddress(typed)
-        if (!url) throw new Error('Enter the full address of the community, such as sweet.example.org.')
+        if (!url) throw new Error('Enter the full address of the community, such as example.sweet.community.')
         const found = await findCommunity(url)
         setCommunities(await addCommunity(found))
         await open(found.url)

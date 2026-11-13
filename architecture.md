@@ -359,7 +359,7 @@ A toggle shows its state, and hovering shows its action. Subscribed is the state
 - Buttons in a row go from the least to the most consequential, left to right. A destructive action never shares a row with a primary.
 - A form ends with Cancel and then the primary, at the right.
 - Destructive actions sit in the last card of a page.
-- A list row shows its common action, and its other actions are in a menu.
+- A list row shows its common action, and its other actions are in a menu. A row whose only other action is always the same shows it as a button, because a menu with one item only hides it (2026-11-13).
 - Every removal asks for confirmation, except revoking an invite link, which is easy to replace.
 - An empty state is one sentence and one button that fills the place.
 - Text under a card's heading is small and grey.
