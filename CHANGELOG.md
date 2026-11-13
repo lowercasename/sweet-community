@@ -1,5 +1,9 @@
 # Changelog
 
+## v1.9.2 (2026-11-13)
+
+- Let browsers keep the hashed web app files
+
 ## v1.9.1 (2026-11-12)
 
 - Comment dots on existing posts, and none on muted discussions
