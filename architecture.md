@@ -4,7 +4,7 @@ This document records what Sweet does and why. The code shows how each part is b
 
 ## What Sweet is
 
-Sweet is a social network for one small community. Each installation, called an instance, serves exactly one community. Its Home page has a feed of posts and a live chat. Members also talk in private rooms and in two-person conversations. Topics sort Home's posts by subject. The owner and moderators look after the community, and members report content to them. Sweet is self-hostable, and one person can host many communities on one server.
+Sweet is a social network for one small community. Each installation, called an instance, serves exactly one community. Its Home page has a feed of posts and a live chat. Members also talk in open rooms, private rooms and two-person conversations. Rooms organise posts by subject. The owner and moderators look after the community, and members report content to them. Sweet is self-hostable, and one person can host many communities on one server.
 
 Old Sweet was the first version of the product. It stored post bodies in four formats. It let the client supply data that the server should derive. It kept copies of some things, and the copies could disagree. Many decisions below exist to prevent these faults. The general rule is that each thing has one place in the system.
 
@@ -13,7 +13,6 @@ Old Sweet was the first version of the product. It stored post bodies in four fo
 - An instance is called a community.
 - A group is called a room. The code keeps the word group, because Home and conversations are also groups.
 - A private chat between two people is called a conversation.
-- Following a topic is called subscribing.
 
 Copy is written for a person who has never used Sweet. It explains Sweet's terms where the user first meets them and never describes how the software works. It uses no semicolons. Server error messages are capitalised sentences, because the client shows them unchanged.
 
@@ -41,7 +40,7 @@ The API client is meant to move to the MIT licence, so that other clients can ex
 
 ## The community and Home
 
-The community is itself a group, called the root group. Every user joins it at registration and leaves it only by leaving the community. Home shows its feed and chat. Everyone sees everything on Home because everyone is a member. No rule treats Home as a special case. Every post and message belongs to exactly one group.
+The community is itself a group, called the root group. Every user joins it at registration and leaves it only by leaving the community. Home shows community posts and posts from open rooms. Its chat belongs to the community. Every post and message belongs to exactly one group. A room post shown on Home still belongs to its room and retains that room’s permissions. Private room posts never appear on Home, including for their members. (Raphael, 2026-11-16. Open-room posts preserve shared context without combining chats.)
 
 Home shows every member's posts. There is no following of people, because a feed of followed people shows each person only part of a small community. If an open instance ever needs following, it will be a separate view and never Home.
 
@@ -49,21 +48,22 @@ The community's name and description are public, because the sign-in and join pa
 
 ### Feature flags
 
-Feature flags are planned. The owner will turn posts, chat, images, embeds and alt text on or off, in rooms too. Alt text will be off, optional or required. The server will refuse a disabled feature, and the web app will hide it. One product can then serve a friend group, an interest community and a chat-first group. Topics need no flag, because they are off while none exist.
+Feature flags are planned. The owner will turn posts, chat, images, embeds and alt text on or off, in rooms too. Alt text will be off, optional or required. The server will refuse a disabled feature, and the web app will hide it. One product can then serve a friend group, an interest community and a chat-first group.
 
 ## Groups
 
 ### Rooms
 
-A room has a feed and a chat like Home, drawn with the same panes. The design serves three needs. They are a moderation room for staff, a small invite-only room for a private subject, and a private conversation with one person. A room that people find and ask to join, such as a support group, is an experiment and not an assumption of the design.
+A room has posts and chat under one shared header. Selecting a room changes both columns. The header names the room and states who can read and participate. Open and private rooms have the same capabilities. A person can collapse either pane. A group that only wants chat can use its room that way. (Raphael, 2026-11-16. A private room beside public chat would make the audience unclear.)
 
-- A room is private and invisible. Its name, members and content exist only for its members. There is no list of rooms and no way to ask to join.
-- A room that wants members is announced in a public post. A "listed" setting that showed a room's name to everyone was dropped, because a public post does the same (2026-11-04).
-- The community's owner and moderators see only the rooms they belong to. A member's report shows them one item.
+- An open room appears in everyone's navigation. Every community member can read and participate without asking to join. New community members gain access to existing open rooms.
+- A private room is invisible to non-members. Its name, members and content are available only to invited members. Existing rooms remain private.
+- Visibility is chosen when the room is created and cannot be changed later. (Codex, 2026-11-16. This prevents a settings change from exposing private history.)
+- The community's owner and moderators have ordinary member access in open rooms. They receive no extra room moderation permissions. They see private rooms only when invited. A report shows eligible staff one reported item.
 - Any member may create a room, unless the owner limits this to staff. The creator owns the room.
-- A room's one setting is its mode, which is posts, chat or both.
-- A post shown outside its room has a header that names the room.
-- A room is deleted when its last member leaves.
+- A post shown outside its room has a header naming and linking to the room. Opening its comments does not change the current chat. Entering the room changes both columns.
+- Everyone belongs to open rooms while they belong to the community. They cannot leave an open room or remove another community member from it. Room chat alert settings remain available.
+- Private room members can leave or be removed. A private room is deleted when its last member leaves.
 
 **A room always has one owner.** The owner may hand ownership to a member and become a moderator. An owner leaves only after handing over. If the owner's account is removed, ownership passes to the longest-serving moderator, or else to the longest-serving member. It never passes to the staff member who removed the owner. The community's owner cannot leave and cannot be removed.
 
@@ -82,23 +82,9 @@ A room continues to exist when its members change. A conversation is defined by 
 
 The roles are owner, moderator and member. A role belongs to a membership, so it applies in one group only. The community's staff are the root group's owner and moderators. The community's owner is a plain member of a room they were added to.
 
-## Topics
+## Categorising posts
 
-A topic is an optional label that filters Home's feed. It is not a separate place to post, because choosing a place before writing discourages people from posting.
-
-- A post has at most one topic, and most have none. Rooms have no topics.
-- The owner and moderators manage topics on the Community page. Topics are listed alphabetically, so there is no order to maintain.
-- Topics are off while none exist. While the list is empty, the owner and moderators see a control that explains topics.
-- A new post gets the feed's current topic. The composer has no topic control, because two controls for one choice were confusing.
-- Staff may move any post to another topic, because that is moderation and not editing.
-- Subscribing to a topic sends its new posts as notifications and in the digest. It never changes who can see a post.
-- The selected topic is part of the page's address, so the view can be shared.
-
-A topic has one shape everywhere, a pill with the tag icon, in two sizes. The small pill is a label on a post. It opens the topic and never edits it. The larger pill is a control at the top of the feed. It is not in the top bar, because on a desktop the bar also spans the chat. Topics are not in the nav, because the nav lists places. Starter topics were rejected, because they would choose a community's subjects for it.
-
-### Tags
-
-Hashtags are on hold. Raphael asked on 2026-11-06 whether tags are the same as topics, and that must be settled first.
+Rooms are the only way to categorise posts. Topics and topic subscriptions are no longer available. Existing posts stay where their authors posted them. Removing topics does not move or rewrite content. Hashtags remain plain text. (Raphael, 2026-11-16. Rooms and topics overlapped and were difficult to distinguish.)
 
 ## Posts and editor
 
@@ -250,9 +236,9 @@ One package on the server holds every rule about who may do what. Each rule take
 Room and staff actions use the current permissions when the change is saved. The permission check and the change happen in one transaction. A request that started earlier keeps no permission after membership is removed or a role changes. The server reads the request body before opening the transaction, so a slow request does not block other writes.
 
 - An author edits their own posts and comments and deletes their own content. A post's author may also delete comments on it.
-- A group's owner and moderators delete anything in it and edit nothing that others wrote, except a post's topic. They add and remove members.
-- Only a group's owner sets roles, hands over ownership, renames the group, sets its mode, or deletes it.
-- Only the community's owner changes the community's name and who may create rooms. The owner and moderators manage invites, topics, rules, the welcome message and reports.
+- A group's owner and moderators may delete content in it. They cannot edit another author's content. They add and remove private room members.
+- Only a group's owner sets roles, hands over ownership, renames the group or deletes it. Named rooms always have posts and chat. Two-person conversations always have chat only.
+- Only the community's owner changes the community's name and who may create rooms. The owner and moderators manage invites, rules, the welcome message and reports.
 - Staff remove users below their own role. Any user may remove themselves. Nobody can remove the owner.
 
 **The web app holds no permission rules.** Everything the server sends carries flags that say what the viewer may do. Copying the rules into TypeScript was rejected, because two copies of a rule come to disagree.
@@ -290,11 +276,12 @@ Unread dots show where unread content exists. The Notifications page records act
 
 - Posting or commenting follows that discussion. Anyone who can see a post may follow it or mute it. Muting stops notifications about that post, including mentions. Commenting again does not undo an explicit mute.
 - Room chat and private conversation messages create notifications. Each chat or post discussion has one entry, read or unread. Further activity updates that entry, makes it unread, moves it to the top and can send another device alert. The entry counts the updates since it was last read.
-- A user is also notified of a mention, being added to a room and a post in a subscribed topic. The owner and moderators receive new-member notifications. Eligible staff receive report notifications without the reporter's identity.
+- A user is also notified of a mention or being added to a private room. Previous topic notifications still open their original posts. The owner and moderators receive new-member notifications. Eligible staff receive report notifications without the reporter's identity.
 - Nobody receives notifications of their own actions. One action never notifies the same person twice. A mention takes precedence over a reply or an ordinary message or comment. An explicit post mute or room alert setting of Off also suppresses mentions.
 - Reading a discussion marks its notifications read through the content reached. Opening one notification marks that version read. Viewing the Notifications page marks nothing read.
 - Mark all read keeps notification history. Clear all removes read and unread notifications. Neither action marks the underlying content read.
 - Read positions and notification preferences are stored on the server and follow the user across devices. Read positions only move forward.
+- Reading open-room posts on Home clears their room feed indicators through the same time. Reading them in their room also clears them from Home’s unread indicator. Chat read positions remain separate. (Codex, 2026-11-16. Reading the same posts in two views should not be required.)
 - Indicators are dots rather than counts.
 - A post's comments button shows a dot while the comments are closed and other users have commented since the user last read them. A post has a read position once the user has written it or opened its comments. A post the user has neither written nor opened shows no dot, so posts the user skipped never show one. A muted discussion shows no dot, because muting means the user does not want to hear about it. Posts written before the dot existed got a read position for their author at that upgrade, so later comments on them show the dot and earlier ones do not. The dot appears only on the button. A room's dot means new posts, because the feed is ordered by when a post was made and a new comment can be on a post far down it.
 - Notification settings are available in Settings and below the notification list. The post’s existing menu offers one action. Follow discussion appears when not following, and Mute discussion appears when following. The community chat and each room chat have a quiet menu for device alerts inside the chat. This control is hidden when chat is hidden or collapsed. The menu marks the current choice.
@@ -339,7 +326,7 @@ Comment and unread counts come from the server. The client refreshes them when c
 
 ## Interface
 
-**One shape per concept.** A topic is always the same pill. A place is a tile or a picture. A feature is a line icon. A person is a profile picture. A notice is always the same alert box. Being offline is a red badge in the bar.
+**One shape per concept.** A place is a tile or a picture. A feature is a line icon. A person is a profile picture. A notice is always the same alert box. Being offline is a red badge in the bar.
 
 - Timestamps use the viewer's local timezone and clock format throughout Sweet. Today shows the time. Yesterday shows Yesterday and the time. Other days show the date and time. Posts and membership details show only the date. Hovering a date shows the full date and time. Chat puts the day in a divider and the first message’s time beside the author of each message group. Edited posts and comments show only “edited”. This keeps dates consistent without repeating them on every message.
 
@@ -352,7 +339,7 @@ There are four kinds of button (2026-11-08).
 - **Ghost** is a quiet action, such as a toggle or Cancel.
 - **Danger** removes something. It has a red border and an icon.
 
-A toggle shows its state, and hovering shows its action. Subscribed is the state, and Unsubscribe appears on hover. A label is a verb, with an object when needed.
+A toggle shows its state, and hovering shows its action. Following is the state, and Unfollow appears on hover. A label is a verb, with an object when needed.
 
 ### Patterns
 
@@ -450,7 +437,7 @@ Data export and custom domains are also planned. Import will be built before exp
 
 ## Admin tools
 
-The Community page holds what the staff manage. A page about the community did not belong behind the owner's profile. Its cards are Reports, About this community, Welcome message, Rules and Topics. Each card shows only to those who may use it. The People page holds roles, removals and invite links.
+The Community page holds what the staff manage. A page about the community did not belong behind the owner's profile. Its cards are Reports, About this community, Welcome message and Rules. Each card shows only to those who may use it. The People page holds roles, removals and invite links.
 
 An approval queue, a pinned announcement and a list of posts with no reply are planned. Nothing more elaborate will be built until a community asks for it.
 
@@ -469,6 +456,8 @@ These decisions came from a security audit (2026-11-08).
 ## Record
 
 ### Reversed
+
+- **Rooms and topics (Raphael, 2026-11-16).** Rooms can be open to the community or private to invited members. Both have posts and chat. Home includes open-room posts and keeps community chat separate. Topics are removed because they duplicated the organisation provided by rooms. Existing rooms stay private and existing posts stay in their original location. Room modes no longer remove either capability. People may collapse either pane for themselves.
 
 - **One notification per discussion.** A discussion now has one entry, and new activity makes it unread again. Before, it had at most one unread entry, and activity after reading created a new one. A user reading a chat as messages arrived got one entry for every message. Entries made before the change stay as they were, until the user clears them.
 

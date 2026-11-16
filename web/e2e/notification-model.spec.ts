@@ -51,7 +51,7 @@ for (const suffix of ['', ' @phone']) {
     const me = await (await kit.context.request.get('/api/me')).json()
     const room = await (
       await boss.context.request.post('/api/groups', {
-        data: { kind: 'group', mode: 'chat', name: uniq('A long room name for our discussion ').slice(0, 40) },
+        data: { kind: 'group', mode: 'both', name: uniq('A long room name for our discussion ').slice(0, 40) },
       })
     ).json()
     await boss.context.request.post(`/api/groups/${room.id}/members`, { data: { user_id: me.id } })

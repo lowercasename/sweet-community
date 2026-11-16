@@ -51,7 +51,7 @@ type Comment struct{ AuthorID, PostAuthorID string }
 type Message struct{ AuthorID string }
 
 // Group holds the fields of a group that the rules use.
-type Group struct{ Kind string }
+type Group struct{ Kind, Visibility string }
 
 // EditPost allows only the author. Staff can delete a post but not edit it.
 func EditPost(a Actor, p Post) bool { return a.member() && a.ID == p.AuthorID }
@@ -101,10 +101,6 @@ func CreateGroup(root Actor, policy string) bool {
 // ManageInstance allows the root group's owner to edit instance settings.
 func ManageInstance(root Actor) bool { return root.Role == Owner }
 
-// ManageTopics allows the root group's staff to manage the community's list
-// of topics.
-func ManageTopics(root Actor) bool { return root.staff() }
-
 // ManageRules allows the root group's owner and moderators to write the community's rules.
 func ManageRules(root Actor) bool { return root.staff() }
 
@@ -135,14 +131,6 @@ func ByRole(a Actor, allowed func(Actor) bool) bool {
 	return allowed(a) && !allowed(Actor{ID: a.ID, Role: Member})
 }
 
-// SetTopic allows the author to set the topic of their own post, and the root
-// group's staff to set the topic of any post. It is the only change staff may
-// make to another user's post. Setting a topic is moderation, not rewriting. The actor's role is their role in the root
-// group, because only the community's feed has topics.
-func SetTopic(root Actor, p Post) bool {
-	return root.member() && (root.ID == p.AuthorID || root.staff())
-}
-
 // Transfer allows the owner to transfer ownership to another member of the group.
 func Transfer(a, target Actor) bool { return a.Role == Owner && target.member() && target.ID != a.ID }
 
@@ -150,10 +138,14 @@ func Transfer(a, target Actor) bool { return a.Role == Owner && target.member() 
 // because a conversation is identified by its participants, and a conversation
 // with a different set of participants is a different conversation. In the
 // root group, members are added by invite link.
-// RemoveMembers allows the group's staff. Nobody can be removed from a
-// conversation. A participant leaves it instead.
-func AddMembers(a Actor, g Group) bool { return g.Kind != KindDM && a.staff() }
-func RemoveMembers(a Actor) bool       { return a.staff() }
+func AddMembers(a Actor, g Group) bool {
+	return g.Kind != KindDM && (g.Kind == KindRoot || g.Visibility != "open") && a.staff()
+}
+
+// RemoveRoomMembers allows private room staff to remove members. Open rooms include the whole community.
+func RemoveRoomMembers(a Actor, g Group) bool {
+	return g.Kind == KindGroup && g.Visibility != "open" && a.staff()
+}
 
 // RemoveFromInstance allows root staff to
 // remove users with a lower role. A moderator can remove members. The owner
@@ -182,14 +174,12 @@ func SetRole(a, target Actor, role string) bool {
 	return role == Member || role == Moderator
 }
 
-// Rename and SetMode allow the owner. The root group cannot be renamed. A DM
-// cannot be renamed or changed from chat mode. DeleteGroup allows the owner,
-// and the root group cannot be deleted.
+// Only a room owner may rename or delete it. Only the community owner may change its mode.
 func Rename(a Actor, g Group) bool      { return a.Role == Owner && g.Kind == KindGroup }
-func SetMode(a Actor, g Group) bool     { return a.Role == Owner && g.Kind != KindDM }
+func SetMode(a Actor, g Group) bool     { return a.Role == Owner && g.Kind == KindRoot }
 func DeleteGroup(a Actor, g Group) bool { return a.Role == Owner && g.Kind != KindRoot }
 
-// Leave allows any member except the owner to leave any group except the
-// root. Leaving a room removes the membership. Leaving a conversation hides
-// it, and opening the conversation again restores it.
-func Leave(a Actor, g Group) bool { return a.member() && a.Role != Owner && g.Kind != KindRoot }
+// Leave allows private room members other than the owner to leave. Leaving a conversation hides it.
+func Leave(a Actor, g Group) bool {
+	return a.member() && a.Role != Owner && g.Kind != KindRoot && g.Visibility != "open"
+}

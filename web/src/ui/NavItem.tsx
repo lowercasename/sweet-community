@@ -11,6 +11,7 @@ interface NavItemProps {
   /** A group's or user's image (a Tile or an Avatar), drawn in place of the icon. */
   mark?: ReactNode
   label: string
+  privateRoom?: boolean
   /** Whether the nav bar is expanded. When it is collapsed, the label is hidden and shown in a tooltip instead. */
   expanded: boolean
   /** The item for the page being viewed. */
@@ -39,6 +40,7 @@ export function NavItem({
   size = 'md',
   dot = false,
   shield,
+  privateRoom = false,
   tour,
   onClick,
 }: NavItemProps) {
@@ -52,7 +54,7 @@ export function NavItem({
         type="button"
         aria-current={current ? 'page' : undefined}
         aria-label={name === label && expanded ? undefined : name}
-        aria-description={shield}
+        aria-description={privateRoom ? 'Private room' : shield}
         data-tour={tour}
         className={`group flex cursor-pointer items-center gap-3 rounded-[4px] text-mute transition-colors ${GHOST_HOVER} focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-pink ${GHOST_CURRENT} ${size === 'sm' ? 'h-8 text-sm' : 'h-10'} ${expanded ? 'px-3' : 'justify-center'}`}
         {...tip.props({ onClick })}
@@ -60,6 +62,11 @@ export function NavItem({
         <Dotted shown={dot}>{glyph}</Dotted>
         {/* The label is ink at regular weight, and the icon stays grey. The current item's label is red, as its icon is. */}
         {expanded && <span className="truncate text-ink group-aria-[current=page]:text-sweet">{label}</span>}
+        {expanded && privateRoom && (
+          <span className="ml-auto shrink-0">
+            <Icon name="lock" size={14} />
+          </span>
+        )}
         {expanded && shield !== undefined && <ShieldMark size={16} />}
       </button>
       {tip.tooltip}

@@ -92,6 +92,7 @@ export function Sidebar({ me, groups, location, expanded, onGo, onToggle }: Side
               key={g.id}
               mark={<Tile name={g.name} picture={g.picture} />}
               label={g.name}
+              privateRoom={g.visibility === 'private'}
               expanded={expanded}
               size="sm"
               dot={anyUnread(places.get(g.id))}
@@ -133,7 +134,7 @@ export function Sidebar({ me, groups, location, expanded, onGo, onToggle }: Side
         current={at(location, '/people')}
         onClick={() => onGo('/people')}
       />
-      {(root?.can.manage_instance || root?.can.manage_topics) && (
+      {(root?.can.manage_instance || root?.can.manage_rules) && (
         <NavItem
           icon="settings"
           label="Community"

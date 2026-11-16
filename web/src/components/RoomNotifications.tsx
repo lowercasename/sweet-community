@@ -1,8 +1,9 @@
+import { ROOT_ID } from '../data/keys'
 import { useState } from 'react'
 import { useRoomNotificationPreference } from '../data/hooks'
 import { useStreamStatus } from '../hooks/StreamContext'
 import type { RoomNotificationMode } from '../api'
-import { Alert, Menu, Row } from '../ui'
+import { Alert, Menu, Row, Text } from '../ui'
 
 export function RoomNotifications({ groupId }: { groupId: string }) {
   const disabled = useStreamStatus() === 'offline'
@@ -28,7 +29,8 @@ export function RoomNotifications({ groupId }: { groupId: string }) {
   const label = choices.find((choice) => choice.mode === data?.mode)?.label ?? 'Loading…'
   return (
     <>
-      <Row pad="compact" justify="end" align="center" shrink={false}>
+      <Row pad="compact" justify="between" align="center" shrink={false}>
+        <Text weight="bold">{groupId === ROOT_ID ? 'Community chat' : 'Chat'}</Text>
         <Menu
           label={`Chat device alerts: ${label}`}
           heading="Notifications for this chat"

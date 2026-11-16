@@ -593,3 +593,45 @@ func TestNotificationUpgradeGroupsUnreadAndReconcilesChatMarkers(t *testing.T) {
 		t.Fatalf("user content changed: %q %v", body, err)
 	}
 }
+
+func TestOpenRoomsUpgradePreservesPrivateContent(t *testing.T) {
+	d, err := Open(filepath.Join(t.TempDir(), "sweet.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer d.Close()
+	migratedTo(t, d, "017")
+	const root = "00000000-0000-7000-8000-000000000000"
+	for _, query := range []string{
+		`INSERT INTO users (id, username, created_at) VALUES ('u', 'kit', 1)`,
+		`INSERT INTO groups (id, kind, name, mode, created_at) VALUES ('room', 'group', 'Private plans', 'chat', 1)`,
+		`INSERT INTO memberships (group_id, user_id, role, joined_at) VALUES ('room', 'u', 'owner', 1)`,
+		`INSERT INTO topics (id, name, created_at) VALUES ('t', 'Practice question', 1)`,
+		`INSERT INTO posts (id, group_id, author_id, topic_id, body_html, body_text, created_at) VALUES ('p', '` + root + `', 'u', 't', '<p>Original post</p>', 'Original post', 1)`,
+		`INSERT INTO messages (id, group_id, author_id, body_html, body_text, created_at) VALUES ('m', 'room', 'u', '<p>Private chat</p>', 'Private chat', 1)`,
+		`INSERT INTO events (kind, payload, created_at) VALUES ('group', '{"id":"room","mode":"chat"}', 1)`,
+	} {
+		if _, err := d.Exec(query); err != nil {
+			t.Fatal(err)
+		}
+	}
+	migratedTo(t, d, "018")
+	var private, content, home bool
+	if err := d.QueryRow(`SELECT visibility = 'private' AND mode = 'both' AND name = 'Private plans' FROM groups WHERE id = 'room'`).Scan(&private); err != nil || !private {
+		t.Fatalf("private room retained: %v %v", private, err)
+	}
+	if err := d.QueryRow(`SELECT group_id = ? AND topic_id = 't' AND body_html = '<p>Original post</p>' FROM posts WHERE id = 'p'`, root).Scan(&content); err != nil || !content {
+		t.Fatalf("post retained: %v %v", content, err)
+	}
+	if err := d.QueryRow(`SELECT visibility = 'open' FROM groups WHERE id = ?`, root).Scan(&home); err != nil || !home {
+		t.Fatalf("community audience: %v %v", home, err)
+	}
+	var body string
+	if err := d.QueryRow(`SELECT body_html FROM messages WHERE id = 'm'`).Scan(&body); err != nil || body != "<p>Private chat</p>" {
+		t.Fatalf("message retained: %q %v", body, err)
+	}
+	var n int
+	if err := d.QueryRow(`SELECT COUNT(*) FROM events WHERE kind = 'group'`).Scan(&n); err != nil || n != 0 {
+		t.Fatalf("stale group events: %d %v", n, err)
+	}
+}

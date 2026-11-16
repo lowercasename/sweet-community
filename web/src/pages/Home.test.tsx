@@ -129,7 +129,7 @@ describe('Home', () => {
   it('shows the root group and fetches its posts and its messages once each', async () => {
     const { getPosts, getMessages } = await import('../api')
     await home()
-    expect(getPosts).toHaveBeenCalledWith(ROOT, null, 20, null)
+    expect(getPosts).toHaveBeenCalledWith(ROOT, null, 20)
     expect(getMessages).toHaveBeenCalledWith(ROOT, null)
   })
 

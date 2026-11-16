@@ -354,27 +354,16 @@ func TestGroupModeAndInstanceSetting(t *testing.T) {
 	kit, _ := registerMember(t, ts, owner, "kit")
 	mo, moID := registerMember(t, ts, owner, "mo")
 
-	// A group's only setting is its mode. A chat-only group has no feed.
-	room := kit.mustStatus(201, "POST", "/api/groups", map[string]string{"name": "Room", "mode": "chat"})
+	// Every room has posts and chat. Its audience is independent of those capabilities.
+	kit.mustStatus(400, "POST", "/api/groups", map[string]string{"name": "Room", "mode": "chat"})
+	room := kit.mustStatus(201, "POST", "/api/groups", map[string]string{"name": "Room"})
 	rid := room["id"].(string)
-	if room["mode"] != "chat" {
-		t.Fatalf("mode: %v", room)
-	}
-	kit.mustStatus(403, "POST", "/api/groups/"+rid+"/posts", map[string]string{"body_html": "<p>x</p>"})
+	kit.mustStatus(201, "POST", "/api/groups/"+rid+"/posts", map[string]string{"body_html": "<p>x</p>"})
 	kit.mustStatus(201, "POST", "/api/groups/"+rid+"/messages", map[string]string{"body_html": "<p>hi</p>"})
-	both := kit.mustStatus(200, "PUT", "/api/groups/"+rid, map[string]string{"mode": "both"})
-	if both["mode"] != "both" || both["name"] != "Room" {
-		t.Fatalf("mode change: %v", both)
-	}
-	// The response is the group as its owner sees it, including the flags. A
-	// group without flags would remove the owner's controls as soon as they saved.
-	if both["role"] != "owner" || !groupCan(both, "rename") || !groupCan(both, "set_mode") || !groupCan(both, "delete") {
-		t.Fatalf("reply to an update is not personalised: %v", both)
-	}
-	kit.mustStatus(201, "POST", "/api/groups/"+rid+"/posts", map[string]string{"body_html": "<p>now ok</p>"})
-	kit.mustStatus(400, "PUT", "/api/groups/"+rid, map[string]string{"mode": "video"})
-	if g := kit.mustStatus(201, "POST", "/api/groups", map[string]string{"name": "Default"}); g["mode"] != "both" {
-		t.Fatalf("default mode: %v", g)
+	kit.mustStatus(403, "PUT", "/api/groups/"+rid, map[string]string{"mode": "posts"})
+	renamed := kit.mustStatus(200, "PUT", "/api/groups/"+rid, map[string]string{"name": "Renamed"})
+	if renamed["mode"] != "both" || !groupCan(renamed, "rename") || groupCan(renamed, "set_mode") {
+		t.Fatalf("room capabilities: %v", renamed)
 	}
 	// A DM is chat only, and its mode cannot be changed.
 	dm := kit.mustStatus(201, "POST", "/api/groups", map[string]any{"kind": "dm", "members": []string{moID}})

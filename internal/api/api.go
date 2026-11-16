@@ -45,25 +45,22 @@ type Can struct {
 	// DeleteByRole is true when Delete is allowed only because of the viewer's role in the item's group. The client
 	// marks that Delete with a shield.
 	DeleteByRole bool `json:"delete_by_role,omitempty"`
-	// SetTopic is set only on a post. The author or the root group's staff may set its topic.
-	SetTopic bool `json:"set_topic,omitempty"`
 }
 
 // Post is the wire shape of a post. It carries no event sequence, because the
 // SSE "id:" line is the sequence and the feed paginates by created_at.
 type Post struct {
-	ID      string `json:"id"`
-	GroupID string `json:"group_id"`
-	// TopicID is the id of the post's topic, or null.
-	TopicID      *string    `json:"topic_id"`
-	Author       User       `json:"author"`
-	BodyHTML     string     `json:"body_html"`
-	BodyText     string     `json:"body_text"`
-	CreatedAt    int64      `json:"created_at"`
-	EditedAt     *int64     `json:"edited_at"`
-	CommentCount int64      `json:"comment_count"`
-	Reactions    []Reaction `json:"reactions"`
-	Can          Can        `json:"can"`
+	ID              string     `json:"id"`
+	GroupID         string     `json:"group_id"`
+	GroupVisibility string     `json:"group_visibility"`
+	Author          User       `json:"author"`
+	BodyHTML        string     `json:"body_html"`
+	BodyText        string     `json:"body_text"`
+	CreatedAt       int64      `json:"created_at"`
+	EditedAt        *int64     `json:"edited_at"`
+	CommentCount    int64      `json:"comment_count"`
+	Reactions       []Reaction `json:"reactions"`
+	Can             Can        `json:"can"`
 }
 
 // forViewer fills in the viewer's can flags on a post, comment, message, group,
@@ -83,7 +80,6 @@ func forViewer(a perm.Actor, v any, st Settings) any {
 		p.Can = Can{
 			Edit: perm.EditPost(a, pp), Delete: perm.DeletePost(a, pp), Report: perm.Report(a, pp.AuthorID),
 			DeleteByRole: perm.ByRole(a, func(x perm.Actor) bool { return perm.DeletePost(x, pp) }),
-			SetTopic:     p.GroupID == perm.Root && perm.SetTopic(a, pp),
 		}
 		return &p
 	case *Comment:
@@ -228,13 +224,6 @@ func (s *Server) Routes(mux *http.ServeMux) {
 	s.previewLimiter.every, s.previewLimiter.burst = 2*time.Second, 30
 	mux.HandleFunc("GET /api/previews", s.requireAuth(s.linkPreview))
 	mux.HandleFunc("PUT /api/posts/{id}", s.requireAuth(s.editPost))
-	mux.HandleFunc("PUT /api/posts/{id}/topic", s.requireAuth(s.setPostTopic))
-	mux.HandleFunc("GET /api/topics", s.requireAuth(s.listTopics))
-	mux.HandleFunc("POST /api/topics", s.requireRoot(perm.ManageTopics, s.createTopic))
-	mux.HandleFunc("PUT /api/topics/{id}", s.requireRoot(perm.ManageTopics, s.updateTopic))
-	mux.HandleFunc("DELETE /api/topics/{id}", s.requireRoot(perm.ManageTopics, s.deleteTopic))
-	mux.HandleFunc("PUT /api/topics/{id}/follow", s.requireAuth(s.followTopic))
-	mux.HandleFunc("DELETE /api/topics/{id}/follow", s.requireAuth(s.unfollowTopic))
 	mux.HandleFunc("DELETE /api/posts/{id}", s.requireAuth(s.deletePost))
 	mux.HandleFunc("GET /api/posts/{id}/comments", s.requireAuth(s.listComments))
 	mux.HandleFunc("POST /api/posts/{id}/comments", s.requireAuth(s.createComment))
@@ -302,18 +291,14 @@ func writeErr(w http.ResponseWriter, status int, msg string) {
 const ServerErrorMessage = "Something went wrong on the server. Try again in a moment."
 
 func (s *Server) listPosts(w http.ResponseWriter, r *http.Request) {
-	g, a := groupFrom(r.Context())
+	g, _ := groupFrom(r.Context())
+	me, _ := userFrom(r.Context())
 	before, limit, err := pageParams(r, 20, 100)
 	if err != nil {
 		writeErr(w, http.StatusBadRequest, err.Error())
 		return
 	}
-	// ?topic= filters the community's feed to one topic.
-	var topic any
-	if t := r.URL.Query().Get("topic"); t != "" {
-		topic = t
-	}
-	rows, err := s.q().ListPosts(r.Context(), store.ListPostsParams{GroupID: g.ID, Before: before.CreatedAt, BeforeID: before.ID, TopicID: topic, PageSize: int64(limit + 1)})
+	rows, err := s.q().ListPosts(r.Context(), store.ListPostsParams{GroupID: g.ID, Before: before.CreatedAt, BeforeID: before.ID, PageSize: int64(limit + 1)})
 	if err != nil {
 		writeErr(w, http.StatusInternalServerError, err.Error())
 		return
@@ -321,6 +306,14 @@ func (s *Server) listPosts(w http.ResponseWriter, r *http.Request) {
 	posts := make([]Post, 0, len(rows))
 	for _, row := range rows {
 		p := wirePost(store.GetPostRow(row))
+		a, err := actorIn(r.Context(), s.q(), me, p.GroupID)
+		if err != nil {
+			writeErr(w, http.StatusInternalServerError, err.Error())
+			return
+		}
+		if !perm.CanSee(a) {
+			continue
+		}
 		posts = append(posts, *forViewer(a, &p, Settings{}).(*Post))
 	}
 	posts, next := page(posts, limit, func(p Post) pageCursor { return pageCursor{p.CreatedAt, p.ID} })
@@ -387,32 +380,7 @@ func readMessageBody(w http.ResponseWriter, r *http.Request) (clean string, repl
 	return clean, in.ReplyTo, true
 }
 
-// readPostBody is readBody with the post's optional topic_id.
-func readPostBody(w http.ResponseWriter, r *http.Request) (clean string, topicID *string, ok bool) {
-	var in struct {
-		BodyHTML string  `json:"body_html"`
-		TopicID  *string `json:"topic_id"`
-	}
-	r.Body = http.MaxBytesReader(w, r.Body, sanitize.MaxBodyBytes)
-	if err := json.NewDecoder(r.Body).Decode(&in); err != nil {
-		writeErr(w, http.StatusBadRequest, "Bad request")
-		return "", nil, false
-	}
-	clean = sanitize.Body(in.BodyHTML)
-	if sanitize.IsEmpty(clean) {
-		writeErr(w, http.StatusBadRequest, "The body is empty")
-		return "", nil, false
-	}
-	if in.TopicID != nil && *in.TopicID == "" {
-		in.TopicID = nil
-	}
-	return clean, in.TopicID, true
-}
-
-// logged runs fn inside a write transaction, logs the one event fn returns,
-// commits, notifies subscribers, and responds with the payload personalised
-// for the actor. fn returns the resource without can flags. The log stores it
-// that way and every reader adds their own view.
+// logged writes the resource and its event in one transaction. The response includes the viewer's permissions.
 func (s *Server) logged(w http.ResponseWriter, r *http.Request, kind string, now int64, fn func(qtx *store.Queries) (payload any, status int, err error)) {
 	s.loggedMany(w, r, now, func(qtx *store.Queries) ([]events.Entry, any, int, error) {
 		payload, status, err := fn(qtx)
@@ -494,7 +462,7 @@ func (s *Server) loggedMany(w http.ResponseWriter, r *http.Request, now int64, f
 var errNotFound = errors.New("Not found")
 
 func (s *Server) createPost(w http.ResponseWriter, r *http.Request) {
-	clean, topicID, ok := readPostBody(w, r)
+	clean, ok := readBody(w, r)
 	if !ok {
 		return
 	}
@@ -505,7 +473,7 @@ func (s *Server) createPost(w http.ResponseWriter, r *http.Request) {
 	}
 	author, _ := userFrom(r.Context())
 	now := db.Now()
-	// The post, a notification to each user it mentions, and a notification to each follower of its topic are written in one transaction.
+	// The post and its mention notifications are written in one transaction.
 	s.loggedMany(w, r, now, func(qtx *store.Queries) ([]events.Entry, any, int, error) {
 		g, a, status, err := s.groupActor(r, qtx)
 		if err != nil {
@@ -517,20 +485,8 @@ func (s *Server) createPost(w http.ResponseWriter, r *http.Request) {
 		if g.Mode == perm.ModeChat {
 			return nil, nil, http.StatusForbidden, errors.New("This room has no posts")
 		}
-		// Only the community's feed has topics.
-		if topicID != nil && g.ID != perm.Root {
-			return nil, nil, http.StatusBadRequest, errors.New("Only posts on the community's feed have topics")
-		}
-
-		if status, err := topicExists(r, qtx, topicID); err != nil {
-			return nil, nil, status, err
-		}
-		topic := sql.NullString{}
-		if topicID != nil {
-			topic = sql.NullString{String: *topicID, Valid: true}
-		}
 		text := sanitize.Text(clean)
-		if err := qtx.CreatePost(r.Context(), store.CreatePostParams{ID: id.String(), GroupID: g.ID, AuthorID: author.ID, TopicID: topic, BodyHtml: clean, BodyText: text, CreatedAt: now}); err != nil {
+		if err := qtx.CreatePost(r.Context(), store.CreatePostParams{ID: id.String(), GroupID: g.ID, AuthorID: author.ID, BodyHtml: clean, BodyText: text, CreatedAt: now}); err != nil {
 			return nil, nil, http.StatusInternalServerError, err
 		}
 		if status, err := recordUses(r.Context(), qtx, "post", id.String(), author.ID, clean); err != nil {
@@ -553,13 +509,6 @@ func (s *Server) createPost(w http.ResponseWriter, r *http.Request) {
 			return nil, nil, http.StatusInternalServerError, err
 		}
 		entries = append(entries, told...)
-		if topic.Valid {
-			followers, err := tellFollowers(r, qtx, topic.String, pid, author.ID, now, sanitize.Mentions(clean)...)
-			if err != nil {
-				return nil, nil, http.StatusInternalServerError, err
-			}
-			entries = append(entries, followers...)
-		}
 		return entries, &p, http.StatusCreated, nil
 	})
 }

@@ -17,7 +17,7 @@ test('identity changes refresh open views and removal clears old names and pictu
       pictures.push(await upload.json())
     }
     expect((await kit.context.request.put('/api/me/picture', { data: { image_id: pictures[0].id } })).ok()).toBeTruthy()
-    const room = await o.context.request.post('/api/groups', { data: { name: uniq('Identity '), mode: 'chat' } })
+    const room = await o.context.request.post('/api/groups', { data: { name: uniq('Identity '), mode: 'both' } })
     expect(room.status()).toBe(201)
     const rid = ((await room.json()) as { id: string }).id
     expect((await o.context.request.post(`/api/groups/${rid}/members`, { data: { user_id: uid } })).status()).toBe(201)

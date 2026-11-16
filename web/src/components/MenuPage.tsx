@@ -56,6 +56,7 @@ export function MenuPage({ me, groups, onGo, onLogout }: MenuPageProps) {
                   key={g.id}
                   mark={<Tile name={g.name} picture={g.picture} />}
                   label={g.name}
+                  privateRoom={g.visibility === 'private'}
                   expanded
                   size="sm"
                   dot={anyUnread(places.get(g.id))}
@@ -67,7 +68,7 @@ export function MenuPage({ me, groups, onGo, onLogout }: MenuPageProps) {
           <ConversationsSection groups={groups} me={me} places={places} expanded onGo={onGo} />
           <Hairline />
           <NavItem icon="people" label="People" expanded onClick={() => onGo('/people')} />
-          {(root?.can.manage_instance || root?.can.manage_topics) && (
+          {(root?.can.manage_instance || root?.can.manage_rules) && (
             <NavItem
               icon="settings"
               label="Community"

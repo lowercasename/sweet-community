@@ -10,13 +10,10 @@ export interface TourContext {
   phone: boolean
   owner: boolean
   canCreateRooms: boolean
-  /** The name of one of the community's topics, when it has any. */
-  topic?: string
   hasRules: boolean
 }
 
-export type TourStepId =
-  'posts' | 'chat' | 'divider' | 'topics' | 'rooms' | 'conversations' | 'rules' | 'community' | 'welcome'
+export type TourStepId = 'posts' | 'chat' | 'divider' | 'rooms' | 'conversations' | 'rules' | 'community' | 'welcome'
 
 export interface TourStep {
   id: TourStepId
@@ -68,17 +65,6 @@ export function tourSteps(c: TourContext): TourStep[] {
       ],
     })
   }
-  if (c.topic) {
-    drafts.push({
-      id: 'topics',
-      target: 'topics',
-      placement: 'bottom',
-      title: 'Topics',
-      body: [
-        `A post can have a topic, such as ${c.topic}. Choose a topic here to see only its posts. While a topic is chosen, anything you post goes into it. Subscribe to a topic to get a notification when someone posts in it.`,
-      ],
-    })
-  }
   if (c.canCreateRooms) {
     const example = owner
       ? `You could make one for you and the moderators who help you run ${community}, or for a few people who share an interest.`
@@ -88,7 +74,7 @@ export function tourSteps(c: TourContext): TourStep[] {
       ...(phone ? menu : { target: 'rooms', placement: 'right' }),
       title: 'Rooms',
       body: [
-        `A room is a private space with its own posts and chat. Only the people in it can see it. ${example} ${phone ? 'Your rooms are in the Menu, and you can create one there.' : 'Create one with the plus button, then add people to it.'}`,
+        `A room has its own posts and chat. Open rooms are available to everyone in the community. Private rooms are visible only to invited members. ${example} ${phone ? 'Your rooms are in the Menu, and you can create one there.' : 'Create one with the plus button.'}`,
       ],
     })
   }
@@ -116,7 +102,7 @@ export function tourSteps(c: TourContext): TourStep[] {
       ...(phone ? menu : { target: 'community', placement: 'right' }),
       title: `Running ${community}`,
       body: [
-        `${phone ? 'The Community page is in the Menu. ' : ''}The Community page is where you look after ${community}. You can change its name and description, write its rules, add topics, and see posts and messages that members have reported. A shield marks any action or section that only you and your moderators can see.`,
+        `${phone ? 'The Community page is in the Menu. ' : ''}The Community page is where you look after ${community}. You can change its name and description, write its rules and see posts and messages that members have reported. A shield marks any action or section that only you and your moderators can see.`,
         `Moderators help you look after ${community}. You choose them on the People page, and you invite new people there too.`,
       ],
     })
@@ -126,7 +112,7 @@ export function tourSteps(c: TourContext): TourStep[] {
       placement: 'center',
       title: 'Write a welcome message',
       body: [
-        `Everyone who joins sees your welcome message when they first open ${community}. You might ask them to introduce themselves in an Introductions topic, to read the rules, or to say hello in the chat.`,
+        `Everyone who joins sees your welcome message when they first open ${community}. You might ask them to introduce themselves in a post, to read the rules, or to say hello in the chat.`,
       ],
     })
   }

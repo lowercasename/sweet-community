@@ -182,7 +182,7 @@ func filterEvent(viewer User, roles map[string]string, st *Settings, e events.Ev
 		}
 		_, ok := inGroup(rs.GroupID)
 		return e, ok
-	case "user", "settings", "rules", "welcome", "topic", "topic_delete":
+	case "user", "settings", "rules", "welcome":
 		return e, true
 	default:
 		return e, false

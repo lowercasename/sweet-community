@@ -15,31 +15,10 @@ export interface Can {
   report: boolean
   /** Whether I may delete it only because of my role in its group. Such a Delete is marked with the shield. */
   delete_by_role?: boolean
-  /**
-   * Posts only. Whether I may file the post under a topic. This is true for the post's
-   * author and for the community's staff.
-   */
-  set_topic?: boolean
-}
-
-/**
- * A topic. A topic is a label on a post in the
- * community's feed. A post has at most one topic. The staff manage the list of
- * topics. `following` is the current user's follow state.
- */
-export interface Topic {
-  id: string
-  name: string
-  description: string
-  created_at: number
-  post_count: number
-  follower_count: number
-  following: boolean
 }
 
 export type Role = 'owner' | 'moderator' | 'member'
 
-/** A user on the instance, with their role in the root group. */
 export interface Member extends User {
   role: Role
   joined_at: number
@@ -61,8 +40,6 @@ export interface GroupCan {
   create_groups?: boolean
   /** Root group only. Whether the current user may edit the instance's settings. */
   manage_instance?: boolean
-  /** Root group only. Whether the current user may manage the topics. The owner and moderators may. */
-  manage_topics?: boolean
   /** Root group only. Whether the current user may write the rules. The owner and moderators may. */
   manage_rules?: boolean
   /** Root group only. Whether the current user may write the welcome message. The owner and moderators may. */
@@ -70,6 +47,8 @@ export interface GroupCan {
   /** Root group only. Whether the current user reads and closes reports. The owner and moderators do. */
   handle_reports?: boolean
 }
+
+export type RoomVisibility = 'open' | 'private'
 
 export type GroupMode = 'posts' | 'chat' | 'both'
 
@@ -90,10 +69,11 @@ export interface Settings {
 
 /** A group as its viewer sees it. The group of kind root represents the instance. */
 export interface Group {
+  visibility: RoomVisibility
   id: string
   kind: 'root' | 'group' | 'dm'
   name: string
-  /** The group's only setting: posts, chat or both. A DM is always chat. */
+  /** Rooms have both posts and chat. A DM has chat only. */
   mode: GroupMode
   created_at: number
   /** A room's picture, or null to show the tile with the room's initial. */
@@ -156,11 +136,7 @@ export interface Session {
 export interface Post {
   id: string
   group_id: string
-  /**
-   * The topic the post is filed under, or null. The client looks up the topic's name in the
-   * topics cache at render time.
-   */
-  topic_id: string | null
+  group_visibility: RoomVisibility
   author: User
   body_html: string
   body_text: string
@@ -421,8 +397,8 @@ export function listGroups(): Promise<{ groups: Group[] }> {
   return request('/api/groups')
 }
 
-export function createGroup(name: string, mode: GroupMode): Promise<Group> {
-  return request<Group>('/api/groups', json('POST', { name, mode }))
+export function createGroup(name: string, visibility: RoomVisibility): Promise<Group> {
+  return request<Group>('/api/groups', json('POST', { name, visibility }))
 }
 
 export function updateGroup(groupId: string, patch: { name?: string; mode?: GroupMode }): Promise<Group> {
@@ -482,15 +458,9 @@ export function removeMember(groupId: string, userId: string): Promise<Membershi
   return request<Membership | undefined>(`${g(groupId)}/members/${encodeURIComponent(userId)}`, { method: 'DELETE' })
 }
 
-export function getPosts(
-  groupId: string,
-  before?: string | null,
-  limit = 20,
-  topicId?: string | null,
-): Promise<PostPage> {
+export function getPosts(groupId: string, before?: string | null, limit = 20): Promise<PostPage> {
   const params = new URLSearchParams({ limit: String(limit) })
   if (before != null) params.set('before', String(before))
-  if (topicId) params.set('topic', topicId)
   return request<PostPage>(`${g(groupId)}/posts?${params}`)
 }
 
@@ -502,40 +472,8 @@ export function getPost(id: string): Promise<Post> {
   return request<Post>(`/api/posts/${encodeURIComponent(id)}`)
 }
 
-export function createPost(groupId: string, bodyHtml: string, topicId: string | null = null): Promise<Post> {
-  return request<Post>(`${g(groupId)}/posts`, json('POST', { body_html: bodyHtml, topic_id: topicId }))
-}
-
-/**
- * Files a post under a topic, or under no topic. Only the post's author or the community's
- * staff can do this.
- */
-export function setPostTopic(id: string, topicId: string | null): Promise<Post> {
-  return request<Post>(`/api/posts/${encodeURIComponent(id)}/topic`, json('PUT', { topic_id: topicId }))
-}
-
-export function listTopics(): Promise<{ topics: Topic[] }> {
-  return request('/api/topics')
-}
-
-export function createTopic(name: string, description: string): Promise<Topic> {
-  return request<Topic>('/api/topics', json('POST', { name, description }))
-}
-
-export function updateTopic(id: string, name: string, description: string): Promise<Topic> {
-  return request<Topic>(`/api/topics/${encodeURIComponent(id)}`, json('PUT', { name, description }))
-}
-
-export async function deleteTopic(id: string): Promise<void> {
-  await request(`/api/topics/${encodeURIComponent(id)}`, { method: 'DELETE' })
-}
-
-/**
- * Follows a topic, so that I get notifications for posts in it, or unfollows it. The response is the topic as I now
- * see it.
- */
-export function followTopic(id: string, on: boolean): Promise<Topic> {
-  return request<Topic>(`/api/topics/${encodeURIComponent(id)}/follow`, { method: on ? 'PUT' : 'DELETE' })
+export function createPost(groupId: string, bodyHtml: string): Promise<Post> {
+  return request<Post>(`${g(groupId)}/posts`, json('POST', { body_html: bodyHtml }))
 }
 
 export function updatePost(id: string, bodyHtml: string): Promise<Post> {

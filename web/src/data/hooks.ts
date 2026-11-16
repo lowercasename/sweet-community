@@ -27,12 +27,6 @@ import {
   createInvite,
   createMessage,
   createPost,
-  createTopic,
-  deleteTopic,
-  followTopic,
-  listTopics,
-  setPostTopic,
-  updateTopic,
   deleteComment,
   deleteGroup,
   deleteMessage,
@@ -71,6 +65,7 @@ import {
   updatePost,
   type Group,
   type GroupMode,
+  type RoomVisibility,
   type Invite,
   type Reactions,
   type Member,
@@ -79,10 +74,9 @@ import {
   type ReportKind,
   type Role,
   type Settings,
-  type Topic,
   type User,
 } from '../api'
-import { applyEvent, applyFollowing, refetchForOwnRole, refreshIdentities } from './apply'
+import { applyEvent, refetchForOwnRole, refreshIdentities } from './apply'
 import { ROOT_ID, keys } from './keys'
 import { hasUnread, type Markers, newerMarkers, NOTIFICATIONS, unreadPlaces, type UnreadPlace } from './notifications'
 
@@ -196,10 +190,10 @@ function usePages<P extends { next_before: string | null }, T extends { id: stri
   }
 }
 
-export function usePosts(groupId: string, topicId: string | null = null) {
+export function usePosts(groupId: string) {
   const { items, ...rest } = usePages(
-    keys.posts(groupId, topicId),
-    (before) => getPosts(groupId, before, 20, topicId),
+    keys.posts(groupId),
+    (before) => getPosts(groupId, before, 20),
     (p) => p.posts,
   )
   return { posts: items, ...rest }
@@ -220,15 +214,11 @@ export function usePost(id: string, enabled = true) {
 export function usePostActions(groupId: string) {
   const qc = useQueryClient()
   return {
-    async create(html: string, topicId: string | null = null) {
-      applyEvent(qc, 'post', await createPost(groupId, html, topicId))
+    async create(html: string) {
+      applyEvent(qc, 'post', await createPost(groupId, html))
     },
     async edit(id: string, html: string) {
       applyEvent(qc, 'post', await updatePost(id, html))
-    },
-    /** Sets a post's topic, or clears it with null. */
-    async setTopic(id: string, topicId: string | null) {
-      applyEvent(qc, 'post', await setPostTopic(id, topicId))
     },
     async remove(id: string) {
       await deletePost(id)
@@ -329,8 +319,8 @@ export function useMembers(groupId: string) {
 export function useGroupActions() {
   const qc = useQueryClient()
   return {
-    async create(name: string, mode: GroupMode): Promise<Group> {
-      const g = await createGroup(name, mode)
+    async create(name: string, visibility: RoomVisibility): Promise<Group> {
+      const g = await createGroup(name, visibility)
       applyEvent(qc, 'group', g)
       return g
     },
@@ -480,33 +470,7 @@ export function useSetBio() {
   }
 }
 
-/** The instance's settings. Only the root owner may request them. */
 /** The community's settings, mainly its name, which every page shows. Public, so the sign-in page reads them too. */
-/** The community's topics, alphabetical, each with whether the user follows it. */
-export function useTopics(): { topics: Topic[]; loading: boolean; error: Error | null } {
-  const q = useQuery({ queryKey: keys.topics, queryFn: listTopics })
-  return { topics: q.data?.topics ?? [], loading: q.isPending, error: q.error }
-}
-
-export function useTopicActions() {
-  const qc = useQueryClient()
-  return {
-    async create(name: string, description: string) {
-      applyEvent(qc, 'topic', await createTopic(name, description))
-    },
-    async update(id: string, name: string, description: string) {
-      applyEvent(qc, 'topic', await updateTopic(id, name, description))
-    },
-    async remove(id: string) {
-      await deleteTopic(id)
-      applyEvent(qc, 'topic_delete', { id })
-    },
-    async follow(id: string, on: boolean) {
-      applyFollowing(qc, await followTopic(id, on))
-    },
-  }
-}
-
 export function useSettings() {
   const q = useQuery({ queryKey: keys.settings, queryFn: getSettings })
   return { settings: q.data, error: q.error }

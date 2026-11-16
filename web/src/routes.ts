@@ -27,9 +27,6 @@ export const COMMUNITY = '/community'
 /** The community's rules. */
 export const RULES = '/rules'
 
-/** The community's feed filtered to one topic. */
-export const topicPath = (id: string) => `/?topic=${encodeURIComponent(id)}`
-
 /** A user's profile page. */
 export const profilePath = (name: string) => `/u/${encodeURIComponent(name)}`
 

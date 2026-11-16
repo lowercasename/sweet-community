@@ -10,6 +10,23 @@ import (
 	"database/sql"
 )
 
+const addCommunityToRoom = `-- name: AddCommunityToRoom :exec
+INSERT INTO memberships (group_id, user_id, role, joined_at)
+SELECT ?1, user_id, 'member', ?2
+FROM memberships WHERE group_id = '00000000-0000-7000-8000-000000000000'
+ON CONFLICT (group_id, user_id) DO NOTHING
+`
+
+type AddCommunityToRoomParams struct {
+	GroupID  string
+	JoinedAt int64
+}
+
+func (q *Queries) AddCommunityToRoom(ctx context.Context, arg AddCommunityToRoomParams) error {
+	_, err := q.db.ExecContext(ctx, addCommunityToRoom, arg.GroupID, arg.JoinedAt)
+	return err
+}
+
 const countMembers = `-- name: CountMembers :one
 SELECT COUNT(*) FROM memberships WHERE group_id = ?1 AND hidden_at IS NULL
 `
@@ -130,7 +147,7 @@ func (q *Queries) DeleteMembership(ctx context.Context, arg DeleteMembershipPara
 }
 
 const getDMByPeople = `-- name: GetDMByPeople :one
-SELECT g.id, g.kind, g.name, g.mode, g.created_at, g.picture_id,
+SELECT g.id, g.kind, g.name, g.mode, g.visibility, g.created_at, g.picture_id,
        (SELECT MAX(created_at) FROM messages WHERE group_id = g.id AND deleted_at IS NULL AND kind = 'message') AS last_message_at
 FROM groups g WHERE g.kind = 'dm' AND g.people_key = ?1 AND g.deleted_at IS NULL
 `
@@ -140,6 +157,7 @@ type GetDMByPeopleRow struct {
 	Kind          string
 	Name          string
 	Mode          string
+	Visibility    string
 	CreatedAt     int64
 	PictureID     sql.NullString
 	LastMessageAt interface{}
@@ -155,6 +173,7 @@ func (q *Queries) GetDMByPeople(ctx context.Context, peopleKey sql.NullString) (
 		&i.Kind,
 		&i.Name,
 		&i.Mode,
+		&i.Visibility,
 		&i.CreatedAt,
 		&i.PictureID,
 		&i.LastMessageAt,
@@ -164,7 +183,7 @@ func (q *Queries) GetDMByPeople(ctx context.Context, peopleKey sql.NullString) (
 
 const getGroup = `-- name: GetGroup :one
 
-SELECT g.id, g.kind, g.name, g.mode, g.created_at, g.picture_id,
+SELECT g.id, g.kind, g.name, g.mode, g.visibility, g.created_at, g.picture_id,
        (SELECT MAX(created_at) FROM messages WHERE group_id = g.id AND deleted_at IS NULL AND kind = 'message') AS last_message_at
 FROM groups g WHERE g.id = ?1 AND g.deleted_at IS NULL
 `
@@ -174,6 +193,7 @@ type GetGroupRow struct {
 	Kind          string
 	Name          string
 	Mode          string
+	Visibility    string
 	CreatedAt     int64
 	PictureID     sql.NullString
 	LastMessageAt interface{}
@@ -190,6 +210,7 @@ func (q *Queries) GetGroup(ctx context.Context, id string) (GetGroupRow, error) 
 		&i.Kind,
 		&i.Name,
 		&i.Mode,
+		&i.Visibility,
 		&i.CreatedAt,
 		&i.PictureID,
 		&i.LastMessageAt,
@@ -278,6 +299,23 @@ type HideMembershipParams struct {
 // Hiding a conversation keeps the row and sets hidden_at.
 func (q *Queries) HideMembership(ctx context.Context, arg HideMembershipParams) error {
 	_, err := q.db.ExecContext(ctx, hideMembership, arg.HiddenAt, arg.GroupID, arg.UserID)
+	return err
+}
+
+const joinOpenRooms = `-- name: JoinOpenRooms :exec
+INSERT INTO memberships (group_id, user_id, role, joined_at)
+SELECT id, ?1, 'member', ?2
+FROM groups WHERE kind = 'group' AND visibility = 'open' AND deleted_at IS NULL
+ON CONFLICT (group_id, user_id) DO NOTHING
+`
+
+type JoinOpenRoomsParams struct {
+	UserID   string
+	JoinedAt int64
+}
+
+func (q *Queries) JoinOpenRooms(ctx context.Context, arg JoinOpenRoomsParams) error {
+	_, err := q.db.ExecContext(ctx, joinOpenRooms, arg.UserID, arg.JoinedAt)
 	return err
 }
 
@@ -391,7 +429,7 @@ func (q *Queries) ListMyGroupIDs(ctx context.Context, userID string) ([]string, 
 }
 
 const listMyGroups = `-- name: ListMyGroups :many
-SELECT g.id, g.kind, g.name, g.mode, g.created_at, g.picture_id, m.role, m.hidden_at,
+SELECT g.id, g.kind, g.name, g.mode, g.visibility, g.created_at, g.picture_id, m.role, m.hidden_at,
        (SELECT MAX(created_at) FROM messages WHERE group_id = g.id AND deleted_at IS NULL AND kind = 'message') AS last_message_at
 FROM memberships m JOIN groups g ON g.id = m.group_id
 WHERE m.user_id = ?1 AND g.deleted_at IS NULL
@@ -403,6 +441,7 @@ type ListMyGroupsRow struct {
 	Kind          string
 	Name          string
 	Mode          string
+	Visibility    string
 	CreatedAt     int64
 	PictureID     sql.NullString
 	Role          string
@@ -426,6 +465,7 @@ func (q *Queries) ListMyGroups(ctx context.Context, userID string) ([]ListMyGrou
 			&i.Kind,
 			&i.Name,
 			&i.Mode,
+			&i.Visibility,
 			&i.CreatedAt,
 			&i.PictureID,
 			&i.Role,
@@ -525,6 +565,20 @@ type SetMembershipRoleParams struct {
 
 func (q *Queries) SetMembershipRole(ctx context.Context, arg SetMembershipRoleParams) error {
 	_, err := q.db.ExecContext(ctx, setMembershipRole, arg.Role, arg.GroupID, arg.UserID)
+	return err
+}
+
+const setRoomVisibility = `-- name: SetRoomVisibility :exec
+UPDATE groups SET visibility = ?1 WHERE id = ?2 AND kind = 'group'
+`
+
+type SetRoomVisibilityParams struct {
+	Visibility string
+	ID         string
+}
+
+func (q *Queries) SetRoomVisibility(ctx context.Context, arg SetRoomVisibilityParams) error {
+	_, err := q.db.ExecContext(ctx, setRoomVisibility, arg.Visibility, arg.ID)
 	return err
 }
 

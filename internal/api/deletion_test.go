@@ -139,7 +139,6 @@ func TestLargeDeletionsAreQuick(t *testing.T) {
 	}
 	gid := owner.mustStatus(201, "POST", "/api/groups", map[string]any{"kind": "group", "name": "Large", "mode": "both"})["id"].(string)
 	post := owner.mustStatus(201, "POST", rootPath+"/posts", map[string]string{"body_html": "<p>Many replies</p>"})["id"].(string)
-	topic := owner.mustStatus(201, "POST", "/api/topics", map[string]string{"name": "Busy"})["id"].(string)
 	// 20,000 messages on Home, and 1,000 rows for each deletion below, each with a search entry.
 	fill := func(n int, query string, args ...any) {
 		t.Helper()
@@ -151,10 +150,9 @@ func TestLargeDeletionsAreQuick(t *testing.T) {
 	fill(1000, "INSERT INTO messages (id, group_id, author_id, body_html, body_text, created_at) SELECT 'room-' || i, ?, ?, '<p>x</p>', 'room text ' || i, i FROM n", gid, uid)
 	fill(1000, "INSERT INTO comments (id, post_id, author_id, body_html, body_text, created_at) SELECT 'comment-' || i, ?, ?, '<p>x</p>', 'comment text ' || i, i FROM n", post, uid)
 	fill(1000, "INSERT INTO messages (id, group_id, author_id, body_html, body_text, created_at) SELECT 'kit-' || i, ?, ?, '<p>x</p>', 'kit text ' || i, i FROM n", perm.Root, kitID)
-	fill(1000, "INSERT INTO posts (id, group_id, author_id, body_html, body_text, created_at, topic_id) SELECT 'topic-' || i, ?, ?, '<p>x</p>', 'topic text ' || i, i, ? FROM n", perm.Root, uid, topic)
 
 	for _, d := range []struct{ path string }{
-		{"/api/groups/" + gid}, {"/api/posts/" + post}, {"/api/users/" + kitID}, {"/api/topics/" + topic},
+		{"/api/groups/" + gid}, {"/api/posts/" + post}, {"/api/users/" + kitID},
 	} {
 		start := time.Now()
 		if status, body := owner.do("DELETE", d.path, nil); status >= 300 {
@@ -166,9 +164,6 @@ func TestLargeDeletionsAreQuick(t *testing.T) {
 	}
 	if n := count(t, srv.DB, "SELECT COUNT(*) FROM search WHERE text LIKE 'room text%' OR text LIKE 'comment text%' OR text LIKE 'kit text%'"); n != 0 {
 		t.Fatalf("search entries left from the deleted rows: %d", n)
-	}
-	if n := count(t, srv.DB, "SELECT COUNT(*) FROM search WHERE text LIKE 'topic text%'"); n != 1000 {
-		t.Fatalf("search entries of the posts whose topic was deleted: %d, want 1000", n)
 	}
 }
 

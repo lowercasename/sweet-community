@@ -7,7 +7,6 @@ import {
   useReadNotification,
   useReadAllNotifications,
   useUnreadNotifications,
-  useTopics,
 } from '../data/hooks'
 import { describe, targetOf } from '../data/notifications'
 import { NotificationsCard } from './NotificationsCard'
@@ -156,8 +155,7 @@ interface NotificationRowProps {
  */
 function NotificationRow({ notification: n, groups, onOpen }: NotificationRowProps) {
   const actor = useAuthor(n.actor)
-  const { topics } = useTopics()
-  const sentence = actor ? `${actor.username} ${describe(n, groups, topics)}` : describe(n, groups, topics)
+  const sentence = actor ? `${actor.username} ${describe(n, groups)}` : describe(n, groups)
   const fresh = n.read_at == null
   return (
     <ListItem>

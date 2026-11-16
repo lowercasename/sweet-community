@@ -11,8 +11,6 @@ interface GroupViewProps {
   group: Group
   /** True while the view is behind another page. The view stays mounted, so its scroll position and uploads are kept. */
   hidden: boolean
-  /** The topic that the community's feed is filtered to. */
-  topicId?: string | null
   /** A chat message to scroll to, from a notification. The chat pane is shown if it is hidden. */
   focusMessage?: string | null
   /** Called once the chat has shown the message, or could not find it. */
@@ -34,7 +32,7 @@ export function groupLabel(g: Group, me: User): string {
  * pane takes the whole width. Home renders the bar above the panes (GroupBar),
  * because the bar stays mounted after the view unmounts.
  */
-export function GroupView({ group, hidden, topicId = null, focusMessage = null, onFocused }: GroupViewProps) {
+export function GroupView({ group, hidden, focusMessage = null, onFocused }: GroupViewProps) {
   const { layout, narrow, ratio, setLayout, setRatio } = useLayout()
   const both = group.mode === 'both'
   const show = layout === 'both' ? 'both' : layout === 'posts' ? 'left' : 'right'
@@ -83,7 +81,6 @@ export function GroupView({ group, hidden, topicId = null, focusMessage = null, 
               groupId={group.id}
               side={show === 'both' ? 'left' : 'full'}
               watching={!hidden && show !== 'right'}
-              topicId={topicId}
               foot={foot}
             />
           }
@@ -98,7 +95,7 @@ export function GroupView({ group, hidden, topicId = null, focusMessage = null, 
           }
         />
       ) : group.mode === 'posts' ? (
-        <PostsPane groupId={group.id} watching={!hidden} topicId={topicId} foot={foot} />
+        <PostsPane groupId={group.id} watching={!hidden} foot={foot} />
       ) : (
         <ChatPane groupId={group.id} watching={!hidden} focusMessage={focusMessage} onFocused={onFocused} />
       )}

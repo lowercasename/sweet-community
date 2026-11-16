@@ -123,6 +123,11 @@ export function MembersPage({ group, me, onLeft }: MembersPageProps) {
       <ScrollArea>
         <Measure>
           <Stack gap={3}>
+            <Text variant="secondary">
+              {group.visibility === 'open'
+                ? 'This room is open to everyone in the community.'
+                : 'This room, its posts and its chat are visible only to invited members.'}
+            </Text>
             {canEdit && (
               <Card>
                 <Stack gap={2}>

@@ -8,7 +8,7 @@ for (const suffix of ['', ' @phone']) {
     const kit = await member(browser, info, 'longusername'.repeat(2))
     const mo = await member(browser, info, 'reader')
     const room = await kit.context.request.post('/api/groups', {
-      data: { name: 'Chat dates and message grouping examples', mode: 'chat' },
+      data: { name: 'Chat dates and message grouping examples', mode: 'both' },
     })
     expect(room.status()).toBe(201)
     const gid = (await room.json()).id as string

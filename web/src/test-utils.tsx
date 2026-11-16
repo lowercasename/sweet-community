@@ -46,6 +46,7 @@ export const member = (id: string, role: Member['role'] = 'member', remove = fal
 /** A group as its viewer sees it, with the viewer's role and permissions. */
 export const group = (id: string, role: Group['role'], extra: Partial<Group> = {}): Group => ({
   id,
+  visibility: id === ROOT ? 'open' : 'private',
   kind: id === ROOT ? 'root' : 'group',
   name: id === ROOT ? '' : id,
   mode: 'both',
@@ -59,12 +60,11 @@ export const group = (id: string, role: Group['role'], extra: Partial<Group> = {
     set_roles: role === 'owner',
     transfer: role === 'owner',
     rename: role === 'owner' && id !== ROOT,
-    set_mode: role === 'owner',
+    set_mode: role === 'owner' && id === ROOT,
     delete: role === 'owner' && id !== ROOT,
     leave: role !== 'owner' && id !== ROOT,
     create_groups: id === ROOT ? true : undefined,
     manage_instance: id === ROOT ? role === 'owner' : undefined,
-    manage_topics: id === ROOT ? role !== 'member' : undefined,
     manage_rules: id === ROOT ? role !== 'member' : undefined,
     manage_welcome: id === ROOT ? role !== 'member' : undefined,
     handle_reports: id === ROOT ? role !== 'member' : undefined,
@@ -76,6 +76,7 @@ export const group = (id: string, role: Group['role'], extra: Partial<Group> = {
 export const dm = (id: string, people: User[], extra: Partial<Group> = {}): Group => ({
   id,
   kind: 'dm',
+  visibility: 'private',
   name: '',
   mode: 'chat',
   created_at: 1,
@@ -106,7 +107,7 @@ export const mentionSpan = (id: string, name: string) =>
 export const post = (id: string, author: User, extra: Partial<Post> = {}): Post => ({
   id,
   group_id: ROOT,
-  topic_id: null,
+  group_visibility: 'private',
   author,
   body_html: `<p>${id}</p>`,
   body_text: id,

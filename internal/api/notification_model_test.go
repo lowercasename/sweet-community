@@ -93,7 +93,7 @@ func TestNotificationBulkActionsLeaveContentUnread(t *testing.T) {
 func TestNotificationDeliveryUsesCurrentPreferencesAndAccess(t *testing.T) {
 	ts, owner, srv := newTestServerWith(t)
 	kit, kitID := registerMember(t, ts, owner, "kit")
-	room := owner.mustStatus(201, "POST", "/api/groups", map[string]any{"kind": "group", "name": "Private room", "mode": "chat"})
+	room := owner.mustStatus(201, "POST", "/api/groups", map[string]any{"kind": "group", "name": "Private room", "mode": "both"})
 	gid := room["id"].(string)
 	owner.mustStatus(201, "POST", "/api/groups/"+gid+"/members", map[string]string{"user_id": kitID})
 	owner.mustStatus(201, "POST", "/api/groups/"+gid+"/messages", map[string]string{"body_html": "<p>Private text</p>"})

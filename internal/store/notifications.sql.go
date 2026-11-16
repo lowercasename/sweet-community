@@ -136,8 +136,12 @@ func (q *Queries) GetChatMarker(ctx context.Context, arg GetChatMarkerParams) (G
 
 const getFeedMarker = `-- name: GetFeedMarker :one
 SELECT m.user_id, CAST('feed:' || m.group_id AS TEXT) AS stream, CAST(COALESCE(r.read_at, m.joined_at) AS INTEGER) AS read_at,
-       (SELECT COUNT(*) FROM posts x WHERE x.group_id = m.group_id AND x.deleted_at IS NULL AND x.author_id != m.user_id
-          AND x.created_at > COALESCE(r.read_at, m.joined_at)) AS unread
+       (SELECT COUNT(*) FROM posts x JOIN groups room ON room.id = x.group_id AND room.deleted_at IS NULL
+        WHERE (x.group_id = m.group_id OR (m.group_id = '00000000-0000-7000-8000-000000000000' AND room.kind = 'group' AND room.visibility = 'open')) AND x.deleted_at IS NULL AND x.author_id != m.user_id
+          AND x.created_at > MAX(COALESCE(r.read_at, m.joined_at),
+            COALESCE((SELECT own.read_at FROM read_markers own WHERE own.user_id = m.user_id AND own.stream = 'feed:' || x.group_id), 0),
+            CASE WHEN room.visibility = 'open' THEN COALESCE((SELECT home.read_at FROM read_markers home
+              WHERE home.user_id = m.user_id AND home.stream = 'feed:00000000-0000-7000-8000-000000000000'), 0) ELSE 0 END)) AS unread
 FROM memberships m LEFT JOIN read_markers r ON r.user_id = m.user_id AND r.stream = 'feed:' || m.group_id
 WHERE m.user_id = ?1 AND m.group_id = ?2 AND m.hidden_at IS NULL
 `
@@ -281,8 +285,12 @@ LEFT JOIN read_markers r ON r.user_id = m.user_id AND r.stream = 'chat:' || m.gr
 WHERE m.user_id = ?1 AND m.hidden_at IS NULL
 UNION ALL
 SELECT m.user_id, CAST('feed:' || m.group_id AS TEXT) AS stream, CAST(COALESCE(r.read_at, m.joined_at) AS INTEGER) AS read_at,
-       (SELECT COUNT(*) FROM posts x WHERE x.group_id = m.group_id AND x.deleted_at IS NULL AND x.author_id != m.user_id
-          AND x.created_at > COALESCE(r.read_at, m.joined_at)) AS unread
+       (SELECT COUNT(*) FROM posts x JOIN groups room ON room.id = x.group_id AND room.deleted_at IS NULL
+        WHERE (x.group_id = m.group_id OR (m.group_id = '00000000-0000-7000-8000-000000000000' AND room.kind = 'group' AND room.visibility = 'open')) AND x.deleted_at IS NULL AND x.author_id != m.user_id
+          AND x.created_at > MAX(COALESCE(r.read_at, m.joined_at),
+            COALESCE((SELECT own.read_at FROM read_markers own WHERE own.user_id = m.user_id AND own.stream = 'feed:' || x.group_id), 0),
+            CASE WHEN room.visibility = 'open' THEN COALESCE((SELECT home.read_at FROM read_markers home
+              WHERE home.user_id = m.user_id AND home.stream = 'feed:00000000-0000-7000-8000-000000000000'), 0) ELSE 0 END)) AS unread
 FROM memberships m JOIN groups g ON g.id = m.group_id AND g.deleted_at IS NULL
 LEFT JOIN read_markers r ON r.user_id = m.user_id AND r.stream = 'feed:' || m.group_id
 WHERE m.user_id = ?1 AND m.hidden_at IS NULL

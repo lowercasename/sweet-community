@@ -74,7 +74,7 @@ test.describe('groups', () => {
     await expect(kit.page.getByRole('heading', { name: 'Room settings' })).toHaveCount(1)
 
     await kit.page.getByRole('textbox', { name: 'Name' }).fill(name + ' renamed')
-    await kit.page.getByLabel('Mode').selectOption('chat')
+    await expect(kit.page.getByLabel('Mode')).toHaveCount(0)
     await kit.page.getByRole('button', { name: 'Save' }).click()
     // There is still exactly one of each card, the controls are still shown, and the new name is shown everywhere.
     await expect(kit.page.getByRole('button', { name: 'Save' })).toBeDisabled()
@@ -82,10 +82,10 @@ test.describe('groups', () => {
     await expect(kit.page.getByRole('heading', { name: 'Members' })).toHaveCount(1)
     await expect(kit.page.getByRole('button', { name: 'Delete room' })).toBeEnabled()
     await expect(nav(kit.page).getByRole('button', { name: name + ' renamed' })).toBeVisible()
-    // The group is now chat only. The view has one pane and no divider.
+    // Renaming preserves both posts and chat.
     await kit.page.goBack()
-    await expect(kit.page.getByRole('separator', { name: 'Resize panes' })).toHaveCount(0)
-    await expect(kit.page.locator('.editor-post')).toHaveCount(0)
+    await expect(kit.page.getByRole('separator', { name: 'Resize panes' })).toHaveCount(1)
+    await expect(kit.page.locator('.editor-post')).toHaveCount(1)
     await expect(kit.page.locator('.editor-line').first()).toBeVisible()
     await kit.context.close()
   })

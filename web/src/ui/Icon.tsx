@@ -1,5 +1,7 @@
 import {
   ArrowLeft,
+  LockKeyhole,
+  Globe,
   Bell,
   BellOff,
   BellRing,
@@ -42,6 +44,8 @@ import {
 } from 'lucide-react'
 
 export type IconName =
+  | 'globe'
+  | 'lock'
   | 'bold'
   | 'italic'
   | 'link'
@@ -83,6 +87,8 @@ export type IconName =
   | 'smile-plus'
 
 const ICONS: Record<IconName, LucideIcon> = {
+  globe: Globe,
+  lock: LockKeyhole,
   bold: Bold,
   italic: Italic,
   link: Link,

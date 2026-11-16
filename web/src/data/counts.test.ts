@@ -28,7 +28,6 @@ describe('server counts', () => {
       const queries = [
         { key: keys.post('p1'), old, read: () => ({ ...old, comment_count: count }) },
         { key: keys.posts(ROOT), old: page(4), read: () => page(count) },
-        { key: keys.posts(ROOT, 'topic'), old: page(4), read: () => page(count) },
         { key: keys.userPosts('mo'), old: page(4), read: () => page(count) },
       ]
       const stops = queries.map(({ key, old, read }) => {

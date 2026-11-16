@@ -34,16 +34,16 @@ func wireUser(id, username string, pictureID sql.NullString) User {
 
 func wirePost(row store.GetPostRow) Post {
 	return Post{
-		ID:           row.ID,
-		GroupID:      row.GroupID,
-		TopicID:      nullStr(row.TopicID),
-		Author:       wireUser(row.AuthorID, row.AuthorUsername, row.AuthorPictureID),
-		BodyHTML:     row.BodyHtml,
-		BodyText:     row.BodyText,
-		CreatedAt:    row.CreatedAt,
-		EditedAt:     nullInt(row.EditedAt),
-		CommentCount: row.CommentCount,
-		Reactions:    reactionsOf(row.Reactions),
+		ID:              row.ID,
+		GroupID:         row.GroupID,
+		GroupVisibility: row.GroupVisibility,
+		Author:          wireUser(row.AuthorID, row.AuthorUsername, row.AuthorPictureID),
+		BodyHTML:        row.BodyHtml,
+		BodyText:        row.BodyText,
+		CreatedAt:       row.CreatedAt,
+		EditedAt:        nullInt(row.EditedAt),
+		CommentCount:    row.CommentCount,
+		Reactions:       reactionsOf(row.Reactions),
 	}
 }
 
@@ -144,7 +144,7 @@ func wireMembership(groupID string, row store.GetMemberRow) Membership {
 // that a group created in a transaction is complete before that transaction
 // commits.
 func wireGroup(ctx context.Context, q *store.Queries, row store.GetGroupRow) (Group, error) {
-	g := Group{ID: row.ID, Kind: row.Kind, Name: row.Name, Mode: row.Mode, CreatedAt: row.CreatedAt, Picture: pictureURL(row.PictureID), LastMessageAt: lastAt(row.LastMessageAt)}
+	g := Group{ID: row.ID, Kind: row.Kind, Name: row.Name, Mode: row.Mode, Visibility: row.Visibility, CreatedAt: row.CreatedAt, Picture: pictureURL(row.PictureID), LastMessageAt: lastAt(row.LastMessageAt)}
 	if g.Kind != perm.KindDM {
 		return g, nil
 	}

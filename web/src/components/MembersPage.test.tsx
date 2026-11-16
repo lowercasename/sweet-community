@@ -111,13 +111,13 @@ describe('MembersPage', () => {
     expect(screen.queryByRole('button', { name: 'Choose a picture' })).toBeNull()
   })
 
-  it('lets the owner rename the group and change its mode', async () => {
+  it('lets the owner rename the room without changing its capabilities', async () => {
     const { updateGroup } = await import('../api')
     await page('owner')
     fireEvent.change(screen.getByLabelText('Name'), { target: { value: 'Knitting' } })
-    fireEvent.change(screen.getByLabelText('Mode'), { target: { value: 'chat' } })
+    expect(screen.queryByLabelText('Mode')).toBeNull()
     fireEvent.click(screen.getByRole('button', { name: 'Save' }))
-    expect(updateGroup).toHaveBeenCalledWith('club', { name: 'Knitting', mode: 'chat' })
+    expect(updateGroup).toHaveBeenCalledWith('club', { name: 'Knitting' })
   })
 
   it('shows a member the list and a Leave room row in the last card, which confirms', async () => {
