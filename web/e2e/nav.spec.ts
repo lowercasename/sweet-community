@@ -1,4 +1,4 @@
-import { article, expect, member, open, png, sendMessage, test, uniq, type Person } from './helpers'
+import { article, expect, member, open, owner, png, sendMessage, test, uniq, type Person } from './helpers'
 
 const nav = (p: Person) => p.page.getByRole('navigation', { name: 'Main' })
 
@@ -348,3 +348,67 @@ test.describe('nav', () => {
     await mo.context.close()
   })
 })
+
+for (const suffix of [' @dev', ' @phone']) {
+  test('navigation labels and marks align across icons, rooms and people' + suffix, async ({ browser }, info) => {
+    const kit = await owner(browser, info)
+    const mo = await member(browser, info, 'aligned')
+    const long = uniq('Alignment ').padEnd(40, 'x')
+    const short = uniq('Room ')
+    for (const name of [long, short]) {
+      const response = await kit.context.request.post('/api/groups', { data: { name, visibility: 'private' } })
+      expect(response.status()).toBe(201)
+      if (name === short) {
+        const room = await response.json()
+        const upload = await kit.context.request.post('/api/images', {
+          multipart: { file: { name: 'room.png', mimeType: 'image/png', buffer: png(24, 24, [80, 120, 180]) } },
+        })
+        const picture = await upload.json()
+        expect(
+          (await kit.context.request.put(`/api/groups/${room.id}/picture`, { data: { image_id: picture.id } })).ok(),
+        ).toBe(true)
+      }
+    }
+    const person = await (await mo.context.request.get('/api/me')).json()
+    await kit.context.request.post('/api/groups', { data: { kind: 'dm', members: [person.id] } })
+    const phone = !!info.project.use.isMobile
+    if (phone) await kit.page.setViewportSize({ width: 360, height: 800 })
+    await open(kit.page, phone ? '/menu' : '/')
+    const names = [long, short, mo.username, 'Browse Rooms', 'Home', 'People', 'Community', kit.username]
+    if (!phone) names.push('Search', 'Notifications', 'Collapse')
+    const rows = names.map((name) =>
+      kit.page.getByRole('button', { name: new RegExp('^' + name + '(?:, unread)?$') }).first(),
+    )
+    const labelEdges: number[] = []
+    const markCenters: number[] = []
+    for (let i = 0; i < rows.length; i++) {
+      const label = rows[i].getByText(names[i], { exact: true })
+      await expect(label).toBeVisible()
+      labelEdges.push((await label.boundingBox())!.x)
+      const mark = rows[i].locator('svg, img, span[aria-hidden="true"]').first()
+      const box = (await mark.boundingBox())!
+      markCenters.push(box.x + box.width / 2)
+    }
+    expect(Math.max(...labelEdges) - Math.min(...labelEdges)).toBeLessThan(1)
+    expect(Math.max(...markCenters) - Math.min(...markCenters)).toBeLessThan(1)
+    await kit.page.screenshot({ path: info.outputPath('navigation-aligned.png'), scale: 'css', animations: 'disabled' })
+    if (!phone) {
+      await nav(kit).getByRole('button', { name: 'Collapse', exact: true }).click()
+      await expect(nav(kit)).toHaveCSS('width', '56px')
+      const centers = []
+      for (const name of [long, short, mo.username, 'Browse Rooms', 'Home', 'People', kit.username]) {
+        const row = nav(kit).getByRole('button', { name: new RegExp('^' + name + '(?:, unread)?$') })
+        const box = (await row.locator('svg, img, span[aria-hidden="true"]').first().boundingBox())!
+        centers.push(box.x + box.width / 2)
+      }
+      expect(Math.max(...centers) - Math.min(...centers)).toBeLessThan(1)
+      await kit.page.screenshot({
+        path: info.outputPath('navigation-collapsed.png'),
+        scale: 'css',
+        animations: 'disabled',
+      })
+    }
+    await kit.context.close()
+    await mo.context.close()
+  })
+}

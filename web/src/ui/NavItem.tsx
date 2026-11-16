@@ -100,7 +100,9 @@ export function NavItem({
             }
           : tip.props({ onClick }))}
       >
-        <Dotted shown={dot}>{glyph}</Dotted>
+        <span className="flex size-6 shrink-0 items-center justify-center">
+          <Dotted shown={dot}>{glyph}</Dotted>
+        </span>
         {/* The label is ink at regular weight, and the icon stays grey. The current item's label is red, as its icon is. */}
         {expanded && (
           <span

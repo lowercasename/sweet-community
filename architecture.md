@@ -398,6 +398,8 @@ Browse Rooms uses a compass icon. Its All filter has no icon. (Codex, 2026-11-16
 
 Conversations accumulate, so their list has a stated limit and not a hidden rule like Slack's. A messenger layout with a column of conversations was rejected, because it would draw chat in a second way.
 
+Navigation labels align across room tiles, profile pictures and feature icons. (Raphael, 2026-11-16. Different mark sizes had shifted the labels.)
+
 Privacy marks align at the right of navigation rows. A truncated name is shown in full on hover or keyboard focus. (Codex, 2026-11-16, following Raphael's review. Short and long names must keep the same alignment and remain readable.)
 
 ## Mobile
