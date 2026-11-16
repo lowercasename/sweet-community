@@ -42,7 +42,7 @@ export function BrowseRooms({ onGo }: { onGo: (path: string) => void }) {
                 <Segmented
                   label="Room visibility"
                   segments={[
-                    { key: 'all', label: 'All', icon: 'menu' },
+                    { key: 'all', label: 'All' },
                     { key: 'open', label: 'Open', icon: 'globe' },
                     { key: 'private', label: 'Private', icon: 'lock' },
                   ]}

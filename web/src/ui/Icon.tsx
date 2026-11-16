@@ -1,5 +1,6 @@
 import {
   ArrowLeft,
+  Compass,
   Star,
   LockKeyhole,
   Globe,
@@ -45,6 +46,7 @@ import {
 } from 'lucide-react'
 
 export type IconName =
+  | 'browse'
   | 'star'
   | 'star-filled'
   | 'globe'
@@ -90,6 +92,7 @@ export type IconName =
   | 'smile-plus'
 
 const ICONS: Record<IconName, LucideIcon> = {
+  browse: Compass,
   star: Star,
   'star-filled': Star,
   globe: Globe,

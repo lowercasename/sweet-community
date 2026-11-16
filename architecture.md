@@ -392,6 +392,8 @@ The nav has three blocks (2026-11-05).
 2. **Tools.** This block holds Search and Notifications.
 3. **The community and the user.** This block holds People, the Community page and the account row.
 
+Browse Rooms uses a compass icon. Its All filter has no icon. (Codex, 2026-11-16, following Raphael's review. Reusing Search and Menu icons made the actions unclear.)
+
 Conversations accumulate, so their list has a stated limit and not a hidden rule like Slack's. A messenger layout with a column of conversations was rejected, because it would draw chat in a second way.
 
 Privacy marks align at the right of navigation rows. A truncated name is shown in full on hover or keyboard focus. (Codex, 2026-11-16, following Raphael's review. Short and long names must keep the same alignment and remain readable.)

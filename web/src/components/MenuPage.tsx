@@ -64,7 +64,7 @@ export function MenuPage({ me, groups, onGo, onLogout }: MenuPageProps) {
                 onClick={() => onGo(groupPath(g.id))}
               />
             ))}
-            <NavItem icon="search" label="Browse Rooms" expanded size="sm" onClick={() => onGo(BROWSE_ROOMS)} />
+            <NavItem icon="browse" label="Browse Rooms" expanded size="sm" onClick={() => onGo(BROWSE_ROOMS)} />
           </NavSection>
           <ConversationsSection groups={groups} me={me} places={places} expanded onGo={onGo} />
           <Hairline />

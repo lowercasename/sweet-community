@@ -102,7 +102,7 @@ export function Sidebar({ me, groups, location, expanded, onGo, onToggle }: Side
           />
         ))}
         <NavItem
-          icon="search"
+          icon="browse"
           label="Browse Rooms"
           expanded={expanded}
           size="sm"
