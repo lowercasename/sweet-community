@@ -25,8 +25,7 @@ const getPostMarker = `-- name: GetPostMarker :one
 SELECT u.id AS user_id, CAST('post:' || p.id AS TEXT) AS stream,
 CAST(COALESCE(r.read_at, 0) AS INTEGER) AS read_at,
 CAST(CASE WHEN r.read_at IS NULL THEN 0 ELSE (SELECT COUNT(*) FROM comments c WHERE c.post_id = p.id AND c.deleted_at IS NULL
-    AND c.author_id != u.id AND c.created_at > r.read_at
-    AND NOT EXISTS (SELECT 1 FROM post_notification_preferences n WHERE n.user_id = u.id AND n.post_id = p.id AND n.enabled = 0)) END AS INTEGER) AS unread
+    AND c.author_id != u.id AND c.created_at > r.read_at) END AS INTEGER) AS unread
 FROM posts p JOIN users u ON u.id = ?1 LEFT JOIN read_markers r ON r.user_id = ?1 AND r.stream = 'post:' || p.id
 WHERE p.id = ?2
 `
@@ -43,7 +42,7 @@ type GetPostMarkerRow struct {
 	Unread int64
 }
 
-// Without a marker the post has no read position, so nothing in it is unread. A muted discussion has nothing unread.
+// Without a marker the post has no read position, so nothing in it is unread.
 func (q *Queries) GetPostMarker(ctx context.Context, arg GetPostMarkerParams) (GetPostMarkerRow, error) {
 	row := q.db.QueryRowContext(ctx, getPostMarker, arg.UserID, arg.PostID)
 	var i GetPostMarkerRow
@@ -98,8 +97,8 @@ func (q *Queries) GetReadPosition(ctx context.Context, arg GetReadPositionParams
 }
 
 const getRoomNotificationPreference = `-- name: GetRoomNotificationPreference :one
-SELECT m.group_id, CAST(COALESCE(pref.mode, 'all') AS TEXT) AS mode
-FROM memberships m LEFT JOIN room_notification_preferences pref ON pref.group_id = m.group_id AND pref.user_id = m.user_id
+SELECT m.group_id, CAST(COALESCE(pref.mode, CASE WHEN g.kind = 'group' THEN 'mentions' ELSE 'all' END) AS TEXT) AS mode
+FROM memberships m JOIN groups g ON g.id = m.group_id LEFT JOIN room_notification_preferences pref ON pref.group_id = m.group_id AND pref.user_id = m.user_id
 WHERE m.group_id = ? AND m.user_id = ?
 `
 

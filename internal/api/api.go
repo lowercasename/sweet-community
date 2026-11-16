@@ -238,6 +238,8 @@ func (s *Server) Routes(mux *http.ServeMux) {
 	mux.HandleFunc("PUT /api/notifications/read", s.requireAuth(s.readAllNotifications))
 	mux.HandleFunc("GET /api/posts/{id}/notifications", s.requireAuth(s.getPostNotificationPreference))
 	mux.HandleFunc("PUT /api/posts/{id}/notifications", s.requireAuth(s.setPostNotificationPreference))
+	mux.HandleFunc("GET /api/me/room-sidebar", s.requireAuth(s.listRoomSidebar))
+	mux.HandleFunc("PUT /api/groups/{gid}/sidebar", s.requireAuth(s.setRoomSidebar))
 	mux.HandleFunc("GET /api/groups/{gid}/notifications", s.requireGroup(s.getRoomNotificationPreference))
 	mux.HandleFunc("PUT /api/groups/{gid}/notifications", s.requireGroup(s.setRoomNotificationPreference))
 	mux.HandleFunc("GET /api/notifications", s.requireAuth(s.listNotifications))

@@ -12,6 +12,7 @@ const PREFIX = 'sweet.draft.'
 const KEEP_FOR = 30 * 24 * 60 * 60 * 1000
 
 interface Saved {
+  destination?: string
   html: string
   at: number
 }
@@ -42,8 +43,11 @@ export function loadDraft(user: string, key: string): string | null {
 }
 
 /** Saves a draft. `from` is the editor that saved it, which does not receive its own change. */
-export function saveDraft(user: string, key: string, html: string, from?: object) {
-  store(entry(user, key), JSON.stringify({ html, at: Date.now() }))
+export function saveDraft(user: string, key: string, html: string, from?: object, destination?: string) {
+  store(
+    entry(user, key),
+    JSON.stringify({ ...read(entry(user, key)), html, at: Date.now(), ...(destination ? { destination } : {}) }),
+  )
   changed(entry(user, key), html, from)
 }
 
@@ -78,4 +82,14 @@ export function pruneDrafts() {
     const saved = read(name)
     if (!saved || now - saved.at >= KEEP_FOR) unstore(name)
   }
+}
+
+export function loadDraftDestination(user: string, key: string): string | null {
+  const value = read(entry(user, key))?.destination
+  return typeof value === 'string' ? value : null
+}
+
+export function saveDraftDestination(user: string, key: string, destination: string) {
+  const saved = read(entry(user, key))
+  store(entry(user, key), JSON.stringify({ html: saved?.html ?? '', at: Date.now(), destination }))
 }

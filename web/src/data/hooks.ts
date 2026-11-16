@@ -1,6 +1,8 @@
 import { type QueryClient, replaceEqualDeep, useInfiniteQuery, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   ApiError,
+  listRoomSidebar,
+  setRoomSidebar,
   getPostNotificationPreference,
   setPostNotificationPreference,
   getRoomNotificationPreference,
@@ -642,5 +644,17 @@ export function useReadAllNotifications() {
   return async () => {
     await readAllNotifications()
     await refreshNotifications(qc)
+  }
+}
+
+export function useRoomSidebar() {
+  const qc = useQueryClient()
+  const query = useQuery({ queryKey: keys.roomSidebar, queryFn: listRoomSidebar })
+  return {
+    ...query,
+    async set(groupId: string, inSidebar: boolean) {
+      await setRoomSidebar(groupId, inSidebar)
+      await qc.invalidateQueries({ queryKey: keys.roomSidebar })
+    },
   }
 }

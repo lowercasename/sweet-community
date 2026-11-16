@@ -635,3 +635,31 @@ func TestOpenRoomsUpgradePreservesPrivateContent(t *testing.T) {
 		t.Fatalf("stale group events: %d %v", n, err)
 	}
 }
+
+func TestRoomPreferencesUpgradePreservesShortcutsAndAlertChoices(t *testing.T) {
+	d, err := Open(filepath.Join(t.TempDir(), "upgrade.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer d.Close()
+	migratedTo(t, d, "018")
+	_, err = d.Exec(`
+ INSERT INTO users(id,username,created_at) VALUES('reader','reader',1),('quiet','quiet',1);
+ INSERT INTO groups(id,kind,name,mode,visibility,created_at) VALUES('room','group','Existing room','both','open',1);
+ INSERT INTO memberships(group_id,user_id,role,joined_at) VALUES('room','reader','owner',1),('room','quiet','member',1);
+ INSERT INTO room_notification_preferences(user_id,group_id,mode) VALUES('quiet','room','off');
+ `)
+	if err != nil {
+		t.Fatal(err)
+	}
+	migratedTo(t, d, "019")
+	var saved int
+	var reader, quiet, role string
+	err = d.QueryRow(`SELECT (SELECT SUM(in_sidebar) FROM memberships WHERE group_id='room'),
+ (SELECT mode FROM room_notification_preferences WHERE group_id='room' AND user_id='reader'),
+ (SELECT mode FROM room_notification_preferences WHERE group_id='room' AND user_id='quiet'),
+ (SELECT role FROM memberships WHERE group_id='room' AND user_id='reader')`).Scan(&saved, &reader, &quiet, &role)
+	if err != nil || saved != 2 || reader != "all" || quiet != "off" || role != "owner" {
+		t.Fatalf("migration: %d %q %q %q %v", saved, reader, quiet, role, err)
+	}
+}

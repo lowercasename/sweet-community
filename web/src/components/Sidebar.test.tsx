@@ -13,6 +13,15 @@ import { ROOT, dm, group, marker, nameOf, notification, renderWithQuery, user } 
  * are People and the user's own account.
  */
 vi.mock('../api', () => ({
+  listRoomSidebar: vi.fn(() =>
+    Promise.resolve({
+      rooms: ['knit', 'wool', 'mods', 'adhd', 'its'].map((group_id) => ({
+        group_id,
+        user_id: 'raphael',
+        in_sidebar: true,
+      })),
+    }),
+  ),
   listMembers: vi.fn(() => Promise.resolve({ members: [] })),
   listUsers: vi.fn(() => Promise.resolve({ users: [] })),
   listNotifications: vi.fn(() => Promise.resolve({ notifications: [], next_before: null })),
@@ -40,9 +49,17 @@ afterEach(cleanup)
 async function draw(groups: Group[], location = '/', expanded = true) {
   const { Sidebar } = await import('./Sidebar')
   const onGo = vi.fn()
+  const { listRoomSidebar } = await import('../api')
+  vi.mocked(listRoomSidebar).mockResolvedValue({
+    rooms: groups
+      .filter((g) => g.kind === 'group')
+      .map((g) => ({ user_id: 'raphael', group_id: g.id, in_sidebar: true })),
+  })
   renderWithQuery(
     <Sidebar me={raphael} groups={groups} location={location} expanded={expanded} onGo={onGo} onToggle={() => {}} />,
   )
+  for (const g of groups.filter((g) => g.kind === 'group'))
+    await screen.findByRole('button', { name: new RegExp(g.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')) })
   return onGo
 }
 
@@ -64,6 +81,7 @@ describe('Sidebar', () => {
       'Home',
       'New room',
       'Knitting',
+      'Browse Rooms',
       'New conversation',
       'kit',
       'Search',
@@ -151,12 +169,13 @@ describe('Sidebar', () => {
       'adhd friends',
       "It's A Room",
       'Mod Team',
+      'Browse Rooms',
     ])
   })
 
-  it('shows the Rooms section only when it has a group or the New room control', async () => {
+  it('keeps Browse Rooms available without saved rooms or creation permission', async () => {
     await draw([root(false), withKit])
-    expect(screen.queryByRole('group', { name: 'Rooms' })).toBeNull()
+    expect(within(groupsSection()).getByRole('button', { name: 'Browse Rooms' })).toBeTruthy()
     cleanup()
     await draw([root(false), knitting])
     expect(within(groupsSection()).getByRole('button', { name: 'Knitting' })).toBeTruthy()
@@ -196,6 +215,7 @@ describe('Sidebar', () => {
     expect(names()).toEqual([
       'Home',
       'Knitting',
+      'Browse Rooms',
       'kit',
       'Search',
       'Notifications',
@@ -206,15 +226,24 @@ describe('Sidebar', () => {
     ])
     expect(screen.queryByText('Rooms')).toBeNull()
     expect(screen.queryByText('Conversations')).toBeNull()
-    expect(screen.getByRole('button', { name: 'Knitting' }).textContent).toBe('K')
+    expect(screen.getByRole('button', { name: /^Knitting/ }).textContent).toBe('K')
     expect(nameOf(screen.getByRole('button', { name: 'Knitting' }))).toBe('Knitting')
     expect(screen.getByRole('navigation').querySelectorAll('hr').length).toBe(2)
   })
 
-  it('when collapsed with no groups and no conversations, renders no section', async () => {
+  it('keeps Browse Rooms available when the sidebar is collapsed', async () => {
     await draw([root(true)], '/', false)
-    expect(screen.queryByRole('group')).toBeNull()
-    expect(names()).toEqual(['Home', 'Search', 'Notifications', 'People', 'Community', 'raphael', 'Expand'])
+    expect(screen.getByRole('button', { name: 'Browse Rooms' })).toBeTruthy()
+    expect(names()).toEqual([
+      'Home',
+      'Browse Rooms',
+      'Search',
+      'Notifications',
+      'People',
+      'Community',
+      'raphael',
+      'Expand',
+    ])
     cleanup()
     // When expanded, each section is shown so that it can offer its control.
     await draw([root(true)], '/', true)
@@ -276,8 +305,8 @@ describe('Sidebar', () => {
   it('a group with a picture shows the picture, and a group without one shows its initial', async () => {
     await draw([root(false), knitting, group('wool', 'member', { name: 'Wool', picture: '/img/wool' })])
     expect(screen.getByRole('button', { name: 'Wool' }).querySelector('img')!.getAttribute('src')).toBe('/img/wool')
-    expect(screen.getByRole('button', { name: 'Knitting' }).querySelector('img')).toBeNull()
-    expect(screen.getByRole('button', { name: 'Knitting' }).textContent).toContain('K')
+    expect(screen.getByRole('button', { name: /^Knitting/ }).querySelector('img')).toBeNull()
+    expect(screen.getByRole('button', { name: /^Knitting/ }).textContent).toContain('K')
   })
 
   it('Search opens its page and is current there', async () => {

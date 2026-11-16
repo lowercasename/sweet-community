@@ -218,9 +218,9 @@ func TestPostUnread(t *testing.T) {
 		t.Fatalf("after reading the first comment: reply %v, listed %v", read, marker(kit, stream))
 	}
 
-	// A muted discussion has nothing unread. Following it again counts its unread comments again.
+	// Muting and following change notifications, not unread content.
 	kit.mustStatus(200, "PUT", "/api/posts/"+id+"/notifications", map[string]bool{"following": false})
-	if m := marker(kit, stream); m["unread"] != float64(0) {
+	if m := marker(kit, stream); m["unread"] != float64(1) {
 		t.Fatalf("unread in a muted discussion: %v", m)
 	}
 	kit.mustStatus(200, "PUT", "/api/posts/"+id+"/notifications", map[string]bool{"following": true})
@@ -316,8 +316,8 @@ func TestChatUnread(t *testing.T) {
 	if n := unread(kit, "chat:"+gid); n != 1 {
 		t.Fatalf("a new message in the room: %v", n)
 	}
-	// The unread entries cover the root chat, the room addition and the room chat.
-	if n := unread(kit, "notifications"); n != 3 {
+	// The unread entries cover root chat and the room addition. The room defaults to mentions.
+	if n := unread(kit, "notifications"); n != 2 {
 		t.Fatalf("notifications unread: %v", n)
 	}
 	// The feed has its own marker, counted the same way. It counts other users' posts that are not deleted, since the user's marker or join time. An edit is not a new post.
@@ -576,6 +576,7 @@ func TestMessageNotifications(t *testing.T) {
 	room := owner.mustStatus(201, "POST", "/api/groups", map[string]any{"kind": "group", "name": "Knitting", "mode": "both"})
 	rid := room["id"].(string)
 	owner.mustStatus(201, "POST", "/api/groups/"+rid+"/members", map[string]string{"user_id": kitID})
+	kit.mustStatus(200, "PUT", "/api/groups/"+rid+"/notifications", map[string]string{"mode": "all"})
 	owner.mustStatus(201, "POST", "/api/groups/"+rid+"/messages", map[string]string{"body_html": "<p>wool</p>"})
 	// Kit now has the conversation's row, the room addition and the room's message.
 	if ns = list(kit); len(ns) != 3 || ns[0]["kind"] != "message" {
@@ -616,6 +617,7 @@ func TestPushForMessages(t *testing.T) {
 	// Ordinary room messages also send device alerts.
 	room := owner.mustStatus(201, "POST", "/api/groups", map[string]any{"kind": "group", "name": "Knitting", "mode": "both"})
 	owner.mustStatus(201, "POST", "/api/groups/"+room["id"].(string)+"/members", map[string]string{"user_id": kitID})
+	kit.mustStatus(200, "PUT", "/api/groups/"+room["id"].(string)+"/notifications", map[string]string{"mode": "all"})
 	owner.mustStatus(201, "POST", "/api/groups/"+room["id"].(string)+"/messages", map[string]string{"body_html": "<p>wool</p>"})
 	waitPushes(t, fake, 4)
 }

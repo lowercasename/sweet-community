@@ -111,13 +111,23 @@ WHERE m.user_id = sqlc.arg(user_id) AND m.hidden_at IS NULL AND g.deleted_at IS 
 UPDATE groups SET visibility = sqlc.arg(visibility) WHERE id = sqlc.arg(id) AND kind = 'group';
 
 -- name: AddCommunityToRoom :exec
-INSERT INTO memberships (group_id, user_id, role, joined_at)
-SELECT sqlc.arg(group_id), user_id, 'member', sqlc.arg(joined_at)
+INSERT INTO memberships (group_id, user_id, role, joined_at, in_sidebar)
+SELECT sqlc.arg(group_id), user_id, 'member', sqlc.arg(joined_at), 0
 FROM memberships WHERE group_id = '00000000-0000-7000-8000-000000000000'
 ON CONFLICT (group_id, user_id) DO NOTHING;
 
 -- name: JoinOpenRooms :exec
-INSERT INTO memberships (group_id, user_id, role, joined_at)
-SELECT id, sqlc.arg(user_id), 'member', sqlc.arg(joined_at)
+INSERT INTO memberships (group_id, user_id, role, joined_at, in_sidebar)
+SELECT id, sqlc.arg(user_id), 'member', sqlc.arg(joined_at), 0
 FROM groups WHERE kind = 'group' AND visibility = 'open' AND deleted_at IS NULL
 ON CONFLICT (group_id, user_id) DO NOTHING;
+
+-- name: ListRoomSidebar :many
+SELECT m.group_id, m.user_id, m.in_sidebar FROM memberships m JOIN groups g ON g.id = m.group_id
+WHERE m.user_id = ? AND g.kind = 'group' AND g.deleted_at IS NULL;
+
+-- name: GetRoomSidebar :one
+SELECT group_id, user_id, in_sidebar FROM memberships WHERE group_id = ? AND user_id = ?;
+
+-- name: SetRoomSidebar :exec
+UPDATE memberships SET in_sidebar = ? WHERE group_id = ? AND user_id = ?;

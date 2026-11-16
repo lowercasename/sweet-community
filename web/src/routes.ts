@@ -9,6 +9,8 @@ export function groupPath(id: string, rootId?: string): string {
   return id === rootId ? '/' : `/r/${encodeURIComponent(id)}`
 }
 
+export const BROWSE_ROOMS = '/rooms'
+
 export const NEW_ROOM = '/rooms/new'
 
 /** The list of the user's conversations, and the page for starting a new one. */

@@ -136,7 +136,7 @@ test.describe('comment unread', () => {
     await mo.context.close()
   })
 
-  test('muting a discussion takes the dot off its comments button', async ({ browser }, testInfo) => {
+  test('muting a discussion keeps its unread comments dot', async ({ browser }, testInfo) => {
     const kit = await member(browser, testInfo, 'kit')
     const mo = await member(browser, testInfo, 'mo')
     const text = uniq('An argument ')
@@ -149,7 +149,8 @@ test.describe('comment unread', () => {
     await mo.context.request.post(`/api/posts/${post.id}/comments`, { data: { body_html: '<p>No.</p>' } })
     await expect(card.getByRole('button', { name: 'Show comments, unread' })).toBeVisible()
     await pick(kit.page, card, 'Post options', 'Mute discussion')
-    await expect(card.getByRole('button', { name: 'Show comments', exact: true })).toBeVisible()
+    await kit.page.reload()
+    await expect(card.getByRole('button', { name: 'Show comments, unread' })).toBeVisible()
     await kit.context.close()
     await mo.context.close()
   })

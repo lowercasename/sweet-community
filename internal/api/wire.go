@@ -272,3 +272,7 @@ func wireMySettings(userID string, rows []store.ListUserSettingsRow) MySettings 
 	}
 	return st
 }
+
+func wireRoomSidebar(row store.GetRoomSidebarRow) RoomSidebar {
+	return RoomSidebar{UserID: row.UserID, GroupID: row.GroupID, InSidebar: row.InSidebar != 0}
+}

@@ -71,6 +71,8 @@ interface BodyEditorProps {
    * an edit deletes the draft. Attached images are not kept.
    */
   draft?: string
+  /** The selected posting destination, saved with this draft. */
+  draftDestination?: string
 }
 
 /**
@@ -94,6 +96,7 @@ export function BodyEditor({
   onEscape,
   focus,
   draft,
+  draftDestination,
 }: BodyEditorProps) {
   const editing = initialHtml !== undefined
   const [busy, setBusy] = useState(false)
@@ -120,13 +123,13 @@ export function BodyEditor({
   // The draft's owner and key, read by the editor's update handler, which TipTap creates once. Each change is saved
   // at once. An editor that has not changed writes nothing.
   const { data: me } = useMe()
-  const draftRef = useRef<{ user: string; key: string } | null>(null)
-  draftRef.current = draft && me ? { user: me.id, key: draft } : null
+  const draftRef = useRef<{ user: string; key: string; destination?: string } | null>(null)
+  draftRef.current = draft && me ? { user: me.id, key: draft, destination: draftDestination } : null
   const keepDraft = (ed: Editor) => {
     const d = draftRef.current
     if (!d) return
     if (ed.isEmpty) clearDraft(d.user, d.key, ed)
-    else saveDraft(d.user, d.key, ed.getHTML(), ed)
+    else saveDraft(d.user, d.key, ed.getHTML(), ed, d.destination)
   }
   const forgetDraft = () => {
     const d = draftRef.current

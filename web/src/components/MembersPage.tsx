@@ -27,6 +27,7 @@ import {
   Tile,
   Time,
 } from '../ui'
+import { RoomNotifications } from './RoomNotifications'
 import { PersonName } from './PersonName'
 
 interface MembersPageProps {
@@ -123,6 +124,12 @@ export function MembersPage({ group, me, onLeft }: MembersPageProps) {
       <ScrollArea>
         <Measure>
           <Stack gap={3}>
+            <Card>
+              <Row justify="between" align="center">
+                <Text>Chat notifications</Text>
+                <RoomNotifications groupId={group.id} />
+              </Row>
+            </Card>
             {canEdit && (
               <Card>
                 <Stack gap={2}>

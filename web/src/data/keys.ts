@@ -8,6 +8,7 @@ export const keys = {
   preview: (url: string) => ['preview', url] as const,
   users: ['users'] as const,
   groups: ['groups'] as const,
+  roomSidebar: ['roomSidebar'] as const,
   members: (groupId: string) => ['members', groupId] as const,
   posts: (groupId: string) => ['posts', groupId] as const,
   /** One post, for its page. applyEvent keeps it in sync with the feed that contains it. */

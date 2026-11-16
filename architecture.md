@@ -56,7 +56,9 @@ Feature flags are planned. The owner will turn posts, chat, images, embeds and a
 
 A room has posts and chat under one shared header. Selecting a room changes both columns. The header names the room. Open and private rooms have the same capabilities. A person can collapse either pane. A group that only wants chat can use its room that way. (Raphael, 2026-11-16. A private room beside public chat would make the audience unclear.)
 
-- An open room appears in everyone's navigation. Every community member can read and participate without asking to join. New community members gain access to existing open rooms.
+- Every community member can discover, read and participate in open rooms without asking to join. New community members gain access to existing open rooms.
+- Sidebar shortcuts are personal. Adding or removing one changes neither access, Home, roles nor notifications. Browse Rooms lists all open rooms and the private rooms the viewer belongs to. A star in the room header adds or removes its shortcut. The star is filled when added. (Raphael, 2026-11-16. Add to sidebar names the action clearly.)
+- Creating a room adds its shortcut for its creator. A private invitation adds the shortcut for the invited person. New open rooms are not automatically added for everyone. Existing shortcuts are preserved during the upgrade.
 - A private room is invisible to non-members. Its name, members and content are available only to invited members. Existing rooms remain private.
 - Visibility is chosen when the room is created and cannot be changed later. (Codex, 2026-11-16. This prevents a settings change from exposing private history.)
 - The community's owner and moderators have ordinary member access in open rooms. They receive no extra room moderation permissions. They see private rooms only when invited. A report shows eligible staff one reported item.
@@ -93,6 +95,8 @@ Rooms are the only way to categorise posts. Topics and topic subscriptions are n
 
 A post is long-form text with inline images. Comments are a flat list, oldest first. A reply to one comment quotes it. A long thread opens at its newest comments, with Load earlier comments above them, as a chat does.
 
+- Home's post editor offers the community and every open room. Choosing a destination keeps Home and its community chat open. Private posting starts inside the private room. A draft keeps its destination across reloads. Changing the destination keeps its text. A successful post clears the draft and resets the next Home draft to the community. An unavailable destination requires another choice before posting. (Codex, 2026-11-16, implementing Raphael's chosen composer design.)
+- Home's post editor has a room selector above the text. The selector strip and the room label on published posts have a faint shaded background. (Raphael, 2026-11-16. This makes the destination visible before posting.)
 - The author edits a post or comment as a whole, and the post is marked as edited. There is no version history.
 - Deleting a post deletes its comments and empties their text, because the author asked for the post to go.
 - Every post has its own address, which notifications link to.
@@ -287,10 +291,13 @@ Unread dots show where unread content exists. The Notifications page records act
 - Read positions and notification preferences are stored on the server and follow the user across devices. Read positions only move forward.
 - Reading open-room posts on Home clears their room feed indicators through the same time. Reading them in their room also clears them from Home’s unread indicator. Chat read positions remain separate. (Codex, 2026-11-16. Reading the same posts in two views should not be required.)
 - Indicators are dots rather than counts.
-- A post's comments button shows a dot while the comments are closed and other users have commented since the user last read them. A post has a read position once the user has written it or opened its comments. A post the user has neither written nor opened shows no dot, so posts the user skipped never show one. A muted discussion shows no dot, because muting means the user does not want to hear about it. Posts written before the dot existed got a read position for their author at that upgrade, so later comments on them show the dot and earlier ones do not. The dot appears only on the button. A room's dot means new posts, because the feed is ordered by when a post was made and a new comment can be on a post far down it.
-- Notification settings are available in Settings and below the notification list. The post’s existing menu offers one action. Follow discussion appears when not following, and Mute discussion appears when following. The community chat and each room chat have a quiet menu for device alerts inside the chat. This control is hidden when chat is hidden or collapsed. The menu marks the current choice.
+- A post's comments button shows a dot while the comments are closed and other users have commented since the user last read them. A post has a read position once the user has written it or opened its comments. A post the user has neither written nor opened shows no dot, so posts the user skipped never show one. Muting a discussion stops notifications but keeps its unread-comment dot. (Raphael, 2026-11-16. Dots should show unread activity independently of notification choices.) Posts written before the dot existed got a read position for their author at that upgrade, so later comments on them show the dot and earlier ones do not. The dot appears only on the button. A room's feed indicator means new posts. Comments retain their own indicators because they can belong to a post far down the feed.
+- Rooms show sidebar dots for unread posts or chat, even with notifications Off. Discussion comments retain their own dots. (Raphael, 2026-11-16. Dots indicate unread content independently of alert preferences.)
+- Notification settings are available in Settings and below the notification list. The post’s existing menu offers one action. Follow discussion appears when not following, and Mute discussion appears when following. The community chat and each room chat have a quiet notification menu inside the chat. The menu marks the current choice. Chat has no extra heading inside its pane. Room settings also offer the same notification choice when chat is hidden. (Raphael, 2026-11-16. The shared header already identifies the location.)
 
-**Device notifications** require permission on each device. Room chat offers All messages, Mentions and replies, or Off. All messages is the default. Account preferences separately control device alerts for comments, mentions and replies, and private conversations. These delivery settings do not hide entries in Notifications or unread content dots.
+**Chat notifications** offer All messages, Mentions and replies, or Off. The choice governs new entries in Notifications and eligibility for device alerts. Off suppresses chat mentions too. Changing the choice keeps existing notification history and unread content dots. Home chat defaults to All messages for everyone. New room preferences default to Mentions and replies. Existing preferences are preserved during the upgrade. (Raphael, 2026-11-16. Chat choices should govern the notification list too. Home chat should start with all notifications.)
+
+**Device notifications** require permission on each device. Account preferences separately control device alerts for comments, mentions and replies, and private conversations. These delivery settings do not hide entries in Notifications or unread content dots.
 
 A device alert holds the community name, the actor's username where appropriate, an action and a link. It contains no message or post text. Current access and preferences are checked before delivery. A device showing the relevant discussion suppresses alerts only for activity it has reached. Repeated alerts for one discussion replace the device's existing alert.
 
@@ -381,7 +388,7 @@ On a phone the space beside cards and inside them is smaller than on a desktop, 
 
 The nav has three blocks (2026-11-05).
 
-1. **Places.** This block holds Home, Rooms and Conversations. Rooms are listed alphabetically without a limit, because there are few. Conversations lists the five with the latest messages.
+1. **Places.** This block holds Home, Rooms and Conversations. Saved rooms are listed alphabetically. Browse Rooms remains available even with no saved rooms. Conversations lists the five with the latest messages.
 2. **Tools.** This block holds Search and Notifications.
 3. **The community and the user.** This block holds People, the Community page and the account row.
 
@@ -462,6 +469,8 @@ These decisions came from a security audit (2026-11-08).
 ## Record
 
 ### Reversed
+
+- **Room shortcuts and chat notifications (Raphael, 2026-11-16).** Open rooms no longer appear automatically in everyone's sidebar. A filled star identifies a saved shortcut. Add to sidebar and Remove from sidebar affect navigation only. Chat notification choices now govern the notification list as well as device alerts. Home chat starts with All messages. Room dots continue to show unread posts and chat independently of notification choices. Muting a discussion no longer hides its unread-comment dot.
 
 - **Room privacy labels (Raphael, 2026-11-16).** One lock beside a private room's name replaces the second header line and repeated privacy explanations. The new room form defaults to Open and lets people select private room members before creating it.
 

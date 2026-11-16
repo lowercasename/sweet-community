@@ -232,7 +232,7 @@ func (s *Server) pushAllowed(ctx context.Context, n Notification) (bool, error) 
 		if err != nil {
 			return false, err
 		}
-		if pref.Mode == "off" || (pref.Mode == "mentions" && n.Kind == NotifyMessage) {
+		if !chatNotificationAllowed(pref.Mode, n.Kind) {
 			return false, nil
 		}
 	}

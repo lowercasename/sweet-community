@@ -62,6 +62,7 @@ export function ConfirmDialog({
     <dialog
       ref={ref}
       tabIndex={-1}
+      aria-label={title}
       className="m-auto w-[min(92vw,24rem)] rounded-card border border-line bg-card p-4 text-ink backdrop:bg-scrim focus:outline-none"
       onCancel={(e) => {
         e.preventDefault()

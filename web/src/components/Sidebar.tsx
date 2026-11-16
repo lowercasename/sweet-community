@@ -1,8 +1,8 @@
 import type { Group, User } from '../api'
 import { roomsOf } from '../data/groups'
-import { useAuthor, useSettings, useUnreadPlaces, useUnreadNotifications } from '../data/hooks'
+import { useRoomSidebar, useAuthor, useSettings, useUnreadPlaces, useUnreadNotifications } from '../data/hooks'
 import { anyUnread } from '../data/notifications'
-import { COMMUNITY, NEW_ROOM, NOTIFICATIONS, SEARCH, groupPath, profilePath } from '../routes'
+import { COMMUNITY, BROWSE_ROOMS, NEW_ROOM, NOTIFICATIONS, SEARCH, groupPath, profilePath } from '../routes'
 import { Avatar, Hairline, NavBar, NavItem, NavSection, shieldText, Tile, Wordmark } from '../ui'
 import { ConversationsSection } from './ConversationsSection'
 
@@ -38,7 +38,9 @@ export function Sidebar({ me, groups, location, expanded, onGo, onToggle }: Side
   const unread = useUnreadNotifications()
   const places = useUnreadPlaces()
   const root = groups.find((g) => g.kind === 'root')
-  const mine = roomsOf(groups)
+  const sidebar = useRoomSidebar()
+  const saved = new Set(sidebar.data?.rooms.filter((r) => r.in_sidebar).map((r) => r.group_id))
+  const mine = roomsOf(groups).filter((g) => saved.has(g.id))
   const canCreate = root?.can.create_groups === true
   const { settings } = useSettings()
   return (
@@ -71,37 +73,43 @@ export function Sidebar({ me, groups, location, expanded, onGo, onToggle }: Side
         current={location === '/'}
         onClick={() => onGo('/')}
       />
-      {(mine.length > 0 || canCreate) && (
-        <NavSection
-          title="Rooms"
-          tour="rooms"
+      <NavSection
+        title="Rooms"
+        tour="rooms"
+        expanded={expanded}
+        action={
+          canCreate
+            ? {
+                icon: 'plus',
+                label: 'New room',
+                current: location === NEW_ROOM,
+                onClick: () => onGo(NEW_ROOM),
+              }
+            : undefined
+        }
+      >
+        {mine.map((g) => (
+          <NavItem
+            key={g.id}
+            mark={<Tile name={g.name} picture={g.picture} />}
+            label={g.name}
+            privateRoom={g.visibility === 'private'}
+            expanded={expanded}
+            size="sm"
+            dot={anyUnread(places.get(g.id))}
+            current={at(location, groupPath(g.id))}
+            onClick={() => onGo(groupPath(g.id))}
+          />
+        ))}
+        <NavItem
+          icon="search"
+          label="Browse Rooms"
           expanded={expanded}
-          action={
-            canCreate
-              ? {
-                  icon: 'plus',
-                  label: 'New room',
-                  current: location === NEW_ROOM,
-                  onClick: () => onGo(NEW_ROOM),
-                }
-              : undefined
-          }
-        >
-          {mine.map((g) => (
-            <NavItem
-              key={g.id}
-              mark={<Tile name={g.name} picture={g.picture} />}
-              label={g.name}
-              privateRoom={g.visibility === 'private'}
-              expanded={expanded}
-              size="sm"
-              dot={anyUnread(places.get(g.id))}
-              current={at(location, groupPath(g.id))}
-              onClick={() => onGo(groupPath(g.id))}
-            />
-          ))}
-        </NavSection>
-      )}
+          size="sm"
+          current={location === BROWSE_ROOMS}
+          onClick={() => onGo(BROWSE_ROOMS)}
+        />
+      </NavSection>
       <ConversationsSection
         groups={groups}
         me={me}

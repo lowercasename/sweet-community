@@ -883,3 +883,17 @@ export function setRoomNotificationPreference(
 export function readAllNotifications(): Promise<Marker> {
   return request('/api/notifications/read', { method: 'PUT' })
 }
+
+export interface RoomSidebar {
+  user_id: string
+  group_id: string
+  in_sidebar: boolean
+}
+
+export function listRoomSidebar(): Promise<{ rooms: RoomSidebar[] }> {
+  return request('/api/me/room-sidebar')
+}
+
+export function setRoomSidebar(groupId: string, inSidebar: boolean): Promise<RoomSidebar> {
+  return request(`/api/groups/${groupId}/sidebar`, { method: 'PUT', body: JSON.stringify({ in_sidebar: inSidebar }) })
+}

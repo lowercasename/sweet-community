@@ -98,6 +98,7 @@ func TestKeyNamesTheResource(t *testing.T) {
 		{"settings", `{"name":"x"}`, "settings"},
 		{"my_settings", `{"user_id":"u"}`, "my_settings:u"},
 		{"post_notification_preference", `{"user_id":"u","post_id":"p"}`, "post_notification_preference:u:p"},
+		{"room_sidebar", `{"user_id":"u","group_id":"g"}`, "room_sidebar:u:g"},
 		{"room_notification_preference", `{"user_id":"u","group_id":"g"}`, "room_notification_preference:u:g"},
 		{"notification_delete", `{"user_id":"u","before":1}`, ""},
 		{"post", `{}`, ""},

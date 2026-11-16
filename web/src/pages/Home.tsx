@@ -15,6 +15,7 @@ import { anyUnread } from '../data/notifications'
 import { StreamProvider } from '../hooks/StreamContext'
 import { useLayout } from '../hooks/useLayout'
 import {
+  BROWSE_ROOMS,
   COMMUNITY,
   CONVERSATIONS,
   NEW_CONVERSATION,
@@ -32,6 +33,8 @@ import { InstallPrompt } from '../components/InstallPrompt'
 import { MembersPage } from '../components/MembersPage'
 import { MenuPage } from '../components/MenuPage'
 import { MessagesPage } from '../components/MessagesPage'
+import { RoomShortcut } from '../components/RoomShortcut'
+import { BrowseRooms } from '../components/BrowseRooms'
 import { NewGroupPage } from '../components/NewGroupPage'
 import { NewMessagePage } from '../components/NewMessagePage'
 import { NotificationsPage } from '../components/NotificationsPage'
@@ -51,6 +54,7 @@ const PAGE_TITLES: Record<string, string> = {
   [CONVERSATIONS]: 'Conversations',
   [NEW_CONVERSATION]: 'New conversation',
   [NEW_ROOM]: 'New room',
+  [BROWSE_ROOMS]: 'Browse Rooms',
   [NOTIFICATIONS]: 'Notifications',
   [SEARCH]: 'Search',
   '/people': 'People',
@@ -214,6 +218,12 @@ export function Home({ me, onSignOut }: HomeProps) {
                 Rules
               </Button>
             )}
+            {location === BROWSE_ROOMS && root?.can.create_groups && (
+              <Button variant="ghost" icon="plus" label="New room" onClick={() => navigate(NEW_ROOM)}>
+                {narrow ? undefined : 'New room'}
+              </Button>
+            )}
+            {viewing && current?.kind === 'group' && <RoomShortcut groupId={current.id} />}
             {viewing && current && current.kind === 'group' && (
               <Button
                 variant="ghost"
@@ -264,6 +274,9 @@ export function Home({ me, onSignOut }: HomeProps) {
           </Route>
           <Route path="/menu">
             <MenuPage me={me} groups={groups} onGo={navigate} onLogout={onSignOut} />
+          </Route>
+          <Route path={BROWSE_ROOMS}>
+            <BrowseRooms onGo={navigate} />
           </Route>
           <Route path={NEW_ROOM}>
             <NewGroupPage onCreated={(g) => navigate(groupPath(g.id, root?.id))} />

@@ -96,6 +96,7 @@ func TestNotificationDeliveryUsesCurrentPreferencesAndAccess(t *testing.T) {
 	room := owner.mustStatus(201, "POST", "/api/groups", map[string]any{"kind": "group", "name": "Private room", "mode": "both"})
 	gid := room["id"].(string)
 	owner.mustStatus(201, "POST", "/api/groups/"+gid+"/members", map[string]string{"user_id": kitID})
+	kit.mustStatus(200, "PUT", "/api/groups/"+gid+"/notifications", map[string]string{"mode": "all"})
 	owner.mustStatus(201, "POST", "/api/groups/"+gid+"/messages", map[string]string{"body_html": "<p>Private text</p>"})
 	raw, _ := json.Marshal(notificationList(t, kit)[0])
 	var n Notification
@@ -268,9 +269,8 @@ func TestReadEntryReopensOnNewActivity(t *testing.T) {
 	}
 }
 
-// The entry and its device alert describe the latest activity. In a chat set to mentions and replies, an ordinary
-// message after a mention is not sent as an alert.
-func TestOrdinaryMessageAfterMentionIsNotAMentionAlert(t *testing.T) {
+// Ordinary messages do not replace a qualifying mention in a mentions-only chat.
+func TestOrdinaryMessageDoesNotReplaceMentionNotification(t *testing.T) {
 	ts, owner, srv := newTestServerWith(t)
 	kit, kitID := registerMember(t, ts, owner, "kit")
 	mo, _ := registerMember(t, ts, owner, "mo")
@@ -280,11 +280,11 @@ func TestOrdinaryMessageAfterMentionIsNotAMentionAlert(t *testing.T) {
 	raw, _ := json.Marshal(notificationList(t, kit)[0])
 	var n Notification
 	json.Unmarshal(raw, &n)
-	if n.Kind != NotifyMessage {
+	if n.Kind != NotifyMention || n.ActivityCount != 1 {
 		t.Fatalf("entry after an ordinary message: %+v", n)
 	}
-	if ok, err := srv.pushAllowed(context.Background(), n); ok || err != nil {
-		t.Fatalf("ordinary message alerted in a mentions-only chat: %v %v", ok, err)
+	if ok, err := srv.pushAllowed(context.Background(), n); !ok || err != nil {
+		t.Fatalf("mention remains eligible: %v %v", ok, err)
 	}
 }
 

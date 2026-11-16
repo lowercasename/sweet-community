@@ -11,8 +11,8 @@ import (
 )
 
 const addCommunityToRoom = `-- name: AddCommunityToRoom :exec
-INSERT INTO memberships (group_id, user_id, role, joined_at)
-SELECT ?1, user_id, 'member', ?2
+INSERT INTO memberships (group_id, user_id, role, joined_at, in_sidebar)
+SELECT ?1, user_id, 'member', ?2, 0
 FROM memberships WHERE group_id = '00000000-0000-7000-8000-000000000000'
 ON CONFLICT (group_id, user_id) DO NOTHING
 `
@@ -286,6 +286,28 @@ func (q *Queries) GetMembership(ctx context.Context, arg GetMembershipParams) (G
 	return i, err
 }
 
+const getRoomSidebar = `-- name: GetRoomSidebar :one
+SELECT group_id, user_id, in_sidebar FROM memberships WHERE group_id = ? AND user_id = ?
+`
+
+type GetRoomSidebarParams struct {
+	GroupID string
+	UserID  string
+}
+
+type GetRoomSidebarRow struct {
+	GroupID   string
+	UserID    string
+	InSidebar int64
+}
+
+func (q *Queries) GetRoomSidebar(ctx context.Context, arg GetRoomSidebarParams) (GetRoomSidebarRow, error) {
+	row := q.db.QueryRowContext(ctx, getRoomSidebar, arg.GroupID, arg.UserID)
+	var i GetRoomSidebarRow
+	err := row.Scan(&i.GroupID, &i.UserID, &i.InSidebar)
+	return i, err
+}
+
 const hideMembership = `-- name: HideMembership :exec
 UPDATE memberships SET hidden_at = ?1 WHERE group_id = ?2 AND user_id = ?3
 `
@@ -303,8 +325,8 @@ func (q *Queries) HideMembership(ctx context.Context, arg HideMembershipParams) 
 }
 
 const joinOpenRooms = `-- name: JoinOpenRooms :exec
-INSERT INTO memberships (group_id, user_id, role, joined_at)
-SELECT id, ?1, 'member', ?2
+INSERT INTO memberships (group_id, user_id, role, joined_at, in_sidebar)
+SELECT id, ?1, 'member', ?2, 0
 FROM groups WHERE kind = 'group' AND visibility = 'open' AND deleted_at IS NULL
 ON CONFLICT (group_id, user_id) DO NOTHING
 `
@@ -485,6 +507,40 @@ func (q *Queries) ListMyGroups(ctx context.Context, userID string) ([]ListMyGrou
 	return items, nil
 }
 
+const listRoomSidebar = `-- name: ListRoomSidebar :many
+SELECT m.group_id, m.user_id, m.in_sidebar FROM memberships m JOIN groups g ON g.id = m.group_id
+WHERE m.user_id = ? AND g.kind = 'group' AND g.deleted_at IS NULL
+`
+
+type ListRoomSidebarRow struct {
+	GroupID   string
+	UserID    string
+	InSidebar int64
+}
+
+func (q *Queries) ListRoomSidebar(ctx context.Context, userID string) ([]ListRoomSidebarRow, error) {
+	rows, err := q.db.QueryContext(ctx, listRoomSidebar, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListRoomSidebarRow{}
+	for rows.Next() {
+		var i ListRoomSidebarRow
+		if err := rows.Scan(&i.GroupID, &i.UserID, &i.InSidebar); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listUserMemberships = `-- name: ListUserMemberships :many
 SELECT m.group_id, m.role, g.kind FROM memberships m JOIN groups g ON g.id = m.group_id
 WHERE m.user_id = ?1 AND g.deleted_at IS NULL
@@ -565,6 +621,21 @@ type SetMembershipRoleParams struct {
 
 func (q *Queries) SetMembershipRole(ctx context.Context, arg SetMembershipRoleParams) error {
 	_, err := q.db.ExecContext(ctx, setMembershipRole, arg.Role, arg.GroupID, arg.UserID)
+	return err
+}
+
+const setRoomSidebar = `-- name: SetRoomSidebar :exec
+UPDATE memberships SET in_sidebar = ? WHERE group_id = ? AND user_id = ?
+`
+
+type SetRoomSidebarParams struct {
+	InSidebar int64
+	GroupID   string
+	UserID    string
+}
+
+func (q *Queries) SetRoomSidebar(ctx context.Context, arg SetRoomSidebarParams) error {
+	_, err := q.db.ExecContext(ctx, setRoomSidebar, arg.InSidebar, arg.GroupID, arg.UserID)
 	return err
 }
 
