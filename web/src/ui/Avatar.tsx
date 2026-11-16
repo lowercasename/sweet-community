@@ -1,4 +1,5 @@
 import donut from '../assets/donut.svg'
+import { ImageWithFallback } from './ImageWithFallback'
 
 interface AvatarProps {
   /** The user's name, as the alt text. The control around the picture shows the name visually. */
@@ -19,15 +20,13 @@ const SIZES: Record<NonNullable<AvatarProps['size']>, string> = {
 
 /** A round profile picture. The default is Sweet's donut, which is part of Sweet's identity. */
 export function Avatar({ name, picture, size = 'md', decorative = false }: AvatarProps) {
-  return (
-    <img
-      className={`${SIZES[size]} flex-none rounded-full object-cover select-none`}
-      src={picture || donut}
-      alt={decorative ? '' : name}
-      aria-hidden={decorative || undefined}
-      draggable={false}
-      loading="lazy"
-      decoding="async"
-    />
-  )
+  const props = {
+    className: `${SIZES[size]} flex-none rounded-full object-cover select-none`,
+    alt: decorative ? '' : name,
+    'aria-hidden': decorative || undefined,
+    draggable: false,
+    loading: 'lazy' as const,
+    decoding: 'async' as const,
+  }
+  return <ImageWithFallback {...props} src={picture} fallback={<img {...props} src={donut} />} />
 }

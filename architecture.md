@@ -153,6 +153,7 @@ A member reacts to a post, a comment or a chat message with an emoji. Each emoji
 - The server records which images each post, comment and message shows when it is saved. An image's id written as text gives no access. Before, any body that contained the id counted, so a member could make a private room's image visible to the whole community by posting its id.
 - A post, comment or message may show only images its writer uploaded or can already see. Any other image, including one deleted while a draft was open, is refused with a message to remove it.
 - A profile picture or a room picture must be an image that the person setting it uploaded. Every signed-in user can see a profile picture, so any other image would let a member show an image from a private room or a conversation to the whole community.
+- If a room picture cannot load, its initial is shown. If a profile picture cannot load, the default profile picture is shown. (Codex, 2026-11-16. Failed pictures must not leave blank tiles or broken images.)
 - An image that nothing uses is deleted once it is a day old. The picture of a deleted room counts as unused. The cleanup never stops at a failure, and tries the image again on its next run.
 - Adjacent images are shown as a gallery. The stored HTML stays a plain run of images.
 - Clicking an image in a post, comment or message opens it alone, full screen, with nothing else. Escape, the close button, a click beside it or pulling down on a phone closes it.
@@ -384,6 +385,8 @@ The nav has three blocks (2026-11-05).
 3. **The community and the user.** This block holds People, the Community page and the account row.
 
 Conversations accumulate, so their list has a stated limit and not a hidden rule like Slack's. A messenger layout with a column of conversations was rejected, because it would draw chat in a second way.
+
+Privacy marks align at the right of navigation rows. A truncated name is shown in full on hover or keyboard focus. (Codex, 2026-11-16, following Raphael's review. Short and long names must keep the same alignment and remain readable.)
 
 ## Mobile
 

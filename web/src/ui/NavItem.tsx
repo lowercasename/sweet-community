@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react'
+import { useLayoutEffect, useRef, useState, type ReactNode } from 'react'
 import { GHOST_CURRENT, GHOST_HOVER } from './Button'
 import { Dotted } from './Dotted'
 import { Icon, type IconName } from './Icon'
@@ -45,7 +45,21 @@ export function NavItem({
   tour,
   onClick,
 }: NavItemProps) {
-  const tip = useTooltip(label, !expanded, 'right')
+  const labelRef = useRef<HTMLSpanElement>(null)
+  const [truncated, setTruncated] = useState(false)
+  useLayoutEffect(() => {
+    const node = labelRef.current
+    if (!node) {
+      setTruncated(false)
+      return
+    }
+    const measure = () => setTruncated(node.scrollWidth > node.clientWidth)
+    measure()
+    const observer = new ResizeObserver(measure)
+    observer.observe(node)
+    return () => observer.disconnect()
+  }, [label, expanded])
+  const tip = useTooltip(label, !expanded || truncated, 'right', true)
   const name = dot ? `${label}, unread` : label
   const glyph = mark ?? (icon && <Icon name={icon} size={20} />)
   return (
@@ -62,7 +76,14 @@ export function NavItem({
       >
         <Dotted shown={dot}>{glyph}</Dotted>
         {/* The label is ink at regular weight, and the icon stays grey. The current item's label is red, as its icon is. */}
-        {expanded && <span className="truncate text-ink group-aria-[current=page]:text-sweet">{label}</span>}
+        {expanded && (
+          <span
+            ref={labelRef}
+            className="min-w-0 flex-1 truncate text-left text-ink group-aria-[current=page]:text-sweet"
+          >
+            {label}
+          </span>
+        )}
         {expanded && privateRoom && <PrivateMark />}
         {expanded && shield !== undefined && <ShieldMark size={16} />}
       </button>
