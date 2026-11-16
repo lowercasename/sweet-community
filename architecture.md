@@ -63,6 +63,7 @@ A room has posts and chat under one shared header. Selecting a room changes both
 - Any member may create a room, unless the owner limits this to staff. The creator owns the room.
 - The new room form starts with Open selected. Choosing Private shows a searchable list of community members. Selected people appear above the list and join when the room is created. The creator is always included. (Raphael, 2026-11-16. People should be able to choose a private room's members during creation.)
 - A private room has the same lock beside its name in the sidebar, header and post labels. The header stays on one line. Room settings do not repeat the privacy explanation. (Raphael, 2026-11-16. Competing privacy labels and a second header line added clutter.)
+- The lock shows a Private room tooltip everywhere it appears. Hovering it does not show the room-name tooltip at the same time. (Raphael, 2026-11-16. The two tooltips overlapped.)
 - A post shown outside its room has a header naming and linking to the room. Opening its comments does not change the current chat. Entering the room changes both columns.
 - Everyone belongs to open rooms while they belong to the community. They cannot leave an open room or remove another community member from it. Room chat alert settings remain available.
 - Private room members can leave or be removed. A private room is deleted when its last member leaves.

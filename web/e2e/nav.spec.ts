@@ -1,4 +1,4 @@
-import { expect, member, open, png, sendMessage, test, uniq, type Person } from './helpers'
+import { article, expect, member, open, png, sendMessage, test, uniq, type Person } from './helpers'
 
 const nav = (p: Person) => p.page.getByRole('navigation', { name: 'Main' })
 
@@ -12,6 +12,72 @@ async function messageFromPeople(p: Person, who: string) {
 
 test.describe('nav', () => {
   for (const suffix of [' @dev', ' @phone']) {
+    test('privacy tooltips are shared and separate from room names' + suffix, async ({ browser }, info) => {
+      const kit = await member(browser, info, 'privacytip')
+      const phone = !!info.project.use.isMobile
+      const name = "It's A Room, Mario, But Not As You Know It"
+      const room = await (
+        await kit.context.request.post('/api/groups', {
+          data: { name, visibility: 'private' },
+        })
+      ).json()
+      const body = uniq('Private post ')
+      await kit.context.request.post(`/api/groups/${room.id}/posts`, { data: { body_html: `<p>${body}</p>` } })
+      await open(kit.page, phone ? '/menu' : `/r/${room.id}`)
+      const row = kit.page.getByRole('group', { name: 'Rooms', exact: true }).getByRole('button', { name, exact: true })
+      const lock = row.getByRole('img', { name: 'Private room', exact: true })
+      await expect(lock).not.toHaveAttribute('title')
+      if (!phone) {
+        await row.getByText(name, { exact: true }).hover()
+        await expect(kit.page.getByRole('tooltip')).toHaveText(name)
+        await lock.hover()
+        await expect(kit.page.getByRole('tooltip')).toHaveText('Private room')
+        await kit.page.screenshot({
+          path: `test-results/privacy-nav-${info.project.name}.png`,
+          animations: 'disabled',
+          scale: 'css',
+        })
+        await row.getByText(name, { exact: true }).hover()
+        await expect(kit.page.getByRole('tooltip')).toHaveText(name)
+        await lock.hover()
+        await expect(kit.page.getByRole('tooltip')).toHaveText('Private room')
+        await kit.page.getByRole('heading', { name, exact: true }).hover()
+        // Wait past the hover delay to catch a pending room-name tooltip.
+        await kit.page.waitForTimeout(500)
+        await expect(kit.page.getByRole('tooltip')).toHaveCount(0)
+        await lock.hover()
+        await expect(kit.page.getByRole('tooltip')).toHaveText('Private room')
+      }
+      await open(kit.page, `/r/${room.id}`)
+      const headerLock = kit.page
+        .getByRole('heading', { name, exact: true })
+        .locator('..')
+        .getByRole('img', { name: 'Private room', exact: true })
+      await expect(headerLock).not.toHaveAttribute('title')
+      await kit.page.keyboard.press('Tab')
+      await headerLock.focus()
+      await expect(kit.page.getByRole('tooltip')).toHaveText('Private room')
+      await kit.page.screenshot({
+        path: `test-results/privacy-header-${info.project.name}.png`,
+        animations: 'disabled',
+        scale: 'css',
+      })
+      await kit.page.keyboard.press('Escape')
+      await expect(kit.page.getByRole('tooltip')).toHaveCount(0)
+      await open(kit.page, `/u/${kit.username}`)
+      const postLock = article(kit.page, body).getByRole('img', { name: 'Private room', exact: true })
+      await expect(postLock).not.toHaveAttribute('title')
+      await kit.page.keyboard.press('Tab')
+      await postLock.focus()
+      await expect(kit.page.getByRole('tooltip')).toHaveText('Private room')
+      await kit.page.screenshot({
+        path: `test-results/privacy-post-${info.project.name}.png`,
+        animations: 'disabled',
+        scale: 'css',
+      })
+      await kit.context.close()
+    })
+
     test('private room locks align beside short and truncated names' + suffix, async ({ browser }, info) => {
       const kit = await member(browser, info, 'navcheck')
       const long = "It's A Room, Mario, But Not As You Know It"

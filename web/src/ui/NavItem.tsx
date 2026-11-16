@@ -1,4 +1,4 @@
-import { useLayoutEffect, useRef, useState, type ReactNode } from 'react'
+import { useCallback, useLayoutEffect, useRef, useState, type PointerEvent, type ReactNode } from 'react'
 import { GHOST_CURRENT, GHOST_HOVER } from './Button'
 import { Dotted } from './Dotted'
 import { Icon, type IconName } from './Icon'
@@ -45,7 +45,7 @@ export function NavItem({
   tour,
   onClick,
 }: NavItemProps) {
-  const labelRef = useRef<HTMLSpanElement>(null)
+  const labelRef = useRef<HTMLSpanElement | null>(null)
   const [truncated, setTruncated] = useState(false)
   useLayoutEffect(() => {
     const node = labelRef.current
@@ -59,32 +59,59 @@ export function NavItem({
     observer.observe(node)
     return () => observer.disconnect()
   }, [label, expanded])
-  const tip = useTooltip(label, !expanded || truncated, 'right', true)
+  // Keep each tooltip's target stable when the navigation expands or collapses.
+  const nameTip = useTooltip(label, expanded && truncated, 'right', true)
+  const collapsedTip = useTooltip(label, !expanded, 'right', true)
+  const tip = expanded ? nameTip : collapsedTip
+  const labelTarget = useCallback(
+    (node: HTMLSpanElement | null) => {
+      labelRef.current = node
+      nameTip.ref(node)
+    },
+    [nameTip.ref],
+  )
+  const controlTarget = useCallback(
+    (node: HTMLButtonElement | null) => {
+      nameTip.positionRef(node)
+      collapsedTip.ref(node)
+    },
+    [nameTip.positionRef, collapsedTip.ref],
+  )
   const name = dot ? `${label}, unread` : label
   const glyph = mark ?? (icon && <Icon name={icon} size={20} />)
   return (
     <>
       <button
-        ref={tip.ref}
+        ref={controlTarget}
         type="button"
         aria-current={current ? 'page' : undefined}
         aria-label={name}
         aria-description={privateRoom ? 'Private room' : shield}
         data-tour={tour}
         className={`group flex cursor-pointer items-center gap-3 rounded-[4px] text-mute transition-colors ${GHOST_HOVER} focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-pink ${GHOST_CURRENT} ${size === 'sm' ? 'h-8 text-sm' : 'h-10'} ${expanded ? 'px-3' : 'justify-center'}`}
-        {...tip.props({ onClick })}
+        {...(expanded
+          ? {
+              ...tip.focusProps,
+              onClick,
+              onPointerLeave: tip.hide,
+              onPointerMove: (event: PointerEvent<HTMLButtonElement>) => {
+                if (!labelRef.current?.contains(event.target as Node)) tip.hide()
+              },
+            }
+          : tip.props({ onClick }))}
       >
         <Dotted shown={dot}>{glyph}</Dotted>
         {/* The label is ink at regular weight, and the icon stays grey. The current item's label is red, as its icon is. */}
         {expanded && (
           <span
-            ref={labelRef}
+            ref={labelTarget}
             className="min-w-0 flex-1 truncate text-left text-ink group-aria-[current=page]:text-sweet"
+            {...tip.props()}
           >
             {label}
           </span>
         )}
-        {expanded && privateRoom && <PrivateMark />}
+        {expanded && privateRoom && <PrivateMark focusable={false} />}
         {expanded && shield !== undefined && <ShieldMark size={16} />}
       </button>
       {tip.tooltip}
