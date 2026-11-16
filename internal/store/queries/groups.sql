@@ -3,7 +3,7 @@
 -- not check permissions.
 
 -- name: GetGroup :one
-SELECT g.id, g.kind, g.name, g.mode, g.visibility, g.created_at, g.picture_id,
+SELECT g.id, g.kind, g.name, g.description, g.mode, g.visibility, g.created_at, g.picture_id,
        (SELECT MAX(created_at) FROM messages WHERE group_id = g.id AND deleted_at IS NULL AND kind = 'message') AS last_message_at
 FROM groups g WHERE g.id = sqlc.arg(id) AND g.deleted_at IS NULL;
 
@@ -15,7 +15,7 @@ SELECT role, joined_at FROM memberships WHERE group_id = sqlc.arg(group_id) AND 
 -- name: ListMyGroups :many
 -- Every group the user has a row in, including conversations they have
 -- hidden. It returns hidden_at so the client can tell them apart.
-SELECT g.id, g.kind, g.name, g.mode, g.visibility, g.created_at, g.picture_id, m.role, m.hidden_at,
+SELECT g.id, g.kind, g.name, g.description, g.mode, g.visibility, g.created_at, g.picture_id, m.role, m.hidden_at,
        (SELECT MAX(created_at) FROM messages WHERE group_id = g.id AND deleted_at IS NULL AND kind = 'message') AS last_message_at
 FROM memberships m JOIN groups g ON g.id = m.group_id
 WHERE m.user_id = sqlc.arg(user_id) AND g.deleted_at IS NULL
@@ -39,18 +39,18 @@ WHERE m.group_id = sqlc.arg(group_id)
 ORDER BY m.role = 'owner' DESC, m.role = 'moderator' DESC, m.joined_at;
 
 -- name: CreateGroup :exec
-INSERT INTO groups (id, kind, name, mode, created_at, people_key)
-VALUES (sqlc.arg(id), sqlc.arg(kind), sqlc.arg(name), sqlc.arg(mode), sqlc.arg(created_at), sqlc.arg(people_key));
+INSERT INTO groups (id, kind, name, description, mode, created_at, people_key)
+VALUES (sqlc.arg(id), sqlc.arg(kind), sqlc.arg(name), sqlc.arg(description), sqlc.arg(mode), sqlc.arg(created_at), sqlc.arg(people_key));
 
 -- name: GetDMByPeople :one
 -- The conversation with exactly these users, found by its people_key. It
 -- returns the same columns as GetGroup.
-SELECT g.id, g.kind, g.name, g.mode, g.visibility, g.created_at, g.picture_id,
+SELECT g.id, g.kind, g.name, g.description, g.mode, g.visibility, g.created_at, g.picture_id,
        (SELECT MAX(created_at) FROM messages WHERE group_id = g.id AND deleted_at IS NULL AND kind = 'message') AS last_message_at
 FROM groups g WHERE g.kind = 'dm' AND g.people_key = sqlc.arg(people_key) AND g.deleted_at IS NULL;
 
 -- name: UpdateGroup :exec
-UPDATE groups SET name = sqlc.arg(name), mode = sqlc.arg(mode) WHERE id = sqlc.arg(id) AND deleted_at IS NULL;
+UPDATE groups SET name = sqlc.arg(name), description = sqlc.arg(description), mode = sqlc.arg(mode) WHERE id = sqlc.arg(id) AND deleted_at IS NULL;
 
 -- name: SetGroupPicture :exec
 UPDATE groups SET picture_id = sqlc.arg(picture_id) WHERE id = sqlc.arg(id) AND deleted_at IS NULL;
@@ -71,7 +71,7 @@ SELECT COUNT(*) FROM memberships WHERE group_id = sqlc.arg(group_id) AND hidden_
 
 -- Marks a group deleted and empties its name. It clears the picture, so the image sweep can delete that image.
 -- name: DeleteGroup :exec
-UPDATE groups SET deleted_at = sqlc.arg(deleted_at), name = '', picture_id = NULL
+UPDATE groups SET deleted_at = sqlc.arg(deleted_at), name = '', description = '', picture_id = NULL
 WHERE id = sqlc.arg(id) AND deleted_at IS NULL;
 
 -- name: DeleteGroupMemberships :exec

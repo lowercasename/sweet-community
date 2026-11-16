@@ -106,7 +106,7 @@ test.describe('roles', () => {
     await expect(o.page.getByText(text)).toHaveCount(0)
     // Ownership of the room passed to mo.
     await open(mo.page, roomURL)
-    await expect(mo.page.getByRole('listitem').filter({ hasText: mo.username })).toContainText('owner')
+    await expect(mo.page.getByRole('region', { name: 'Owner', exact: true })).toContainText(mo.username)
     await expect(mo.page.getByRole('listitem').filter({ hasText: kit.username })).toHaveCount(0)
 
     // Mo removes themselves from Settings, after a confirmation.

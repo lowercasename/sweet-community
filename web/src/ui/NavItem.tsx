@@ -12,6 +12,8 @@ interface NavItemProps {
   /** A group's or user's image (a Tile or an Avatar), drawn in place of the icon. */
   mark?: ReactNode
   label: string
+  /** Secondary text for room listings. Navigation rows omit it. */
+  description?: string
   privateRoom?: boolean
   /** Whether the nav bar is expanded. When it is collapsed, the label is hidden and shown in a tooltip instead. */
   expanded: boolean
@@ -36,6 +38,7 @@ export function NavItem({
   icon,
   mark,
   label,
+  description,
   expanded,
   current,
   size = 'md',
@@ -88,7 +91,7 @@ export function NavItem({
         aria-label={name}
         aria-description={privateRoom ? 'Private room' : shield}
         data-tour={tour}
-        className={`group flex cursor-pointer items-center gap-3 rounded-[4px] text-mute transition-colors ${GHOST_HOVER} focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-pink ${GHOST_CURRENT} ${size === 'sm' ? 'h-8 text-sm' : 'h-10'} ${expanded ? 'px-3' : 'justify-center'}`}
+        className={`group flex cursor-pointer gap-3 rounded-[4px] text-mute transition-colors ${GHOST_HOVER} focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-pink ${GHOST_CURRENT} ${description && expanded ? 'min-h-10 items-start py-2' : `items-center ${size === 'sm' ? 'h-8 text-sm' : 'h-10'}`} ${expanded ? 'px-3' : 'justify-center'}`}
         {...(expanded
           ? {
               ...tip.focusProps,
@@ -105,15 +108,26 @@ export function NavItem({
         </span>
         {/* The label is ink at regular weight, and the icon stays grey. The current item's label is red, as its icon is. */}
         {expanded && (
-          <span
-            ref={labelTarget}
-            className="min-w-0 flex-1 truncate text-left text-ink group-aria-[current=page]:text-sweet"
-            {...tip.props()}
-          >
-            {label}
+          <span className="min-w-0 flex-1 text-left">
+            <span
+              ref={labelTarget}
+              className="block truncate text-ink group-aria-[current=page]:text-sweet"
+              {...tip.props()}
+            >
+              {label}
+            </span>
+            {description && (
+              <span className="mt-0.5 block text-sm text-mute whitespace-pre-line [overflow-wrap:anywhere]">
+                {description}
+              </span>
+            )}
           </span>
         )}
-        {expanded && privateRoom && <PrivateMark focusable={false} />}
+        {expanded && privateRoom && (
+          <span className="flex h-6 shrink-0 items-center">
+            <PrivateMark focusable={false} />
+          </span>
+        )}
         {expanded && shield !== undefined && <ShieldMark size={16} />}
       </button>
       {tip.tooltip}

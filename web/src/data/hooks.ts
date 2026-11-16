@@ -321,12 +321,12 @@ export function useMembers(groupId: string) {
 export function useGroupActions() {
   const qc = useQueryClient()
   return {
-    async create(name: string, visibility: RoomVisibility, members: string[] = []): Promise<Group> {
-      const g = await createGroup(name, visibility, members)
+    async create(name: string, visibility: RoomVisibility, members: string[] = [], description = ''): Promise<Group> {
+      const g = await createGroup(name, visibility, members, description)
       applyEvent(qc, 'group', g)
       return g
     },
-    async update(groupId: string, patch: { name?: string; mode?: GroupMode }) {
+    async update(groupId: string, patch: { name?: string; description?: string; mode?: GroupMode }) {
       applyEvent(qc, 'group', await updateGroup(groupId, patch))
     },
     async setPicture(groupId: string, imageId: string | null) {

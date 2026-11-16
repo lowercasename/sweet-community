@@ -75,6 +75,7 @@ export interface Group {
   id: string
   kind: 'root' | 'group' | 'dm'
   name: string
+  description: string
   /** Rooms have both posts and chat. A DM has chat only. */
   mode: GroupMode
   created_at: number
@@ -399,11 +400,19 @@ export function listGroups(): Promise<{ groups: Group[] }> {
   return request('/api/groups')
 }
 
-export function createGroup(name: string, visibility: RoomVisibility, members: string[] = []): Promise<Group> {
-  return request<Group>('/api/groups', json('POST', { name, visibility, members }))
+export function createGroup(
+  name: string,
+  visibility: RoomVisibility,
+  members: string[] = [],
+  description = '',
+): Promise<Group> {
+  return request<Group>('/api/groups', json('POST', { name, visibility, members, description }))
 }
 
-export function updateGroup(groupId: string, patch: { name?: string; mode?: GroupMode }): Promise<Group> {
+export function updateGroup(
+  groupId: string,
+  patch: { name?: string; description?: string; mode?: GroupMode },
+): Promise<Group> {
   return request<Group>(g(groupId), json('PUT', patch))
 }
 

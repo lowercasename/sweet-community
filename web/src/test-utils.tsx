@@ -47,6 +47,7 @@ export const member = (id: string, role: Member['role'] = 'member', remove = fal
 export const group = (id: string, role: Group['role'], extra: Partial<Group> = {}): Group => ({
   id,
   visibility: id === ROOT ? 'open' : 'private',
+  description: '',
   kind: id === ROOT ? 'root' : 'group',
   name: id === ROOT ? '' : id,
   mode: 'both',
@@ -76,6 +77,7 @@ export const group = (id: string, role: Group['role'], extra: Partial<Group> = {
 export const dm = (id: string, people: User[], extra: Partial<Group> = {}): Group => ({
   id,
   kind: 'dm',
+  description: '',
   visibility: 'private',
   name: '',
   mode: 'chat',

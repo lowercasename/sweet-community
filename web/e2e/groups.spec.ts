@@ -76,7 +76,7 @@ test.describe('groups', () => {
     await expect(kit.page.getByRole('heading', { name: 'Room settings' })).toHaveCount(1)
 
     await kit.page.getByRole('textbox', { name: 'Name' }).fill(name + ' renamed')
-    await expect(kit.page.getByLabel('Mode')).toHaveCount(0)
+    await expect(kit.page.getByLabel('Mode', { exact: true })).toHaveCount(0)
     await kit.page.getByRole('button', { name: 'Save' }).click()
     // There is still exactly one of each card, the controls are still shown, and the new name is shown everywhere.
     await expect(kit.page.getByRole('button', { name: 'Save' })).toBeDisabled()
@@ -110,19 +110,19 @@ test.describe('groups', () => {
     // The owner has no Leave button. Mo can be made moderator, then owner after a confirmation.
     await expect(kit.page.getByRole('button', { name: 'Leave room' })).toHaveCount(0)
     await pick(kit.page, moRow, `Options for ${mo.username}`, 'Make moderator')
-    await expect(moRow).toContainText('moderator')
-    // The row's menu button and the longer role text are on the same line as the name.
+    await expect(kit.page.getByRole('region', { name: 'Moderators', exact: true })).toContainText(mo.username)
+    // The row's menu button stays on the same line as the name.
     const face = await moRow.getByRole('img').boundingBox()
     const action = await moRow.getByRole('button', { name: `Options for ${mo.username}` }).boundingBox()
     expect(face && action && action.y < face.y + face.height && action.y + action.height > face.y).toBeTruthy()
     await pick(kit.page, moRow, `Options for ${mo.username}`, 'Make owner')
     await confirm(kit.page, 'Make owner')
-    await expect(moRow).toContainText('owner')
+    await expect(kit.page.getByRole('region', { name: 'Owner', exact: true })).toContainText(mo.username)
     await expect(moRow.locator('time')).not.toContainText(/\d{1,2}:\d{2}/)
     // Kit's own row shows the new role at once, without a reload.
     const kitRow = kit.page.getByRole('listitem').filter({ hasText: kit.username })
-    await expect(kitRow).toContainText('moderator')
-    await expect(kitRow).not.toContainText('owner')
+    await expect(kit.page.getByRole('region', { name: 'Moderators', exact: true })).toContainText(kit.username)
+    await expect(kit.page.getByRole('region', { name: 'Owner', exact: true })).not.toContainText(kit.username)
     await expect(kitRow.locator('time')).not.toContainText(/\d{1,2}:\d{2}/)
     await expect(kit.page.getByRole('button', { name: 'Leave room' })).toBeVisible()
     await expect(kit.page.getByRole('heading', { name: 'Room settings' })).toHaveCount(0)
@@ -205,10 +205,9 @@ test.describe('groups', () => {
     const moRow = kit.page.getByRole('listitem').filter({ hasText: mo.username })
     await pick(kit.page, moRow, `Options for ${mo.username}`, 'Make owner')
     await confirm(kit.page, 'Make owner')
-    await expect(moRow).toContainText('owner')
-    const kitRow = kit.page.getByRole('listitem').filter({ hasText: kit.username })
-    await expect(kitRow).toContainText('moderator')
-    await expect(kitRow).not.toContainText('owner')
+    await expect(kit.page.getByRole('region', { name: 'Owner', exact: true })).toContainText(mo.username)
+    await expect(kit.page.getByRole('region', { name: 'Moderators', exact: true })).toContainText(kit.username)
+    await expect(kit.page.getByRole('region', { name: 'Owner', exact: true })).not.toContainText(kit.username)
     await expect(kit.page.getByRole('heading', { name: 'Room settings' })).toHaveCount(0)
     await kit.context.close()
     await mo.context.close()

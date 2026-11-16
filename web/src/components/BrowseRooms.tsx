@@ -29,7 +29,7 @@ export function BrowseRooms({ onGo }: { onGo: (path: string) => void }) {
   const rooms = roomsOf(groups).filter(
     (g) =>
       (visibility === 'all' || g.visibility === visibility) &&
-      g.name.toLocaleLowerCase().includes(search.trim().toLocaleLowerCase()),
+      `${g.name} ${g.description ?? ''}`.toLocaleLowerCase().includes(search.trim().toLocaleLowerCase()),
   )
   return (
     <Pane>
@@ -59,10 +59,11 @@ export function BrowseRooms({ onGo }: { onGo: (path: string) => void }) {
                 <List gap={1}>
                   {rooms.map((g) => (
                     <ListItem key={g.id}>
-                      <Row align="center" wrap="never" gap={1}>
+                      <Row align={g.description ? 'start' : 'center'} wrap="never" gap={1}>
                         <Stack fill>
                           <NavItem
                             label={g.name}
+                            description={g.description}
                             mark={<Tile name={g.name} picture={g.picture} />}
                             privateRoom={g.visibility === 'private'}
                             expanded

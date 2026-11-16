@@ -663,3 +663,34 @@ func TestRoomPreferencesUpgradePreservesShortcutsAndAlertChoices(t *testing.T) {
 		t.Fatalf("migration: %d %q %q %q %v", saved, reader, quiet, role, err)
 	}
 }
+
+func TestRoomDescriptionsUpgradeKeepsExistingRooms(t *testing.T) {
+	d, err := Open(filepath.Join(t.TempDir(), "upgrade.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer d.Close()
+	migratedTo(t, d, "019")
+	_, err = d.Exec(`
+ INSERT INTO users(id,username,created_at) VALUES('owner','owner',1);
+ INSERT INTO groups(id,kind,name,mode,visibility,created_at) VALUES('room','group','Existing room','both','private',1);
+ INSERT INTO memberships(group_id,user_id,role,joined_at) VALUES('room','owner','owner',1);
+ INSERT INTO posts(id,group_id,author_id,body_html,body_text,created_at) VALUES('post','room','owner','<p>Existing text</p>','Existing text',1);
+ INSERT INTO events(kind,payload,key,created_at) VALUES('group','{"id":"room","name":"Existing room"}','group:room',1);
+ `)
+	if err != nil {
+		t.Fatal(err)
+	}
+	migratedTo(t, d, "020")
+	var name, description, visibility, body string
+	if err := d.QueryRow(`SELECT g.name,g.description,g.visibility,p.body_html FROM groups g JOIN posts p ON p.group_id=g.id WHERE g.id='room'`).Scan(&name, &description, &visibility, &body); err != nil {
+		t.Fatal(err)
+	}
+	if name != "Existing room" || description != "" || visibility != "private" || body != "<p>Existing text</p>" {
+		t.Fatal("upgrade changed existing content or visibility")
+	}
+	var snapshots int
+	if err := d.QueryRow(`SELECT COUNT(*) FROM events WHERE kind='group'`).Scan(&snapshots); err != nil || snapshots != 0 {
+		t.Fatal("stale group snapshots survived")
+	}
+}

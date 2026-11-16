@@ -21,10 +21,11 @@ import (
 // Group is the wire shape of a group as one viewer sees it. It includes the
 // viewer's role in the group and the actions they may perform on it.
 type Group struct {
-	ID         string `json:"id"`
-	Kind       string `json:"kind"`
-	Visibility string `json:"visibility"`
-	Name       string `json:"name"`
+	ID          string `json:"id"`
+	Kind        string `json:"kind"`
+	Visibility  string `json:"visibility"`
+	Name        string `json:"name"`
+	Description string `json:"description"`
 	// A named room has posts and chat. A conversation has chat only.
 	Mode      string `json:"mode"`
 	CreatedAt int64  `json:"created_at"`
@@ -80,8 +81,9 @@ type Settings struct {
 }
 
 const (
-	maxNameLen        = 60
-	maxDescriptionLen = 500
+	maxRoomDescriptionLen = 140
+	maxNameLen            = 60
+	maxDescriptionLen     = 500
 )
 
 func (s *Server) settings(ctx context.Context) (Settings, error) {
@@ -227,7 +229,7 @@ func (s *Server) listGroups(w http.ResponseWriter, r *http.Request) {
 	out := make([]Group, 0, len(rows))
 	for _, row := range rows {
 		// The list row is the group row plus the viewer's role. TestRepliesAndEventsMatchTheRow checks that list and fetch produce the same shape.
-		g, err := wireGroup(r.Context(), s.q(), store.GetGroupRow{ID: row.ID, Kind: row.Kind, Name: row.Name, Mode: row.Mode, Visibility: row.Visibility, CreatedAt: row.CreatedAt, PictureID: row.PictureID, LastMessageAt: row.LastMessageAt})
+		g, err := wireGroup(r.Context(), s.q(), store.GetGroupRow{ID: row.ID, Kind: row.Kind, Name: row.Name, Description: row.Description, Mode: row.Mode, Visibility: row.Visibility, CreatedAt: row.CreatedAt, PictureID: row.PictureID, LastMessageAt: row.LastMessageAt})
 		if err != nil {
 			writeErr(w, http.StatusInternalServerError, err.Error())
 			return
@@ -249,11 +251,12 @@ func (s *Server) getGroup(w http.ResponseWriter, r *http.Request) {
 // instead of 201.
 func (s *Server) createGroup(w http.ResponseWriter, r *http.Request) {
 	var in struct {
-		Kind       string   `json:"kind"`
-		Visibility string   `json:"visibility"`
-		Name       string   `json:"name"`
-		Mode       string   `json:"mode"`
-		Members    []string `json:"members"`
+		Kind        string   `json:"kind"`
+		Visibility  string   `json:"visibility"`
+		Name        string   `json:"name"`
+		Description string   `json:"description"`
+		Mode        string   `json:"mode"`
+		Members     []string `json:"members"`
 	}
 	r.Body = http.MaxBytesReader(w, r.Body, 64*1024)
 	if err := json.NewDecoder(r.Body).Decode(&in); err != nil {
@@ -264,6 +267,11 @@ func (s *Server) createGroup(w http.ResponseWriter, r *http.Request) {
 	now := db.Now()
 	switch in.Kind {
 	case "", perm.KindGroup:
+		in.Description = strings.TrimSpace(in.Description)
+		if utf8.RuneCountInString(in.Description) > maxRoomDescriptionLen {
+			writeErr(w, http.StatusBadRequest, "A room description can have up to 140 characters")
+			return
+		}
 		in.Name = strings.TrimSpace(in.Name)
 		if in.Name == "" || len(in.Name) > 80 {
 			writeErr(w, http.StatusBadRequest, "A room needs a name of up to 80 characters")
@@ -290,8 +298,12 @@ func (s *Server) createGroup(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 		people[me.ID] = perm.Owner
-		s.createGroupWith(w, r, perm.KindGroup, in.Name, in.Mode, in.Visibility, now, people)
+		s.createGroupWith(w, r, perm.KindGroup, in.Name, in.Description, in.Mode, in.Visibility, now, people)
 	case perm.KindDM:
+		if in.Description != "" {
+			writeErr(w, http.StatusBadRequest, "Descriptions are for rooms")
+			return
+		}
 		people := map[string]bool{me.ID: true}
 		for _, id := range in.Members {
 			people[id] = true
@@ -393,7 +405,7 @@ func validMode(m string) bool { return m == perm.ModePosts || m == perm.ModeChat
 // createGroupWith creates a group and its memberships. The response and the
 // events are read back from the rows after the writes. loggedMany
 // personalises the response for the creator's role in the new group.
-func (s *Server) createGroupWith(w http.ResponseWriter, r *http.Request, kind, name, mode, visibility string, now int64, people map[string]string) {
+func (s *Server) createGroupWith(w http.ResponseWriter, r *http.Request, kind, name, description, mode, visibility string, now int64, people map[string]string) {
 	id, err := uuid.NewV7()
 	if err != nil {
 		writeErr(w, http.StatusInternalServerError, err.Error())
@@ -404,7 +416,7 @@ func (s *Server) createGroupWith(w http.ResponseWriter, r *http.Request, kind, n
 		if status, err := allowGroupCreation(r, qtx); err != nil {
 			return nil, nil, status, err
 		}
-		if err := qtx.CreateGroup(r.Context(), store.CreateGroupParams{ID: gid, Kind: kind, Name: name, Mode: mode, CreatedAt: now, PeopleKey: sql.NullString{}}); err != nil {
+		if err := qtx.CreateGroup(r.Context(), store.CreateGroupParams{ID: gid, Kind: kind, Name: name, Description: description, Mode: mode, CreatedAt: now, PeopleKey: sql.NullString{}}); err != nil {
 			return nil, nil, http.StatusInternalServerError, err
 		}
 		for uid, role := range people {
@@ -493,12 +505,13 @@ func (s *Server) setGroupPicture(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// updateGroup sets a group's name and mode (perm.Rename, perm.SetMode).
+// updateGroup sets a group's name, description and mode.
 func (s *Server) updateGroup(w http.ResponseWriter, r *http.Request) {
 	var in struct {
-		Name       *string `json:"name"`
-		Mode       *string `json:"mode"`
-		Visibility *string `json:"visibility"`
+		Name        *string `json:"name"`
+		Description *string `json:"description"`
+		Mode        *string `json:"mode"`
+		Visibility  *string `json:"visibility"`
 	}
 	r.Body = http.MaxBytesReader(w, r.Body, 4096)
 	if err := json.NewDecoder(r.Body).Decode(&in); err != nil {
@@ -517,6 +530,14 @@ func (s *Server) updateGroup(w http.ResponseWriter, r *http.Request) {
 		}
 		in.Name = &name
 	}
+	if in.Description != nil {
+		description := strings.TrimSpace(*in.Description)
+		if utf8.RuneCountInString(description) > maxRoomDescriptionLen {
+			writeErr(w, http.StatusBadRequest, "A room description can have up to 140 characters")
+			return
+		}
+		in.Description = &description
+	}
 	if in.Mode != nil && !validMode(*in.Mode) {
 		writeErr(w, http.StatusBadRequest, "Mode must be posts, chat or both")
 		return
@@ -533,6 +554,12 @@ func (s *Server) updateGroup(w http.ResponseWriter, r *http.Request) {
 			}
 			g.Name = *in.Name
 		}
+		if in.Description != nil {
+			if !perm.Rename(a, pg) {
+				return nil, http.StatusForbidden, errors.New("Not allowed")
+			}
+			g.Description = *in.Description
+		}
 		if in.Mode != nil {
 			if g.Kind == perm.KindDM {
 				return nil, http.StatusBadRequest, errors.New("A conversation is chat only")
@@ -543,7 +570,7 @@ func (s *Server) updateGroup(w http.ResponseWriter, r *http.Request) {
 			g.Mode = *in.Mode
 		}
 
-		if err := qtx.UpdateGroup(r.Context(), store.UpdateGroupParams{Name: g.Name, Mode: g.Mode, ID: g.ID}); err != nil {
+		if err := qtx.UpdateGroup(r.Context(), store.UpdateGroupParams{Name: g.Name, Description: g.Description, Mode: g.Mode, ID: g.ID}); err != nil {
 			return nil, http.StatusInternalServerError, err
 		}
 		row, err := qtx.GetGroup(r.Context(), g.ID)

@@ -144,7 +144,7 @@ func wireMembership(groupID string, row store.GetMemberRow) Membership {
 // that a group created in a transaction is complete before that transaction
 // commits.
 func wireGroup(ctx context.Context, q *store.Queries, row store.GetGroupRow) (Group, error) {
-	g := Group{ID: row.ID, Kind: row.Kind, Name: row.Name, Mode: row.Mode, Visibility: row.Visibility, CreatedAt: row.CreatedAt, Picture: pictureURL(row.PictureID), LastMessageAt: lastAt(row.LastMessageAt)}
+	g := Group{ID: row.ID, Kind: row.Kind, Name: row.Name, Description: row.Description, Mode: row.Mode, Visibility: row.Visibility, CreatedAt: row.CreatedAt, Picture: pictureURL(row.PictureID), LastMessageAt: lastAt(row.LastMessageAt)}
 	if g.Kind != perm.KindDM {
 		return g, nil
 	}

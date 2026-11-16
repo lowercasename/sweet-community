@@ -17,6 +17,7 @@ import {
   PeoplePicker,
   Stack,
   Text,
+  Textarea,
 } from '../ui'
 
 interface NewGroupPageProps {
@@ -27,6 +28,7 @@ interface NewGroupPageProps {
 export function NewGroupPage({ onCreated }: NewGroupPageProps) {
   const { create } = useGroupActions()
   const [name, setName] = useState('')
+  const [description, setDescription] = useState('')
   const [visibility, setVisibility] = useState<RoomVisibility>('open')
   const [members, setMembers] = useState<string[]>([])
   const { data: me } = useMe()
@@ -41,7 +43,7 @@ export function NewGroupPage({ onCreated }: NewGroupPageProps) {
     setBusy(true)
     setError(null)
     try {
-      onCreated(await create(name.trim(), visibility, visibility === 'private' ? members : []))
+      onCreated(await create(name.trim(), visibility, visibility === 'private' ? members : [], description.trim()))
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Could not create the room')
     } finally {
@@ -58,6 +60,9 @@ export function NewGroupPage({ onCreated }: NewGroupPageProps) {
               <Form onSubmit={() => void submit()}>
                 <Field label="Room name">
                   <Input value={name} onChange={setName} autoFocus required maxLength={80} readOnly={busy} />
+                </Field>
+                <Field label="Description" hint="Optional. Up to 140 characters.">
+                  <Textarea value={description} onChange={setDescription} maxLength={140} rows={3} readOnly={busy} />
                 </Field>
                 <RadioCards
                   label="Visibility"

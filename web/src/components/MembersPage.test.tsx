@@ -61,7 +61,7 @@ describe('MembersPage', () => {
     const { addMember, removeMember } = await import('../api')
     await page('owner')
     // Only users who are not already members are offered.
-    const picker = screen.getByLabelText('Add someone')
+    const picker = await screen.findByLabelText('Add someone')
     expect(within(picker).queryByText('mo')).toBeNull()
     fireEvent.change(picker, { target: { value: 'jo' } })
     fireEvent.click(screen.getByRole('button', { name: 'Add to room' }))
@@ -74,9 +74,8 @@ describe('MembersPage', () => {
     fireEvent.click(within(screen.getByRole('dialog', { hidden: true })).getByRole('button', { name: 'Remove' }))
     expect(removeMember).toHaveBeenCalledWith('club', 'mo')
     // The removed user is no longer in the list and is offered for adding again.
-    // The first list is the members list. The last card's action rows are a list too.
-    await vi.waitFor(() => expect(within(screen.getAllByRole('list')[0]).queryByText('mo')).toBeNull())
-    expect(within(screen.getByLabelText('Add someone')).getByText('mo')).toBeTruthy()
+    await vi.waitFor(() => expect(within(screen.getByRole('region', { name: 'Members' })).queryByText('mo')).toBeNull())
+    expect(within(await screen.findByLabelText('Add someone')).getByText('mo')).toBeTruthy()
   })
 
   it('lets the owner set roles and transfer ownership, the latter after a confirmation', async () => {
@@ -91,6 +90,7 @@ describe('MembersPage', () => {
     ])
     fireEvent.click(screen.getByRole('menuitem', { name: 'Make moderator' }))
     expect(setMemberRole).toHaveBeenCalledWith('club', 'mo', 'moderator')
+    await within(screen.getByRole('region', { name: 'Moderators' })).findByText('mo')
     await vi.waitFor(() => fireEvent.click(within(rowOf('mo')).getByRole('button', { name: 'Options for mo' })))
     await screen.findByRole('menuitem', { name: 'Make member' })
     fireEvent.click(screen.getByRole('menuitem', { name: 'Make owner' }))

@@ -24,6 +24,7 @@ import {
   Select,
   Stack,
   Text,
+  Textarea,
   Tile,
   Time,
 } from '../ui'
@@ -43,11 +44,11 @@ const MODES: { value: GroupMode; label: string }[] = [
   { value: 'chat', label: 'Chat only' },
 ]
 
-const ROLE_WORD: Record<Membership['role'], string> = {
-  owner: 'owner',
-  moderator: 'moderator',
-  member: '',
-}
+const ROLE_SECTIONS = [
+  { role: 'owner', title: 'Owner', empty: '' },
+  { role: 'moderator', title: 'Moderators', empty: 'No moderators.' },
+  { role: 'member', title: 'Members', empty: 'No members.' },
+] as const
 
 /**
  * Who is in a room and, for those the room's can flags allow, the controls:
@@ -61,6 +62,8 @@ export function MembersPage({ group, me, onLeft }: MembersPageProps) {
   const setRole = useSetRole(group.id)
   const [pick, setPick] = useState('')
   const [name, setName] = useState(group.name)
+  const [descriptionDraft, setDescription] = useState<string | null>(null)
+  const description = descriptionDraft ?? group.description ?? ''
   const [mode, setMode] = useState<GroupMode>(group.mode)
   const [confirm, setConfirm] = useState<
     | { kind: 'handover'; to: Membership }
@@ -94,7 +97,7 @@ export function MembersPage({ group, me, onLeft }: MembersPageProps) {
 
   const inGroup = new Set(members.map((m) => m.user.id))
   const candidates = [...(users?.values() ?? [])].filter((u) => !inGroup.has(u.id))
-  const dirty = name.trim() !== group.name || mode !== group.mode
+  const dirty = name.trim() !== group.name || description.trim() !== (group.description ?? '') || mode !== group.mode
   const canEdit = group.can.rename || group.can.set_mode
 
   // What I may do to one member, behind a three-dot menu on their row (the server's can flags say what).
@@ -124,6 +127,15 @@ export function MembersPage({ group, me, onLeft }: MembersPageProps) {
       <ScrollArea>
         <Measure>
           <Stack gap={3}>
+            {!canEdit && group.description && (
+              <Card>
+                <Stack gap={2}>
+                  <Heading level={2}>About this room</Heading>
+                  <Text>{group.description}</Text>
+                </Stack>
+              </Card>
+            )}
+            {problem && <Alert tone="error">{problem}</Alert>}
             <Card>
               <Row justify="between" align="center">
                 <Text>Chat notifications</Text>
@@ -166,6 +178,17 @@ export function MembersPage({ group, me, onLeft }: MembersPageProps) {
                       <Input value={name} onChange={setName} />
                     </Field>
                   )}
+                  {group.can.rename && (
+                    <Field label="Description" hint="Optional. Up to 140 characters.">
+                      <Textarea
+                        value={description}
+                        onChange={setDescription}
+                        maxLength={140}
+                        rows={3}
+                        readOnly={busy}
+                      />
+                    </Field>
+                  )}
                   {group.can.set_mode && (
                     <Field
                       label="Mode"
@@ -180,10 +203,15 @@ export function MembersPage({ group, me, onLeft }: MembersPageProps) {
                       busy={working === 'save'}
                       onClick={() =>
                         void run('save', () =>
-                          actions.update(group.id, {
-                            ...(group.can.rename && name.trim() !== group.name ? { name: name.trim() } : {}),
-                            ...(group.can.set_mode && mode !== group.mode ? { mode } : {}),
-                          }),
+                          actions
+                            .update(group.id, {
+                              ...(group.can.rename && name.trim() !== group.name ? { name: name.trim() } : {}),
+                              ...(group.can.set_mode && mode !== group.mode ? { mode } : {}),
+                              ...(group.can.rename && description.trim() !== (group.description ?? '')
+                                ? { description: description.trim() }
+                                : {}),
+                            })
+                            .then(() => setDescription(null)),
                         )
                       }
                     >
@@ -195,14 +223,9 @@ export function MembersPage({ group, me, onLeft }: MembersPageProps) {
             )}
             <Card>
               <Stack gap={2}>
-                <Heading level={2}>Members</Heading>
-                <Text variant="small">
-                  Moderators can delete anything in the room and add or remove members. The owner can also change its
-                  settings and hand it over.
-                </Text>
+                <Heading level={2}>People in this room</Heading>
                 {loading && <Text variant="secondary">Loading…</Text>}
                 {error && <Alert tone="error">{error.message}</Alert>}
-                {problem && <Alert tone="error">{problem}</Alert>}
                 {group.can.add_members && !loading && candidates.length > 0 && (
                   <Row gap={2} align="center">
                     <Select
@@ -228,27 +251,45 @@ export function MembersPage({ group, me, onLeft }: MembersPageProps) {
                   </Row>
                 )}
 
-                <List>
-                  {members.map((m) => {
-                    const self = m.user.id === me.id
-                    return (
-                      <ListItem key={m.user.id}>
-                        <Row justify="between" align="center" wrap="narrow">
-                          <Row gap={2} align="center">
-                            <PersonName user={m.user} avatar="md" />
-                            <Text as="span" variant="small">
-                              {ROLE_WORD[m.role] && `${ROLE_WORD[m.role]} · `}
-                              joined <Time at={m.joined_at} format="date" />
-                            </Text>
-                          </Row>
-                          {!self && m.role !== 'owner' && !busy && items(m).length > 0 && (
-                            <Menu label={`Options for ${m.user.username}`} items={items(m)} />
+                <Stack gap={3}>
+                  {!loading &&
+                    !error &&
+                    ROLE_SECTIONS.map(({ role, title, empty }) => {
+                      const people = members
+                        .filter((m) => m.role === role)
+                        .sort((a, b) => a.user.username.localeCompare(b.user.username))
+                      return (
+                        <Stack key={role} as="section" label={title} gap={2}>
+                          <Heading level={3}>{title}</Heading>
+                          {people.length === 0 ? (
+                            <Text variant="small">{empty}</Text>
+                          ) : (
+                            <List>
+                              {people.map((m) => (
+                                <ListItem key={m.user.id}>
+                                  <Row justify="between" align="center" wrap="never">
+                                    <Row gap={2} align="center">
+                                      <PersonName user={m.user} avatar="md" />
+                                      {group.visibility !== 'open' && (
+                                        <Text as="span" variant="small">
+                                          joined <Time at={m.joined_at} format="date" />
+                                        </Text>
+                                      )}
+                                    </Row>
+                                    {m.user.id !== me.id && m.role !== 'owner' && !busy && items(m).length > 0 && (
+                                      <Row shrink={false}>
+                                        <Menu label={`Options for ${m.user.username}`} items={items(m)} />
+                                      </Row>
+                                    )}
+                                  </Row>
+                                </ListItem>
+                              ))}
+                            </List>
                           )}
-                        </Row>
-                      </ListItem>
-                    )
-                  })}
-                </List>
+                        </Stack>
+                      )
+                    })}
+                </Stack>
               </Stack>
             </Card>
             {ending && (

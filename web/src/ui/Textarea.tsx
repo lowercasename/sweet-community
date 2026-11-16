@@ -5,6 +5,7 @@ interface TextareaProps {
   autoFocus?: boolean
   maxLength?: number
   rows?: number
+  readOnly?: boolean
   /** Enter (without Shift) calls this instead of inserting a newline. */
   onSubmit?: () => void
   /** Called on Escape. */
@@ -19,6 +20,7 @@ export function Textarea({
   autoFocus,
   maxLength,
   rows = 2,
+  readOnly,
   onSubmit,
   onCancel,
 }: TextareaProps) {
@@ -30,6 +32,7 @@ export function Textarea({
       autoFocus={autoFocus}
       maxLength={maxLength}
       rows={rows}
+      readOnly={readOnly}
       onChange={(e) => onChange(e.target.value)}
       onKeyDown={(e) => {
         if (e.key === 'Enter' && !e.shiftKey && onSubmit) {
