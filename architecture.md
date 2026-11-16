@@ -54,13 +54,15 @@ Feature flags are planned. The owner will turn posts, chat, images, embeds and a
 
 ### Rooms
 
-A room has posts and chat under one shared header. Selecting a room changes both columns. The header names the room and states who can read and participate. Open and private rooms have the same capabilities. A person can collapse either pane. A group that only wants chat can use its room that way. (Raphael, 2026-11-16. A private room beside public chat would make the audience unclear.)
+A room has posts and chat under one shared header. Selecting a room changes both columns. The header names the room. Open and private rooms have the same capabilities. A person can collapse either pane. A group that only wants chat can use its room that way. (Raphael, 2026-11-16. A private room beside public chat would make the audience unclear.)
 
 - An open room appears in everyone's navigation. Every community member can read and participate without asking to join. New community members gain access to existing open rooms.
 - A private room is invisible to non-members. Its name, members and content are available only to invited members. Existing rooms remain private.
 - Visibility is chosen when the room is created and cannot be changed later. (Codex, 2026-11-16. This prevents a settings change from exposing private history.)
 - The community's owner and moderators have ordinary member access in open rooms. They receive no extra room moderation permissions. They see private rooms only when invited. A report shows eligible staff one reported item.
 - Any member may create a room, unless the owner limits this to staff. The creator owns the room.
+- The new room form starts with Open selected. Choosing Private shows a searchable list of community members. Selected people appear above the list and join when the room is created. The creator is always included. (Raphael, 2026-11-16. People should be able to choose a private room's members during creation.)
+- A private room has the same lock beside its name in the sidebar, header and post labels. The header stays on one line. Room settings do not repeat the privacy explanation. (Raphael, 2026-11-16. Competing privacy labels and a second header line added clutter.)
 - A post shown outside its room has a header naming and linking to the room. Opening its comments does not change the current chat. Entering the room changes both columns.
 - Everyone belongs to open rooms while they belong to the community. They cannot leave an open room or remove another community member from it. Room chat alert settings remain available.
 - Private room members can leave or be removed. A private room is deleted when its last member leaves.
@@ -456,6 +458,8 @@ These decisions came from a security audit (2026-11-08).
 ## Record
 
 ### Reversed
+
+- **Room privacy labels (Raphael, 2026-11-16).** One lock beside a private room's name replaces the second header line and repeated privacy explanations. The new room form defaults to Open and lets people select private room members before creating it.
 
 - **Rooms and topics (Raphael, 2026-11-16).** Rooms can be open to the community or private to invited members. Both have posts and chat. Home includes open-room posts and keeps community chat separate. Topics are removed because they duplicated the organisation provided by rooms. Existing rooms stay private and existing posts stay in their original location. Room modes no longer remove either capability. People may collapse either pane for themselves.
 

@@ -10,7 +10,7 @@ import {
   Card,
   ConfirmDialog,
   Link,
-  Icon,
+  PrivateMark,
   Menu,
   type MenuItem,
   Row,
@@ -139,7 +139,7 @@ export function Post({ post, linked = true, expanded = false, place, disabled, o
       as="article"
       head={
         place && (
-          <Row gap={2} align="center">
+          <Row gap={2} align="center" wrap="never">
             <Tile name={place.name} picture={place.picture} />
             <Text as="span" variant="small">
               Posted in{' '}
@@ -148,13 +148,13 @@ export function Post({ post, linked = true, expanded = false, place, disabled, o
                   {place.name}
                 </Text>
               </Link>
+              {post.group_visibility === 'private' && (
+                <>
+                  {'\u00a0'}
+                  <PrivateMark />
+                </>
+              )}
             </Text>
-            {post.group_visibility === 'private' && (
-              <Row gap={1} align="center" wrap="never">
-                <Icon name="lock" size={14} />
-                <Text variant="small">Private</Text>
-              </Row>
-            )}
           </Row>
         )
       }

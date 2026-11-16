@@ -397,8 +397,8 @@ export function listGroups(): Promise<{ groups: Group[] }> {
   return request('/api/groups')
 }
 
-export function createGroup(name: string, visibility: RoomVisibility): Promise<Group> {
-  return request<Group>('/api/groups', json('POST', { name, visibility }))
+export function createGroup(name: string, visibility: RoomVisibility, members: string[] = []): Promise<Group> {
+  return request<Group>('/api/groups', json('POST', { name, visibility, members }))
 }
 
 export function updateGroup(groupId: string, patch: { name?: string; mode?: GroupMode }): Promise<Group> {

@@ -77,6 +77,46 @@ func TestHomeExcludesPrivatePostsForMembersToo(t *testing.T) {
 	owner.mustStatus(400, "PUT", gp, map[string]string{"visibility": "open"})
 }
 
+func TestPrivateRoomCreationIncludesSelectedMembers(t *testing.T) {
+	ts, owner := newTestServer(t)
+	kit, kitID := registerMember(t, ts, owner, "kit")
+	mo, moID := registerMember(t, ts, owner, "mo")
+	ownerID := owner.mustStatus(200, "GET", "/api/me", nil)["id"].(string)
+	g := owner.mustStatus(201, "POST", "/api/groups", map[string]any{
+		"name": "Private plans", "visibility": "private", "members": []string{kitID, kitID, ownerID},
+	})
+	gid := g["id"].(string)
+	kit.mustStatus(200, "GET", "/api/groups/"+gid, nil)
+	mo.mustStatus(404, "GET", "/api/groups/"+gid, nil)
+	if len(owner.mustStatus(200, "GET", "/api/groups/"+gid+"/members", nil)["members"].([]any)) != 2 {
+		t.Fatal("selected members were not deduplicated")
+	}
+	if myGroups(owner)[gid]["role"] != "owner" {
+		t.Fatal("selecting the creator changed ownership")
+	}
+	found := false
+	for _, raw := range kit.mustStatus(200, "GET", "/api/notifications", nil)["notifications"].([]any) {
+		n := raw.(map[string]any)
+		if n["kind"] == "added" && n["group_id"] == gid {
+			found = true
+		}
+	}
+	if !found {
+		t.Fatal("selected member was not notified")
+	}
+	before := len(myGroups(owner))
+	owner.mustStatus(400, "POST", "/api/groups", map[string]any{
+		"name": "Invalid", "visibility": "private", "members": []string{kitID, "missing"},
+	})
+	owner.mustStatus(204, "DELETE", "/api/users/"+moID, nil)
+	owner.mustStatus(400, "POST", "/api/groups", map[string]any{
+		"name": "Removed", "visibility": "private", "members": []string{moID},
+	})
+	if len(myGroups(owner)) != before {
+		t.Fatal("invalid selection left a partial room")
+	}
+}
+
 func TestOpenRoomReadPositionsApplyOnHomeAndInRoom(t *testing.T) {
 	ts, owner := newTestServer(t)
 	kit, _ := registerMember(t, ts, owner, "kit")

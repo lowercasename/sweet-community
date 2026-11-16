@@ -10,7 +10,7 @@ for (const tag of ['@dev', '@phone'])
     if (phone) await anyView(reader.page, 'Posts').click()
     await open(creator.page, '/rooms/new')
     await creator.page.getByLabel('Room name', { exact: true }).fill(name)
-    await creator.page.getByRole('radio', { name: 'Open', exact: true }).check()
+    await expect(creator.page.getByRole('radio', { name: 'Open', exact: true })).toBeChecked()
     await creator.page.screenshot({
       animations: 'disabled',
       scale: 'css',
@@ -18,7 +18,7 @@ for (const tag of ['@dev', '@phone'])
     })
     await creator.page.getByRole('button', { name: 'Create room', exact: true }).click()
     await expect(creator.page.getByRole('heading', { name, exact: true })).toBeVisible()
-    await expect(creator.page.getByText('Open room · Everyone in the community', { exact: true })).toBeVisible()
+    await expect(creator.page.getByText('Open room · Everyone in the community', { exact: true })).toHaveCount(0)
     await creator.page.screenshot({
       animations: 'disabled',
       scale: 'css',
@@ -65,7 +65,7 @@ for (const tag of ['@dev', '@phone'])
     await creator.context.request.post(`/api/groups/${privateID}/posts`, { data: { body_html: `<p>${secret}</p>` } })
     await expect(article(reader.page, secret)).toHaveCount(0)
     await open(reader.page, `/r/${privateID}`)
-    await expect(reader.page.getByText('Private room · Invited members only', { exact: true })).toBeVisible()
+    await expect(reader.page.getByRole('img', { name: 'Private room', exact: true }).first()).toBeVisible()
     if (phone) await anyView(reader.page, 'Posts').click()
     await expect(article(reader.page, secret)).toBeVisible()
     await reader.page.screenshot({
@@ -80,4 +80,66 @@ for (const tag of ['@dev', '@phone'])
     ).toBe(false)
     await creator.context.close()
     await reader.context.close()
+  })
+
+for (const tag of ['@dev', '@phone'])
+  test(tag + ' private room creation selects people before creating the room', async ({ browser }, info) => {
+    const creator = await member(browser, info, 'creator')
+    const reader = await member(browser, info, 'longusernameforselectionx')
+    const outsider = await member(browser, info, 'outsider')
+    await open(reader.page)
+    await open(creator.page, '/rooms/new')
+    await creator.page.getByLabel('Room name', { exact: true }).fill('Private plans with a long room name here')
+    await creator.page.getByRole('radio', { name: 'Private', exact: true }).check()
+    await creator.page.getByRole('textbox', { name: 'Search people' }).fill(reader.username)
+    await creator.page.getByRole('checkbox', { name: reader.username, exact: true }).check()
+    await creator.page.getByRole('textbox', { name: 'Search people' }).fill('')
+    await expect(creator.page.getByRole('button', { name: `Remove ${reader.username}` })).toBeVisible()
+    const list = creator.page.getByRole('group', { name: 'Available people' })
+    expect((await list.boundingBox())!.height).toBeLessThanOrEqual(260)
+    expect(await creator.page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(
+      creator.page.viewportSize()!.width,
+    )
+    await creator.page.screenshot({
+      path: `test-results/private-picker-${info.project.name}.png`,
+      scale: 'css',
+      animations: 'disabled',
+    })
+    await creator.page.getByRole('button', { name: 'Create room', exact: true }).click()
+    await expect(
+      creator.page.getByRole('heading', { name: 'Private plans with a long room name here', exact: true }),
+    ).toBeVisible()
+    await expect(creator.page.getByText('Private room · Invited members only', { exact: true })).toHaveCount(0)
+    const title = creator.page.getByRole('heading', { name: 'Private plans with a long room name here', exact: true })
+    await expect(title.locator('..').getByRole('img', { name: 'Private room', exact: true })).toBeVisible()
+    await creator.page.screenshot({
+      path: `test-results/private-header-${info.project.name}.png`,
+      scale: 'css',
+      animations: 'disabled',
+    })
+    const gid = creator.page.url().split('/').pop()!
+    if (info.project.use.isMobile) await open(reader.page, '/menu')
+    await expect(reader.page.getByRole('button', { name: /Private plans with a long room name here/ })).toBeVisible()
+    expect((await outsider.context.request.get(`/api/groups/${gid}`)).status()).toBe(404)
+    const privatePost = uniq('A selected-members post ')
+    await creator.context.request.post(`/api/groups/${gid}/posts`, { data: { body_html: `<p>${privatePost}</p>` } })
+    await open(reader.page, `/u/${creator.username}`)
+    await expect(
+      article(reader.page, privatePost).getByRole('img', { name: 'Private room', exact: true }),
+    ).toBeVisible()
+    const placeLink = await article(reader.page, privatePost)
+      .getByRole('link', { name: 'Private plans with a long room name here', exact: true })
+      .boundingBox()
+    const placeTile = await article(reader.page, privatePost).getByText('P', { exact: true }).boundingBox()
+    expect(placeTile!.y + placeTile!.height).toBeGreaterThan(placeLink!.y)
+    await reader.page.screenshot({
+      path: `test-results/private-post-label-${info.project.name}.png`,
+      scale: 'css',
+      animations: 'disabled',
+    })
+    await open(reader.page, `/r/${gid}`)
+    await expect(reader.page.getByRole('img', { name: 'Private room', exact: true }).first()).toBeVisible()
+    await creator.context.close()
+    await reader.context.close()
+    await outsider.context.close()
   })

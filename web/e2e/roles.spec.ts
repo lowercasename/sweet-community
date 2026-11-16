@@ -77,6 +77,7 @@ test.describe('roles', () => {
     await open(kit.page, '/rooms/new')
     const name = uniq('Kits room ')
     await kit.page.getByLabel('Room name').fill(name)
+    await kit.page.getByRole('radio', { name: 'Private', exact: true }).check()
     await kit.page.getByRole('button', { name: 'Create room' }).click()
     await kit.page.getByRole('button', { name: 'Members and settings' }).click()
     await kit.page.getByLabel('Add someone').selectOption({ label: mo.username })

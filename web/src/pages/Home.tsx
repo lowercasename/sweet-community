@@ -182,17 +182,7 @@ export function Home({ me, onSignOut }: HomeProps) {
           <PageBar
             title={bar.title}
             back={bar.back}
-            audience={
-              viewing && current
-                ? current.kind === 'group'
-                  ? current.visibility === 'open'
-                    ? 'Open room · Everyone in the community'
-                    : 'Private room · Invited members only'
-                  : current.kind === 'root'
-                    ? 'Everyone in the community'
-                    : 'Private conversation'
-                : undefined
-            }
+            privateRoom={(viewing || atMembers) && current?.kind === 'group' && current.visibility === 'private'}
           >
             {narrow && viewing && current?.mode === 'both' && (
               <Segmented
