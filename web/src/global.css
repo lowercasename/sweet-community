@@ -30,6 +30,7 @@
   --color-brand: #ce1717;
 
   --radius-card: 6px;
+  --container-reading: 680px;
 }
 
 /* The phone layout: one pane and a tab bar. The width is the same as NARROW in src/hooks/useLayout.ts. */
@@ -162,8 +163,8 @@
   }
   /* In the editor, images are EditorImage cards and style themselves. */
   .content img {
-    /* The tallest an image in a body is drawn. */
-    --image-max-height: 480px;
+    /* The height limit lets a square image fill the widest post. */
+    --image-max-height: var(--container-reading);
     display: block;
     max-width: 100%;
     height: auto;

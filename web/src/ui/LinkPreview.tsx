@@ -82,7 +82,7 @@ export function LinkPreview({ url, preview, note, inert = false, selected = fals
     </>
   )
   return (
-    <span className="@container block max-w-[680px]">
+    <span className="@container block max-w-reading">
       {inert ? (
         <span className={`${CARD} ${border}`}>{inner}</span>
       ) : (

@@ -39,36 +39,74 @@ test.describe('images', () => {
     await kit.context.close()
   })
 
-  test("a tall image is drawn no taller than 480px, in its own shape at the text's left edge, before and after it loads", async ({
-    browser,
-  }, testInfo) => {
-    const kit = await member(browser, testInfo)
-    const upload = await kit.context.request.post('/api/images', {
-      multipart: { file: { name: 'tall.png', mimeType: 'image/png', buffer: png(900, 1600) } },
+  for (const tag of ['@dev', '@phone']) {
+    test(`single images fit the reading width and retain their shape before and after loading ${tag}`, async ({
+      browser,
+    }, info) => {
+      const kit = await member(browser, info)
+      if (!info.project.use.isMobile) await kit.page.setViewportSize({ width: 1280, height: 1000 })
+      for (const [name, width, height] of [
+        ['Square', 1200, 1200],
+        ['Portrait', 900, 1600],
+        ['Landscape', 1200, 800],
+      ] as const) {
+        const upload = await kit.context.request.post('/api/images', {
+          multipart: { file: { name: `${name}.png`, mimeType: 'image/png', buffer: png(width, height) } },
+        })
+        expect(upload.status()).toBe(201)
+        const image = (await upload.json()) as { id: string }
+        const text = uniq(name + ' ')
+        const body = `<p>${text}</p><img src="/img/${image.id}" data-image-id="${image.id}" alt="${name}" width="${width}" height="${height}">`
+        const created = await kit.context.request.post(`/api/groups/${ROOT}/posts`, { data: { body_html: body } })
+        expect(created.status()).toBe(201)
+        const post = (await created.json()) as { id: string }
+        const img = kit.page.getByRole('button', { name: `Open image: ${name}`, exact: true })
+        const fits = async () => {
+          const box = (await img.boundingBox())!
+          const content = (await img.locator('..').boundingBox())!
+          const expectedWidth = Math.min(width, content.width, (680 * width) / height)
+          expect(box.width).toBeCloseTo(expectedWidth, 0)
+          expect(box.height).toBeCloseTo((expectedWidth * height) / width, 0)
+          expect(box.x).toBeCloseTo(content.x, 0)
+          expect(box.x + box.width).toBeLessThanOrEqual(content.x + content.width + 1)
+        }
+        await kit.page.route(`**/img/${image.id}`, () => {})
+        await open(kit.page, `/p/${post.id}`)
+        await expect(img).toBeVisible()
+        await fits()
+        await kit.page.unroute(`**/img/${image.id}`)
+        await kit.page.reload()
+        await expect.poll(() => img.evaluate((e: HTMLImageElement) => e.naturalWidth)).toBe(width)
+        await fits()
+        await kit.page.screenshot({ path: info.outputPath(`${name.toLowerCase()}-post.png`), animations: 'disabled' })
+        if (name === 'Square') {
+          expect(
+            (
+              await kit.context.request.post(`/api/posts/${post.id}/comments`, {
+                data: { body_html: body.replace('alt="Square"', 'alt="Comment"') },
+              })
+            ).status(),
+          ).toBe(201)
+          const comment = kit.page.getByRole('button', { name: 'Open image: Comment', exact: true })
+          await comment.scrollIntoViewIfNeeded()
+          await expect.poll(() => comment.evaluate((e: HTMLImageElement) => e.naturalWidth)).toBe(width)
+          const commentBox = (await comment.boundingBox())!
+          expect(commentBox.width).toBeCloseTo(Math.min(680, (await comment.locator('..').boundingBox())!.width), 0)
+          expect(commentBox.height).toBeCloseTo(commentBox.width, 0)
+          await kit.page.screenshot({ path: info.outputPath('square-comment.png'), animations: 'disabled' })
+          const room = await kit.context.request.post('/api/groups', { data: { name: uniq('Images '), mode: 'chat' } })
+          const gid = (await room.json()).id
+          expect(
+            (await kit.context.request.post(`/api/groups/${gid}/messages`, { data: { body_html: body } })).status(),
+          ).toBe(201)
+          await open(kit.page, `/r/${gid}`)
+          await img.scrollIntoViewIfNeeded()
+          await expect.poll(() => img.evaluate((e: HTMLImageElement) => e.naturalWidth)).toBe(width)
+          await fits()
+          await kit.page.screenshot({ path: info.outputPath('square-chat.png'), animations: 'disabled' })
+        }
+      }
+      await kit.context.close()
     })
-    const image = (await upload.json()) as { id: string }
-    const text = uniq('Tall ')
-    const created = await kit.context.request.post(`/api/groups/${ROOT}/posts`, {
-      data: {
-        body_html: `<p>${text}</p><img src="/img/${image.id}" data-image-id="${image.id}" alt="Tall" width="900" height="1600">`,
-      },
-    })
-    const post = (await created.json()) as { id: string }
-    const img = kit.page.getByRole('button', { name: 'Open image: Tall' })
-    const fits = async () => {
-      const box = (await img.boundingBox())!
-      expect([Math.round(box.width), Math.round(box.height)]).toEqual([270, 480])
-      expect(Math.round(box.x)).toBe(Math.round((await article(kit.page, text).getByText(text).boundingBox())!.x))
-    }
-    // At first the image does not load.
-    await kit.page.route('**/img/**', () => {})
-    await open(kit.page, `/p/${post.id}`)
-    await expect(img).toBeVisible()
-    await fits()
-    await kit.page.unroute('**/img/**')
-    await kit.page.reload()
-    await expect.poll(() => img.evaluate((e: HTMLImageElement) => e.naturalWidth)).toBeGreaterThan(0)
-    await fits()
-    await kit.context.close()
-  })
+  }
 })

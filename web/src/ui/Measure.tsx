@@ -6,5 +6,5 @@ interface MeasureProps {
 
 /** Centres content at the reading width. */
 export function Measure({ children }: MeasureProps) {
-  return <div className="mx-auto w-full max-w-[680px]">{children}</div>
+  return <div className="mx-auto w-full max-w-reading">{children}</div>
 }
