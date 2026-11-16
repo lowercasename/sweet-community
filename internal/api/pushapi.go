@@ -180,6 +180,8 @@ func (s *Server) pushAllowed(ctx context.Context, n Notification) (bool, error) 
 		a, err := actorIn(ctx, q, User{ID: n.UserID}, perm.Root)
 		return perm.HandleReport(a, author), err
 	}
+	// A queued notification may belong to a post that has moved since it was created.
+	n.GroupID = row.GroupID
 	g, err := q.GetGroup(ctx, n.GroupID)
 	if errors.Is(err, sql.ErrNoRows) {
 		return false, nil

@@ -219,8 +219,8 @@ export function usePostActions(groupId: string) {
     async create(html: string) {
       applyEvent(qc, 'post', await createPost(groupId, html))
     },
-    async edit(id: string, html: string) {
-      applyEvent(qc, 'post', await updatePost(id, html))
+    async edit(id: string, html: string, destination?: string) {
+      applyEvent(qc, 'post', await updatePost(id, html, destination))
     },
     async remove(id: string) {
       await deletePost(id)

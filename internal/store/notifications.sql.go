@@ -460,6 +460,22 @@ func (q *Queries) ListUnreadNotificationsUpTo(ctx context.Context, arg ListUnrea
 	return items, nil
 }
 
+const movePostNotifications = `-- name: MovePostNotifications :exec
+UPDATE notifications SET group_id = ?1
+WHERE post_id = ?2 AND scope = 'post:' || ?2
+`
+
+type MovePostNotificationsParams struct {
+	GroupID string
+	PostID  sql.NullString
+}
+
+// Moving a discussion changes its location without creating notification activity.
+func (q *Queries) MovePostNotifications(ctx context.Context, arg MovePostNotificationsParams) error {
+	_, err := q.db.ExecContext(ctx, movePostNotifications, arg.GroupID, arg.PostID)
+	return err
+}
+
 const readNotification = `-- name: ReadNotification :exec
 UPDATE notifications SET read_at = ?1 WHERE id = ?2 AND user_id = ?3 AND read_at IS NULL AND created_at <= ?4 AND (COALESCE(?5, 0) = 0 OR activity_count <= ?5)
 `

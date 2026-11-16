@@ -38,6 +38,7 @@ type User struct {
 // computed by perm when the response is built. The frontend shows controls
 // based on these flags and holds no rules of its own.
 type Can struct {
+	Move   bool `json:"move,omitempty"`
 	Edit   bool `json:"edit"`
 	Delete bool `json:"delete"`
 	// Report is true for every member but the author.
@@ -78,6 +79,7 @@ func forViewer(a perm.Actor, v any, st Settings) any {
 		p := *x
 		pp := perm.Post{AuthorID: p.Author.ID}
 		p.Can = Can{
+			Move: perm.MovePost(a, pp, p.GroupVisibility),
 			Edit: perm.EditPost(a, pp), Delete: perm.DeletePost(a, pp), Report: perm.Report(a, pp.AuthorID),
 			DeleteByRole: perm.ByRole(a, func(x perm.Actor) bool { return perm.DeletePost(x, pp) }),
 		}
@@ -343,21 +345,28 @@ func (s *Server) getPost(w http.ResponseWriter, r *http.Request) {
 
 // readBody decodes {body_html} and sanitises it. When the body is malformed
 // or empty, it writes the 400 response itself and returns ok false.
-func readBody(w http.ResponseWriter, r *http.Request) (clean string, ok bool) {
+func readBody(w http.ResponseWriter, r *http.Request) (string, bool) {
+	clean, _, ok := readPostBody(w, r)
+	return clean, ok
+}
+
+// readPostBody also reads the optional destination used when editing a post.
+func readPostBody(w http.ResponseWriter, r *http.Request) (string, string, bool) {
 	var in struct {
 		BodyHTML string `json:"body_html"`
+		GroupID  string `json:"group_id"`
 	}
 	r.Body = http.MaxBytesReader(w, r.Body, sanitize.MaxBodyBytes)
 	if err := json.NewDecoder(r.Body).Decode(&in); err != nil {
 		writeErr(w, http.StatusBadRequest, "Bad request")
-		return "", false
+		return "", "", false
 	}
-	clean = sanitize.Body(in.BodyHTML)
+	clean := sanitize.Body(in.BodyHTML)
 	if sanitize.IsEmpty(clean) {
 		writeErr(w, http.StatusBadRequest, "The body is empty")
-		return "", false
+		return "", "", false
 	}
-	return clean, true
+	return clean, in.GroupID, true
 }
 
 // readMessageBody is readBody with the message's optional reply_to.
@@ -516,7 +525,7 @@ func (s *Server) createPost(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) editPost(w http.ResponseWriter, r *http.Request) {
-	clean, ok := readBody(w, r)
+	clean, destination, ok := readPostBody(w, r)
 	if !ok {
 		return
 	}
@@ -541,14 +550,64 @@ func (s *Server) editPost(w http.ResponseWriter, r *http.Request) {
 		if !perm.EditPost(a, perm.Post{AuthorID: owners.AuthorID}) {
 			return nil, http.StatusForbidden, errors.New("Not your post")
 		}
+		if destination == "" {
+			destination = owners.GroupID
+		}
+		if destination != owners.GroupID {
+			source, err := qtx.GetGroup(r.Context(), owners.GroupID)
+			if err != nil {
+				return nil, http.StatusInternalServerError, err
+			}
+			if !perm.MovePost(a, perm.Post{AuthorID: owners.AuthorID}, source.Visibility) {
+				return nil, http.StatusForbidden, errors.New("Private posts cannot move")
+			}
+			target, err := qtx.GetGroup(r.Context(), destination)
+			if errors.Is(err, sql.ErrNoRows) {
+				return nil, http.StatusNotFound, errors.New("No such room")
+			}
+			if err != nil {
+				return nil, http.StatusInternalServerError, err
+			}
+			to, err := actorIn(r.Context(), qtx, author, destination)
+			if err != nil {
+				return nil, http.StatusInternalServerError, err
+			}
+			if !perm.CanSee(to) {
+				return nil, http.StatusNotFound, errors.New("No such room")
+			}
+			if !perm.PostDestination(to, perm.Group{Kind: target.Kind, Visibility: target.Visibility}) {
+				return nil, http.StatusForbidden, errors.New("Choose Home or an open room")
+			}
+		}
 		text := sanitize.Text(clean)
 		if err := qtx.EditPost(r.Context(), store.EditPostParams{
-			BodyHtml: clean, BodyText: text, EditedAt: sql.NullInt64{Int64: now, Valid: true}, ID: id,
+			GroupID: destination, BodyHtml: clean, BodyText: text, EditedAt: sql.NullInt64{Int64: now, Valid: true}, ID: id,
 		}); err != nil {
 			return nil, http.StatusInternalServerError, err
 		}
 		if status, err := recordUses(r.Context(), qtx, "post", id, author.ID, clean); err != nil {
 			return nil, status, err
+		}
+		if destination != owners.GroupID {
+			if err := qtx.MovePostNotifications(r.Context(), store.MovePostNotificationsParams{GroupID: destination, PostID: sql.NullString{String: id, Valid: true}}); err != nil {
+				return nil, http.StatusInternalServerError, err
+			}
+			if err := qtx.MovePostReports(r.Context(), store.MovePostReportsParams{GroupID: destination, PostID: sql.NullString{String: id, Valid: true}}); err != nil {
+				return nil, http.StatusInternalServerError, err
+			}
+			if err := qtx.ForgetPostReportEvents(r.Context(), sql.NullString{String: id, Valid: true}); err != nil {
+				return nil, http.StatusInternalServerError, err
+			}
+			// The post event makes clients refetch replies and notifications. Remove snapshots with the old room.
+			if err := qtx.ForgetPostCommentEvents(r.Context(), id); err != nil {
+				return nil, http.StatusInternalServerError, err
+			}
+			if err := qtx.ForgetReactionEvents(r.Context(), id); err != nil {
+				return nil, http.StatusInternalServerError, err
+			}
+			if err := qtx.ForgetPostNotificationEvents(r.Context(), sql.NullString{String: id, Valid: true}); err != nil {
+				return nil, http.StatusInternalServerError, err
+			}
 		}
 		// An edit does not create new mention notifications.
 		row, err := qtx.GetPost(r.Context(), id)

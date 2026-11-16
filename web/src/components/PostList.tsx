@@ -6,7 +6,7 @@ interface PostListProps {
   posts: PostData[]
   /** True while offline. */
   disabled: boolean
-  onEdit: (id: string, bodyHtml: string) => Promise<void>
+  onEdit: (id: string, bodyHtml: string, groupId?: string) => Promise<void>
   onDelete: (id: string) => Promise<void>
   places?: Group[]
 }
@@ -20,7 +20,7 @@ export function PostList({ posts, disabled, onEdit, onDelete, places }: PostList
           key={post.id}
           post={post}
           disabled={disabled}
-          onEdit={(html) => onEdit(post.id, html)}
+          onEdit={(html, destination) => onEdit(post.id, html, destination)}
           onDelete={() => onDelete(post.id)}
           place={places?.find((g) => g.id === post.group_id && g.kind === 'group')}
         />

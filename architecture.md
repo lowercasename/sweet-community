@@ -96,6 +96,8 @@ Rooms are the only way to categorise posts. Topics and topic subscriptions are n
 A post is long-form text with inline images. Comments are a flat list, oldest first. A reply to one comment quotes it. A long thread opens at its newest comments, with Load earlier comments above them, as a chat does.
 
 - Home's post editor offers the community and every open room. Choosing a destination keeps Home and its community chat open. Private posting starts inside the private room. A draft keeps its destination across reloads. Changing the destination keeps its text. A successful post clears the draft and resets the next Home draft to the community. An unavailable destination requires another choice before posting. (Codex, 2026-11-16, implementing Raphael's chosen composer design.)
+- The community destination is labelled Home and uses the navigation's house icon. Rooms keep their images or initials. (Raphael, 2026-11-16. Community looked like an extra room that appeared nowhere else.)
+- Authors may move a post between Home and open rooms while editing it. Existing replies stay with the post. Private posts cannot move, and private rooms cannot be destinations. The post keeps its address, creation time and discussion preferences. (Raphael, 2026-11-16. The destination should be editable without exposing private discussions.)
 - Home's post editor has a room selector above the text. The selector strip and the room label on published posts have a faint shaded background. (Raphael, 2026-11-16. This makes the destination visible before posting.)
 - The author edits a post or comment as a whole, and the post is marked as edited. There is no version history.
 - Deleting a post deletes its comments and empties their text, because the author asked for the post to go.

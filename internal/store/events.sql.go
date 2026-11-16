@@ -65,6 +65,31 @@ func (q *Queries) ForgetPostCommentEvents(ctx context.Context, postID string) er
 	return err
 }
 
+const forgetPostNotificationEvents = `-- name: ForgetPostNotificationEvents :exec
+DELETE FROM events WHERE key IN (
+ SELECT 'notification:' || id FROM notifications
+ WHERE post_id = ?1 AND scope = 'post:' || ?1
+)
+`
+
+// The post event makes clients refetch notifications after a move.
+func (q *Queries) ForgetPostNotificationEvents(ctx context.Context, postID sql.NullString) error {
+	_, err := q.db.ExecContext(ctx, forgetPostNotificationEvents, postID)
+	return err
+}
+
+const forgetPostReportEvents = `-- name: ForgetPostReportEvents :exec
+DELETE FROM events WHERE key IN (
+ SELECT 'report:' || kind || ':' || subject_id FROM reports WHERE post_id = ?1
+)
+`
+
+// The post event makes staff refetch reports after a move.
+func (q *Queries) ForgetPostReportEvents(ctx context.Context, postID sql.NullString) error {
+	_, err := q.db.ExecContext(ctx, forgetPostReportEvents, postID)
+	return err
+}
+
 const insertEvent = `-- name: InsertEvent :one
 INSERT INTO events (kind, payload, key, created_at) VALUES (?, ?, ?, ?) RETURNING seq
 `

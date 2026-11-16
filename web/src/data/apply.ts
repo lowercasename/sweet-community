@@ -222,21 +222,58 @@ function upsertInPages<
 
 /** Upserts a post into its author's posts list, if that list is loaded. */
 function upsertUserPost(qc: QueryClient, post: Post) {
-  qc.setQueryData<Posts>(keys.userPosts(post.author.username), (old) => upsertInPages(old, 'posts', post))
+  qc.setQueryData<Posts>(keys.userPosts(post.author.username), (old) => upsertPostInPages(old, post))
+}
+
+/** Inserts a moved post at its original date, including across loaded page boundaries. */
+function upsertPostInPages(old: Posts | undefined, post: Post): Posts | undefined {
+  const updated = upsertInPages(old, 'posts', post)
+  if (!updated || holds(old, 'posts', post.id)) return updated
+  const sorted = updated.pages
+    .flatMap((p) => p.posts)
+    .sort((a, b) => b.created_at - a.created_at || b.id.localeCompare(a.id))
+  let offset = 0
+  return {
+    ...updated,
+    pages: updated.pages.map((p) => {
+      const posts = sorted.slice(offset, offset + p.posts.length)
+      offset += p.posts.length
+      return { ...p, posts }
+    }),
+  }
 }
 
 function upsertPost(qc: QueryClient, post: Post) {
   upsertUserPost(qc, post)
   void qc.invalidateQueries({ queryKey: keys.markers })
-  // The post's page query, if loaded, gets the same post.
   qc.setQueryData<Post>(keys.post(post.id), (old) => (old ? post : old))
-  qc.setQueryData<Posts>(keys.posts(post.group_id), (old) => upsertInPages(old, 'posts', post))
+  // A move removes the post from every feed except its new room and Home.
+  qc.setQueriesData<Posts>(
+    {
+      queryKey: ['posts'],
+      predicate: (q) =>
+        q.queryKey[1] !== post.group_id && !(q.queryKey[1] === ROOT_ID && post.group_visibility === 'open'),
+    },
+    (old) => eachPage(old, 'posts', (ps) => ps.filter((p) => p.id !== post.id)),
+  )
+  qc.setQueryData<Posts>(keys.posts(post.group_id), (old) => upsertPostInPages(old, post))
   if (post.group_id !== ROOT_ID && post.group_visibility === 'open')
-    qc.setQueryData<Posts>(keys.posts(ROOT_ID), (old) => upsertInPages(old, 'posts', post))
+    qc.setQueryData<Posts>(keys.posts(ROOT_ID), (old) => upsertPostInPages(old, post))
+  if (post.edited_at != null) {
+    // Replies inherit the post's room permissions. Notification locations and search results can change too.
+    void qc.invalidateQueries({ queryKey: keys.comments(post.id) })
+    void qc.invalidateQueries({ queryKey: keys.notifications })
+    void qc.invalidateQueries({ queryKey: ['search'] })
+    void qc.invalidateQueries({ queryKey: keys.reports })
+  }
 }
 
 function deletePost(qc: QueryClient, id: string) {
   void qc.invalidateQueries({ queryKey: keys.markers })
+  // A deletion can replace a move in the replay log.
+  void qc.invalidateQueries({ queryKey: keys.notifications })
+  void qc.invalidateQueries({ queryKey: ['search'] })
+  void qc.invalidateQueries({ queryKey: keys.reports })
   const without = (old: Posts | undefined) => eachPage(old, 'posts', (ps) => ps.filter((x) => x.id !== id))
   qc.setQueriesData<Posts>({ queryKey: ['posts'] }, without)
   qc.removeQueries({ queryKey: keys.comments(id) })

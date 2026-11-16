@@ -195,7 +195,7 @@ function AuthorPost({
       post={post}
       place={place}
       disabled={disabled}
-      onEdit={(html) => edit(post.id, html)}
+      onEdit={(html, destination) => edit(post.id, html, destination)}
       onDelete={() => remove(post.id)}
     />
   )

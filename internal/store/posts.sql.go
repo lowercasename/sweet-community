@@ -71,11 +71,12 @@ func (q *Queries) DeletePost(ctx context.Context, arg DeletePostParams) error {
 }
 
 const editPost = `-- name: EditPost :exec
-UPDATE posts SET body_html = ?1, body_text = ?2, edited_at = ?3
-WHERE id = ?4 AND deleted_at IS NULL
+UPDATE posts SET group_id = ?1, body_html = ?2, body_text = ?3, edited_at = ?4
+WHERE id = ?5 AND deleted_at IS NULL
 `
 
 type EditPostParams struct {
+	GroupID  string
 	BodyHtml string
 	BodyText string
 	EditedAt sql.NullInt64
@@ -84,6 +85,7 @@ type EditPostParams struct {
 
 func (q *Queries) EditPost(ctx context.Context, arg EditPostParams) error {
 	_, err := q.db.ExecContext(ctx, editPost,
+		arg.GroupID,
 		arg.BodyHtml,
 		arg.BodyText,
 		arg.EditedAt,

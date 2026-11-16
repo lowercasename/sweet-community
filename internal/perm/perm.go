@@ -56,6 +56,16 @@ type Group struct{ Kind, Visibility string }
 // EditPost allows only the author. Staff can delete a post but not edit it.
 func EditPost(a Actor, p Post) bool { return a.member() && a.ID == p.AuthorID }
 
+// MovePost allows authors to move posts that the whole community can read.
+func MovePost(a Actor, p Post, visibility string) bool {
+	return EditPost(a, p) && visibility == "open"
+}
+
+// PostDestination allows posting to Home and open rooms.
+func PostDestination(a Actor, g Group) bool {
+	return Write(a) && (g.Kind == KindRoot || (g.Kind == KindGroup && g.Visibility == "open"))
+}
+
 // DeletePost allows the author and the group's staff.
 func DeletePost(a Actor, p Post) bool { return a.member() && (a.ID == p.AuthorID || a.staff()) }
 

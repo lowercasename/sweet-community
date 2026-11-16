@@ -35,7 +35,7 @@ SELECT p.author_id, p.group_id FROM posts p JOIN groups g ON g.id = p.group_id
 WHERE p.id = sqlc.arg(id) AND p.deleted_at IS NULL AND g.deleted_at IS NULL;
 
 -- name: EditPost :exec
-UPDATE posts SET body_html = sqlc.arg(body_html), body_text = sqlc.arg(body_text), edited_at = sqlc.arg(edited_at)
+UPDATE posts SET group_id = sqlc.arg(group_id), body_html = sqlc.arg(body_html), body_text = sqlc.arg(body_text), edited_at = sqlc.arg(edited_at)
 WHERE id = sqlc.arg(id) AND deleted_at IS NULL;
 
 -- name: DeletePost :exec

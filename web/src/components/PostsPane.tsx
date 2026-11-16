@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react'
 import { useEffect, useState } from 'react'
 import { useMe, useGroups, useMarkRead, useMarkers, usePostActions, usePosts } from '../data/hooks'
+import { postDestinations } from '../data/groups'
 import { ROOT_ID } from '../data/keys'
 import { feedStream, markerOf } from '../data/notifications'
 import { usePageVisible } from '../hooks/usePageVisible'
@@ -41,9 +42,7 @@ export function PostsPane({ groupId, side = 'full', watching, foot }: PostsPaneP
   const { create } = usePostActions(destination)
   const offline = status === 'offline'
   const { groups } = useGroups()
-  const choices = groups
-    .filter((g) => g.kind === 'root' || (g.kind === 'group' && g.visibility === 'open'))
-    .map((g) => ({ id: g.id, name: g.name || 'Community', picture: g.picture }))
+  const choices = postDestinations(groups)
   const valid = groupId !== ROOT_ID || choices.some((g) => g.id === destination)
   const choose = (id: string) => {
     setDestination(id)

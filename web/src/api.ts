@@ -9,6 +9,8 @@ export interface User {
 
 /** What the signed-in user may do to one resource. The server decides this (internal/perm) and the client shows it. */
 export interface Can {
+  /** Whether this post may move to Home or an open room. */
+  move?: boolean
   edit: boolean
   delete: boolean
   /** Whether I may report it to the owner and moderators. True for every member except the author. */
@@ -476,8 +478,8 @@ export function createPost(groupId: string, bodyHtml: string): Promise<Post> {
   return request<Post>(`${g(groupId)}/posts`, json('POST', { body_html: bodyHtml }))
 }
 
-export function updatePost(id: string, bodyHtml: string): Promise<Post> {
-  return request<Post>(`/api/posts/${encodeURIComponent(id)}`, json('PUT', { body_html: bodyHtml }))
+export function updatePost(id: string, bodyHtml: string, groupId?: string): Promise<Post> {
+  return request<Post>(`/api/posts/${encodeURIComponent(id)}`, json('PUT', { body_html: bodyHtml, group_id: groupId }))
 }
 
 export async function deletePost(id: string): Promise<void> {

@@ -122,3 +122,8 @@ SELECT r.user_id, r.stream, r.read_at,
 FROM read_markers r JOIN posts p ON p.id = substr(r.stream, 6)
 JOIN memberships m ON m.group_id = p.group_id AND m.user_id = r.user_id
 WHERE r.user_id = sqlc.arg(user_id) AND r.stream LIKE 'post:%' AND p.deleted_at IS NULL;
+
+-- name: MovePostNotifications :exec
+-- Moving a discussion changes its location without creating notification activity.
+UPDATE notifications SET group_id = sqlc.arg(group_id)
+WHERE post_id = sqlc.arg(post_id) AND scope = 'post:' || sqlc.arg(post_id);

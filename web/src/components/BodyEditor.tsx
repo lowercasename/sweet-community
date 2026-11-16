@@ -193,6 +193,14 @@ export function BodyEditor({
       handleDrop: (_view, event) => takeImages(event.dataTransfer, event),
     },
   })
+  const savedDestination = useRef(draftDestination)
+  useEffect(() => {
+    const d = draftRef.current
+    if (!editing || !editor || !d || savedDestination.current === draftDestination) return
+    savedDestination.current = draftDestination
+    // A destination-only edit must keep the editor's text, even when the user has emptied it.
+    saveDraft(d.user, d.key, editor.getHTML(), editor, draftDestination)
+  }, [editor, draftDestination, editing])
   useEffect(() => {
     if (focus) editor?.commands.focus('end')
   }, [focus, editor])

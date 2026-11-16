@@ -37,3 +37,16 @@ DELETE FROM events WHERE key IN (
 
 -- name: LatestEventSequence :one
 SELECT CAST(COALESCE(MAX(seq), 0) AS INTEGER) FROM events;
+
+-- name: ForgetPostNotificationEvents :exec
+-- The post event makes clients refetch notifications after a move.
+DELETE FROM events WHERE key IN (
+ SELECT 'notification:' || id FROM notifications
+ WHERE post_id = sqlc.arg(post_id) AND scope = 'post:' || sqlc.arg(post_id)
+);
+
+-- name: ForgetPostReportEvents :exec
+-- The post event makes staff refetch reports after a move.
+DELETE FROM events WHERE key IN (
+ SELECT 'report:' || kind || ':' || subject_id FROM reports WHERE post_id = sqlc.arg(post_id)
+);

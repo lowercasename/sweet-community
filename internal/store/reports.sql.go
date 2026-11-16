@@ -243,3 +243,18 @@ func (q *Queries) ListUnreadReportNotifications(ctx context.Context, arg ListUnr
 	}
 	return items, nil
 }
+
+const movePostReports = `-- name: MovePostReports :exec
+UPDATE reports SET group_id = ?1 WHERE post_id = ?2
+`
+
+type MovePostReportsParams struct {
+	GroupID string
+	PostID  sql.NullString
+}
+
+// Reports keep their original text and follow the discussion's current location.
+func (q *Queries) MovePostReports(ctx context.Context, arg MovePostReportsParams) error {
+	_, err := q.db.ExecContext(ctx, movePostReports, arg.GroupID, arg.PostID)
+	return err
+}

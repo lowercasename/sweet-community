@@ -12,13 +12,24 @@ import {
   useInteractions,
   useRole,
 } from '@floating-ui/react'
-import { Icon } from './Icon'
+import { Icon, type IconName } from './Icon'
 import { Tile } from './Tile'
 
 interface Destination {
   id: string
   name: string
   picture: string | null
+  icon?: IconName
+}
+
+function DestinationMark({ destination }: { destination: Destination }) {
+  return destination.icon ? (
+    <span className="inline-flex size-6 shrink-0 items-center justify-center">
+      <Icon name={destination.icon} />
+    </span>
+  ) : (
+    <Tile name={destination.name} picture={destination.picture} />
+  )
 }
 
 export function DestinationPicker({
@@ -57,7 +68,7 @@ export function DestinationPicker({
         className="flex min-w-0 max-w-full cursor-pointer items-center gap-2 rounded-[4px] text-sm text-mute hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-pink disabled:cursor-default disabled:opacity-50"
         {...getReferenceProps()}
       >
-        {selected && <Tile name={selected.name} picture={selected.picture} />}
+        {selected && <DestinationMark destination={selected} />}
         <span className="min-w-0 truncate">
           {selected ? (
             <>
@@ -104,7 +115,7 @@ export function DestinationPicker({
                     }}
                     className="flex w-full cursor-pointer items-center gap-2 rounded-[4px] px-2 py-2 text-left text-sm text-ink hover:bg-field focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-pink aria-pressed:bg-blush"
                   >
-                    <Tile name={c.name} picture={c.picture} />
+                    <DestinationMark destination={c} />
                     <span className="min-w-0 flex-1 break-words">{c.name}</span>
                     {c.id === value && (
                       <span className="flex-none">
