@@ -35,6 +35,7 @@ test.describe('chat', () => {
     await open(kit.page)
     const text = uniq('look at this ')
     const chat = kit.page.locator('form', { has: kit.page.locator('.editor-line') })
+    await chat.getByRole('button', { name: 'Formatting and attachments' }).click()
     await chat
       .locator('input[type=file]')
       .setInputFiles({ name: 'wide.png', mimeType: 'image/png', buffer: png(1200, 300) })

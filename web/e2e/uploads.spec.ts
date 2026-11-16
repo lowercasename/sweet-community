@@ -141,6 +141,7 @@ test.describe('image uploads', () => {
     await failUploads(kit.page)
     await chatEditor(kit.page).click()
     await kit.page.keyboard.type(uniq('Look '))
+    await chat(kit.page).getByRole('button', { name: 'Formatting and attachments' }).click()
     await chat(kit.page)
       .locator('input[type=file]')
       .setInputFiles({ name: 'a.png', mimeType: 'image/png', buffer: png(320, 200) })
@@ -215,6 +216,7 @@ test.describe('image uploads', () => {
     // The wait starts before the file is chosen, because the upload can be sent before the card shows it.
     const sent = kit.page.waitForRequest('**/api/images')
     await chatEditor(kit.page).click()
+    await chat(kit.page).getByRole('button', { name: 'Formatting and attachments' }).click()
     await chat(kit.page)
       .locator('input[type=file]')
       .setInputFiles({ name: 'a.png', mimeType: 'image/png', buffer: png(320, 200) })
@@ -235,6 +237,7 @@ test.describe('image uploads', () => {
     await kit.page.keyboard.type(uniq('Sent '))
     await kit.page.keyboard.press('Enter')
     await expect.poll(() => held.length).toBe(1)
+    await chat(kit.page).getByRole('button', { name: 'Formatting and attachments' }).click()
     await chat(kit.page)
       .locator('input[type=file]')
       .setInputFiles({ name: 'b.png', mimeType: 'image/png', buffer: png(200, 320, [42, 143, 203]) })

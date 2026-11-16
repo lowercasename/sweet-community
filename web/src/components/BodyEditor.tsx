@@ -5,7 +5,7 @@ import { mentionSuggestionKey, withMentions } from '../editor/mentions'
 import { useMe, useMembers, useUsers } from '../data/hooks'
 import { clearDraft, loadDraft, saveDraft, watchDraft } from '../editor/drafts'
 import type { Topic } from '../api'
-import { Alert, Button, EditorSurface, Form, ImageCard, Row, Stack } from '../ui'
+import { Alert, Button, EditorLayout, EditorSurface, Form, ImageCard, Stack } from '../ui'
 import { convertAndUpload, failedUploads, failureReason, imageFiles, imagesHtml, insertImages } from '../editor/images'
 import type { UploadedImage } from '../api'
 import { EditorToolbar } from './EditorToolbar'
@@ -123,8 +123,18 @@ export function BodyEditor({
   // TipTap creates the keydown handler once, so the handler reads the latest callbacks through refs.
   const submitRef = useRef<() => void>(() => {})
   // The link panel. Mod+K opens it from the editor, whose keydown handler is created once, so it is reached by a ref.
+  const [toolsOpen, setToolsOpen] = useState(false)
+  const toolsOpenRef = useRef(false)
+  toolsOpenRef.current = toolsOpen
   const [linkOpen, setLinkOpen] = useState(false)
-  const openLinkRef = useRef(() => setLinkOpen(true))
+  const closeTools = () => {
+    setToolsOpen(false)
+    setLinkOpen(false)
+  }
+  const openLinkRef = useRef(() => {
+    if (enterSubmits) setToolsOpen(true)
+    setLinkOpen(true)
+  })
 
   // The draft's owner and key, read by the editor's update handler, which TipTap creates once. Each change is saved
   // at once. An editor that has not changed writes nothing.
@@ -186,6 +196,11 @@ export function BodyEditor({
         if (modKey && (event.key === 'k' || event.key === 'K')) {
           event.preventDefault()
           openLinkRef.current()
+          return true
+        }
+        if (event.key === 'Escape' && toolsOpenRef.current) {
+          event.preventDefault()
+          closeTools()
           return true
         }
         if (event.key === 'Escape' && cancelRef.current) {
@@ -311,6 +326,7 @@ export function BodyEditor({
       const sent = sending.flatMap((a) => (a.uploaded ? [{ ...a.uploaded, alt: a.alt }] : []))
       await onSubmit(imagesHtml(sent) + (isEmpty ? '' : editor.getHTML()))
       forgetDraft()
+      closeTools()
       if (!editing) {
         editor.commands.clearContent(true)
         // Images attached while the message was sending stay for the next one.
@@ -352,18 +368,31 @@ export function BodyEditor({
             ))}
           </Stack>
         )}
-        <EditorSurface editor={editor} size={size} />
-        <Row justify="between" align="center">
-          <Row gap={2} align="center" wrap="never">
-            <Row shrink={false}>
-              <EditorToolbar
-                editor={editor}
-                onImage={takesImages ? (files) => addImagesRef.current(files) : undefined}
-                linkOpen={linkOpen}
-                onLinkOpenChange={setLinkOpen}
-              />
-            </Row>
-            {topic && topic.topics.length > 0 && (
+        <EditorLayout
+          chat={enterSubmits}
+          gap={size === 'line' ? 1 : 2}
+          toolsOpen={toolsOpen}
+          onToolsChange={(open) => (open ? setToolsOpen(true) : closeTools())}
+          onFocusEditor={() => editor?.commands.focus()}
+          surface={<EditorSurface editor={editor} size={size} />}
+          tools={
+            <EditorToolbar
+              editor={editor}
+              onImage={
+                takesImages
+                  ? (files) => {
+                      addImagesRef.current(files)
+                      closeTools()
+                    }
+                  : undefined
+              }
+              linkOpen={linkOpen}
+              onLinkOpenChange={setLinkOpen}
+            />
+          }
+          extraControls={
+            topic &&
+            topic.topics.length > 0 && (
               <TopicMenu
                 topics={topic.topics}
                 value={topic.value}
@@ -373,19 +402,28 @@ export function BodyEditor({
                 label="Topic"
                 disabled={busy || disabled}
               />
-            )}
-          </Row>
-          <Row gap={2} align="center" wrap="never" shrink={false} push="end">
-            {cancel && (
-              <Button variant="ghost" disabled={busy} onClick={cancel}>
-                Cancel
+            )
+          }
+          actions={
+            <>
+              {cancel && (
+                <Button variant="ghost" disabled={busy} onClick={cancel}>
+                  Cancel
+                </Button>
+              )}
+              <Button
+                type="submit"
+                preserveFocus={enterSubmits}
+                icon={enterSubmits ? 'send' : undefined}
+                label={enterSubmits ? submitLabel : undefined}
+                disabled={!canSubmit && !busy}
+                busy={busy}
+              >
+                {enterSubmits ? undefined : submitLabel}
               </Button>
-            )}
-            <Button type="submit" disabled={!canSubmit && !busy} busy={busy}>
-              {submitLabel}
-            </Button>
-          </Row>
-        </Row>
+            </>
+          }
+        />
         {failed > 0 && <Alert tone="error">{failedUploads(failed, total)}</Alert>}
         {error && <Alert tone="error">{error}</Alert>}
       </Stack>

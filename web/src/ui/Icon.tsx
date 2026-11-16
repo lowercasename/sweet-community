@@ -1,5 +1,6 @@
 import {
   ArrowLeft,
+  ArrowUp,
   Bell,
   BellOff,
   BellRing,
@@ -69,6 +70,7 @@ export type IconName =
   | 'trash'
   | 'plus'
   | 'back'
+  | 'send'
   | 'tag'
   | 'chevron'
   | 'check'
@@ -110,6 +112,7 @@ const ICONS: Record<IconName, LucideIcon> = {
   trash: Trash2,
   plus: Plus,
   back: ArrowLeft,
+  send: ArrowUp,
   tag: Tag,
   chevron: ChevronDown,
   check: Check,

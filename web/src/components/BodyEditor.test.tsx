@@ -208,7 +208,7 @@ it('updates visible mentions from community identities without replacing the edi
 
 /** The keys that send. A chat sends on Enter and breaks the line on Shift+Enter. A post sends on Mod+Enter. */
 describe('sending from the keyboard', () => {
-  async function editor(chat: boolean) {
+  async function editor(chat: boolean, onCancel?: () => void) {
     const { BodyEditor } = await import('./BodyEditor')
     const onSubmit = vi.fn(() => Promise.resolve())
     const { container } = render(
@@ -222,6 +222,7 @@ describe('sending from the keyboard', () => {
           disabled={false}
           onSubmit={onSubmit}
           initialHtml={paragraph('line one')}
+          onCancel={onCancel}
         />
       </QueryClientProvider>,
     )
@@ -238,6 +239,17 @@ describe('sending from the keyboard', () => {
     expect(onSubmit).not.toHaveBeenCalled()
     fireEvent.keyDown(element, { key: 'Enter' })
     await waitFor(() => expect(onSubmit).toHaveBeenCalledWith(paragraph('line one<br>line two')))
+  })
+
+  it('Escape still cancels a post edit after opening and closing its link panel', async () => {
+    const cancel = vi.fn()
+    const { element } = await editor(false, cancel)
+    fireEvent.keyDown(element, { key: 'k', metaKey: true })
+    const panel = await screen.findByRole('dialog', { name: 'Add link' })
+    fireEvent.click(within(panel).getByRole('button', { name: 'Cancel' }))
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Add link' })).toBeNull())
+    fireEvent.keyDown(element, { key: 'Escape' })
+    expect(cancel).toHaveBeenCalledOnce()
   })
 
   it('in a post, Enter starts a new paragraph and Mod+Enter sends the post', async () => {

@@ -11,6 +11,8 @@ interface ButtonProps {
    */
   variant?: 'primary' | 'secondary' | 'ghost' | 'danger'
   type?: 'button' | 'submit'
+  /** Pointer presses keep the current editor focused. Keyboard activation is unchanged. */
+  preserveFocus?: boolean
   disabled?: boolean
   /** True while the action runs. The button is disabled, shows a spinner and keeps its label and colour. */
   busy?: boolean
@@ -128,6 +130,7 @@ export function Button({
   onHoverChange,
   labels,
   children,
+  preserveFocus = false,
 }: ButtonProps) {
   const iconOnly = icon !== undefined && children === undefined && !count
   // A button with no text uses the label as its accessible name, whether or not a count is shown.
@@ -147,6 +150,7 @@ export function Button({
         aria-current={current ? 'page' : undefined}
         aria-label={wordless ? (dot ? `${label}, unread` : label) : undefined}
         {...tip.props({
+          onPointerDown: preserveFocus ? (event) => event.preventDefault() : undefined,
           onMouseDown: pressed === undefined ? undefined : (e) => e.preventDefault(), // toggles keep editor focus
           onClick,
           onMouseEnter: onHoverChange && (() => onHoverChange(true)),
