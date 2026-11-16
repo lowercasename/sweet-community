@@ -44,7 +44,10 @@ test.describe('images', () => {
       browser,
     }, info) => {
       const kit = await member(browser, info)
-      if (!info.project.use.isMobile) await kit.page.setViewportSize({ width: 1280, height: 1000 })
+      await kit.page.setViewportSize({
+        width: info.project.use.isMobile ? 360 : 1280,
+        height: info.project.use.isMobile ? 800 : 1000,
+      })
       for (const [name, width, height] of [
         ['Square', 1200, 1200],
         ['Portrait', 900, 1600],
@@ -61,10 +64,10 @@ test.describe('images', () => {
         expect(created.status()).toBe(201)
         const post = (await created.json()) as { id: string }
         const img = kit.page.getByRole('button', { name: `Open image: ${name}`, exact: true })
-        const fits = async () => {
+        const fits = async (maxWidth = Infinity) => {
           const box = (await img.boundingBox())!
           const content = (await img.locator('..').boundingBox())!
-          const expectedWidth = Math.min(width, content.width, (680 * width) / height)
+          const expectedWidth = Math.min(width, content.width, maxWidth, (680 * width) / height)
           expect(box.width).toBeCloseTo(expectedWidth, 0)
           expect(box.height).toBeCloseTo((expectedWidth * height) / width, 0)
           expect(box.x).toBeCloseTo(content.x, 0)
@@ -94,17 +97,53 @@ test.describe('images', () => {
           expect(commentBox.width).toBeCloseTo(Math.min(680, (await comment.locator('..').boundingBox())!.width), 0)
           expect(commentBox.height).toBeCloseTo(commentBox.width, 0)
           await kit.page.screenshot({ path: info.outputPath('square-comment.png'), animations: 'disabled' })
-          const room = await kit.context.request.post('/api/groups', { data: { name: uniq('Images '), mode: 'chat' } })
-          const gid = (await room.json()).id
-          expect(
-            (await kit.context.request.post(`/api/groups/${gid}/messages`, { data: { body_html: body } })).status(),
-          ).toBe(201)
-          await open(kit.page, `/r/${gid}`)
-          await img.scrollIntoViewIfNeeded()
-          await expect.poll(() => img.evaluate((e: HTMLImageElement) => e.naturalWidth)).toBe(width)
-          await fits()
-          await kit.page.screenshot({ path: info.outputPath('square-chat.png'), animations: 'disabled' })
         }
+        const room = await kit.context.request.post('/api/groups', { data: { name: uniq('Images '), mode: 'chat' } })
+        const gid = (await room.json()).id
+        expect(
+          (await kit.context.request.post(`/api/groups/${gid}/messages`, { data: { body_html: body } })).status(),
+        ).toBe(201)
+        await kit.page.route(`**/img/${image.id}`, () => {})
+        await open(kit.page, `/r/${gid}`)
+        await img.scrollIntoViewIfNeeded()
+        await fits(360)
+        await kit.page.unroute(`**/img/${image.id}`)
+        await kit.page.reload()
+        await img.scrollIntoViewIfNeeded()
+        await expect.poll(() => img.evaluate((e: HTMLImageElement) => e.naturalWidth)).toBe(width)
+        await fits(360)
+        await kit.page.screenshot({
+          path: info.outputPath(`${name.toLowerCase()}-chat.png`),
+          animations: 'disabled',
+          scale: 'css',
+        })
+        if (name === 'Square') {
+          await img.click()
+          await expect(kit.page.getByRole('button', { name: 'Close', exact: true })).toBeVisible()
+          if (!info.project.use.isMobile) {
+            await expect
+              .poll(async () => (await kit.page.getByRole('img', { name, exact: true }).boundingBox())?.width ?? 0)
+              .toBeGreaterThan(360)
+          }
+          await kit.page.getByRole('button', { name: 'Close', exact: true }).click()
+          await expect(img).toBeFocused()
+        }
+        const imageTag = `<img src="/img/${image.id}" data-image-id="${image.id}" alt="Gallery" width="${width}" height="${height}">`
+        expect(
+          (
+            await kit.context.request.post(`/api/groups/${gid}/messages`, { data: { body_html: imageTag + imageTag } })
+          ).status(),
+        ).toBe(201)
+        const gallery = kit.page.locator('.gallery')
+        await gallery.scrollIntoViewIfNeeded()
+        await expect(gallery.locator('img')).toHaveCount(2)
+        const galleryBox = (await gallery.boundingBox())!
+        expect(galleryBox.width).toBeCloseTo(Math.min(360, (await gallery.locator('..').boundingBox())!.width), 0)
+        await kit.page.screenshot({
+          path: info.outputPath(`${name.toLowerCase()}-chat-gallery.png`),
+          animations: 'disabled',
+          scale: 'css',
+        })
       }
       await kit.context.close()
     })

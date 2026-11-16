@@ -8,6 +8,8 @@ interface BodyProps {
   /** The server's sanitised HTML. */
   html: string
   size?: 'body' | 'small'
+  /** Chat uses smaller images and galleries without narrowing its text. */
+  chat?: boolean
 }
 
 /** The body image an event happened on. prepareImages makes each body image that is not inside a link a button. */
@@ -21,7 +23,7 @@ const imageOf = (target: EventTarget) => (target as HTMLElement).closest?.<HTMLI
  * a card with the server's preview, or stays a plain link when there is none.
  * An image opens alone, full screen, on a click, on Enter or on Space.
  */
-export function Body({ html, size }: BodyProps) {
+export function Body({ html, size, chat }: BodyProps) {
   const { data: users } = useUsers()
   const [, navigate] = useLocation()
   const names = useMemo(() => new Map([...(users?.values() ?? [])].map((u) => [u.id, u.username])), [users])
@@ -52,7 +54,7 @@ export function Body({ html, size }: BodyProps) {
   }
   return (
     <>
-      <HtmlContent html={decorated} size={size} onClick={onClick} onKeyDown={onKeyDown} embed={drawCard} />
+      <HtmlContent html={decorated} size={size} chat={chat} onClick={onClick} onKeyDown={onKeyDown} embed={drawCard} />
       <Lightbox
         image={shown}
         onClose={() => setShown(null)}

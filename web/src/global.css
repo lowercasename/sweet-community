@@ -166,7 +166,7 @@
     /* The height limit lets a square image fill the widest post. */
     --image-max-height: var(--container-reading);
     display: block;
-    max-width: 100%;
+    max-width: min(100%, var(--image-max-width, 100%));
     height: auto;
     max-height: var(--image-max-height);
     margin: 0 0 0.6em;
@@ -177,7 +177,7 @@
    * then no wider than its shape allows at the height limit, so its box has the photo's shape, also before it loads.
    */
   .content img[style*='--ratio'] {
-    max-width: min(100%, calc(var(--image-max-height) * var(--ratio)));
+    max-width: min(100%, var(--image-max-width, 100%), calc(var(--image-max-height) * var(--ratio)));
   }
   /* A body's images open full size. HtmlContent makes them focusable. */
   .content img[tabindex] {
@@ -196,6 +196,7 @@
    * 5: two, two, one. 6: four across, two below. 7: four, two, one. 8: four, four.
    */
   .content .gallery {
+    max-width: min(100%, var(--image-max-width, 100%));
     display: grid;
     grid-template-columns: repeat(2, 1fr);
     grid-auto-rows: 200px;

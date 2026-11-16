@@ -143,7 +143,7 @@ export function MessageGroup({
                 onClick={onJump ? () => onJump(m.reply_to!.id) : undefined}
               />
             )}
-            <Body html={m.body_html} />
+            <Body html={m.body_html} chat />
             <Reactions reactions={m.reactions} disabled={offline} onToggle={(emoji) => void react(m, emoji)} />
             {reactionError?.id === m.id && <Alert tone="error">{reactionError.text}</Alert>}
             <ReadPoint at={m.created_at} />

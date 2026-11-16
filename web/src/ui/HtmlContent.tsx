@@ -7,6 +7,7 @@ interface HtmlContentProps {
   html: string
   /** `small` is for a comment. A smaller font size than the post it replies to. */
   size?: 'body' | 'small'
+  chat?: boolean
   /** Called on a click anywhere in the body. Body uses it to route the mention anchors it created without a page load. */
   onClick?: (e: MouseEvent<HTMLDivElement>) => void
   /** Called on a key press in the body, such as Enter on an image. */
@@ -28,7 +29,7 @@ interface HtmlContentProps {
  * before storage. Nothing client-generated may be passed here unsanitised.
  * `pnpm check:atomic` fails if dangerouslySetInnerHTML appears anywhere else.
  */
-export function HtmlContent({ html, size = 'body', onClick, onKeyDown, embed }: HtmlContentProps) {
+export function HtmlContent({ html, size = 'body', chat = false, onClick, onKeyDown, embed }: HtmlContentProps) {
   const rendered = useMemo(() => prepareImages(html), [html])
   const ref = useRef<HTMLDivElement>(null)
   // The renderer is read through a ref, so a new function on every render does not find the paragraphs again.
@@ -53,7 +54,7 @@ export function HtmlContent({ html, size = 'body', onClick, onKeyDown, embed }: 
     <>
       <div
         ref={ref}
-        className={size === 'small' ? 'content text-[15px]' : 'content'}
+        className={`content ${size === 'small' ? 'text-[15px]' : ''} ${chat ? '[--image-max-width:360px]' : ''}`}
         onClick={onClick}
         onKeyDown={onKeyDown}
         dangerouslySetInnerHTML={{ __html: rendered }}

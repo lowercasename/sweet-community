@@ -167,7 +167,7 @@ A member reacts to a post, a comment or a chat message with an emoji. Each emoji
 - A post, comment or message may show only images its writer uploaded or can already see. Any other image, including one deleted while a draft was open, is refused with a message to remove it.
 - A profile picture or a room picture must be an image that the person setting it uploaded. Every signed-in user can see a profile picture, so any other image would let a member show an image from a private room or a conversation to the whole community.
 - An image that nothing uses is deleted once it is a day old. The picture of a deleted room counts as unused. The cleanup never stops at a failure, and tries the image again on its next run.
-- Single images keep their proportions and have a height limit equal to the maximum post width. A square image can fill the post’s content width. Smaller images are not enlarged. This applies to posts, comments and chat. (Raphael, 2026-11-16. The previous height limit left large square photos narrower than the post.)
+- Single images keep their proportions and have a height limit equal to the maximum post width. A square image can fill the post’s content width. Smaller images are not enlarged. Chat images and galleries are at most 360px wide and fit narrower columns. (Raphael, 2026-11-16. The previous height limit left large square photos narrower than the post.)
 - Adjacent images are shown as a gallery. The stored HTML stays a plain run of images.
 - Clicking an image in a post, comment or message opens it alone, full screen, with nothing else. Escape, the close button, a click beside it or pulling down on a phone closes it.
 - Images load only when they come near the screen. Each image is stored at one size.
@@ -469,6 +469,8 @@ These decisions came from a security audit (2026-11-08).
 - The server never lists a directory of the app's files.
 
 ## Record
+
+- **Chat image width (Raphael, 2026-11-16).** Chat images and galleries are limited to 360px wide. They previously used the same width as posts, which made them too large in chat. Posts and comments keep their existing image sizing.
 
 ### Reversed
 
