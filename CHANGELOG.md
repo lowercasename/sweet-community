@@ -1,5 +1,12 @@
 # Changelog
 
+## v1.9.4 (2026-11-16)
+
+- Measure chat controls together after resizing
+- Limit chat images to 360 pixels wide
+- Keep chat controls beside the text field
+- Let square images fill the post width
+
 ## v1.9.3 (2026-11-13)
 
 - Remove browser tests that repeat other tests
