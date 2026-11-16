@@ -13,9 +13,12 @@ for (const tag of ['@dev', '@phone']) {
     const tools = form.getByRole('button', { name: 'Formatting and attachments', exact: true })
     const send = form.getByRole('button', { name: 'Send', exact: true })
     const aligned = async () => {
-      const text = (await field.boundingBox())!
-      const left = (await tools.boundingBox())!
-      const right = (await send.boundingBox())!
+      // Measure together so a resize cannot move the form between measurements.
+      const [text, left, right] = await form.evaluate((element) =>
+        ['[role="textbox"]', '[aria-label="Formatting and attachments"]', '[aria-label="Send"]'].map((selector) =>
+          element.querySelector(selector)!.getBoundingClientRect().toJSON(),
+        ),
+      )
       expect(left.x + left.width).toBeLessThanOrEqual(text.x)
       expect(right.x).toBeGreaterThanOrEqual(text.x + text.width)
       expect(Math.abs(left.y + left.height - text.y - text.height)).toBeLessThanOrEqual(2)
@@ -109,6 +112,7 @@ for (const tag of ['@dev', '@phone']) {
     await expect(form.getByText('Replying to')).toHaveCount(0)
     // A short viewport checks layout space, without claiming to emulate a native keyboard.
     await kit.page.setViewportSize({ width: info.project.use.isMobile ? 360 : 600, height: 420 })
+    await expect(kit.page.getByRole('navigation', { name: 'Main', exact: true })).toBeVisible()
     await field.fill('A message in a short viewport')
     await aligned()
     await expect(send).toBeInViewport()
