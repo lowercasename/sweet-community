@@ -1,5 +1,9 @@
 # Changelog
 
+## v1.10.1 (2026-11-17)
+
+- Migrate legacy rooms as open
+
 ## v1.10.0 (2026-11-17)
 
 - Adjust pin icon alignment
