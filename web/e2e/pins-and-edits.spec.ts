@@ -35,8 +35,8 @@ for (const tag of ['@dev', '@phone']) {
     await expect(kit.page.locator('article').first()).toContainText(title)
     await expect(article(kit.page, title).locator(':scope > div').first()).toHaveText('Pinned')
     const strip = await article(kit.page, title).locator(':scope > div').first().boundingBox()
-    const pin = await article(kit.page, title).getByText('Pinned', { exact: true }).locator('svg').boundingBox()
-    expect(Math.abs(strip!.y + strip!.height / 2 - pin!.y - pin!.height / 2)).toBeLessThan(1)
+    const pinLabel = await article(kit.page, title).getByText('Pinned', { exact: true }).boundingBox()
+    expect(Math.abs(strip!.y + strip!.height / 2 - pinLabel!.y - pinLabel!.height / 2)).toBeLessThan(1)
     await kit.page.screenshot({ path: info.outputPath('pinned-feed.png'), scale: 'css' })
     await kit.page.getByRole('button', { name: /load more/i }).click()
     await expect(kit.page.locator('article').filter({ hasText: title })).toHaveCount(1)
@@ -80,14 +80,13 @@ for (const tag of ['@dev', '@phone']) {
       await expect(article(kit.page, roomTitle)).toContainText('Pinned in Open pin room')
       const header = article(kit.page, roomTitle)
       const label = header.getByText('Pinned in', { exact: true })
-      const icon = label.locator('svg')
       const roomLink = header.getByRole('link', { name: /^Open pin room/ })
       const center = async (element: typeof label) => {
         const box = await element.boundingBox()
         expect(box).not.toBeNull()
         return box!.y + box!.height / 2
       }
-      expect(Math.abs((await center(icon)) - (await center(roomLink)))).toBeLessThan(1)
+      expect(Math.abs((await center(label)) - (await center(roomLink)))).toBeLessThan(1)
       await kit.page.screenshot({ path: info.outputPath('home-pins.png'), scale: 'css' })
       await open(kit.page, `/u/${kit.username}`)
       await expect(article(kit.page, homeTitle)).toContainText('Pinned')

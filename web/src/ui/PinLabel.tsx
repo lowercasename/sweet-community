@@ -4,7 +4,9 @@ import { Icon } from './Icon'
 export function PinLabel({ label = 'Pinned' }: { label?: string }) {
   return (
     <span className="flex shrink-0 items-center gap-1 whitespace-nowrap text-sm leading-5 text-mute">
-      <Icon name="pin" size={14} />
+      <span className="mt-0.75">
+        <Icon name="pin" size={14} />
+      </span>
       {label}
     </span>
   )
