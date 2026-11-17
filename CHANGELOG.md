@@ -1,5 +1,9 @@
 # Changelog
 
+## v1.10.1 (2026-11-17)
+
+- Restore posts-only and chat-only room modes
+
 ## v1.10.0 (2026-11-17)
 
 - Migrate existing rooms as open
