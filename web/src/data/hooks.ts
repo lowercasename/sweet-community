@@ -334,8 +334,14 @@ export function useMembers(groupId: string) {
 export function useGroupActions() {
   const qc = useQueryClient()
   return {
-    async create(name: string, visibility: RoomVisibility, members: string[] = [], description = ''): Promise<Group> {
-      const g = await createGroup(name, visibility, members, description)
+    async create(
+      name: string,
+      visibility: RoomVisibility,
+      members: string[] = [],
+      description = '',
+      mode: GroupMode = 'both',
+    ): Promise<Group> {
+      const g = await createGroup(name, visibility, members, description, mode)
       applyEvent(qc, 'group', g)
       return g
     },

@@ -593,7 +593,7 @@ func (s *Server) editPost(w http.ResponseWriter, r *http.Request) {
 			if !perm.CanSee(to) {
 				return nil, http.StatusNotFound, errors.New("No such room")
 			}
-			if !perm.PostDestination(to, perm.Group{Kind: target.Kind, Visibility: target.Visibility}) {
+			if !perm.PostDestination(to, perm.Group{Kind: target.Kind, Visibility: target.Visibility, Mode: target.Mode}) {
 				return nil, http.StatusForbidden, errors.New("Choose Home or an open room")
 			}
 		}

@@ -85,7 +85,7 @@ export function Post({ post, linked = true, expanded = false, place, disabled, o
   const [editing, setEditing] = useState(false)
   const { data: me } = useMe()
   const { groups } = useGroups()
-  const choices = postDestinations(groups)
+  const choices = postDestinations(groups, post.group_id)
   const draft = `post-edit:${post.id}`
   const [destination, setDestination] = useState(post.group_id)
   const [saving, setSaving] = useState(false)

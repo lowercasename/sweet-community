@@ -23,6 +23,7 @@ export default defineConfig({
   expect: { timeout: 8_000 },
   reporter: [['list']],
   use: {
+    channel: 'chrome',
     trace: 'retain-on-failure',
     screenshot: 'only-on-failure',
   },
@@ -54,7 +55,7 @@ export default defineConfig({
   ],
   projects: [
     { name: 'built', use: { ...devices['Desktop Chrome'], baseURL: BUILT }, grepInvert: /@phone|@fresh/ },
-    // A phone-sized Chromium: WebKit is not installed, and the layout is what matters here.
+    // Google Chrome with a phone viewport and touch input.
     { name: 'phone', use: { ...devices['Pixel 7'], baseURL: BUILT }, grep: /@phone/ },
     // The dev server differs from the binary only in its proxy and in React StrictMode. The tests tagged @dev cover
     // each proxied route (sign-in cookies, the event stream, uploads, images, the health check) and the stream's live

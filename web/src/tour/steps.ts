@@ -74,7 +74,7 @@ export function tourSteps(c: TourContext): TourStep[] {
       ...(phone ? menu : { target: 'rooms', placement: 'right' }),
       title: 'Rooms',
       body: [
-        `A room has its own posts and chat. Open rooms are available to everyone in the community. Private rooms are visible only to invited members. ${example} ${phone ? 'Your rooms are in the Menu, and you can create one there.' : 'Create one with the plus button.'}`,
+        `A room can have posts, chat or both. Open rooms are available to everyone in the community. Private rooms are visible only to invited members. ${example} ${phone ? 'Your rooms are in the Menu, and you can create one there.' : 'Create one with the plus button.'}`,
       ],
     })
   }

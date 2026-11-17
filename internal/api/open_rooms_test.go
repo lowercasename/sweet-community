@@ -144,3 +144,54 @@ func TestOpenRoomReadPositionsApplyOnHomeAndInRoom(t *testing.T) {
 		}
 	}
 }
+
+func TestRoomModesPreserveContentAndRejectDisabledWrites(t *testing.T) {
+	for _, visibility := range []string{"open", "private"} {
+		t.Run(visibility, func(t *testing.T) {
+			ts, owner := newTestServer(t)
+			kit, _ := registerMember(t, ts, owner, "kit")
+			mo, moID := registerMember(t, ts, owner, "mo")
+			for _, mode := range []string{"posts", "chat", "both"} {
+				g := kit.mustStatus(201, "POST", "/api/groups", map[string]string{"name": mode, "visibility": visibility, "mode": mode})
+				if g["mode"] != mode || !groupCan(g, "set_mode") {
+					t.Fatalf("mode or permission: %v", g)
+				}
+			}
+			g := kit.mustStatus(201, "POST", "/api/groups", map[string]string{"name": "Room", "visibility": visibility})
+			gp := "/api/groups/" + g["id"].(string)
+			if visibility == "private" {
+				kit.mustStatus(201, "POST", gp+"/members", map[string]string{"user_id": moID})
+			}
+			post := kit.mustStatus(201, "POST", gp+"/posts", map[string]string{"body_html": "<p>Keep this post</p>"})
+			message := kit.mustStatus(201, "POST", gp+"/messages", map[string]string{"body_html": "<p>Keep this message</p>"})
+			mo.mustStatus(403, "PUT", gp, map[string]string{"mode": "posts"})
+			kit.mustStatus(200, "PUT", gp+"/members/"+moID, map[string]string{"role": "moderator"})
+			mo.mustStatus(403, "PUT", gp, map[string]string{"mode": "posts"})
+			kit.mustStatus(400, "PUT", gp, map[string]string{"mode": "invalid"})
+			kit.mustStatus(200, "PUT", gp, map[string]string{"mode": "posts"})
+			mo.mustStatus(403, "POST", gp+"/messages", map[string]string{"body_html": "<p>No new chat</p>"})
+			kit.mustStatus(200, "PUT", gp, map[string]string{"mode": "chat"})
+			mo.mustStatus(403, "POST", gp+"/posts", map[string]string{"body_html": "<p>No new post</p>"})
+			kit.mustStatus(200, "PUT", "/api/posts/"+post["id"].(string), map[string]string{"body_html": "<p>Edited existing post</p>", "group_id": g["id"].(string)})
+			if visibility == "open" {
+				homePost := kit.mustStatus(201, "POST", rootPath+"/posts", map[string]string{"body_html": "<p>Home post</p>"})
+				kit.mustStatus(403, "PUT", "/api/posts/"+homePost["id"].(string), map[string]string{"body_html": "<p>Home post</p>", "group_id": g["id"].(string)})
+			}
+			kit.mustStatus(200, "PUT", gp, map[string]string{"mode": "both"})
+			kept := mo.mustStatus(200, "GET", "/api/posts/"+post["id"].(string), nil)
+			if kept["body_text"] != "Edited existing post" {
+				t.Fatal("mode change lost post")
+			}
+			found := false
+			for _, raw := range mo.mustStatus(200, "GET", gp+"/messages", nil)["messages"].([]any) {
+				m := raw.(map[string]any)
+				if m["id"] == message["id"] && m["body_text"] == "Keep this message" {
+					found = true
+				}
+			}
+			if !found {
+				t.Fatal("mode change lost message")
+			}
+		})
+	}
+}

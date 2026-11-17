@@ -115,7 +115,7 @@ describe('MembersPage', () => {
     const { updateGroup } = await import('../api')
     await page('owner')
     fireEvent.change(screen.getByLabelText('Name'), { target: { value: 'Knitting' } })
-    expect(screen.queryByLabelText('Mode')).toBeNull()
+    expect(screen.getByLabelText('Mode')).toHaveProperty('value', 'both')
     fireEvent.click(screen.getByRole('button', { name: 'Save' }))
     expect(updateGroup).toHaveBeenCalledWith('club', { name: 'Knitting' })
   })

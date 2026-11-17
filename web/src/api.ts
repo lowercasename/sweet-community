@@ -77,7 +77,7 @@ export interface Group {
   kind: 'root' | 'group' | 'dm'
   name: string
   description: string
-  /** Rooms have both posts and chat. A DM has chat only. */
+  /** Rooms support posts, chat or both. A DM has chat only. */
   mode: GroupMode
   created_at: number
   /** A room's picture, or null to show the tile with the room's initial. */
@@ -410,8 +410,9 @@ export function createGroup(
   visibility: RoomVisibility,
   members: string[] = [],
   description = '',
+  mode: GroupMode = 'both',
 ): Promise<Group> {
-  return request<Group>('/api/groups', json('POST', { name, visibility, members, description }))
+  return request<Group>('/api/groups', json('POST', { name, visibility, members, description, mode }))
 }
 
 export function updateGroup(

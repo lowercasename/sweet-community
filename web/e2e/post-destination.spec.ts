@@ -315,3 +315,49 @@ for (const tag of ['@dev', '@phone'])
     await expect(article(kit.page, text).locator('.editor-post .ProseMirror')).toHaveText(text + ' saved on page')
     await kit.context.close()
   })
+
+for (const tag of ['@dev', '@phone'])
+  test(
+    tag + ' a chat-only room cannot receive new posts but its existing posts remain editable',
+    async ({ browser }, info) => {
+      const writer = await member(browser, info, 'writer')
+      const room = await (
+        await writer.context.request.post('/api/groups', {
+          data: { name: uniq('Posts '), visibility: 'open' },
+        })
+      ).json()
+      const body = uniq('Existing post ')
+      const post = await (
+        await writer.context.request.post(`/api/groups/${room.id}/posts`, {
+          data: { body_html: `<p>${body}</p>` },
+        })
+      ).json()
+      await open(writer.page)
+      if (info.project.use.isMobile) await anyView(writer.page, 'Posts').click()
+      const editor = writer.page.locator('[data-tour="posts"] .ProseMirror').first()
+      await editor.fill('Unsent draft')
+      await writer.page.getByRole('button', { name: 'Post in Home', exact: true }).click()
+      await writer.page.getByRole('dialog').getByRole('button', { name: room.name, exact: true }).click()
+      expect((await writer.context.request.put(`/api/groups/${room.id}`, { data: { mode: 'chat' } })).ok()).toBe(true)
+      await expect(writer.page.getByRole('button', { name: 'Choose a room', exact: true })).toBeVisible()
+      await expect(writer.page.getByRole('button', { name: 'Post', exact: true })).toBeDisabled()
+      await expect(editor).toHaveText('Unsent draft')
+      await writer.page.getByRole('button', { name: 'Choose a room', exact: true }).click()
+      await expect(writer.page.getByRole('dialog').getByRole('button', { name: room.name, exact: true })).toHaveCount(0)
+      await open(writer.page, `/p/${post.id}`)
+      const card = article(writer.page, body)
+      await pick(writer.page, card, 'Post options', 'Edit')
+      await expect(card.getByRole('button', { name: `Post in ${room.name}`, exact: true })).toBeVisible()
+      await card
+        .locator('.ProseMirror')
+        .first()
+        .fill(body + ' edited')
+      await card.getByRole('button', { name: 'Save', exact: true }).click()
+      await expect(card.getByRole('button', { name: 'Save', exact: true })).toBeHidden()
+      await expect(card).toContainText(body + ' edited')
+      const saved = await (await writer.context.request.get(`/api/posts/${post.id}`)).json()
+      expect(saved.group_id).toBe(room.id)
+      expect(saved.body_text).toBe(body + ' edited')
+      await writer.context.close()
+    },
+  )

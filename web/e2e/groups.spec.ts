@@ -76,7 +76,7 @@ test.describe('groups', () => {
     await expect(kit.page.getByRole('heading', { name: 'Room settings' })).toHaveCount(1)
 
     await kit.page.getByRole('textbox', { name: 'Name' }).fill(name + ' renamed')
-    await expect(kit.page.getByLabel('Mode', { exact: true })).toHaveCount(0)
+    await expect(kit.page.getByRole('combobox', { name: 'Mode', exact: true })).toHaveValue('both')
     await kit.page.getByRole('button', { name: 'Save' }).click()
     // There is still exactly one of each card, the controls are still shown, and the new name is shown everywhere.
     await expect(kit.page.getByRole('button', { name: 'Save' })).toBeDisabled()

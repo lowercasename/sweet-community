@@ -104,7 +104,9 @@ func TestRules(t *testing.T) {
 		{"owner hands over to an outsider", Transfer(owner, outsider), false},
 		{"moderator hands over", Transfer(mod, kit), false},
 
-		{"owner cannot change a room's mode", SetMode(owner, club), false},
+		{"owner sets a room's mode", SetMode(owner, club), true},
+		{"member cannot set a room's mode", SetMode(kit, club), false},
+		{"moderator cannot set a room's mode", SetMode(mod, club), false},
 		{"owner sets the root's mode", SetMode(owner, root), true},
 		{"owner sets a dm's mode", SetMode(owner, Group{Kind: KindDM}), false},
 		{"owner renames a dm", Rename(owner, Group{Kind: KindDM}), false},

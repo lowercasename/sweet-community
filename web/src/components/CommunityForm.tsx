@@ -54,10 +54,7 @@ export function CommunityForm({ settings, submitLabel, onSaved }: CommunityFormP
         <Field label="Short community description">
           <Textarea value={description} onChange={setDescription} rows={3} maxLength={500} />
         </Field>
-        <Field
-          label="Who can create rooms"
-          hint="A room is a private space inside the community, with its own posts and chat. Only the people added to a room can see it. Moderators are people you choose to help run the community. They can delete anything posted and add or remove people."
-        >
+        <Field label="Who can create rooms" hint="Rooms can be open to the community or private to invited members.">
           <Select value={creation} options={CREATION} onChange={setCreation} disabled={busy} />
         </Field>
         {note && <Alert tone={note.tone}>{note.text}</Alert>}

@@ -10,7 +10,7 @@ test.describe('notification settings', () => {
     browser,
   }, testInfo) => {
     const kit = await member(browser, testInfo, 'kit')
-    // Headless Chromium denies notifications unless the permission is granted. A user's browser asks the user.
+    // Grant notification permission without opening a browser prompt.
     await kit.context.grantPermissions(['notifications'])
     await open(kit.page, '/settings')
     const on = kit.page.getByRole('button', { name: 'Weekly digest on' })
@@ -30,11 +30,11 @@ test.describe('notification settings', () => {
     // Move the pointer away so the button shows its state text instead of its hover text.
     await kit.page.mouse.move(0, 0)
     await expect(kit.page.getByRole('button', { name: 'Weekly digest on' })).toBeVisible()
-    // The device section shows one of its states. Headless Chromium reports notifications as denied
-    // regardless of granted permissions, and subscribing would need a push service, so the test only
-    // checks that one of the three texts is shown.
-    const device = kit.page.getByText(/Notify this device|blocking notifications from Sweet|cannot show notifications/)
-    await expect(device.first()).toBeVisible()
+    // Subscribing requires a push service. Check the available action or the browser's explanation.
+    const device = kit.page
+      .getByRole('button', { name: 'Notify this device', exact: true })
+      .or(kit.page.getByText(/blocking notifications from Sweet|cannot show notifications/))
+    await expect(device).toBeVisible()
     // The app is installable. It serves a manifest and the service worker that shows push notifications.
     const manifest = await kit.context.request.get('/manifest.json')
     expect(manifest.ok()).toBeTruthy()

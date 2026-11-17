@@ -51,7 +51,7 @@ type Comment struct{ AuthorID, PostAuthorID string }
 type Message struct{ AuthorID string }
 
 // Group holds the fields of a group that the rules use.
-type Group struct{ Kind, Visibility string }
+type Group struct{ Kind, Visibility, Mode string }
 
 // EditPost allows only the author. Staff can delete a post but not edit it.
 func EditPost(a Actor, p Post) bool { return a.member() && a.ID == p.AuthorID }
@@ -61,9 +61,9 @@ func MovePost(a Actor, p Post, visibility string) bool {
 	return EditPost(a, p) && visibility == "open"
 }
 
-// PostDestination allows posting to Home and open rooms.
+// PostDestination allows posting to Home and open rooms with posts enabled.
 func PostDestination(a Actor, g Group) bool {
-	return Write(a) && (g.Kind == KindRoot || (g.Kind == KindGroup && g.Visibility == "open"))
+	return Write(a) && g.Mode != ModeChat && (g.Kind == KindRoot || (g.Kind == KindGroup && g.Visibility == "open"))
 }
 
 // DeletePost allows the author and the group's staff.
@@ -190,9 +190,9 @@ func SetRole(a, target Actor, role string) bool {
 	return role == Member || role == Moderator
 }
 
-// Only a room owner may rename or delete it. Only the community owner may change its mode.
+// Only a group owner may rename it, change its mode or delete it.
 func Rename(a Actor, g Group) bool      { return a.Role == Owner && g.Kind == KindGroup }
-func SetMode(a Actor, g Group) bool     { return a.Role == Owner && g.Kind == KindRoot }
+func SetMode(a Actor, g Group) bool     { return a.Role == Owner && g.Kind != KindDM }
 func DeleteGroup(a Actor, g Group) bool { return a.Role == Owner && g.Kind != KindRoot }
 
 // Leave allows private room members other than the owner to leave. Leaving a conversation hides it.

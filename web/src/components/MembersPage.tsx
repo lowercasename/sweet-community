@@ -30,6 +30,7 @@ import {
 } from '../ui'
 import { RoomNotifications } from './RoomNotifications'
 import { PersonName } from './PersonName'
+import { RoomMode } from './RoomMode'
 
 interface MembersPageProps {
   group: Group
@@ -37,12 +38,6 @@ interface MembersPageProps {
   /** After I have left or deleted the group: there is nothing here to show any more. */
   onLeft: () => void
 }
-
-const MODES: { value: GroupMode; label: string }[] = [
-  { value: 'both', label: 'Posts and chat' },
-  { value: 'posts', label: 'Posts only' },
-  { value: 'chat', label: 'Chat only' },
-]
 
 const ROLE_SECTIONS = [
   { role: 'owner', title: 'Owner', empty: '' },
@@ -64,7 +59,8 @@ export function MembersPage({ group, me, onLeft }: MembersPageProps) {
   const [name, setName] = useState(group.name)
   const [descriptionDraft, setDescription] = useState<string | null>(null)
   const description = descriptionDraft ?? group.description ?? ''
-  const [mode, setMode] = useState<GroupMode>(group.mode)
+  const [modeDraft, setMode] = useState<GroupMode | null>(null)
+  const mode = modeDraft ?? group.mode
   const [confirm, setConfirm] = useState<
     | { kind: 'handover'; to: Membership }
     | { kind: 'remove'; who: Membership }
@@ -136,12 +132,14 @@ export function MembersPage({ group, me, onLeft }: MembersPageProps) {
               </Card>
             )}
             {problem && <Alert tone="error">{problem}</Alert>}
-            <Card>
-              <Row justify="between" align="center">
-                <Text>Chat notifications</Text>
-                <RoomNotifications groupId={group.id} />
-              </Row>
-            </Card>
+            {group.mode !== 'posts' && (
+              <Card>
+                <Row justify="between" align="center">
+                  <Text>Chat notifications</Text>
+                  <RoomNotifications groupId={group.id} />
+                </Row>
+              </Card>
+            )}
             {canEdit && (
               <Card>
                 <Stack gap={2}>
@@ -189,14 +187,7 @@ export function MembersPage({ group, me, onLeft }: MembersPageProps) {
                       />
                     </Field>
                   )}
-                  {group.can.set_mode && (
-                    <Field
-                      label="Mode"
-                      hint="Posts are longer pieces that people comment on. Chat is a running conversation."
-                    >
-                      <Select value={mode} options={MODES} onChange={setMode} />
-                    </Field>
-                  )}
+                  {group.can.set_mode && <RoomMode value={mode} onChange={setMode} disabled={busy} />}
                   <Row justify="end">
                     <Button
                       disabled={!dirty || !name.trim() || (busy && working !== 'save')}
@@ -211,7 +202,10 @@ export function MembersPage({ group, me, onLeft }: MembersPageProps) {
                                 ? { description: description.trim() }
                                 : {}),
                             })
-                            .then(() => setDescription(null)),
+                            .then(() => {
+                              setDescription(null)
+                              setMode(null)
+                            }),
                         )
                       }
                     >

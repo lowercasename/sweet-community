@@ -354,15 +354,15 @@ func TestGroupModeAndInstanceSetting(t *testing.T) {
 	kit, _ := registerMember(t, ts, owner, "kit")
 	mo, moID := registerMember(t, ts, owner, "mo")
 
-	// Every room has posts and chat. Its audience is independent of those capabilities.
-	kit.mustStatus(400, "POST", "/api/groups", map[string]string{"name": "Room", "mode": "chat"})
+	// Room owners choose posts, chat or both independently of visibility.
+	kit.mustStatus(400, "POST", "/api/groups", map[string]string{"name": "Room", "mode": "invalid"})
 	room := kit.mustStatus(201, "POST", "/api/groups", map[string]string{"name": "Room"})
 	rid := room["id"].(string)
 	kit.mustStatus(201, "POST", "/api/groups/"+rid+"/posts", map[string]string{"body_html": "<p>x</p>"})
 	kit.mustStatus(201, "POST", "/api/groups/"+rid+"/messages", map[string]string{"body_html": "<p>hi</p>"})
-	kit.mustStatus(403, "PUT", "/api/groups/"+rid, map[string]string{"mode": "posts"})
+	kit.mustStatus(200, "PUT", "/api/groups/"+rid, map[string]string{"mode": "posts"})
 	renamed := kit.mustStatus(200, "PUT", "/api/groups/"+rid, map[string]string{"name": "Renamed"})
-	if renamed["mode"] != "both" || !groupCan(renamed, "rename") || groupCan(renamed, "set_mode") {
+	if renamed["mode"] != "posts" || !groupCan(renamed, "rename") || !groupCan(renamed, "set_mode") {
 		t.Fatalf("room capabilities: %v", renamed)
 	}
 	// A DM is chat only, and its mode cannot be changed.

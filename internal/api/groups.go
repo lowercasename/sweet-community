@@ -26,7 +26,7 @@ type Group struct {
 	Visibility  string `json:"visibility"`
 	Name        string `json:"name"`
 	Description string `json:"description"`
-	// A named room has posts and chat. A conversation has chat only.
+	// Rooms support posts, chat or both. A conversation has chat only.
 	Mode      string `json:"mode"`
 	CreatedAt int64  `json:"created_at"`
 	// Picture is the URL of the room's picture, or null when the tile with the room's initial is shown.
@@ -280,8 +280,8 @@ func (s *Server) createGroup(w http.ResponseWriter, r *http.Request) {
 		if in.Mode == "" {
 			in.Mode = perm.ModeBoth
 		}
-		if in.Mode != perm.ModeBoth {
-			writeErr(w, http.StatusBadRequest, "Rooms have posts and chat")
+		if !validMode(in.Mode) {
+			writeErr(w, http.StatusBadRequest, "Mode must be posts, chat or both")
 			return
 		}
 		if in.Visibility == "" {

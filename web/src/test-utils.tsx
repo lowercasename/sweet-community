@@ -61,7 +61,7 @@ export const group = (id: string, role: Group['role'], extra: Partial<Group> = {
     set_roles: role === 'owner',
     transfer: role === 'owner',
     rename: role === 'owner' && id !== ROOT,
-    set_mode: role === 'owner' && id === ROOT,
+    set_mode: role === 'owner',
     delete: role === 'owner' && id !== ROOT,
     leave: role !== 'owner' && id !== ROOT,
     create_groups: id === ROOT ? true : undefined,

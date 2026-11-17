@@ -54,7 +54,7 @@ Feature flags are planned. The owner will turn posts, chat, images, embeds and a
 
 ### Rooms
 
-A room has posts and chat under one shared header. Selecting a room changes both columns. The header names the room. Open and private rooms have the same capabilities. A person can collapse either pane. A group that only wants chat can use its room that way. (Raphael, 2026-11-16. A private room beside public chat would make the audience unclear.)
+A room has posts, chat or both under one shared header. The owner chooses the mode when creating the room and can change it later. New rooms default to both. Open and private rooms offer the same choices. Selecting a room shows its enabled panes. The header names the room. Disabling a pane prevents new posts or messages in it but preserves existing content. Enabling it again shows that content. A person can also collapse either pane for themselves. (Raphael, 2026-11-17. Restoring room modes lets a community organise posts without creating a separate chat for every subject.)
 
 - Every community member can discover, read and participate in open rooms without asking to join. New community members gain access to existing open rooms.
 - Sidebar shortcuts are personal. Adding or removing one changes neither access, Home, roles nor notifications. Browse Rooms lists all open rooms and the private rooms the viewer belongs to. A star in the room header adds or removes its shortcut. The star is filled when added. (Raphael, 2026-11-16. Add to sidebar names the action clearly.)
@@ -69,7 +69,7 @@ A room has posts and chat under one shared header. Selecting a room changes both
 - A private room has the same lock beside its name in the sidebar, header and post labels. The header stays on one line. Room settings do not repeat the privacy explanation. (Raphael, 2026-11-16. Competing privacy labels and a second header line added clutter.)
 - The lock shows a Private room tooltip everywhere it appears. Hovering it does not show the room-name tooltip at the same time. (Raphael, 2026-11-16. The two tooltips overlapped.)
 - A post shown outside its room has a header naming and linking to the room. Opening its comments does not change the current chat. Entering the room changes both columns.
-- Everyone belongs to open rooms while they belong to the community. They cannot leave an open room or remove another community member from it. Room chat alert settings remain available.
+- Everyone belongs to open rooms while they belong to the community. They cannot leave an open room or remove another community member from it. Room chat alert settings are available when chat is enabled.
 - Private room members can leave or be removed. A private room is deleted when its last member leaves.
 
 **A room always has one owner.** The owner may hand ownership to a member and become a moderator. An owner leaves only after handing over. If the owner's account is removed, ownership passes to the longest-serving moderator, or else to the longest-serving member. It never passes to the staff member who removed the owner. The community's owner cannot leave and cannot be removed.
@@ -97,9 +97,9 @@ Rooms are the only way to categorise posts. Topics and topic subscriptions are n
 
 A post is long-form text with inline images. Comments are a flat list, oldest first. A reply to one comment quotes it. A long thread opens at its newest comments, with Load earlier comments above them, as a chat does.
 
-- Home's post editor offers the community and every open room. Choosing a destination keeps Home and its community chat open. Private posting starts inside the private room. A draft keeps its destination across reloads. Changing the destination keeps its text. A successful post clears the draft and resets the next Home draft to the community. An unavailable destination requires another choice before posting. (Codex, 2026-11-16, implementing Raphael's chosen composer design.)
+- Home's post editor offers Home and open rooms with posts enabled. Choosing a destination keeps Home and its community chat open. Private posting starts inside the private room. A draft keeps its destination across reloads. Changing the destination keeps its text. A successful post clears the draft and resets the next Home draft to the community. An unavailable destination requires another choice before posting. (Codex, 2026-11-16, implementing Raphael's chosen composer design.)
 - The community destination is labelled Home and uses the navigation's house icon. Rooms keep their images or initials. (Raphael, 2026-11-16. Community looked like an extra room that appeared nowhere else.)
-- Authors may move a post between Home and open rooms while editing it. Existing replies stay with the post. Private posts cannot move, and private rooms cannot be destinations. The post keeps its address, creation time and discussion preferences. (Raphael, 2026-11-16. The destination should be editable without exposing private discussions.)
+- Authors may move a post between Home and open rooms with posts enabled while editing it. Existing posts remain editable if their room becomes chat only. Existing replies stay with the post. Private posts cannot move, and private rooms cannot be destinations. The post keeps its address, creation time and discussion preferences. (Raphael, 2026-11-16. The destination should be editable without exposing private discussions.)
 - Home's post editor has a room selector above the text. The selector strip and the room label on published posts have a faint shaded background. (Raphael, 2026-11-16. This makes the destination visible before posting.)
 - The author edits a post or comment as a whole, and the post is marked as edited. There is no version history.
 - The owner and moderators of a group can pin and unpin its posts. Pinned posts appear first in that group's feed, newest first, with a small pin label. An open-room pin does not move the post to the top of Home. Moving a post to another group clears its pin. Pinning changes neither visibility nor notifications. (Raphael, 2026-11-17. Important posts need to stay at the top of their own posts view.)
@@ -254,7 +254,7 @@ Room and staff actions use the current permissions when the change is saved. The
 
 - An author edits their own posts, comments and messages and deletes their own content. A post's author may also delete comments on it.
 - A group's owner and moderators may delete content in it. They cannot edit another author's content. They add and remove private room members.
-- Only a group's owner sets roles, hands over ownership, renames the group or deletes it. Named rooms always have posts and chat. Two-person conversations always have chat only.
+- Only a group's owner sets roles, hands over ownership, renames the group, chooses its mode or deletes it. Two-person conversations always have chat only.
 - Only the community's owner changes the community's name and who may create rooms. The owner and moderators manage invites, rules, the welcome message and reports.
 - Staff remove users below their own role. Any user may remove themselves. Nobody can remove the owner.
 
@@ -481,6 +481,8 @@ These decisions came from a security audit (2026-11-08).
 
 ## Record
 
+- **Room modes restored (Raphael, 2026-11-17).** Room owners can choose posts only, chat only or both. This reverses the removal of room modes during the open-room change. Personal pane controls did not replace a room-wide choice. Existing content is preserved when a mode changes.
+
 - **Chat image width (Raphael, 2026-11-16).** Chat images and galleries are limited to 360px wide. They previously used the same width as posts, which made them too large in chat. Posts and comments keep their existing image sizing.
 
 ### Reversed
@@ -553,6 +555,8 @@ These decisions came from a security audit (2026-11-08).
 - **Smaller stored sizes for avatars and room pictures**. A community is small, so the full image is fetched once and cached.
 
 ### Deferred
+
+- **Share in chat (Raphael, 2026-11-17).** Sharing a post will place a link in chat and add a comment linking back to that chat message. The menu will offer Home chat first, then the post’s own room chat. Only enabled chats are offered. Private posts can be shared only in their own room. Home posts have only the Home option. This lets people discuss a post in chat without copying the whole discussion into its comments.
 
 - A store app waits until store presence matters.
 - Self-serve community creation waits until there are more communities than one person can track.

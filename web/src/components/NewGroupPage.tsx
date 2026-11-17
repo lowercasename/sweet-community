@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useLocation } from 'wouter'
-import type { Group, RoomVisibility } from '../api'
+import type { Group, GroupMode, RoomVisibility } from '../api'
 import { useGroupActions, useMe, useUsers } from '../data/hooks'
 import {
   Alert,
@@ -20,15 +20,18 @@ import {
   Textarea,
 } from '../ui'
 
+import { RoomMode } from './RoomMode'
+
 interface NewGroupPageProps {
   onCreated: (group: Group) => void
 }
 
-/** The page for creating a group. A room has a name and an audience. Both audiences have posts and chat. */
+/** Create a room with an audience and a choice of posts, chat or both. */
 export function NewGroupPage({ onCreated }: NewGroupPageProps) {
   const { create } = useGroupActions()
   const [name, setName] = useState('')
   const [description, setDescription] = useState('')
+  const [mode, setMode] = useState<GroupMode>('both')
   const [visibility, setVisibility] = useState<RoomVisibility>('open')
   const [members, setMembers] = useState<string[]>([])
   const { data: me } = useMe()
@@ -43,7 +46,9 @@ export function NewGroupPage({ onCreated }: NewGroupPageProps) {
     setBusy(true)
     setError(null)
     try {
-      onCreated(await create(name.trim(), visibility, visibility === 'private' ? members : [], description.trim()))
+      onCreated(
+        await create(name.trim(), visibility, visibility === 'private' ? members : [], description.trim(), mode),
+      )
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Could not create the room')
     } finally {
@@ -64,6 +69,7 @@ export function NewGroupPage({ onCreated }: NewGroupPageProps) {
                 <Field label="Description" hint="Optional. Up to 140 characters.">
                   <Textarea value={description} onChange={setDescription} maxLength={140} rows={3} readOnly={busy} />
                 </Field>
+                <RoomMode value={mode} onChange={setMode} disabled={busy} />
                 <RadioCards
                   label="Visibility"
                   value={visibility}
@@ -74,7 +80,10 @@ export function NewGroupPage({ onCreated }: NewGroupPageProps) {
                       value: 'open',
                       label: 'Open',
                       icon: 'globe',
-                      description: 'Everyone in the community. Posts also appear on Home.',
+                      description:
+                        mode === 'chat'
+                          ? 'Everyone in the community.'
+                          : 'Everyone in the community. Posts also appear on Home.',
                     },
                     {
                       value: 'private',
