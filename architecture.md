@@ -59,7 +59,7 @@ A room has posts and chat under one shared header. Selecting a room changes both
 - Every community member can discover, read and participate in open rooms without asking to join. New community members gain access to existing open rooms.
 - Sidebar shortcuts are personal. Adding or removing one changes neither access, Home, roles nor notifications. Browse Rooms lists all open rooms and the private rooms the viewer belongs to. A star in the room header adds or removes its shortcut. The star is filled when added. (Raphael, 2026-11-16. Add to sidebar names the action clearly.)
 - Creating a room adds its shortcut for its creator. A private invitation adds the shortcut for the invited person. New open rooms are not automatically added for everyone. Existing shortcuts are preserved during the upgrade.
-- A private room is invisible to non-members. Its name, members and content are available only to invited members. Existing rooms remain private.
+- A private room is invisible to non-members. Its name, members and content are available only to invited members. Rooms that existed before open and private visibility choices were introduced migrate as open. Rooms created afterward keep their chosen visibility. (Raphael, 2026-11-17.)
 - Visibility is chosen when the room is created and cannot be changed later. (Codex, 2026-11-16. This prevents a settings change from exposing private history.)
 - The community's owner and moderators have ordinary member access in open rooms. They receive no extra room moderation permissions. They see private rooms only when invited. A report shows eligible staff one reported item.
 - Any member may create a room, unless the owner limits this to staff. The creator owns the room.
@@ -484,6 +484,8 @@ These decisions came from a security audit (2026-11-08).
 - **Chat image width (Raphael, 2026-11-16).** Chat images and galleries are limited to 360px wide. They previously used the same width as posts, which made them too large in chat. Posts and comments keep their existing image sizing.
 
 ### Reversed
+
+- **Existing room visibility (Raphael, 2026-11-17).** Rooms that predate the open/private distinction become open during upgrade. The previous migration kept them private. Newly created private rooms and conversations remain private.
 
 - **Message edit labels (Raphael, 2026-11-17).** The edit status appears only inside the message’s three-dot menu. The label under each edited message was too noisy.
 

@@ -3,6 +3,7 @@ package db
 import (
 	"context"
 	"database/sql"
+	"fmt"
 	"io/fs"
 	"os"
 	"path/filepath"
@@ -633,6 +634,66 @@ func TestOpenRoomsUpgradePreservesPrivateContent(t *testing.T) {
 	var n int
 	if err := d.QueryRow(`SELECT COUNT(*) FROM events WHERE kind = 'group'`).Scan(&n); err != nil || n != 0 {
 		t.Fatalf("stale group events: %d %v", n, err)
+	}
+}
+
+func TestLegacyRoomsBecomeOpenWithoutChangingNewPrivateRooms(t *testing.T) {
+	for _, staged := range []bool{false, true} {
+		t.Run(fmt.Sprintf("already_on_v1_10=%t", staged), func(t *testing.T) {
+			d, err := Open(filepath.Join(t.TempDir(), "upgrade.db"))
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer d.Close()
+			migratedTo(t, d, "017")
+			if _, err := d.Exec(`
+				INSERT INTO users(id, username, created_at) VALUES('u', 'kit', 1);
+				INSERT INTO groups(id, kind, name, mode, created_at) VALUES
+				('legacy', 'group', 'Conference', 'chat', 1), ('dm', 'dm', '', 'chat', 1);
+				INSERT INTO memberships(group_id,user_id,role,joined_at) VALUES('legacy','u','owner',1);
+				INSERT INTO posts(id,group_id,author_id,body_html,body_text,created_at)
+				VALUES('p','legacy','u','<p>Original post</p>','Original post',1);
+				INSERT INTO messages(id,group_id,author_id,body_html,body_text,created_at)
+				VALUES('m','legacy','u','<p>Original chat</p>','Original chat',1);`); err != nil {
+				t.Fatal(err)
+			}
+			if staged {
+				migratedTo(t, d, "021")
+				if _, err := d.Exec(`
+					INSERT INTO groups(id,kind,name,mode,visibility,created_at)
+					SELECT 'new-private','group','Private plans','both','private',applied_at + 1
+					FROM schema_migrations WHERE name='018_open_rooms.sql';
+					INSERT INTO events(kind,payload,created_at) VALUES
+					('group','{"id":"legacy","visibility":"private"}',1),
+					('post','{"id":"p","group_id":"legacy","group_visibility":"private"}',1),
+					('group','{"id":"new-private","visibility":"private"}',1);`); err != nil {
+					t.Fatal(err)
+				}
+			}
+			migratedTo(t, d, "022")
+			var visibility, mode, post, message, role string
+			var saved int
+			if err := d.QueryRow(`SELECT g.visibility,g.mode,p.body_html,m.body_html,ms.role,ms.in_sidebar
+				FROM groups g JOIN posts p ON p.group_id=g.id JOIN messages m ON m.group_id=g.id
+				JOIN memberships ms ON ms.group_id=g.id WHERE g.id='legacy'`).Scan(&visibility, &mode, &post, &message, &role, &saved); err != nil {
+				t.Fatal(err)
+			}
+			if visibility != "open" || mode != "both" || post != "<p>Original post</p>" || message != "<p>Original chat</p>" || role != "owner" || saved != 1 {
+				t.Fatalf("legacy room after upgrade: %q %q %q %q %q %d", visibility, mode, post, message, role, saved)
+			}
+			if err := d.QueryRow(`SELECT visibility FROM groups WHERE id='dm'`).Scan(&visibility); err != nil || visibility != "private" {
+				t.Fatalf("conversation visibility: %q %v", visibility, err)
+			}
+			if staged {
+				if err := d.QueryRow(`SELECT visibility FROM groups WHERE id='new-private'`).Scan(&visibility); err != nil || visibility != "private" {
+					t.Fatalf("new private room visibility: %q %v", visibility, err)
+				}
+				var events int
+				if err := d.QueryRow(`SELECT COUNT(*) FROM events`).Scan(&events); err != nil || events != 1 {
+					t.Fatalf("events after removing old room snapshots: %d %v", events, err)
+				}
+			}
+		})
 	}
 }
 

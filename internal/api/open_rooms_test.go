@@ -1,11 +1,60 @@
 package api
 
 import (
+	"context"
+	"os"
 	"testing"
 	"time"
 
+	"sweet/internal/db"
 	"sweet/internal/perm"
 )
+
+func TestLegacyRoomMigrationSharesPostsAndRoomChat(t *testing.T) {
+	ts, owner, server := newTestServerWith(t)
+	mo, moID := registerMember(t, ts, owner, "mo")
+	legacy := owner.mustStatus(201, "POST", "/api/groups", map[string]string{"name": "Conference", "visibility": "private"})["id"].(string)
+	private := owner.mustStatus(201, "POST", "/api/groups", map[string]string{"name": "Private plans", "visibility": "private"})["id"].(string)
+	p := owner.mustStatus(201, "POST", "/api/groups/"+legacy+"/posts", map[string]string{"body_html": "<p>Conference post</p>"})
+	owner.mustStatus(201, "POST", "/api/groups/"+legacy+"/messages", map[string]string{"body_html": "<p>Conference chat</p>"})
+	owner.mustStatus(201, "POST", "/api/groups/"+private+"/posts", map[string]string{"body_html": "<p>Private post</p>"})
+	mo.mustStatus(404, "GET", "/api/groups/"+legacy, nil)
+	// Reproduce the database state immediately before the corrective migration.
+	cutoff := db.Now()
+	for _, query := range []struct {
+		sql  string
+		args []any
+	}{
+		{`DELETE FROM schema_migrations WHERE name='022_open_existing_rooms.sql'`, nil},
+		{`UPDATE schema_migrations SET applied_at=? WHERE name='018_open_rooms.sql'`, []any{cutoff}},
+		{`UPDATE groups SET created_at=? WHERE id=?`, []any{cutoff - 1, legacy}},
+		{`UPDATE groups SET created_at=? WHERE id=?`, []any{cutoff + 1, private}},
+	} {
+		if _, err := server.DB.Exec(query.sql, query.args...); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := db.Migrate(context.Background(), server.DB, os.DirFS("../../migrations")); err != nil {
+		t.Fatal(err)
+	}
+	var role string
+	var saved int
+	if err := server.DB.QueryRow(`SELECT role,in_sidebar FROM memberships WHERE group_id=? AND user_id=?`, legacy, moID).Scan(&role, &saved); err != nil || role != "member" || saved != 0 {
+		t.Fatalf("new access changed role or sidebar: %q %d %v", role, saved, err)
+	}
+	if group := mo.mustStatus(200, "GET", "/api/groups/"+legacy, nil); group["visibility"] != "open" {
+		t.Fatalf("legacy room visibility: %v", group["visibility"])
+	}
+	posts := mo.mustStatus(200, "GET", rootPath+"/posts", nil)["posts"].([]any)
+	if len(posts) != 1 || posts[0].(map[string]any)["id"] != p["id"] || posts[0].(map[string]any)["group_visibility"] != "open" {
+		t.Fatal("Home does not show only the migrated room's post as open")
+	}
+	mo.mustStatus(200, "GET", "/api/groups/"+legacy+"/messages", nil)
+	mo.mustStatus(201, "POST", "/api/groups/"+legacy+"/messages", map[string]string{"body_html": "<p>Joining the discussion</p>"})
+	mo.mustStatus(404, "GET", "/api/groups/"+private, nil)
+	mo.mustStatus(404, "GET", "/api/groups/"+private+"/messages", nil)
+	mo.mustStatus(403, "DELETE", "/api/posts/"+p["id"].(string), nil)
+}
 
 func TestOpenRoomsShareAccessButKeepChatSeparate(t *testing.T) {
 	ts, owner := newTestServer(t)
