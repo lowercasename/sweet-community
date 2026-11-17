@@ -14,6 +14,7 @@ import {
   DestinationPicker,
   Link,
   PinLabel,
+  PostHeader,
   PrivateMark,
   Menu,
   type MenuItem,
@@ -184,32 +185,38 @@ export function Post({ post, linked = true, expanded = false, place, disabled, o
             disabled={disabled || saving || choices.length === 0}
             onChange={setDestination}
           />
-        ) : (
-          place && (
-            <Row gap={2} align="center" wrap="never">
-              <Tile name={place.name} picture={place.picture} />
-              <Text as="span" variant="small">
-                {post.pinned ? <PinLabel label="Pinned in" /> : 'Posted in'}{' '}
+        ) : place ? (
+          <PostHeader>
+            <Tile name={place.name} picture={place.picture} />
+            <Row gap={1} align="center" wrap="never">
+              {post.pinned ? (
+                <PinLabel label="Pinned in" />
+              ) : (
+                <Text as="span" variant="small">
+                  Posted in
+                </Text>
+              )}{' '}
+              <Row gap={1} align="center" wrap="never">
                 <Link href={groupPath(place.id)}>
                   <Text as="span" variant="body" weight="bold">
                     {place.name}
                   </Text>
                 </Link>
-                {post.group_visibility === 'private' && (
-                  <>
-                    {'\u00a0'}
-                    <PrivateMark />
-                  </>
-                )}
-              </Text>
+                {post.group_visibility === 'private' && <PrivateMark />}
+              </Row>
             </Row>
+          </PostHeader>
+        ) : (
+          post.pinned && (
+            <PostHeader>
+              <PinLabel />
+            </PostHeader>
           )
         )
       }
     >
       <Stack gap={3}>
         <Stack gap={2}>
-          {post.pinned && !place && <PinLabel />}
           <Row justify="between" align="start" wrap="never">
             <Row gap={2} align="center">
               <PersonName user={author} avatar="md" />

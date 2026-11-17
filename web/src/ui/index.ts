@@ -80,3 +80,4 @@ export { PrivateMark } from './PrivateMark'
 export { DestinationPicker } from './DestinationPicker'
 
 export { PinLabel } from './PinLabel'
+export { PostHeader } from './PostHeader'

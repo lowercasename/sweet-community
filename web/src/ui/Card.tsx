@@ -29,7 +29,7 @@ export function Card({ as = 'div', label, fill = false, flush = false, tone = 'c
   const cls = `${as === 'article' ? 'block-post ' : ''}${frame} ${fill ? 'flex min-h-0 flex-1 flex-col overflow-hidden' : pad}`
   // The head strip cancels the card's padding to run edge to edge. Only bordered cards have a head.
   const strip = head ? (
-    <div className="-mx-4 -mt-4 mb-4 rounded-t-card bg-ground border-b border-line px-4 pt-3 pb-3.5 phone:-mx-3 phone:-mt-3 phone:mb-3 phone:px-3">
+    <div className="-mx-4 -mt-4 mb-4 rounded-t-card bg-ground border-b border-line px-4 py-3 phone:-mx-3 phone:-mt-3 phone:mb-3 phone:px-3">
       {head}
     </div>
   ) : null
