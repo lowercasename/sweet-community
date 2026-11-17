@@ -1,5 +1,21 @@
 # Changelog
 
+## v1.10.0 (2026-11-17)
+
+- Adjust pin icon alignment
+- Move message edit status into the options menu
+- Align pin labels in shared post headers
+- Add pinned posts and chat message editing
+- Add room descriptions and group members by role
+- Align navigation labels across icons and pictures
+- Allow authors to move posts between Home and open rooms
+- Clarify room browsing icons
+- Separate room shortcuts from access and notifications
+- Separate privacy and room name tooltips
+- Align room privacy marks and handle failed pictures
+- Add private room member selection and simplify privacy labels
+- Replace topics with open and private rooms
+
 ## v1.9.4 (2026-11-16)
 
 - Measure chat controls together after resizing
