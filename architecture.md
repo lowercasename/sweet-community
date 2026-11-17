@@ -132,7 +132,7 @@ Raphael chose the layout from three drawings (2026-11-06). An open thread sits o
 A message uses part of the same schema and passes the same policy. Chat history is kept forever.
 
 - A reply quotes the original and stays in the flat list. Threads were rejected, because they would make a chat into a second feed.
-- The author or the group's staff may delete a message. Only the author can edit it, with no time limit, while they still belong to the group. The shared editor opens inline with Save and Cancel. An edit shows “edited” and updates live without changing the message's position, reactions or notifications. There is no version history. (Raphael, 2026-11-17. Authors need to correct their messages.)
+- The author or the group's staff may delete a message. Only the author can edit it, with no time limit, while they still belong to the group. The shared editor opens inline with Save and Cancel. An edit updates live without changing the message's position, reactions or notifications. There is no version history. (Raphael, 2026-11-17. Authors need to correct their messages.)
 - A reply keeps the text it quoted even if the original message is edited. Deleting the original clears its quoted text from replies.
 - The chat shows a line when someone joins the community or is added to a room. A line is stored as a message, so it keeps its order. Notifying a whole room of each addition was rejected, because a room of twenty would get twenty notifications.
 - Consecutive messages from one person share a name and picture when the gap between messages is at most fifteen minutes. A different speaker, a membership notice or a new calendar day starts a new group. This keeps short pauses from repeating the same header.
@@ -348,7 +348,7 @@ Comment and unread counts come from the server. The client refreshes them when c
 
 **One shape per concept.** A place is a tile or a picture. A feature is a line icon. A person is a profile picture. A notice is always the same alert box. Being offline is a red badge in the bar.
 
-- Timestamps use the viewer's local timezone and clock format throughout Sweet. Today shows the time. Yesterday shows Yesterday and the time. Other days show the date and time. Posts and membership details show only the date. Hovering a date shows the full date and time. Chat puts the day in a divider and the first message’s time beside the author of each message group. Edited posts, comments and messages show only “edited”. This keeps dates consistent without repeating them on every message.
+- Timestamps use the viewer's local timezone and clock format throughout Sweet. Today shows the time. Yesterday shows Yesterday and the time. Other days show the date and time. Posts and membership details show only the date. Hovering a date shows the full date and time. Chat puts the day in a divider and the first message’s time beside the author of each message group. Edited posts and comments show only “edited”. A message shows “Edited” only inside its three-dot menu. This keeps dates consistent without repeating them on every message.
 
 ### Buttons
 
@@ -484,6 +484,8 @@ These decisions came from a security audit (2026-11-08).
 - **Chat image width (Raphael, 2026-11-16).** Chat images and galleries are limited to 360px wide. They previously used the same width as posts, which made them too large in chat. Posts and comments keep their existing image sizing.
 
 ### Reversed
+
+- **Message edit labels (Raphael, 2026-11-17).** The edit status appears only inside the message’s three-dot menu. The label under each edited message was too noisy.
 
 - **Chat editing (Raphael, 2026-11-17).** Authors can now edit their sent messages to correct them. Previously sent messages could only be deleted. Existing reply quotes keep their original text, and edits do not send notifications.
 

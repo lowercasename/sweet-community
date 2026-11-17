@@ -117,6 +117,7 @@ export function MessageGroup({
                   {(m.can.edit || m.can.delete || m.can.report) && (
                     <Menu
                       label="Message options"
+                      heading={m.edited_at != null ? 'Edited' : undefined}
                       compact
                       onOpenChange={openChange(m.id)}
                       items={[
@@ -177,7 +178,6 @@ export function MessageGroup({
             ) : (
               <Body html={m.body_html} chat />
             )}
-            {m.edited_at != null && <Text variant="small">edited</Text>}
             <Reactions reactions={m.reactions} disabled={offline} onToggle={(emoji) => void react(m, emoji)} />
             {reactionError?.id === m.id && <Alert tone="error">{reactionError.text}</Alert>}
             <ReadPoint at={m.created_at} />

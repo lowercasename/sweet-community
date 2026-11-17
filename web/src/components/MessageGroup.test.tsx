@@ -43,6 +43,17 @@ describe('MessageGroup replies', () => {
 })
 
 describe('MessageGroup', () => {
+  it('shows edit status only inside the message menu', async () => {
+    const { MessageGroup } = await import('./MessageGroup')
+    renderWithQuery(
+      <MessageGroup messages={[message('m1', user('mo'), { edited_at: 123, can: reportable })]} onDelete={vi.fn()} />,
+    )
+    expect(screen.queryByText(/^edited$/i)).toBeNull()
+    fireEvent.click(screen.getByLabelText('Message options'))
+    expect(within(screen.getByRole('menu')).getByText('Edited')).toBeTruthy()
+    expect(screen.queryByRole('menuitem', { name: 'Edited' })).toBeNull()
+  })
+
   it('offers Delete only on messages the server allows, and confirms before deleting', async () => {
     const { MessageGroup } = await import('./MessageGroup')
     const onDelete = vi.fn(() => Promise.resolve())
