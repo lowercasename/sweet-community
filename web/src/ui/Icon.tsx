@@ -28,6 +28,8 @@ import {
   MessagesSquare,
   Newspaper,
   Pencil,
+  Pin,
+  PinOff,
   Plus,
   Reply,
   ScrollText,
@@ -72,6 +74,8 @@ export type IconName =
   | 'comment'
   | 'image'
   | 'pencil'
+  | 'pin'
+  | 'pin-off'
   | 'devices'
   | 'grip'
   | 'remove'
@@ -119,6 +123,8 @@ const ICONS: Record<IconName, LucideIcon> = {
   comment: MessageCircle,
   image: ImageIcon,
   pencil: Pencil,
+  pin: Pin,
+  'pin-off': PinOff,
   devices: TabletSmartphone,
   grip: GripVertical,
   remove: X,

@@ -694,3 +694,36 @@ func TestRoomDescriptionsUpgradeKeepsExistingRooms(t *testing.T) {
 		t.Fatal("stale group snapshots survived")
 	}
 }
+
+func TestMigrationPreservesReplyQuotesAndMessageBodies(t *testing.T) {
+	d, err := Open(filepath.Join(t.TempDir(), "test.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer d.Close()
+	migratedTo(t, d, "017")
+	_, err = d.Exec(`INSERT INTO users (id,username,created_at) VALUES ('author','author',1);
+ INSERT INTO messages (id,group_id,author_id,body_html,body_text,created_at) VALUES ('original','00000000-0000-7000-8000-000000000000','author','<p>Original</p>','Original',1);
+ INSERT INTO messages (id,group_id,author_id,body_html,body_text,created_at,reply_to) VALUES ('reply','00000000-0000-7000-8000-000000000000','author','<p>Reply</p>','Reply',2,'original');`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	migratedTo(t, d, "021")
+	var quote, body string
+	if err = d.QueryRow(`SELECT reply_text,body_html FROM messages WHERE id='reply'`).Scan(&quote, &body); err != nil || quote != "Original" || body != "<p>Reply</p>" {
+		t.Fatalf("migration changed reply: %q %q %v", quote, body, err)
+	}
+	if _, err = d.Exec(`UPDATE messages SET body_html='<p>Edited</p>',body_text='Edited' WHERE id='original'`); err != nil {
+		t.Fatal(err)
+	}
+	if err = d.QueryRow(`SELECT reply_text FROM messages WHERE id='reply'`).Scan(&quote); err != nil || quote != "Original" {
+		t.Fatalf("quote changed: %q %v", quote, err)
+	}
+	if _, err = d.Exec(`UPDATE messages SET deleted_at=3,body_html='',body_text='' WHERE id='original'`); err != nil {
+		t.Fatal(err)
+	}
+	var cleared bool
+	if err = d.QueryRow(`SELECT reply_text IS NULL FROM messages WHERE id='reply'`).Scan(&cleared); err != nil || !cleared {
+		t.Fatalf("deleted quote retained: %v %v", cleared, err)
+	}
+}

@@ -23,6 +23,7 @@ type Message struct {
 	BodyHTML  string `json:"body_html"`
 	BodyText  string `json:"body_text"`
 	CreatedAt int64  `json:"created_at"`
+	EditedAt  *int64 `json:"edited_at"`
 	// ReplyTo is the message this one replies to, or nil.
 	ReplyTo *ReplyTo `json:"reply_to"`
 	// Kind is "message", or "joined" or "added" for a line in the chat. A line has no body. Its author joined, or
@@ -34,7 +35,7 @@ type Message struct {
 }
 
 // ReplyTo is a snippet of the message a reply answers, built from the
-// original row when the reply is read. Once the original is deleted, only its
+// saved quote and original author. Once the original is deleted, only its
 // id and Deleted are sent, so the deleted text is not shown.
 type ReplyTo struct {
 	ID      string `json:"id"`
@@ -230,4 +231,31 @@ func chatLine(ctx context.Context, qtx *store.Queries, groupID, kind, author, su
 	}
 	m := wireMessage(row)
 	return events.Entry{Kind: "message", Payload: &m}, nil
+}
+
+func (s *Server) editMessage(w http.ResponseWriter, r *http.Request) {
+	clean, ok := readBody(w, r)
+	if !ok {
+		return
+	}
+	id, now := r.PathValue("id"), db.Now()
+	me, _ := userFrom(r.Context())
+	s.logged(w, r, "message", now, func(qtx *store.Queries) (any, int, error) {
+		owners, a, status, err := s.messageActor(r, qtx, id)
+		if err != nil {
+			return nil, status, err
+		}
+		if owners.Kind != MessageKind || !perm.EditMessage(a, perm.Message{AuthorID: owners.AuthorID}) {
+			return nil, http.StatusForbidden, errors.New("Not your message")
+		}
+		if err := qtx.EditMessage(r.Context(), store.EditMessageParams{ID: id, BodyHtml: clean, BodyText: sanitize.Text(clean), EditedAt: sql.NullInt64{Int64: now, Valid: true}}); err != nil {
+			return nil, 500, err
+		}
+		if status, err := recordUses(r.Context(), qtx, "message", id, me.ID, clean); err != nil {
+			return nil, status, err
+		}
+		row, err := qtx.GetMessage(r.Context(), id)
+		m := wireMessage(row)
+		return &m, http.StatusOK, err
+	})
 }

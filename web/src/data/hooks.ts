@@ -65,6 +65,8 @@ import {
   updateComment,
   updateGroup,
   updatePost,
+  setPostPinned,
+  updateMessage,
   type Group,
   type GroupMode,
   type RoomVisibility,
@@ -196,9 +198,14 @@ export function usePosts(groupId: string) {
   const { items, ...rest } = usePages(
     keys.posts(groupId),
     (before) => getPosts(groupId, before, 20),
-    (p) => p.posts,
+    (p) => [...(p.pinned ?? []), ...p.posts],
   )
-  return { posts: items, ...rest }
+  return {
+    posts: items.sort(
+      (a, b) => Number(b.pinned && b.group_id === groupId) - Number(a.pinned && a.group_id === groupId),
+    ),
+    ...rest,
+  }
 }
 
 /** Fetches the post's current state for its page. */
@@ -218,6 +225,9 @@ export function usePostActions(groupId: string) {
   return {
     async create(html: string) {
       applyEvent(qc, 'post', await createPost(groupId, html))
+    },
+    async pin(id: string, pinned: boolean) {
+      applyEvent(qc, 'post', await setPostPinned(id, pinned))
     },
     async edit(id: string, html: string, destination?: string) {
       applyEvent(qc, 'post', await updatePost(id, html, destination))
@@ -270,6 +280,10 @@ export function useMessages(groupId: string) {
 export function useMessageActions(groupId: string) {
   const qc = useQueryClient()
   return {
+    async edit(id: string, html: string) {
+      applyEvent(qc, 'message', await updateMessage(id, html))
+      void qc.invalidateQueries({ queryKey: ['search'] })
+    },
     async send(html: string, replyTo?: string) {
       applyEvent(qc, 'message', await createMessage(groupId, html, replyTo))
     },

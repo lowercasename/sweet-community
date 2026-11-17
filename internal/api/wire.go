@@ -34,6 +34,7 @@ func wireUser(id, username string, pictureID sql.NullString) User {
 
 func wirePost(row store.GetPostRow) Post {
 	return Post{
+		Pinned:          row.Pinned != 0,
 		ID:              row.ID,
 		GroupID:         row.GroupID,
 		GroupVisibility: row.GroupVisibility,
@@ -70,6 +71,7 @@ func wireMessage(row store.GetMessageRow) Message {
 		BodyHTML:  row.BodyHtml,
 		BodyText:  row.BodyText,
 		CreatedAt: row.CreatedAt,
+		EditedAt:  nullInt(row.EditedAt),
 		Kind:      row.Kind,
 		Reactions: reactionsOf(row.Reactions),
 	}

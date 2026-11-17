@@ -115,6 +115,7 @@ export const post = (id: string, author: User, extra: Partial<Post> = {}): Post 
   body_text: id,
   created_at: Number.parseInt(id.replace(/\D/g, ''), 10) || 1,
   edited_at: null,
+  pinned: false,
   comment_count: 0,
   reactions: [],
   can: nobody,
@@ -161,6 +162,7 @@ export const marker = (stream: string, readAt: number, unread = 0): Marker => ({
 })
 
 export const message = (id: string, author: User, extra: Partial<Message> = {}): Message => ({
+  edited_at: null,
   id,
   group_id: ROOT,
   author,

@@ -78,3 +78,5 @@ export { PeoplePicker } from './PeoplePicker'
 export { PrivateMark } from './PrivateMark'
 
 export { DestinationPicker } from './DestinationPicker'
+
+export { PinLabel } from './PinLabel'

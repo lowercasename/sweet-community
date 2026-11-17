@@ -71,7 +71,7 @@ func (q *Queries) DeletePost(ctx context.Context, arg DeletePostParams) error {
 }
 
 const editPost = `-- name: EditPost :exec
-UPDATE posts SET group_id = ?1, body_html = ?2, body_text = ?3, edited_at = ?4
+UPDATE posts SET pinned = CASE WHEN group_id = ?1 THEN pinned ELSE 0 END, group_id = ?1, body_html = ?2, body_text = ?3, edited_at = ?4
 WHERE id = ?5 AND deleted_at IS NULL
 `
 
@@ -112,7 +112,7 @@ func (q *Queries) EraseAuthorPosts(ctx context.Context, arg EraseAuthorPostsPara
 }
 
 const getPost = `-- name: GetPost :one
-SELECT p.id, p.group_id, g.visibility AS group_visibility, p.body_html, p.body_text, p.created_at, p.edited_at,
+SELECT p.id, p.group_id, g.visibility AS group_visibility, p.body_html, p.body_text, p.created_at, p.edited_at, p.pinned,
        u.id AS author_id, u.username AS author_username, u.picture_id AS author_picture_id,
        (SELECT COUNT(*) FROM comments c WHERE c.post_id = p.id AND c.deleted_at IS NULL) AS comment_count,
        CAST((SELECT json_group_array(json_array(x.emoji, x.user_id))
@@ -130,6 +130,7 @@ type GetPostRow struct {
 	BodyText        string
 	CreatedAt       int64
 	EditedAt        sql.NullInt64
+	Pinned          int64
 	AuthorID        string
 	AuthorUsername  string
 	AuthorPictureID sql.NullString
@@ -148,6 +149,7 @@ func (q *Queries) GetPost(ctx context.Context, id string) (GetPostRow, error) {
 		&i.BodyText,
 		&i.CreatedAt,
 		&i.EditedAt,
+		&i.Pinned,
 		&i.AuthorID,
 		&i.AuthorUsername,
 		&i.AuthorPictureID,
@@ -207,9 +209,74 @@ func (q *Queries) ListLivePostsByAuthor(ctx context.Context, authorID string) ([
 	return items, nil
 }
 
+const listPinnedPosts = `-- name: ListPinnedPosts :many
+SELECT p.id, p.group_id, g.visibility AS group_visibility, p.body_html, p.body_text, p.created_at, p.edited_at, p.pinned,
+       u.id AS author_id, u.username AS author_username, u.picture_id AS author_picture_id,
+       (SELECT COUNT(*) FROM comments c WHERE c.post_id = p.id AND c.deleted_at IS NULL) AS comment_count,
+       CAST((SELECT json_group_array(json_array(x.emoji, x.user_id))
+             FROM (SELECT emoji, user_id FROM reactions WHERE item_id = p.id ORDER BY rowid) x) AS TEXT) AS reactions
+FROM posts p JOIN users u ON u.id = p.author_id
+JOIN groups g ON g.id = p.group_id AND g.deleted_at IS NULL
+WHERE p.group_id = ?1 AND p.deleted_at IS NULL AND p.pinned = 1
+ORDER BY p.created_at DESC, p.id DESC
+`
+
+type ListPinnedPostsRow struct {
+	ID              string
+	GroupID         string
+	GroupVisibility string
+	BodyHtml        string
+	BodyText        string
+	CreatedAt       int64
+	EditedAt        sql.NullInt64
+	Pinned          int64
+	AuthorID        string
+	AuthorUsername  string
+	AuthorPictureID sql.NullString
+	CommentCount    int64
+	Reactions       string
+}
+
+func (q *Queries) ListPinnedPosts(ctx context.Context, groupID string) ([]ListPinnedPostsRow, error) {
+	rows, err := q.db.QueryContext(ctx, listPinnedPosts, groupID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListPinnedPostsRow{}
+	for rows.Next() {
+		var i ListPinnedPostsRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.GroupID,
+			&i.GroupVisibility,
+			&i.BodyHtml,
+			&i.BodyText,
+			&i.CreatedAt,
+			&i.EditedAt,
+			&i.Pinned,
+			&i.AuthorID,
+			&i.AuthorUsername,
+			&i.AuthorPictureID,
+			&i.CommentCount,
+			&i.Reactions,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listPosts = `-- name: ListPosts :many
 
-SELECT p.id, p.group_id, g.visibility AS group_visibility, p.body_html, p.body_text, p.created_at, p.edited_at,
+SELECT p.id, p.group_id, g.visibility AS group_visibility, p.body_html, p.body_text, p.created_at, p.edited_at, p.pinned,
        u.id AS author_id, u.username AS author_username, u.picture_id AS author_picture_id,
        (SELECT COUNT(*) FROM comments c WHERE c.post_id = p.id AND c.deleted_at IS NULL) AS comment_count,
        CAST((SELECT json_group_array(json_array(x.emoji, x.user_id))
@@ -238,6 +305,7 @@ type ListPostsRow struct {
 	BodyText        string
 	CreatedAt       int64
 	EditedAt        sql.NullInt64
+	Pinned          int64
 	AuthorID        string
 	AuthorUsername  string
 	AuthorPictureID sql.NullString
@@ -270,6 +338,7 @@ func (q *Queries) ListPosts(ctx context.Context, arg ListPostsParams) ([]ListPos
 			&i.BodyText,
 			&i.CreatedAt,
 			&i.EditedAt,
+			&i.Pinned,
 			&i.AuthorID,
 			&i.AuthorUsername,
 			&i.AuthorPictureID,
@@ -290,7 +359,7 @@ func (q *Queries) ListPosts(ctx context.Context, arg ListPostsParams) ([]ListPos
 }
 
 const listPostsByAuthor = `-- name: ListPostsByAuthor :many
-SELECT p.id, p.group_id, g.visibility AS group_visibility, p.body_html, p.body_text, p.created_at, p.edited_at,
+SELECT p.id, p.group_id, g.visibility AS group_visibility, p.body_html, p.body_text, p.created_at, p.edited_at, p.pinned,
        u.id AS author_id, u.username AS author_username, u.picture_id AS author_picture_id,
        (SELECT COUNT(*) FROM comments c WHERE c.post_id = p.id AND c.deleted_at IS NULL) AS comment_count,
        CAST((SELECT json_group_array(json_array(x.emoji, x.user_id))
@@ -320,6 +389,7 @@ type ListPostsByAuthorRow struct {
 	BodyText        string
 	CreatedAt       int64
 	EditedAt        sql.NullInt64
+	Pinned          int64
 	AuthorID        string
 	AuthorUsername  string
 	AuthorPictureID sql.NullString
@@ -352,6 +422,7 @@ func (q *Queries) ListPostsByAuthor(ctx context.Context, arg ListPostsByAuthorPa
 			&i.BodyText,
 			&i.CreatedAt,
 			&i.EditedAt,
+			&i.Pinned,
 			&i.AuthorID,
 			&i.AuthorUsername,
 			&i.AuthorPictureID,
@@ -369,4 +440,18 @@ func (q *Queries) ListPostsByAuthor(ctx context.Context, arg ListPostsByAuthorPa
 		return nil, err
 	}
 	return items, nil
+}
+
+const setPostPinned = `-- name: SetPostPinned :exec
+UPDATE posts SET pinned = ?1 WHERE id = ?2 AND deleted_at IS NULL
+`
+
+type SetPostPinnedParams struct {
+	Pinned int64
+	ID     string
+}
+
+func (q *Queries) SetPostPinned(ctx context.Context, arg SetPostPinnedParams) error {
+	_, err := q.db.ExecContext(ctx, setPostPinned, arg.Pinned, arg.ID)
+	return err
 }

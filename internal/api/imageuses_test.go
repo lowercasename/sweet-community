@@ -64,6 +64,14 @@ func TestABodyUsesOnlyImagesItsWriterCanUse(t *testing.T) {
 	refused("PUT", "/api/posts/"+pid)
 	refused("POST", "/api/posts/"+pid+"/comments")
 	refused("POST", rootPath+"/messages")
+	message := mo.mustStatus(201, "POST", rootPath+"/messages", map[string]string{"body_html": "<p>hello</p>"})
+	refused("PUT", "/api/messages/"+message["id"].(string))
+	for _, x := range mo.mustStatus(200, "GET", rootPath+"/messages", nil)["messages"].([]any) {
+		m := x.(map[string]any)
+		if m["id"] == message["id"] && (m["body_html"] != "<p>hello</p>" || m["edited_at"] != nil) {
+			t.Fatal("refused edit changed the message")
+		}
+	}
 	if got := mo.mustStatus(200, "GET", "/api/posts/"+pid, nil)["body_html"]; got != "<p>hello</p>" {
 		t.Fatalf("the refused edit changed the post: %v", got)
 	}

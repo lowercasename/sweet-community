@@ -743,9 +743,9 @@ func TestCanFlags(t *testing.T) {
 		t.Fatalf("owner on mo's comment: edit %v delete %v", e, d)
 	}
 
-	// A message. Its author and the owner can delete it. Nobody can edit it.
+	// A message. Its author can edit it. The author and owner can delete it.
 	m := mo.mustStatus(201, "POST", rootPath+"/messages", map[string]string{"body_html": "<p>hi</p>"})
-	if e, d := can(m); e || !d {
+	if e, d := can(m); !e || !d {
 		t.Fatalf("own message: edit %v delete %v", e, d)
 	}
 	if e, d := can(first(kit, "messages")); e || d {

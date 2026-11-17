@@ -77,7 +77,13 @@ func DeleteComment(a Actor, c Comment) bool {
 	return a.member() && (a.ID == c.AuthorID || a.ID == c.PostAuthorID || a.staff())
 }
 
-// DeleteMessage allows the author and the group's staff. A sent message cannot be edited.
+// PinPost allows the group's owner and moderators.
+func PinPost(a Actor) bool { return a.staff() }
+
+// EditMessage allows only the author while they can still see the group.
+func EditMessage(a Actor, m Message) bool { return a.member() && a.ID == m.AuthorID }
+
+// DeleteMessage allows the author and the group's staff.
 func DeleteMessage(a Actor, m Message) bool { return a.member() && (a.ID == m.AuthorID || a.staff()) }
 
 // React allows any member of an item's group to add and remove their own reactions on it.

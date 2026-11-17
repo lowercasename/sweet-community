@@ -149,6 +149,9 @@ const shortKit = {
  */
 export const chatExtensions = [StarterKit.configure({ ...shortKit, blockquote: false }), link, Embed, placeholder]
 
+/** Sent chat messages include their stored images when opened for editing. */
+export const chatEditExtensions = [...chatExtensions, SweetImage]
+
 const commentKit = StarterKit.configure(shortKit)
 
 /** The comment schema. The chat schema plus blockquote, which is used for a quote-reply. */

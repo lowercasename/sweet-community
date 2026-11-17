@@ -38,6 +38,7 @@ type User struct {
 // computed by perm when the response is built. The frontend shows controls
 // based on these flags and holds no rules of its own.
 type Can struct {
+	Pin    bool `json:"pin,omitempty"`
 	Move   bool `json:"move,omitempty"`
 	Edit   bool `json:"edit"`
 	Delete bool `json:"delete"`
@@ -51,6 +52,7 @@ type Can struct {
 // Post is the wire shape of a post. It carries no event sequence, because the
 // SSE "id:" line is the sequence and the feed paginates by created_at.
 type Post struct {
+	Pinned          bool       `json:"pinned"`
 	ID              string     `json:"id"`
 	GroupID         string     `json:"group_id"`
 	GroupVisibility string     `json:"group_visibility"`
@@ -79,7 +81,7 @@ func forViewer(a perm.Actor, v any, st Settings) any {
 		p := *x
 		pp := perm.Post{AuthorID: p.Author.ID}
 		p.Can = Can{
-			Move: perm.MovePost(a, pp, p.GroupVisibility),
+			Move: perm.MovePost(a, pp, p.GroupVisibility), Pin: perm.PinPost(a),
 			Edit: perm.EditPost(a, pp), Delete: perm.DeletePost(a, pp), Report: perm.Report(a, pp.AuthorID),
 			DeleteByRole: perm.ByRole(a, func(x perm.Actor) bool { return perm.DeletePost(x, pp) }),
 		}
@@ -98,7 +100,7 @@ func forViewer(a perm.Actor, v any, st Settings) any {
 		if m.Kind == MessageKind {
 			pm := perm.Message{AuthorID: m.Author.ID}
 			m.Can = Can{
-				Delete: perm.DeleteMessage(a, pm), Report: perm.Report(a, m.Author.ID),
+				Edit: perm.EditMessage(a, pm), Delete: perm.DeleteMessage(a, pm), Report: perm.Report(a, m.Author.ID),
 				DeleteByRole: perm.ByRole(a, func(x perm.Actor) bool { return perm.DeleteMessage(x, pm) }),
 			}
 		}
@@ -225,12 +227,14 @@ func (s *Server) Routes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/search", s.requireAuth(s.search))
 	s.previewLimiter.every, s.previewLimiter.burst = 2*time.Second, 30
 	mux.HandleFunc("GET /api/previews", s.requireAuth(s.linkPreview))
+	mux.HandleFunc("PUT /api/posts/{id}/pin", s.requireAuth(s.setPostPinned))
 	mux.HandleFunc("PUT /api/posts/{id}", s.requireAuth(s.editPost))
 	mux.HandleFunc("DELETE /api/posts/{id}", s.requireAuth(s.deletePost))
 	mux.HandleFunc("GET /api/posts/{id}/comments", s.requireAuth(s.listComments))
 	mux.HandleFunc("POST /api/posts/{id}/comments", s.requireAuth(s.createComment))
 	mux.HandleFunc("PUT /api/comments/{id}", s.requireAuth(s.editComment))
 	mux.HandleFunc("DELETE /api/comments/{id}", s.requireAuth(s.deleteComment))
+	mux.HandleFunc("PUT /api/messages/{id}", s.requireAuth(s.editMessage))
 	mux.HandleFunc("DELETE /api/messages/{id}", s.requireAuth(s.deleteMessage))
 	mux.HandleFunc("GET /api/me/reactions", s.requireAuth(s.frequentReactions))
 	mux.HandleFunc("PUT /api/posts/{id}/reactions", s.requireAuth(s.react("post")))
@@ -321,7 +325,21 @@ func (s *Server) listPosts(w http.ResponseWriter, r *http.Request) {
 		posts = append(posts, *forViewer(a, &p, Settings{}).(*Post))
 	}
 	posts, next := page(posts, limit, func(p Post) pageCursor { return pageCursor{p.CreatedAt, p.ID} })
-	writeJSON(w, http.StatusOK, map[string]any{"posts": posts, "next_before": next})
+	// Pins accompany the first page even when their chronological page is not loaded.
+	pinned := []Post{}
+	if r.URL.Query().Get("before") == "" {
+		rows, err := s.q().ListPinnedPosts(r.Context(), g.ID)
+		if err != nil {
+			writeErr(w, http.StatusInternalServerError, err.Error())
+			return
+		}
+		_, a := groupFrom(r.Context())
+		for _, row := range rows {
+			p := wirePost(store.GetPostRow(row))
+			pinned = append(pinned, *forViewer(a, &p, Settings{}).(*Post))
+		}
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"posts": posts, "pinned": pinned, "next_before": next})
 }
 
 // getPost returns one post by id. The post page

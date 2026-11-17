@@ -193,6 +193,20 @@ function eachPage<K extends string, P extends Record<K, unknown[]>>(
   return old && { ...old, pages: old.pages.map((p) => ({ ...p, [key]: change(p[key]) })) }
 }
 
+/** Updates every copy of a post in a feed, including its first page's pins. */
+function eachPostPage(old: Posts | undefined, change: (posts: Post[]) => Post[]): Posts | undefined {
+  return (
+    old && {
+      ...old,
+      pages: old.pages.map((page) => ({
+        ...page,
+        posts: change(page.posts),
+        ...(page.pinned ? { pinned: change(page.pinned) } : {}),
+      })),
+    }
+  )
+}
+
 /** Whether a paged list holds an item. */
 function holds<K extends string, P extends Record<K, { id: string }[]>>(
   old: InfiniteData<P> | undefined,
@@ -243,6 +257,22 @@ function upsertPostInPages(old: Posts | undefined, post: Post): Posts | undefine
   }
 }
 
+/** A pin belongs only to the feed of the group that pinned it. */
+function upsertFeed(old: Posts | undefined, post: Post, groupId: string): Posts | undefined {
+  const next = upsertPostInPages(old, post)
+  if (!next) return next
+  return {
+    ...next,
+    pages: next.pages.map((page, index) => ({
+      ...page,
+      pinned: [
+        ...(index === 0 && post.pinned && post.group_id === groupId ? [post] : []),
+        ...(page.pinned ?? []).filter((x) => x.id !== post.id),
+      ],
+    })),
+  }
+}
+
 function upsertPost(qc: QueryClient, post: Post) {
   upsertUserPost(qc, post)
   void qc.invalidateQueries({ queryKey: keys.markers })
@@ -254,11 +284,11 @@ function upsertPost(qc: QueryClient, post: Post) {
       predicate: (q) =>
         q.queryKey[1] !== post.group_id && !(q.queryKey[1] === ROOT_ID && post.group_visibility === 'open'),
     },
-    (old) => eachPage(old, 'posts', (ps) => ps.filter((p) => p.id !== post.id)),
+    (old) => eachPostPage(old, (ps) => ps.filter((p) => p.id !== post.id)),
   )
-  qc.setQueryData<Posts>(keys.posts(post.group_id), (old) => upsertPostInPages(old, post))
+  qc.setQueryData<Posts>(keys.posts(post.group_id), (old) => upsertFeed(old, post, post.group_id))
   if (post.group_id !== ROOT_ID && post.group_visibility === 'open')
-    qc.setQueryData<Posts>(keys.posts(ROOT_ID), (old) => upsertPostInPages(old, post))
+    qc.setQueryData<Posts>(keys.posts(ROOT_ID), (old) => upsertFeed(old, post, ROOT_ID))
   if (post.edited_at != null) {
     // Replies inherit the post's room permissions. Notification locations and search results can change too.
     void qc.invalidateQueries({ queryKey: keys.comments(post.id) })
@@ -274,7 +304,7 @@ function deletePost(qc: QueryClient, id: string) {
   void qc.invalidateQueries({ queryKey: keys.notifications })
   void qc.invalidateQueries({ queryKey: ['search'] })
   void qc.invalidateQueries({ queryKey: keys.reports })
-  const without = (old: Posts | undefined) => eachPage(old, 'posts', (ps) => ps.filter((x) => x.id !== id))
+  const without = (old: Posts | undefined) => eachPostPage(old, (ps) => ps.filter((x) => x.id !== id))
   qc.setQueriesData<Posts>({ queryKey: ['posts'] }, without)
   qc.removeQueries({ queryKey: keys.comments(id) })
   qc.removeQueries({ queryKey: keys.post(id) })
@@ -286,8 +316,8 @@ function setReactions(qc: QueryClient, r: Reactions) {
   const set = <T extends { id: string; reactions: Reaction[] }>(items: T[]) =>
     items.map((x) => (x.id === r.id ? { ...x, reactions: r.reactions } : x))
   if (r.kind === 'post') {
-    qc.setQueriesData<Posts>({ queryKey: ['posts'] }, (old) => eachPage(old, 'posts', set))
-    qc.setQueriesData<Posts>({ queryKey: ['userPosts'] }, (old) => eachPage(old, 'posts', set))
+    qc.setQueriesData<Posts>({ queryKey: ['posts'] }, (old) => eachPostPage(old, set))
+    qc.setQueriesData<Posts>({ queryKey: ['userPosts'] }, (old) => eachPostPage(old, set))
     qc.setQueryData<Post>(keys.post(r.id), (old) => old && { ...old, reactions: r.reactions })
   } else if (r.kind === 'comment' && r.post_id) {
     qc.setQueryData<Thread>(keys.comments(r.post_id), (old) => eachPage(old, 'comments', set))
@@ -321,6 +351,7 @@ function deleteComment(qc: QueryClient, id: string, postId: string, groupId: str
 }
 
 function upsertMessage(qc: QueryClient, m: Message) {
+  if (m.edited_at != null) void qc.invalidateQueries({ queryKey: ['search'] })
   if (m.kind === 'message') void qc.invalidateQueries({ queryKey: keys.markers })
   // The group's newest message time orders the Conversations page. A replay never moves it backwards.
   if (m.kind === 'message')
@@ -475,16 +506,14 @@ function upsertGroup(qc: QueryClient, g: Group) {
 function dropGroup(qc: QueryClient, id: string) {
   qc.setQueryData<Groups>(keys.groups, (old) => (old ? { groups: old.groups.filter((x) => x.id !== id) } : old))
   qc.removeQueries({ queryKey: keys.posts(id) })
-  qc.setQueryData<Posts>(keys.posts(ROOT_ID), (old) =>
-    eachPage(old, 'posts', (ps) => ps.filter((p) => p.group_id !== id)),
-  )
+  qc.setQueryData<Posts>(keys.posts(ROOT_ID), (old) => eachPostPage(old, (ps) => ps.filter((p) => p.group_id !== id)))
   qc.removeQueries({ queryKey: keys.messages(id) })
   qc.removeQueries({ queryKey: keys.members(id) })
   qc.removeQueries({
     predicate: (q) => q.queryKey[0] === 'post' && (q.state.data as Post | undefined)?.group_id === id,
   })
   qc.setQueriesData<Posts>({ queryKey: ['userPosts'] }, (old) =>
-    eachPage(old, 'posts', (ps) => ps.filter((x) => x.group_id !== id)),
+    eachPostPage(old, (ps) => ps.filter((x) => x.group_id !== id)),
   )
   dropMarker(qc, `chat:${id}`)
   dropMarker(qc, `feed:${id}`)
@@ -604,7 +633,11 @@ function inGroup(qc: QueryClient, postId: unknown, groupId: string): boolean {
   if (qc.getQueryData<Post>(keys.post(postId))?.group_id === groupId) return true
   return qc
     .getQueriesData<Posts>({ queryKey: ['posts'] })
-    .some(([, data]) => data?.pages.some((page) => page.posts.some((p) => p.id === postId && p.group_id === groupId)))
+    .some(([, data]) =>
+      data?.pages.some((page) =>
+        [...(page.pinned ?? []), ...page.posts].some((p) => p.id === postId && p.group_id === groupId),
+      ),
+    )
 }
 
 /** Whether the id is the root group's fixed id. Used when the groups list is not loaded yet. */

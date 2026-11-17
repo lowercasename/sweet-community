@@ -3,9 +3,9 @@
 -- name: ListMessages :many
 -- Each message with the message it replies to, if any: its author and text, or
 -- its deleted time once deleted. The columns match GetMessage.
-SELECT m.id, m.group_id, m.body_html, m.body_text, m.created_at,
+SELECT m.id, m.group_id, m.body_html, m.body_text, m.created_at, m.edited_at,
        u.id AS author_id, u.username AS author_username, u.picture_id AS author_picture_id,
-       m.reply_to, r.body_text AS reply_text, r.deleted_at AS reply_deleted_at,
+       m.reply_to, m.reply_text, r.deleted_at AS reply_deleted_at,
        ru.id AS reply_author_id, ru.username AS reply_author_username, ru.picture_id AS reply_author_picture_id,
        m.kind, su.id AS subject_id, su.username AS subject_username, su.picture_id AS subject_picture_id,
        CAST((SELECT json_group_array(json_array(x.emoji, x.user_id))
@@ -20,9 +20,9 @@ ORDER BY m.created_at DESC, m.id DESC
 LIMIT sqlc.arg(page_size);
 
 -- name: GetMessage :one
-SELECT m.id, m.group_id, m.body_html, m.body_text, m.created_at,
+SELECT m.id, m.group_id, m.body_html, m.body_text, m.created_at, m.edited_at,
        u.id AS author_id, u.username AS author_username, u.picture_id AS author_picture_id,
-       m.reply_to, r.body_text AS reply_text, r.deleted_at AS reply_deleted_at,
+       m.reply_to, m.reply_text, r.deleted_at AS reply_deleted_at,
        ru.id AS reply_author_id, ru.username AS reply_author_username, ru.picture_id AS reply_author_picture_id,
        m.kind, su.id AS subject_id, su.username AS subject_username, su.picture_id AS subject_picture_id,
        CAST((SELECT json_group_array(json_array(x.emoji, x.user_id))
@@ -34,8 +34,8 @@ LEFT JOIN users su ON su.id = m.subject_id
 WHERE m.id = sqlc.arg(id) AND m.deleted_at IS NULL;
 
 -- name: CreateMessage :exec
-INSERT INTO messages (id, group_id, author_id, body_html, body_text, created_at, reply_to)
-VALUES (sqlc.arg(id), sqlc.arg(group_id), sqlc.arg(author_id), sqlc.arg(body_html), sqlc.arg(body_text), sqlc.arg(created_at), sqlc.narg(reply_to));
+INSERT INTO messages (id, group_id, author_id, body_html, body_text, created_at, reply_to, reply_text)
+VALUES (sqlc.arg(id), sqlc.arg(group_id), sqlc.arg(author_id), sqlc.arg(body_html), sqlc.arg(body_text), sqlc.arg(created_at), sqlc.narg(reply_to), (SELECT substr(body_text, 1, 200) FROM messages WHERE id = sqlc.narg(reply_to) AND deleted_at IS NULL));
 
 -- name: GetMessageOwners :one
 SELECT m.author_id, m.group_id, m.kind FROM messages m JOIN groups g ON g.id = m.group_id
@@ -70,3 +70,7 @@ WHERE author_id = sqlc.arg(author_id) AND (deleted_at IS NULL OR body_html != ''
 -- A joined or added line in a chat. It has no body.
 INSERT INTO messages (id, group_id, author_id, body_html, body_text, created_at, kind, subject_id)
 VALUES (sqlc.arg(id), sqlc.arg(group_id), sqlc.arg(author_id), '', '', sqlc.arg(created_at), sqlc.arg(kind), sqlc.narg(subject_id));
+
+-- name: EditMessage :exec
+UPDATE messages SET body_html = sqlc.arg(body_html), body_text = sqlc.arg(body_text), edited_at = sqlc.arg(edited_at)
+WHERE id = sqlc.arg(id) AND deleted_at IS NULL;

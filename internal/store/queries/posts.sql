@@ -3,7 +3,7 @@
 -- after GetPostOwners. The queries do not check permissions.
 
 -- name: ListPosts :many
-SELECT p.id, p.group_id, g.visibility AS group_visibility, p.body_html, p.body_text, p.created_at, p.edited_at,
+SELECT p.id, p.group_id, g.visibility AS group_visibility, p.body_html, p.body_text, p.created_at, p.edited_at, p.pinned,
        u.id AS author_id, u.username AS author_username, u.picture_id AS author_picture_id,
        (SELECT COUNT(*) FROM comments c WHERE c.post_id = p.id AND c.deleted_at IS NULL) AS comment_count,
        CAST((SELECT json_group_array(json_array(x.emoji, x.user_id))
@@ -17,7 +17,7 @@ ORDER BY p.created_at DESC, p.id DESC
 LIMIT sqlc.arg(page_size);
 
 -- name: GetPost :one
-SELECT p.id, p.group_id, g.visibility AS group_visibility, p.body_html, p.body_text, p.created_at, p.edited_at,
+SELECT p.id, p.group_id, g.visibility AS group_visibility, p.body_html, p.body_text, p.created_at, p.edited_at, p.pinned,
        u.id AS author_id, u.username AS author_username, u.picture_id AS author_picture_id,
        (SELECT COUNT(*) FROM comments c WHERE c.post_id = p.id AND c.deleted_at IS NULL) AS comment_count,
        CAST((SELECT json_group_array(json_array(x.emoji, x.user_id))
@@ -35,7 +35,7 @@ SELECT p.author_id, p.group_id FROM posts p JOIN groups g ON g.id = p.group_id
 WHERE p.id = sqlc.arg(id) AND p.deleted_at IS NULL AND g.deleted_at IS NULL;
 
 -- name: EditPost :exec
-UPDATE posts SET group_id = sqlc.arg(group_id), body_html = sqlc.arg(body_html), body_text = sqlc.arg(body_text), edited_at = sqlc.arg(edited_at)
+UPDATE posts SET pinned = CASE WHEN group_id = sqlc.arg(group_id) THEN pinned ELSE 0 END, group_id = sqlc.arg(group_id), body_html = sqlc.arg(body_html), body_text = sqlc.arg(body_text), edited_at = sqlc.arg(edited_at)
 WHERE id = sqlc.arg(id) AND deleted_at IS NULL;
 
 -- name: DeletePost :exec
@@ -51,7 +51,7 @@ WHERE group_id = sqlc.arg(group_id) AND deleted_at IS NULL;
 -- name: ListPostsByAuthor :many
 -- One user's posts that a viewer can see. Only posts in groups that the
 -- viewer is in, and has not hidden, are returned.
-SELECT p.id, p.group_id, g.visibility AS group_visibility, p.body_html, p.body_text, p.created_at, p.edited_at,
+SELECT p.id, p.group_id, g.visibility AS group_visibility, p.body_html, p.body_text, p.created_at, p.edited_at, p.pinned,
        u.id AS author_id, u.username AS author_username, u.picture_id AS author_picture_id,
        (SELECT COUNT(*) FROM comments c WHERE c.post_id = p.id AND c.deleted_at IS NULL) AS comment_count,
        CAST((SELECT json_group_array(json_array(x.emoji, x.user_id))
@@ -74,3 +74,17 @@ SELECT id, group_id FROM posts WHERE author_id = sqlc.arg(author_id) AND deleted
 -- Rows that are already deleted and empty are not updated again.
 UPDATE posts SET deleted_at = COALESCE(deleted_at, sqlc.arg(deleted_at)), body_html = '', body_text = ''
 WHERE author_id = sqlc.arg(author_id) AND (deleted_at IS NULL OR body_html != '' OR body_text != '');
+
+-- name: ListPinnedPosts :many
+SELECT p.id, p.group_id, g.visibility AS group_visibility, p.body_html, p.body_text, p.created_at, p.edited_at, p.pinned,
+       u.id AS author_id, u.username AS author_username, u.picture_id AS author_picture_id,
+       (SELECT COUNT(*) FROM comments c WHERE c.post_id = p.id AND c.deleted_at IS NULL) AS comment_count,
+       CAST((SELECT json_group_array(json_array(x.emoji, x.user_id))
+             FROM (SELECT emoji, user_id FROM reactions WHERE item_id = p.id ORDER BY rowid) x) AS TEXT) AS reactions
+FROM posts p JOIN users u ON u.id = p.author_id
+JOIN groups g ON g.id = p.group_id AND g.deleted_at IS NULL
+WHERE p.group_id = sqlc.arg(group_id) AND p.deleted_at IS NULL AND p.pinned = 1
+ORDER BY p.created_at DESC, p.id DESC;
+
+-- name: SetPostPinned :exec
+UPDATE posts SET pinned = sqlc.arg(pinned) WHERE id = sqlc.arg(id) AND deleted_at IS NULL;

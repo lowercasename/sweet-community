@@ -711,3 +711,30 @@ it('moves a post out of its old feed and preserves chronological order in its ne
   expect(posts('next').map((p) => p.id)).toEqual(['newer', 'older'])
   expect(posts(ROOT).filter((p) => p.id === original.id)).toHaveLength(1)
 })
+
+it('keeps old pins current within their own room and removes them after a move', () => {
+  const oldPin = post('p0', kit, { created_at: 0, pinned: true, group_id: CLUB, group_visibility: 'open' })
+  for (const gid of [ROOT, CLUB])
+    qc.setQueryData(keys.posts(gid), {
+      pages: [{ posts: [post('p9', mo, { group_id: gid })], pinned: [], next_before: 'older' }],
+      pageParams: [null],
+    })
+  const pins = (gid: string) => (qc.getQueryData(keys.posts(gid)) as { pages: PostPage[] }).pages[0].pinned
+  applyEvent(qc, 'post', oldPin)
+  expect(pins(CLUB)).toEqual([oldPin])
+  expect(pins(ROOT)).toEqual([])
+  expect(posts(CLUB).map((p) => p.id)).toEqual(['p9'])
+  applyEvent(qc, 'post', oldPin)
+  expect(pins(CLUB)).toHaveLength(1)
+  const reactions = [{ emoji: '👍', user_ids: [mo.id] }]
+  applyEvent(qc, 'reactions', { kind: 'post', id: oldPin.id, group_id: CLUB, reactions })
+  expect(pins(CLUB)?.[0].reactions).toEqual(reactions)
+  applyEvent(qc, 'post', { ...oldPin, body_html: '<p>Edited pin</p>' })
+  expect(pins(CLUB)?.[0].body_html).toBe('<p>Edited pin</p>')
+  applyEvent(qc, 'post', { ...oldPin, pinned: false, group_id: ROOT })
+  expect(pins(CLUB)).toEqual([])
+  expect(pins(ROOT)).toEqual([])
+  applyEvent(qc, 'post', oldPin)
+  applyEvent(qc, 'post_delete', { id: oldPin.id, group_id: CLUB })
+  expect(pins(CLUB)).toEqual([])
+})

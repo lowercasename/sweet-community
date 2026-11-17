@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import type { Message } from '../api'
-import { useAuthor } from '../data/hooks'
+import { useAuthor, useMessageActions } from '../data/hooks'
 import { useStreamStatus } from '../hooks/StreamContext'
 import {
   Alert,
@@ -18,6 +18,8 @@ import {
   Text,
 } from '../ui'
 import { Body } from './Body'
+import { BodyEditor } from './BodyEditor'
+import { chatEditExtensions } from '../editor/extensions'
 import { PersonName } from './PersonName'
 import { AddReaction, Reactions, useToggleReaction } from './Reactions'
 import { ReportDialog } from './ReportDialog'
@@ -52,6 +54,8 @@ export function MessageGroup({
 }: MessageGroupProps) {
   const first = messages[0]
   const author = useAuthor(first.author)
+  const { edit } = useMessageActions(first.group_id)
+  const [editing, setEditing] = useState<string | null>(null)
   const [confirming, setConfirming] = useState<string | null>(null)
   const [deleting, setDeleting] = useState(false)
   const [reporting, setReporting] = useState<string | null>(null)
@@ -93,46 +97,58 @@ export function MessageGroup({
             highlight={highlight === m.id}
             actionsOpen={opened === m.id}
             actions={
-              <>
-                <AddReaction
-                  compact
-                  disabled={offline}
-                  onPick={(emoji) => void react(m, emoji)}
-                  onOpenChange={openChange(m.id)}
-                />
-                {onReply && (
-                  <Button
-                    variant="ghost"
-                    icon="reply"
-                    label="Reply to this message"
+              editing === m.id ? undefined : (
+                <>
+                  <AddReaction
                     compact
-                    onClick={() => onReply(m)}
-                  />
-                )}
-                {(m.can.delete || m.can.report) && (
-                  <Menu
-                    label="Message options"
-                    compact
+                    disabled={offline}
+                    onPick={(emoji) => void react(m, emoji)}
                     onOpenChange={openChange(m.id)}
-                    items={[
-                      ...(m.can.report
-                        ? [{ label: 'Report', icon: 'flag' as const, onSelect: () => setReporting(m.id) }]
-                        : []),
-                      ...(m.can.delete
-                        ? [
-                            {
-                              label: 'Delete',
-                              icon: 'trash' as const,
-                              danger: true,
-                              shield: m.can.delete_by_role ? shieldText.rolesDo : undefined,
-                              onSelect: () => setConfirming(m.id),
-                            },
-                          ]
-                        : []),
-                    ]}
                   />
-                )}
-              </>
+                  {onReply && (
+                    <Button
+                      variant="ghost"
+                      icon="reply"
+                      label="Reply to this message"
+                      compact
+                      onClick={() => onReply(m)}
+                    />
+                  )}
+                  {(m.can.edit || m.can.delete || m.can.report) && (
+                    <Menu
+                      label="Message options"
+                      compact
+                      onOpenChange={openChange(m.id)}
+                      items={[
+                        ...(m.can.edit
+                          ? [
+                              {
+                                label: 'Edit',
+                                icon: 'pencil' as const,
+                                disabled: offline,
+                                onSelect: () => setEditing(m.id),
+                              },
+                            ]
+                          : []),
+                        ...(m.can.report
+                          ? [{ label: 'Report', icon: 'flag' as const, onSelect: () => setReporting(m.id) }]
+                          : []),
+                        ...(m.can.delete
+                          ? [
+                              {
+                                label: 'Delete',
+                                icon: 'trash' as const,
+                                danger: true,
+                                shield: m.can.delete_by_role ? shieldText.rolesDo : undefined,
+                                onSelect: () => setConfirming(m.id),
+                              },
+                            ]
+                          : []),
+                      ]}
+                    />
+                  )}
+                </>
+              )
             }
           >
             {m.reply_to && (
@@ -143,7 +159,25 @@ export function MessageGroup({
                 onClick={onJump ? () => onJump(m.reply_to!.id) : undefined}
               />
             )}
-            <Body html={m.body_html} chat />
+            {editing === m.id ? (
+              <BodyEditor
+                groupId={m.group_id}
+                extensions={chatEditExtensions}
+                size="line"
+                submitLabel="Save"
+                initialHtml={m.body_html}
+                draft={`message-edit:${m.id}`}
+                disabled={offline}
+                onSubmit={async (html) => {
+                  await edit(m.id, html)
+                  setEditing(null)
+                }}
+                onCancel={() => setEditing(null)}
+              />
+            ) : (
+              <Body html={m.body_html} chat />
+            )}
+            {m.edited_at != null && <Text variant="small">edited</Text>}
             <Reactions reactions={m.reactions} disabled={offline} onToggle={(emoji) => void react(m, emoji)} />
             {reactionError?.id === m.id && <Alert tone="error">{reactionError.text}</Alert>}
             <ReadPoint at={m.created_at} />

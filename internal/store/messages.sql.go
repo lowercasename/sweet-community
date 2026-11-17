@@ -38,8 +38,8 @@ func (q *Queries) CreateChatLine(ctx context.Context, arg CreateChatLineParams) 
 }
 
 const createMessage = `-- name: CreateMessage :exec
-INSERT INTO messages (id, group_id, author_id, body_html, body_text, created_at, reply_to)
-VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)
+INSERT INTO messages (id, group_id, author_id, body_html, body_text, created_at, reply_to, reply_text)
+VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, (SELECT substr(body_text, 1, 200) FROM messages WHERE id = ?7 AND deleted_at IS NULL))
 `
 
 type CreateMessageParams struct {
@@ -97,6 +97,28 @@ func (q *Queries) DeleteMessage(ctx context.Context, arg DeleteMessageParams) er
 	return err
 }
 
+const editMessage = `-- name: EditMessage :exec
+UPDATE messages SET body_html = ?1, body_text = ?2, edited_at = ?3
+WHERE id = ?4 AND deleted_at IS NULL
+`
+
+type EditMessageParams struct {
+	BodyHtml string
+	BodyText string
+	EditedAt sql.NullInt64
+	ID       string
+}
+
+func (q *Queries) EditMessage(ctx context.Context, arg EditMessageParams) error {
+	_, err := q.db.ExecContext(ctx, editMessage,
+		arg.BodyHtml,
+		arg.BodyText,
+		arg.EditedAt,
+		arg.ID,
+	)
+	return err
+}
+
 const eraseAuthorMessages = `-- name: EraseAuthorMessages :exec
 UPDATE messages SET deleted_at = COALESCE(deleted_at, ?1), body_html = '', body_text = ''
 WHERE author_id = ?2 AND (deleted_at IS NULL OR body_html != '' OR body_text != '')
@@ -115,9 +137,9 @@ func (q *Queries) EraseAuthorMessages(ctx context.Context, arg EraseAuthorMessag
 }
 
 const getMessage = `-- name: GetMessage :one
-SELECT m.id, m.group_id, m.body_html, m.body_text, m.created_at,
+SELECT m.id, m.group_id, m.body_html, m.body_text, m.created_at, m.edited_at,
        u.id AS author_id, u.username AS author_username, u.picture_id AS author_picture_id,
-       m.reply_to, r.body_text AS reply_text, r.deleted_at AS reply_deleted_at,
+       m.reply_to, m.reply_text, r.deleted_at AS reply_deleted_at,
        ru.id AS reply_author_id, ru.username AS reply_author_username, ru.picture_id AS reply_author_picture_id,
        m.kind, su.id AS subject_id, su.username AS subject_username, su.picture_id AS subject_picture_id,
        CAST((SELECT json_group_array(json_array(x.emoji, x.user_id))
@@ -135,6 +157,7 @@ type GetMessageRow struct {
 	BodyHtml             string
 	BodyText             string
 	CreatedAt            int64
+	EditedAt             sql.NullInt64
 	AuthorID             string
 	AuthorUsername       string
 	AuthorPictureID      sql.NullString
@@ -160,6 +183,7 @@ func (q *Queries) GetMessage(ctx context.Context, id string) (GetMessageRow, err
 		&i.BodyHtml,
 		&i.BodyText,
 		&i.CreatedAt,
+		&i.EditedAt,
 		&i.AuthorID,
 		&i.AuthorUsername,
 		&i.AuthorPictureID,
@@ -231,9 +255,9 @@ func (q *Queries) ListLiveMessagesByAuthor(ctx context.Context, authorID string)
 
 const listMessages = `-- name: ListMessages :many
 
-SELECT m.id, m.group_id, m.body_html, m.body_text, m.created_at,
+SELECT m.id, m.group_id, m.body_html, m.body_text, m.created_at, m.edited_at,
        u.id AS author_id, u.username AS author_username, u.picture_id AS author_picture_id,
-       m.reply_to, r.body_text AS reply_text, r.deleted_at AS reply_deleted_at,
+       m.reply_to, m.reply_text, r.deleted_at AS reply_deleted_at,
        ru.id AS reply_author_id, ru.username AS reply_author_username, ru.picture_id AS reply_author_picture_id,
        m.kind, su.id AS subject_id, su.username AS subject_username, su.picture_id AS subject_picture_id,
        CAST((SELECT json_group_array(json_array(x.emoji, x.user_id))
@@ -261,6 +285,7 @@ type ListMessagesRow struct {
 	BodyHtml             string
 	BodyText             string
 	CreatedAt            int64
+	EditedAt             sql.NullInt64
 	AuthorID             string
 	AuthorUsername       string
 	AuthorPictureID      sql.NullString
@@ -300,6 +325,7 @@ func (q *Queries) ListMessages(ctx context.Context, arg ListMessagesParams) ([]L
 			&i.BodyHtml,
 			&i.BodyText,
 			&i.CreatedAt,
+			&i.EditedAt,
 			&i.AuthorID,
 			&i.AuthorUsername,
 			&i.AuthorPictureID,

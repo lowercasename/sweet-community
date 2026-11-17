@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import type { Post as PostData } from '../api'
-import { useAuthor, useGroups, useMe, useMarkers, usePostNotificationPreference } from '../data/hooks'
+import { useAuthor, useGroups, useMe, useMarkers, usePostNotificationPreference, usePostActions } from '../data/hooks'
 import { postDestinations } from '../data/groups'
 import { loadDraftDestination } from '../editor/drafts'
 import { hasUnread, postStream } from '../data/notifications'
@@ -13,6 +13,7 @@ import {
   ConfirmDialog,
   DestinationPicker,
   Link,
+  PinLabel,
   PrivateMark,
   Menu,
   type MenuItem,
@@ -50,6 +51,20 @@ interface PostProps {
 }
 
 export function Post({ post, linked = true, expanded = false, place, disabled, onEdit, onDelete }: PostProps) {
+  const { pin } = usePostActions(post.group_id)
+  const [pinning, setPinning] = useState(false)
+  const [pinError, setPinError] = useState<string | null>(null)
+  const togglePin = async () => {
+    setPinning(true)
+    setPinError(null)
+    try {
+      await pin(post.id, !post.pinned)
+    } catch (e) {
+      setPinError(e instanceof Error ? e.message : 'Could not update pin')
+    } finally {
+      setPinning(false)
+    }
+  }
   const [optionsOpen, setOptionsOpen] = useState(false)
   const preference = usePostNotificationPreference(post.id, optionsOpen)
   const [notificationError, setNotificationError] = useState<string | null>(null)
@@ -129,6 +144,13 @@ export function Post({ post, linked = true, expanded = false, place, disabled, o
           onSelect: () => {},
         },
       ]
+  if (post.can.pin)
+    items.push({
+      label: post.pinned ? 'Unpin post' : 'Pin post',
+      icon: post.pinned ? 'pin-off' : 'pin',
+      shield: shieldText.rolesDo,
+      onSelect: () => void togglePin(),
+    })
   if (post.can.edit) items.push({ label: 'Edit', icon: 'pencil', onSelect: startEditing })
   if (post.can.report) items.push({ label: 'Report', icon: 'flag', onSelect: () => setReporting(true) })
   if (post.can.delete)
@@ -167,7 +189,7 @@ export function Post({ post, linked = true, expanded = false, place, disabled, o
             <Row gap={2} align="center" wrap="never">
               <Tile name={place.name} picture={place.picture} />
               <Text as="span" variant="small">
-                Posted in{' '}
+                {post.pinned ? <PinLabel label="Pinned in" /> : 'Posted in'}{' '}
                 <Link href={groupPath(place.id)}>
                   <Text as="span" variant="body" weight="bold">
                     {place.name}
@@ -187,6 +209,7 @@ export function Post({ post, linked = true, expanded = false, place, disabled, o
     >
       <Stack gap={3}>
         <Stack gap={2}>
+          {post.pinned && !place && <PinLabel />}
           <Row justify="between" align="start" wrap="never">
             <Row gap={2} align="center">
               <PersonName user={author} avatar="md" />
@@ -199,7 +222,7 @@ export function Post({ post, linked = true, expanded = false, place, disabled, o
                 label="Post options"
                 items={items}
                 reveal
-                disabled={savingPreference}
+                disabled={savingPreference || pinning}
                 onOpenChange={setOptionsOpen}
               />
             )}
@@ -224,6 +247,7 @@ export function Post({ post, linked = true, expanded = false, place, disabled, o
           ) : (
             <Body html={post.body_html} />
           )}
+          {pinError && <Alert tone="error">{pinError}</Alert>}
           {notificationError && <Alert tone="error">{notificationError}</Alert>}
           {deleteError && <Alert tone="error">{deleteError}</Alert>}
         </Stack>

@@ -102,9 +102,10 @@ A post is long-form text with inline images. Comments are a flat list, oldest fi
 - Authors may move a post between Home and open rooms while editing it. Existing replies stay with the post. Private posts cannot move, and private rooms cannot be destinations. The post keeps its address, creation time and discussion preferences. (Raphael, 2026-11-16. The destination should be editable without exposing private discussions.)
 - Home's post editor has a room selector above the text. The selector strip and the room label on published posts have a faint shaded background. (Raphael, 2026-11-16. This makes the destination visible before posting.)
 - The author edits a post or comment as a whole, and the post is marked as edited. There is no version history.
+- The owner and moderators of a group can pin and unpin its posts. Pinned posts appear first in that group's feed, newest first, with a small pin label. An open-room pin does not move the post to the top of Home. Moving a post to another group clears its pin. Pinning changes neither visibility nor notifications. (Raphael, 2026-11-17. Important posts need to stay at the top of their own posts view.)
 - Deleting a post deletes its comments and empties their text, because the author asked for the post to go.
 - Every post has its own address, which notifications link to.
-- Each editor keeps its unsent text in the browser, so a reload or a closed tab does not lose it. This covers new posts, comments and messages, and edits of posts and comments. Sending, saving an edit or cancelling an edit deletes the draft. Safari will clear saved drafts after seven days without a visit unless the app is installed, and this is accepted.
+- Each editor keeps its unsent text in the browser, so a reload or a closed tab does not lose it. This covers new posts, comments and messages, and edits of posts, comments and messages. Sending, saving an edit or cancelling an edit deletes the draft. Safari will clear saved drafts after seven days without a visit unless the app is installed, and this is accepted.
 - A draft belongs to the signed-in user. Signing out, by any means, deletes every draft in the browser, so a shared computer keeps none. A draft not changed for 30 days is deleted. A message's attached images, an image still uploading and the message being replied to are not kept. Raphael left these details to Claude (2026-11-10), and they are open to change.
 - The @ list offers only the members of the current group.
 - Chat places its tools toggle, text field and Send button in one bottom-aligned row. The field grows upward. The toggle opens formatting and attachments above the row. Reply previews and attached images also appear above it. All editors share their editing behaviour and controls. (Raphael, 2026-11-16. Controls below the field were difficult to reach with the phone keyboard open.)
@@ -130,7 +131,8 @@ Raphael chose the layout from three drawings (2026-11-06). An open thread sits o
 A message uses part of the same schema and passes the same policy. Chat history is kept forever.
 
 - A reply quotes the original and stays in the flat list. Threads were rejected, because they would make a chat into a second feed.
-- The author or the group's staff may delete a message. Nobody can edit a sent message.
+- The author or the group's staff may delete a message. Only the author can edit it, with no time limit, while they still belong to the group. The shared editor opens inline with Save and Cancel. An edit shows “edited” and updates live without changing the message's position, reactions or notifications. There is no version history. (Raphael, 2026-11-17. Authors need to correct their messages.)
+- A reply keeps the text it quoted even if the original message is edited. Deleting the original clears its quoted text from replies.
 - The chat shows a line when someone joins the community or is added to a room. A line is stored as a message, so it keeps its order. Notifying a whole room of each addition was rejected, because a room of twenty would get twenty notifications.
 - Consecutive messages from one person share a name and picture when the gap between messages is at most fifteen minutes. A different speaker, a membership notice or a new calendar day starts a new group. This keeps short pauses from repeating the same header.
 - Calendar days are separated by quiet date dividers with text between thin lines. These are distinct from membership notices. A message group shows its first message’s time beside the author, without a time on every message.
@@ -178,7 +180,7 @@ A link on its own line becomes a preview card, as in WhatsApp and Signal. The ca
 
 - Previews appear in posts, comments and chat, not in bios, the rules or the welcome message. There is no button for them.
 - In a post or a comment, pressing Enter after a link on its own line turns it into a card. A link on the last line is turned into a card when the post is saved, without the author seeing it happen. The editor shows "Embedded link" above a card, with "Turn back into regular link", and a link turned back stays a link when the post is saved again.
-- In chat, a link on its own line becomes a card when the message is sent. A sent message cannot be edited, so the card stays.
+- In chat, a link on its own line becomes a card when the message is sent. An author editing the message can turn the card back into a regular link.
 - A page that gives no title, or cannot be fetched, stays a plain link.
 - The server fetches the page and keeps a copy of its picture, so readers' browsers never contact the other site. The fetcher refuses internal addresses. A preview is fetched once for each address and kept while a post, comment or message shows it as a card. The server records which cards each body shows when it is saved.
 - Every member can see a preview's picture, because it comes from a public page.
@@ -249,7 +251,7 @@ One package on the server holds every rule about who may do what. Each rule take
 
 Room and staff actions use the current permissions when the change is saved. The permission check and the change happen in one transaction. A request that started earlier keeps no permission after membership is removed or a role changes. The server reads the request body before opening the transaction, so a slow request does not block other writes.
 
-- An author edits their own posts and comments and deletes their own content. A post's author may also delete comments on it.
+- An author edits their own posts, comments and messages and deletes their own content. A post's author may also delete comments on it.
 - A group's owner and moderators may delete content in it. They cannot edit another author's content. They add and remove private room members.
 - Only a group's owner sets roles, hands over ownership, renames the group or deletes it. Named rooms always have posts and chat. Two-person conversations always have chat only.
 - Only the community's owner changes the community's name and who may create rooms. The owner and moderators manage invites, rules, the welcome message and reports.
@@ -345,7 +347,7 @@ Comment and unread counts come from the server. The client refreshes them when c
 
 **One shape per concept.** A place is a tile or a picture. A feature is a line icon. A person is a profile picture. A notice is always the same alert box. Being offline is a red badge in the bar.
 
-- Timestamps use the viewer's local timezone and clock format throughout Sweet. Today shows the time. Yesterday shows Yesterday and the time. Other days show the date and time. Posts and membership details show only the date. Hovering a date shows the full date and time. Chat puts the day in a divider and the first message’s time beside the author of each message group. Edited posts and comments show only “edited”. This keeps dates consistent without repeating them on every message.
+- Timestamps use the viewer's local timezone and clock format throughout Sweet. Today shows the time. Yesterday shows Yesterday and the time. Other days show the date and time. Posts and membership details show only the date. Hovering a date shows the full date and time. Chat puts the day in a divider and the first message’s time beside the author of each message group. Edited posts, comments and messages show only “edited”. This keeps dates consistent without repeating them on every message.
 
 ### Buttons
 
@@ -462,7 +464,7 @@ Data export and custom domains are also planned. Import will be built before exp
 
 The Community page holds what the staff manage. A page about the community did not belong behind the owner's profile. Its cards are Reports, About this community, Welcome message and Rules. Each card shows only to those who may use it. The People page holds roles, removals and invite links.
 
-An approval queue, a pinned announcement and a list of posts with no reply are planned. Nothing more elaborate will be built until a community asks for it.
+An approval queue and a list of posts with no reply are planned. Nothing more elaborate will be built until a community asks for it.
 
 ## Security
 
@@ -481,6 +483,8 @@ These decisions came from a security audit (2026-11-08).
 - **Chat image width (Raphael, 2026-11-16).** Chat images and galleries are limited to 360px wide. They previously used the same width as posts, which made them too large in chat. Posts and comments keep their existing image sizing.
 
 ### Reversed
+
+- **Chat editing (Raphael, 2026-11-17).** Authors can now edit their sent messages to correct them. Previously sent messages could only be deleted. Existing reply quotes keep their original text, and edits do not send notifications.
 
 - **Room shortcuts and chat notifications (Raphael, 2026-11-16).** Open rooms no longer appear automatically in everyone's sidebar. A filled star identifies a saved shortcut. Add to sidebar and Remove from sidebar affect navigation only. Chat notification choices now govern the notification list as well as device alerts. Home chat starts with All messages. Room dots continue to show unread posts and chat independently of notification choices. Muting a discussion no longer hides its unread-comment dot.
 

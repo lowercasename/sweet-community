@@ -156,3 +156,18 @@ func TestRules(t *testing.T) {
 		}
 	}
 }
+
+func TestPinAndEditMessage(t *testing.T) {
+	for _, tc := range []struct {
+		role, id  string
+		pin, edit bool
+	}{
+		{"", "author", false, false}, {Member, "author", false, true}, {Member, "other", false, false},
+		{Moderator, "author", true, true}, {Moderator, "other", true, false}, {Owner, "other", true, false},
+	} {
+		a := Actor{ID: tc.id, Role: tc.role}
+		if PinPost(a) != tc.pin || EditMessage(a, Message{AuthorID: "author"}) != tc.edit {
+			t.Errorf("permissions for %+v", tc)
+		}
+	}
+}

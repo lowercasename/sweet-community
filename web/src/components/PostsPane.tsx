@@ -64,7 +64,7 @@ export function PostsPane({ groupId, side = 'full', watching, foot }: PostsPaneP
   const { markers, loaded } = useMarkers()
   const markRead = useMarkRead()
   const visible = usePageVisible()
-  const newest = posts[0]?.created_at
+  const newest = posts.length ? Math.max(...posts.map((post) => post.created_at)) : undefined
   const readAt = markerOf(markers, feedStream(groupId))
   useEffect(() => {
     if (!watching || !visible || !loaded || newest === undefined) return

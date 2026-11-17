@@ -9,6 +9,7 @@ export interface User {
 
 /** What the signed-in user may do to one resource. The server decides this (internal/perm) and the client shows it. */
 export interface Can {
+  pin?: boolean
   /** Whether this post may move to Home or an open room. */
   move?: boolean
   edit: boolean
@@ -146,6 +147,7 @@ export interface Post {
   created_at: number
   /** Unix ms of the last edit, or null if never edited. */
   edited_at: number | null
+  pinned: boolean
   comment_count: number
   reactions: Reaction[]
   can: Can
@@ -192,6 +194,7 @@ export interface Comment {
 }
 
 export interface Message {
+  edited_at: number | null
   id: string
   group_id: string
   author: User
@@ -318,6 +321,8 @@ export interface MessagePage {
 }
 
 export interface PostPage {
+  /** Pins accompany the first page of a group feed. Author lists have none. */
+  pinned?: Post[]
   posts: Post[]
   next_before: string | null
 }
@@ -907,4 +912,12 @@ export function listRoomSidebar(): Promise<{ rooms: RoomSidebar[] }> {
 
 export function setRoomSidebar(groupId: string, inSidebar: boolean): Promise<RoomSidebar> {
   return request(`/api/groups/${groupId}/sidebar`, { method: 'PUT', body: JSON.stringify({ in_sidebar: inSidebar }) })
+}
+
+export function setPostPinned(id: string, pinned: boolean): Promise<Post> {
+  return request<Post>(`/api/posts/${encodeURIComponent(id)}/pin`, json('PUT', { pinned }))
+}
+
+export function updateMessage(id: string, bodyHtml: string): Promise<Message> {
+  return request<Message>(`/api/messages/${encodeURIComponent(id)}`, json('PUT', { body_html: bodyHtml }))
 }
