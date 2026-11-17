@@ -1,4 +1,4 @@
-import type { Group } from '../api'
+import type { Group, RoomSidebar } from '../api'
 
 /*
  * Views of the user's groups for the nav and the Messages page. Pure functions over the groups in the cache.
@@ -31,3 +31,9 @@ export const postDestinations = (groups: Group[]) =>
       picture: g.picture,
       icon: g.kind === 'root' ? ('home' as const) : undefined,
     }))
+
+/** Rooms added to navigation, in the same order on desktop and phone. */
+export function sidebarRooms(groups: Group[], sidebar: RoomSidebar[] = []) {
+  const saved = new Set(sidebar.filter((r) => r.in_sidebar).map((r) => r.group_id))
+  return roomsOf(groups).filter((g) => saved.has(g.id))
+}

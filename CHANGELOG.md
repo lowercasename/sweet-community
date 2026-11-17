@@ -1,11 +1,8 @@
 # Changelog
 
-## v1.10.1 (2026-11-17)
-
-- Migrate legacy rooms as open
-
 ## v1.10.0 (2026-11-17)
 
+- Migrate existing rooms as open
 - Adjust pin icon alignment
 - Move message edit status into the options menu
 - Align pin labels in shared post headers

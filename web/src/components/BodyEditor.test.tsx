@@ -272,7 +272,7 @@ it('saves the current edit text when only its destination changes, including an 
       <BodyEditor
         groupId={destination}
         draft="post-edit:move"
-        draftDestination={destination}
+        draftDestination={{ value: destination, initial: ROOT, onChange: vi.fn() }}
         initialHtml={paragraph('Stored text')}
         extensions={postExtensions}
         size="post"

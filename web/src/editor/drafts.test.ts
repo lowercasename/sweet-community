@@ -8,6 +8,7 @@ import {
   loadDraft,
   pruneDrafts,
   saveDraft,
+  watchDraft,
 } from './drafts'
 
 afterEach(() => {
@@ -74,4 +75,24 @@ it('keeps the destination with the draft through edits and deletes both together
   expect(loadDraftDestination('mo', 'home')).toBeNull()
   clearDraft('kit', 'home')
   expect(loadDraftDestination('kit', 'home')).toBeNull()
+})
+
+it('shares text and destination together with other editors of the same draft', () => {
+  const source = {}
+  const ownChanges = vi.fn()
+  const otherChanges = vi.fn()
+  const stopOwn = watchDraft('kit', 'post:home', source, ownChanges)
+  const stopOther = watchDraft('kit', 'post:home', {}, otherChanges)
+  try {
+    saveDraft('kit', 'post:home', '<p>Draft</p>', source, 'room')
+    expect(ownChanges).not.toHaveBeenCalled()
+    expect(otherChanges).toHaveBeenLastCalledWith('<p>Draft</p>', 'room')
+    saveDraft('kit', 'post:home', '<p>Draft</p>', source, 'another')
+    expect(otherChanges).toHaveBeenLastCalledWith('<p>Draft</p>', 'another')
+    clearDraft('kit', 'post:home', source)
+    expect(otherChanges).toHaveBeenLastCalledWith(null, undefined)
+  } finally {
+    stopOwn()
+    stopOther()
+  }
 })

@@ -1,5 +1,5 @@
 import type { Group, User } from '../api'
-import { roomsOf } from '../data/groups'
+import { sidebarRooms } from '../data/groups'
 import { useRoomSidebar, useAuthor, useRules, useUnreadPlaces } from '../data/hooks'
 import { anyUnread } from '../data/notifications'
 import { BROWSE_ROOMS, NEW_ROOM, RULES, groupPath, profilePath, COMMUNITY } from '../routes'
@@ -26,8 +26,7 @@ export function MenuPage({ me, groups, onGo, onLogout }: MenuPageProps) {
   const places = useUnreadPlaces()
   const root = groups.find((g) => g.kind === 'root')
   const sidebar = useRoomSidebar()
-  const saved = new Set(sidebar.data?.rooms.filter((r) => r.in_sidebar).map((r) => r.group_id))
-  const mine = roomsOf(groups).filter((g) => saved.has(g.id))
+  const mine = sidebarRooms(groups, sidebar.data?.rooms)
   const canCreate = root?.can.create_groups === true
   return (
     <Pane flush>

@@ -34,8 +34,8 @@ function read(name: string): Saved | null {
  */
 const changes = new EventTarget()
 
-function changed(name: string, html: string | null, from: object | undefined) {
-  changes.dispatchEvent(new CustomEvent(name, { detail: { html, from } }))
+function changed(name: string, html: string | null, from: object | undefined, destination?: string) {
+  changes.dispatchEvent(new CustomEvent(name, { detail: { html, from, destination } }))
 }
 
 export function loadDraft(user: string, key: string): string | null {
@@ -44,11 +44,9 @@ export function loadDraft(user: string, key: string): string | null {
 
 /** Saves a draft. `from` is the editor that saved it, which does not receive its own change. */
 export function saveDraft(user: string, key: string, html: string, from?: object, destination?: string) {
-  store(
-    entry(user, key),
-    JSON.stringify({ ...read(entry(user, key)), html, at: Date.now(), ...(destination ? { destination } : {}) }),
-  )
-  changed(entry(user, key), html, from)
+  const saved = { ...read(entry(user, key)), html, at: Date.now(), ...(destination ? { destination } : {}) }
+  store(entry(user, key), JSON.stringify(saved))
+  changed(entry(user, key), html, from, saved.destination)
 }
 
 export function clearDraft(user: string, key: string, from?: object) {
@@ -60,11 +58,17 @@ export function clearDraft(user: string, key: string, from?: object) {
  * Calls `onChange` when another editor in this tab saves or clears the same draft. `self` is the editor that
  * watches. Returns a function that stops watching.
  */
-export function watchDraft(user: string, key: string, self: object, onChange: (html: string | null) => void) {
+export function watchDraft(
+  user: string,
+  key: string,
+  self: object,
+  onChange: (html: string | null, destination?: string) => void,
+) {
   const name = entry(user, key)
   const listener = (e: Event) => {
-    const { html, from } = (e as CustomEvent<{ html: string | null; from?: object }>).detail
-    if (from !== self) onChange(html)
+    const { html, from, destination } = (e as CustomEvent<{ html: string | null; from?: object; destination?: string }>)
+      .detail
+    if (from !== self) onChange(html, destination)
   }
   changes.addEventListener(name, listener)
   return () => changes.removeEventListener(name, listener)

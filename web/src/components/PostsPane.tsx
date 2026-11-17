@@ -99,7 +99,7 @@ export function PostsPane({ groupId, side = 'full', watching, foot }: PostsPaneP
                 disabled={offline || !valid}
                 onSubmit={submit}
                 draft={draft}
-                draftDestination={destination}
+                draftDestination={{ value: destination, initial: groupId, onChange: setDestination }}
               />
             </Card>
             <Stack gap={3}>

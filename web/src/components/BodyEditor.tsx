@@ -72,7 +72,11 @@ interface BodyEditorProps {
    */
   draft?: string
   /** The selected posting destination, saved with this draft. */
-  draftDestination?: string
+  draftDestination?: {
+    value: string
+    initial: string
+    onChange: (destination: string) => void
+  }
 }
 
 /**
@@ -134,7 +138,7 @@ export function BodyEditor({
   // at once. An editor that has not changed writes nothing.
   const { data: me } = useMe()
   const draftRef = useRef<{ user: string; key: string; destination?: string } | null>(null)
-  draftRef.current = draft && me ? { user: me.id, key: draft, destination: draftDestination } : null
+  draftRef.current = draft && me ? { user: me.id, key: draft, destination: draftDestination?.value } : null
   const keepDraft = (ed: Editor) => {
     const d = draftRef.current
     if (!d) return
@@ -208,14 +212,17 @@ export function BodyEditor({
       handleDrop: (_view, event) => takeImages(event.dataTransfer, event),
     },
   })
-  const savedDestination = useRef(draftDestination)
+  const destination = draftDestination?.value
+  const initialDestination = draftDestination?.initial
+  const onDestinationChange = draftDestination?.onChange
+  const savedDestination = useRef(destination)
   useEffect(() => {
     const d = draftRef.current
-    if (!editing || !editor || !d || savedDestination.current === draftDestination) return
-    savedDestination.current = draftDestination
+    if (!editing || !editor || !d || savedDestination.current === destination) return
+    savedDestination.current = destination
     // A destination-only edit must keep the editor's text, even when the user has emptied it.
-    saveDraft(d.user, d.key, editor.getHTML(), editor, draftDestination)
-  }, [editor, draftDestination, editing])
+    saveDraft(d.user, d.key, editor.getHTML(), editor, destination)
+  }, [editor, destination, editing])
   useEffect(() => {
     if (focus) editor?.commands.focus('end')
   }, [focus, editor])
@@ -225,10 +232,15 @@ export function BodyEditor({
   const user = me?.id
   useEffect(() => {
     if (!editor || !draft || !user) return
-    return watchDraft(user, draft, editor, (html) =>
-      editor.commands.setContent(html ?? initialHtml ?? '', { emitUpdate: false }),
-    )
-  }, [editor, draft, user, initialHtml])
+    return watchDraft(user, draft, editor, (html, destination) => {
+      editor.commands.setContent(html ?? initialHtml ?? '', { emitUpdate: false })
+      const nextDestination = destination ?? initialDestination
+      if (nextDestination !== undefined) {
+        savedDestination.current = nextDestination
+        onDestinationChange?.(nextDestination)
+      }
+    })
+  }, [editor, draft, user, initialHtml, initialDestination, onDestinationChange])
   // An empty transaction makes the editor draw its decorations again, which reads the new placeholder.
   useEffect(() => {
     if (editor && !editor.isDestroyed) editor.view.dispatch(editor.state.tr)

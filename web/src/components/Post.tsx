@@ -246,7 +246,7 @@ export function Post({ post, linked = true, expanded = false, place, disabled, o
               submitLabel="Save"
               initialHtml={post.body_html}
               draft={draft}
-              draftDestination={destination}
+              draftDestination={{ value: destination, initial: post.group_id, onChange: setDestination }}
               disabled={disabled || !valid}
               onSubmit={save}
               onCancel={() => setEditing(false)}

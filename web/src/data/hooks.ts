@@ -282,7 +282,6 @@ export function useMessageActions(groupId: string) {
   return {
     async edit(id: string, html: string) {
       applyEvent(qc, 'message', await updateMessage(id, html))
-      void qc.invalidateQueries({ queryKey: ['search'] })
     },
     async send(html: string, replyTo?: string) {
       applyEvent(qc, 'message', await createMessage(groupId, html, replyTo))
