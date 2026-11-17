@@ -4,7 +4,7 @@ import { Dotted } from './Dotted'
 
 interface Segment<K extends string> {
   key: K
-  icon: IconName
+  icon?: IconName
   label: string
   /** Whether this view has unread content. Shows a dot and adds "unread" to the accessible name. */
   dot?: boolean
@@ -33,13 +33,11 @@ export function Segmented<K extends string>({ label, segments, value, compact = 
           aria-pressed={s.key === value}
           data-tour={s.tour}
           aria-label={s.dot ? `${s.label}, unread` : compact ? s.label : undefined}
-          className={buttonClass('ghost', compact)}
+          className={buttonClass('ghost', compact && !!s.icon)}
           onClick={() => onChange(s.key)}
         >
-          <Dotted shown={s.dot === true}>
-            <Icon name={s.icon} />
-          </Dotted>
-          {!compact && s.label}
+          <Dotted shown={s.dot === true}>{s.icon ? <Icon name={s.icon} /> : s.label}</Dotted>
+          {s.icon && !compact && s.label}
         </button>
       ))}
     </div>

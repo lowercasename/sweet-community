@@ -1,3 +1,5 @@
+import { ImageWithFallback } from './ImageWithFallback'
+
 interface TileProps {
   /** The group's name. Its first letter is shown when the group has no picture. */
   name: string
@@ -16,25 +18,24 @@ interface TileProps {
 export function Tile({ name, picture, size = 'sm' }: TileProps) {
   const initial = [...name.trim()][0]?.toLocaleUpperCase() ?? '?'
   const box = size === 'md' ? 'h-8 w-8 rounded-[8px] text-sm' : 'h-6 w-6 rounded-[6px] text-xs'
-  if (picture) {
-    return (
-      <img
-        aria-hidden="true"
-        className={`${box} flex-none border border-line object-cover select-none`}
-        src={picture}
-        alt=""
-        draggable={false}
-        loading="lazy"
-        decoding="async"
-      />
-    )
-  }
-  return (
+  const fallback = (
     <span
       aria-hidden="true"
       className={`${box} flex flex-none items-center justify-center border border-line bg-field font-bold text-ink select-none`}
     >
       {initial}
     </span>
+  )
+  return (
+    <ImageWithFallback
+      aria-hidden="true"
+      className={`${box} flex-none border border-line object-cover select-none`}
+      src={picture}
+      alt=""
+      draggable={false}
+      loading="lazy"
+      decoding="async"
+      fallback={fallback}
+    />
   )
 }

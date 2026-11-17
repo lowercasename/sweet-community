@@ -54,16 +54,15 @@ describe('CommunityPage', () => {
     expect(screen.getAllByRole('img', { name: 'Only the owner sees this' })).toHaveLength(1)
   })
 
-  it('the owner sees the reports, the community settings, the welcome message, the rules and the topics', async () => {
+  it('the owner sees the reports, the community settings, the welcome message, the rules', async () => {
     const { CommunityPage } = await import('./CommunityPage')
     renderWithQuery(<CommunityPage root={group(ROOT, 'owner')} />)
-    await screen.findByRole('heading', { name: 'Topics' })
+    await screen.findByRole('heading', { name: 'Rules' })
     expect(screen.getAllByRole('heading', { level: 2 }).map((h) => h.textContent)).toEqual([
       'Reports',
       'About this community',
       'Welcome message',
       'Rules',
-      'Topics',
     ])
   })
 
@@ -74,18 +73,17 @@ describe('CommunityPage', () => {
     expect(await screen.findByRole('button', { name: 'Save' })).toBeTruthy()
   })
 
-  it('a moderator sees the reports first, then the welcome message, rules and topics, and not the community settings', async () => {
+  it('a moderator sees the reports first, then the welcome message, rules, and not the community settings', async () => {
     const { CommunityPage } = await import('./CommunityPage')
     renderWithQuery(<CommunityPage root={group(ROOT, 'moderator')} />)
-    await screen.findByRole('heading', { name: 'Topics' })
+    await screen.findByRole('heading', { name: 'Rules' })
     expect(screen.getAllByRole('heading', { level: 2 }).map((h) => h.textContent)).toEqual([
       'Reports',
       'Welcome message',
       'Rules',
-      'Topics',
     ])
     // Each card is marked with the shield, and the page says once what the shield means.
-    expect(screen.getAllByRole('img', { name: 'Only the owner and moderators see this' })).toHaveLength(4)
+    expect(screen.getAllByRole('img', { name: 'Only the owner and moderators see this' })).toHaveLength(3)
     expect(screen.getByText(/marks what only owners and moderators can see and do\./)).toBeTruthy()
     expect(screen.queryByRole('heading', { name: 'About this community' })).toBeNull()
     expect(screen.queryByLabelText('Community name')).toBeNull()

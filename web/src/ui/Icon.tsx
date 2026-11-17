@@ -1,6 +1,10 @@
 import {
   ArrowLeft,
   ArrowUp,
+  Compass,
+  Star,
+  LockKeyhole,
+  Globe,
   Bell,
   BellOff,
   BellRing,
@@ -43,6 +47,11 @@ import {
 } from 'lucide-react'
 
 export type IconName =
+  | 'browse'
+  | 'star'
+  | 'star-filled'
+  | 'globe'
+  | 'lock'
   | 'bold'
   | 'italic'
   | 'link'
@@ -85,6 +94,11 @@ export type IconName =
   | 'smile-plus'
 
 const ICONS: Record<IconName, LucideIcon> = {
+  browse: Compass,
+  star: Star,
+  'star-filled': Star,
+  globe: Globe,
+  lock: LockKeyhole,
   bold: Bold,
   italic: Italic,
   link: Link,
@@ -135,5 +149,13 @@ interface IconProps {
 /** A Lucide icon in the current text colour. Decorative. The control around it carries the label. */
 export function Icon({ name, size = 18 }: IconProps) {
   const Glyph = ICONS[name]
-  return <Glyph size={size} strokeWidth={2} aria-hidden="true" focusable="false" />
+  return (
+    <Glyph
+      fill={name === 'star-filled' ? 'currentColor' : 'none'}
+      size={size}
+      strokeWidth={2}
+      aria-hidden="true"
+      focusable="false"
+    />
+  )
 }

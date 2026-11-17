@@ -162,22 +162,15 @@ func TestGroupWritesReadCurrentRole(t *testing.T) {
 }
 
 func TestStaffWritesReadCurrentRole(t *testing.T) {
-	for _, name := range []string{"create topic", "edit topic", "delete topic", "rules", "welcome", "settings", "create invite", "delete invite"} {
+	for _, name := range []string{"rules", "welcome", "settings", "create invite", "delete invite"} {
 		t.Run(name, func(t *testing.T) {
 			ts, owner, srv := newTestServerWith(t)
 			ownerID := owner.mustStatus(200, "GET", "/api/me", nil)["id"].(string)
-			topic := owner.mustStatus(201, "POST", "/api/topics", map[string]string{"name": "Existing"})["id"].(string)
 			invite := owner.mustStatus(201, "POST", "/api/invites", nil)["code"].(string)
 			var handler http.HandlerFunc
-			allowed := perm.ManageTopics
+			allowed := perm.ManageRules
 			body := `{"name":"Changed","description":""}`
 			switch name {
-			case "create topic":
-				handler = srv.createTopic
-			case "edit topic":
-				handler = srv.updateTopic
-			case "delete topic":
-				handler = srv.deleteTopic
 			case "rules":
 				handler, allowed, body = srv.setText(rulesText), perm.ManageRules, `{"body_html":"<p>Changed</p>"}`
 			case "welcome":
@@ -193,7 +186,6 @@ func TestStaffWritesReadCurrentRole(t *testing.T) {
 			for _, cookie := range owner.http.Jar.Cookies(r.URL) {
 				r.AddCookie(cookie)
 			}
-			r.SetPathValue("id", topic)
 			r.SetPathValue("code", invite)
 			wrapped := srv.requireRoot(allowed, func(w http.ResponseWriter, r *http.Request) {
 				if _, err := srv.DB.Exec(`UPDATE memberships SET role = 'member' WHERE group_id = ? AND user_id = ?`, perm.Root, ownerID); err != nil {

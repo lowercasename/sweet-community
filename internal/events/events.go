@@ -138,7 +138,7 @@ func Key(kind string, raw []byte) string {
 		if p.UserID != "" && p.PostID != "" {
 			return kind + ":" + p.UserID + ":" + p.PostID
 		}
-	case "room_notification_preference":
+	case "room_notification_preference", "room_sidebar":
 		if p.UserID != "" && p.GroupID != "" {
 			return kind + ":" + p.UserID + ":" + p.GroupID
 		}

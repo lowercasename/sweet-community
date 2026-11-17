@@ -7,7 +7,7 @@ import { chatExtensions, postExtensions } from '../editor/extensions'
 import { ROOT, member, mentionSpan, paragraph, user } from '../test-utils'
 import { makeQueryClient } from '../data/client'
 import { keys } from '../data/keys'
-import { loadDraft, saveDraft } from '../editor/drafts'
+import { loadDraft, loadDraftDestination, saveDraft } from '../editor/drafts'
 
 /**
  * The editor's placeholder follows its prop after the editor has been created. Home's composer names the chosen
@@ -261,4 +261,35 @@ describe('sending from the keyboard', () => {
     fireEvent.keyDown(element, { key: 'Enter', ctrlKey: true })
     await waitFor(() => expect(onSubmit).toHaveBeenCalledTimes(2))
   })
+})
+
+it('saves the current edit text when only its destination changes, including an empty edit', async () => {
+  const { BodyEditor } = await import('./BodyEditor')
+  const qc = makeQueryClient()
+  qc.setQueryData(keys.me, user('kit'))
+  const draw = (destination: string) => (
+    <QueryClientProvider client={qc}>
+      <BodyEditor
+        groupId={destination}
+        draft="post-edit:move"
+        draftDestination={destination}
+        initialHtml={paragraph('Stored text')}
+        extensions={postExtensions}
+        size="post"
+        submitLabel="Save"
+        disabled={false}
+        onSubmit={async () => {}}
+      />
+    </QueryClientProvider>
+  )
+  const { rerender, container } = render(draw(ROOT))
+  await waitFor(() => expect(container.querySelector('.ProseMirror')?.textContent).toBe('Stored text'))
+  rerender(draw('room'))
+  await waitFor(() => expect(loadDraftDestination('kit', 'post-edit:move')).toBe('room'))
+  expect(loadDraft('kit', 'post-edit:move')).toBe(paragraph('Stored text'))
+  const editor = (container.querySelector('.ProseMirror') as HTMLElement & { editor: Editor }).editor
+  editor.commands.clearContent(true)
+  rerender(draw(ROOT))
+  await waitFor(() => expect(loadDraftDestination('kit', 'post-edit:move')).toBe(ROOT))
+  expect(loadDraft('kit', 'post-edit:move')).toBe(paragraph(''))
 })

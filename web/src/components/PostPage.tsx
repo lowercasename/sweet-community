@@ -63,7 +63,7 @@ function Loaded({ post, groups, onGo }: { post: PostData; groups: Group[]; onGo:
               linked={false}
               expanded
               disabled={status === 'offline'}
-              onEdit={(html) => actions.edit(post.id, html)}
+              onEdit={(html, destination) => actions.edit(post.id, html, destination)}
               onDelete={async () => {
                 await actions.remove(post.id)
                 onGo(back)

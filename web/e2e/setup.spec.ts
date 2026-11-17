@@ -72,11 +72,7 @@ test.describe('a fresh instance', () => {
     await page.reload()
     await expect(page.getByRole('navigation', { name: 'Main' })).toBeVisible()
     await expect(page.getByRole('heading', { name: 'Set up your community' })).toHaveCount(0)
-    // The new community has no topics. Home offers the owner Add topics, which opens the Topics card.
-    await page.getByRole('link', { name: 'Add topics' }).click()
-    await expect(page).toHaveURL(/\/community$/)
-    await expect(page.getByRole('heading', { name: 'Topics' })).toBeVisible()
-    await page.goto('/')
+    await expect(page.getByRole('link', { name: 'Add topics' })).toHaveCount(0)
 
     // Two users register through the link. The join page names Knitting Circle for each of them. The owner gets a
     // notification for both.

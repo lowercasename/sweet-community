@@ -324,12 +324,12 @@ describe('applyEvent', () => {
     expect((qc.getQueryData(keys.profile('mo')) as { bio_html: string }).bio_html).toBe('<p>hi</p>')
   })
 
-  it('prepends a new post to its own group and replaces an existing one in place', () => {
+  it('orders posts by creation time and replaces an existing one in place', () => {
     applyEvent(qc, 'post', post('p4', mo))
     expect(posts().map((p) => p.id)).toEqual(['p4', 'p3', 'p2', 'p1'])
     expect(posts(CLUB).map((p) => p.id)).toEqual(['c9'])
     applyEvent(qc, 'post', post('c8', kit, { group_id: CLUB }))
-    expect(posts(CLUB).map((p) => p.id)).toEqual(['c8', 'c9'])
+    expect(posts(CLUB).map((p) => p.id)).toEqual(['c9', 'c8'])
     applyEvent(qc, 'post', post('p1', kit, { body_html: '<p>edited</p>', edited_at: 9 }))
     expect(posts().map((p) => p.id)).toEqual(['p4', 'p3', 'p2', 'p1'])
     expect(posts()[3].body_html).toBe('<p>edited</p>')
@@ -471,11 +471,11 @@ describe('applyEvent', () => {
     applyEvent(qc, 'membership', { group_id: CLUB, user: kit, role: 'moderator', joined_at: 1 })
     expect(qc.getQueryState(keys.groups)?.isInvalidated).toBe(true)
     expect(qc.getQueryState(keys.posts(CLUB))?.isInvalidated).toBe(true)
-    expect(qc.getQueryState(keys.posts(ROOT))?.isInvalidated).toBe(false)
+    expect(qc.getQueryState(keys.posts(ROOT))?.isInvalidated).toBe(true)
     expect(qc.getQueryState(keys.comments('p2'))?.isInvalidated).toBe(false)
     // Another user's membership change invalidates nothing of the viewer's.
     applyEvent(qc, 'membership', { group_id: ROOT, user: mo, role: 'moderator', joined_at: 1 })
-    expect(qc.getQueryState(keys.posts(ROOT))?.isInvalidated).toBe(false)
+    expect(qc.getQueryState(keys.posts(ROOT))?.isInvalidated).toBe(true)
   })
 
   it('being removed from a group removes it and everything in it from the cache, and another user leaving only removes them from the members list', () => {
@@ -663,4 +663,51 @@ it("moves a discussion's notification to the top when new activity makes it unre
     ['n1', null],
     ['n2', null],
   ])
+})
+
+describe('open room posts on Home', () => {
+  it('updates both feeds and excludes private room posts', () => {
+    const shared = { ...post('open-post', mo, { group_id: CLUB }), group_visibility: 'open' as const }
+    applyEvent(qc, 'post', shared)
+    expect(posts().some((p) => p.id === shared.id)).toBe(true)
+    expect(posts(CLUB).some((p) => p.id === shared.id)).toBe(true)
+    applyEvent(qc, 'post', { ...shared, body_html: '<p>Edited</p>' })
+    expect(posts().find((p) => p.id === shared.id)?.body_html).toBe('<p>Edited</p>')
+    applyEvent(qc, 'post', { ...shared, id: 'private-post', group_visibility: 'private' })
+    expect(posts().some((p) => p.id === 'private-post')).toBe(false)
+    applyEvent(qc, 'post_delete', { id: shared.id, group_id: CLUB })
+    expect(posts().some((p) => p.id === shared.id)).toBe(false)
+  })
+})
+
+it('refreshes permissions on an open-room discussion loaded only through Home', () => {
+  const shared = { ...post('public', mo, { group_id: CLUB }), group_visibility: 'open' as const }
+  qc.setQueryData(keys.posts(ROOT), { pages: [{ posts: [shared], next_before: null }], pageParams: [null] })
+  qc.removeQueries({ queryKey: keys.posts(CLUB) })
+  qc.setQueryData(keys.post(shared.id), shared)
+  qc.setQueryData(keys.comments(shared.id), onePage(comment('reply', shared.id, mo, { group_id: CLUB })))
+  applyEvent(qc, 'membership', { group_id: CLUB, user: kit, role: 'member', joined_at: 1 })
+  expect(qc.getQueryState(keys.comments(shared.id))?.isInvalidated).toBe(true)
+  expect(qc.getQueryState(keys.post(shared.id))?.isInvalidated).toBe(true)
+})
+
+it('moves a post out of its old feed and preserves chronological order in its new feed', () => {
+  const original = post('moving', kit, { group_id: CLUB, group_visibility: 'open', created_at: 2 })
+  qc.setQueryData(keys.posts(CLUB), { pages: [{ posts: [original], next_before: null }], pageParams: [null] })
+  qc.setQueryData(keys.posts('next'), {
+    pages: [{ posts: [post('newer', mo, { created_at: 3 }), post('older', mo, { created_at: 1 })], next_before: null }],
+    pageParams: [null],
+  })
+  qc.setQueryData(keys.post(original.id), original)
+  qc.setQueryData(keys.comments(original.id), onePage(comment('reply', original.id, mo)))
+  const moved = { ...original, group_id: 'next', edited_at: 4 }
+  applyEvent(qc, 'post', moved)
+  expect(posts(CLUB)).toEqual([])
+  expect(posts('next').map((p) => p.id)).toEqual(['newer', 'moving', 'older'])
+  expect(posts(ROOT).filter((p) => p.id === original.id)).toEqual([moved])
+  expect(qc.getQueryData(keys.post(original.id))).toEqual(moved)
+  expect(qc.getQueryState(keys.comments(original.id))?.isInvalidated).toBe(true)
+  applyEvent(qc, 'post', { ...moved, group_id: ROOT })
+  expect(posts('next').map((p) => p.id)).toEqual(['newer', 'older'])
+  expect(posts(ROOT).filter((p) => p.id === original.id)).toHaveLength(1)
 })

@@ -8,11 +8,9 @@ export const keys = {
   preview: (url: string) => ['preview', url] as const,
   users: ['users'] as const,
   groups: ['groups'] as const,
+  roomSidebar: ['roomSidebar'] as const,
   members: (groupId: string) => ['members', groupId] as const,
-  /** A feed, or the community's feed filtered to one topic. The group's key prefix matches both. */
-  posts: (groupId: string, topicId?: string | null) =>
-    topicId ? (['posts', groupId, topicId] as const) : (['posts', groupId] as const),
-  topics: ['topics'] as const,
+  posts: (groupId: string) => ['posts', groupId] as const,
   /** One post, for its page. applyEvent keeps it in sync with the feed that contains it. */
   post: (id: string) => ['post', id] as const,
   comments: (postId: string) => ['comments', postId] as const,

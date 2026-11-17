@@ -33,46 +33,23 @@ func (q *Queries) CountConversationsWithNewMessages(ctx context.Context, arg Cou
 	return count, err
 }
 
-const countPostsSinceByTopic = `-- name: CountPostsSinceByTopic :many
-SELECT p.topic_id, COUNT(*) AS n
-FROM posts p
-WHERE p.group_id = ?1 AND p.deleted_at IS NULL AND p.author_id != ?2 AND p.created_at > ?3
-GROUP BY p.topic_id
+const countHomePostsSince = `-- name: CountHomePostsSince :one
+SELECT COUNT(*) FROM posts p JOIN groups g ON g.id = p.group_id AND g.deleted_at IS NULL
+WHERE (p.group_id = ?1 OR (g.kind = 'group' AND g.visibility = 'open'))
+  AND p.deleted_at IS NULL AND p.author_id != ?2 AND p.created_at > ?3
 `
 
-type CountPostsSinceByTopicParams struct {
+type CountHomePostsSinceParams struct {
 	Root   string
 	UserID string
 	Since  int64
 }
 
-type CountPostsSinceByTopicRow struct {
-	TopicID sql.NullString
-	N       int64
-}
-
-// Counts other users' live posts on the community's feed since a time, by topic (NULL for no topic).
-func (q *Queries) CountPostsSinceByTopic(ctx context.Context, arg CountPostsSinceByTopicParams) ([]CountPostsSinceByTopicRow, error) {
-	rows, err := q.db.QueryContext(ctx, countPostsSinceByTopic, arg.Root, arg.UserID, arg.Since)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	items := []CountPostsSinceByTopicRow{}
-	for rows.Next() {
-		var i CountPostsSinceByTopicRow
-		if err := rows.Scan(&i.TopicID, &i.N); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Close(); err != nil {
-		return nil, err
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
+func (q *Queries) CountHomePostsSince(ctx context.Context, arg CountHomePostsSinceParams) (int64, error) {
+	row := q.db.QueryRowContext(ctx, countHomePostsSince, arg.Root, arg.UserID, arg.Since)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
 }
 
 const countRepliesSince = `-- name: CountRepliesSince :one

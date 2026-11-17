@@ -71,11 +71,12 @@ func (q *Queries) DeletePost(ctx context.Context, arg DeletePostParams) error {
 }
 
 const editPost = `-- name: EditPost :exec
-UPDATE posts SET body_html = ?1, body_text = ?2, edited_at = ?3
-WHERE id = ?4 AND deleted_at IS NULL
+UPDATE posts SET group_id = ?1, body_html = ?2, body_text = ?3, edited_at = ?4
+WHERE id = ?5 AND deleted_at IS NULL
 `
 
 type EditPostParams struct {
+	GroupID  string
 	BodyHtml string
 	BodyText string
 	EditedAt sql.NullInt64
@@ -84,6 +85,7 @@ type EditPostParams struct {
 
 func (q *Queries) EditPost(ctx context.Context, arg EditPostParams) error {
 	_, err := q.db.ExecContext(ctx, editPost,
+		arg.GroupID,
 		arg.BodyHtml,
 		arg.BodyText,
 		arg.EditedAt,
@@ -110,19 +112,20 @@ func (q *Queries) EraseAuthorPosts(ctx context.Context, arg EraseAuthorPostsPara
 }
 
 const getPost = `-- name: GetPost :one
-SELECT p.id, p.group_id, p.topic_id, p.body_html, p.body_text, p.created_at, p.edited_at,
+SELECT p.id, p.group_id, g.visibility AS group_visibility, p.body_html, p.body_text, p.created_at, p.edited_at,
        u.id AS author_id, u.username AS author_username, u.picture_id AS author_picture_id,
        (SELECT COUNT(*) FROM comments c WHERE c.post_id = p.id AND c.deleted_at IS NULL) AS comment_count,
        CAST((SELECT json_group_array(json_array(x.emoji, x.user_id))
              FROM (SELECT emoji, user_id FROM reactions WHERE item_id = p.id ORDER BY rowid) x) AS TEXT) AS reactions
 FROM posts p JOIN users u ON u.id = p.author_id
+JOIN groups g ON g.id = p.group_id AND g.deleted_at IS NULL
 WHERE p.id = ?1 AND p.deleted_at IS NULL
 `
 
 type GetPostRow struct {
 	ID              string
 	GroupID         string
-	TopicID         sql.NullString
+	GroupVisibility string
 	BodyHtml        string
 	BodyText        string
 	CreatedAt       int64
@@ -140,7 +143,7 @@ func (q *Queries) GetPost(ctx context.Context, id string) (GetPostRow, error) {
 	err := row.Scan(
 		&i.ID,
 		&i.GroupID,
-		&i.TopicID,
+		&i.GroupVisibility,
 		&i.BodyHtml,
 		&i.BodyText,
 		&i.CreatedAt,
@@ -206,31 +209,31 @@ func (q *Queries) ListLivePostsByAuthor(ctx context.Context, authorID string) ([
 
 const listPosts = `-- name: ListPosts :many
 
-SELECT p.id, p.group_id, p.topic_id, p.body_html, p.body_text, p.created_at, p.edited_at,
+SELECT p.id, p.group_id, g.visibility AS group_visibility, p.body_html, p.body_text, p.created_at, p.edited_at,
        u.id AS author_id, u.username AS author_username, u.picture_id AS author_picture_id,
        (SELECT COUNT(*) FROM comments c WHERE c.post_id = p.id AND c.deleted_at IS NULL) AS comment_count,
        CAST((SELECT json_group_array(json_array(x.emoji, x.user_id))
              FROM (SELECT emoji, user_id FROM reactions WHERE item_id = p.id ORDER BY rowid) x) AS TEXT) AS reactions
 FROM posts p JOIN users u ON u.id = p.author_id
-WHERE p.group_id = ?1 AND p.deleted_at IS NULL AND p.created_at <= ?2
+JOIN groups g ON g.id = p.group_id AND g.deleted_at IS NULL
+WHERE (p.group_id = ?1 OR
+       (?1 = '00000000-0000-7000-8000-000000000000' AND g.kind = 'group' AND g.visibility = 'open')) AND p.deleted_at IS NULL AND p.created_at <= ?2
   AND (p.created_at < ?2 OR p.id < ?3)
-  AND (?4 IS NULL OR p.topic_id = ?4)
 ORDER BY p.created_at DESC, p.id DESC
-LIMIT ?5
+LIMIT ?4
 `
 
 type ListPostsParams struct {
 	GroupID  string
 	Before   int64
 	BeforeID string
-	TopicID  interface{}
 	PageSize int64
 }
 
 type ListPostsRow struct {
 	ID              string
 	GroupID         string
-	TopicID         sql.NullString
+	GroupVisibility string
 	BodyHtml        string
 	BodyText        string
 	CreatedAt       int64
@@ -250,7 +253,6 @@ func (q *Queries) ListPosts(ctx context.Context, arg ListPostsParams) ([]ListPos
 		arg.GroupID,
 		arg.Before,
 		arg.BeforeID,
-		arg.TopicID,
 		arg.PageSize,
 	)
 	if err != nil {
@@ -263,7 +265,7 @@ func (q *Queries) ListPosts(ctx context.Context, arg ListPostsParams) ([]ListPos
 		if err := rows.Scan(
 			&i.ID,
 			&i.GroupID,
-			&i.TopicID,
+			&i.GroupVisibility,
 			&i.BodyHtml,
 			&i.BodyText,
 			&i.CreatedAt,
@@ -288,7 +290,7 @@ func (q *Queries) ListPosts(ctx context.Context, arg ListPostsParams) ([]ListPos
 }
 
 const listPostsByAuthor = `-- name: ListPostsByAuthor :many
-SELECT p.id, p.group_id, p.topic_id, p.body_html, p.body_text, p.created_at, p.edited_at,
+SELECT p.id, p.group_id, g.visibility AS group_visibility, p.body_html, p.body_text, p.created_at, p.edited_at,
        u.id AS author_id, u.username AS author_username, u.picture_id AS author_picture_id,
        (SELECT COUNT(*) FROM comments c WHERE c.post_id = p.id AND c.deleted_at IS NULL) AS comment_count,
        CAST((SELECT json_group_array(json_array(x.emoji, x.user_id))
@@ -313,7 +315,7 @@ type ListPostsByAuthorParams struct {
 type ListPostsByAuthorRow struct {
 	ID              string
 	GroupID         string
-	TopicID         sql.NullString
+	GroupVisibility string
 	BodyHtml        string
 	BodyText        string
 	CreatedAt       int64
@@ -345,7 +347,7 @@ func (q *Queries) ListPostsByAuthor(ctx context.Context, arg ListPostsByAuthorPa
 		if err := rows.Scan(
 			&i.ID,
 			&i.GroupID,
-			&i.TopicID,
+			&i.GroupVisibility,
 			&i.BodyHtml,
 			&i.BodyText,
 			&i.CreatedAt,

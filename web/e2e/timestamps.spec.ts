@@ -21,7 +21,7 @@ for (const suffix of ['', ' @phone']) {
     const conversation = await mo.context.request.post('/api/groups', { data: { kind: 'dm', members: [uid] } })
     expect(conversation.status()).toBe(201)
     const gid = (await conversation.json()).id
-    const room = await kit.context.request.post('/api/groups', { data: { name: 'Timestamp examples', mode: 'posts' } })
+    const room = await kit.context.request.post('/api/groups', { data: { name: 'Timestamp examples', mode: 'both' } })
     expect(room.status()).toBe(201)
     const rid = (await room.json()).id
     expect((await kit.context.request.post(`/api/groups/${rid}/members`, { data: { user_id: other } })).status()).toBe(

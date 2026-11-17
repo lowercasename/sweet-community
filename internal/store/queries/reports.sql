@@ -45,3 +45,7 @@ SELECT DISTINCT kind, subject_id FROM reports WHERE author_id = sqlc.arg(author_
 -- name: ClearReportCopiesByAuthor :exec
 -- Clears the copies of a removed user's content kept by reports.
 UPDATE reports SET body_html = '' WHERE author_id = sqlc.arg(author_id);
+
+-- name: MovePostReports :exec
+-- Reports keep their original text and follow the discussion's current location.
+UPDATE reports SET group_id = sqlc.arg(group_id) WHERE post_id = sqlc.arg(post_id);

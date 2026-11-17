@@ -10,6 +10,15 @@ import { ROOT, dm, group, nameOf, paragraph, renderWithQuery, user } from '../te
  * Messages, as in the nav column.
  */
 vi.mock('../api', () => ({
+  listRoomSidebar: vi.fn(() =>
+    Promise.resolve({
+      rooms: ['knit', 'wool', 'mods', 'adhd', 'its'].map((group_id) => ({
+        group_id,
+        user_id: 'raphael',
+        in_sidebar: true,
+      })),
+    }),
+  ),
   listMembers: vi.fn(() => Promise.resolve({ members: [] })),
   listUsers: vi.fn(() => Promise.resolve({ users: [] })),
   listMarkers: vi.fn(() =>
@@ -76,6 +85,7 @@ describe('MenuPage', () => {
       'Home',
       'New room',
       'Knitting, unread',
+      'Browse Rooms',
       'New conversation',
       'kit',
       'People',

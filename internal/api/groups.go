@@ -21,10 +21,12 @@ import (
 // Group is the wire shape of a group as one viewer sees it. It includes the
 // viewer's role in the group and the actions they may perform on it.
 type Group struct {
-	ID   string `json:"id"`
-	Kind string `json:"kind"`
-	Name string `json:"name"`
-	// Mode is the group's only setting. It is posts, chat or both. A DM is always chat.
+	ID          string `json:"id"`
+	Kind        string `json:"kind"`
+	Visibility  string `json:"visibility"`
+	Name        string `json:"name"`
+	Description string `json:"description"`
+	// A named room has posts and chat. A conversation has chat only.
 	Mode      string `json:"mode"`
 	CreatedAt int64  `json:"created_at"`
 	// Picture is the URL of the room's picture, or null when the tile with the room's initial is shown.
@@ -58,8 +60,6 @@ type GroupCan struct {
 	CreateGroups  bool `json:"create_groups,omitempty"`
 	// ManageInstance is meaningful on the root group only. The owner may edit instance settings.
 	ManageInstance bool `json:"manage_instance,omitempty"`
-	// ManageTopics is meaningful on the root group only. The owner and moderators may manage the topics.
-	ManageTopics bool `json:"manage_topics,omitempty"`
 	// ManageRules is meaningful on the root group only. The owner and moderators may write the rules.
 	ManageRules bool `json:"manage_rules,omitempty"`
 	// ManageWelcome is meaningful on the root group only. The owner and moderators may write the welcome message.
@@ -81,8 +81,9 @@ type Settings struct {
 }
 
 const (
-	maxNameLen        = 60
-	maxDescriptionLen = 500
+	maxRoomDescriptionLen = 140
+	maxNameLen            = 60
+	maxDescriptionLen     = 500
 )
 
 func (s *Server) settings(ctx context.Context) (Settings, error) {
@@ -134,12 +135,12 @@ type Membership struct {
 }
 
 func groupFor(a perm.Actor, g Group, st Settings) Group {
-	pg := perm.Group{Kind: g.Kind}
+	pg := perm.Group{Kind: g.Kind, Visibility: g.Visibility}
 	g.Role = a.Role
 	g.Can = GroupCan{
 		// In the root group, members are added by invite link and nobody is removed (member removal comes with admin tools). Nobody is added to a conversation.
 		AddMembers:    perm.AddMembers(a, pg),
-		RemoveMembers: perm.RemoveMembers(a) && g.Kind == perm.KindGroup,
+		RemoveMembers: perm.RemoveRoomMembers(a, pg),
 		SetRoles:      a.Role == perm.Owner,
 		Transfer:      a.Role == perm.Owner,
 		Rename:        perm.Rename(a, pg),
@@ -150,7 +151,6 @@ func groupFor(a perm.Actor, g Group, st Settings) Group {
 	if g.Kind == perm.KindRoot {
 		g.Can.CreateGroups = perm.CreateGroup(a, st.GroupCreation)
 		g.Can.ManageInstance = perm.ManageInstance(a)
-		g.Can.ManageTopics = perm.ManageTopics(a)
 		g.Can.ManageRules = perm.ManageRules(a)
 		g.Can.ManageWelcome = perm.ManageWelcome(a)
 		g.Can.HandleReports = perm.HandleReports(a)
@@ -229,7 +229,7 @@ func (s *Server) listGroups(w http.ResponseWriter, r *http.Request) {
 	out := make([]Group, 0, len(rows))
 	for _, row := range rows {
 		// The list row is the group row plus the viewer's role. TestRepliesAndEventsMatchTheRow checks that list and fetch produce the same shape.
-		g, err := wireGroup(r.Context(), s.q(), store.GetGroupRow{ID: row.ID, Kind: row.Kind, Name: row.Name, Mode: row.Mode, CreatedAt: row.CreatedAt, PictureID: row.PictureID, LastMessageAt: row.LastMessageAt})
+		g, err := wireGroup(r.Context(), s.q(), store.GetGroupRow{ID: row.ID, Kind: row.Kind, Name: row.Name, Description: row.Description, Mode: row.Mode, Visibility: row.Visibility, CreatedAt: row.CreatedAt, PictureID: row.PictureID, LastMessageAt: row.LastMessageAt})
 		if err != nil {
 			writeErr(w, http.StatusInternalServerError, err.Error())
 			return
@@ -251,12 +251,14 @@ func (s *Server) getGroup(w http.ResponseWriter, r *http.Request) {
 // instead of 201.
 func (s *Server) createGroup(w http.ResponseWriter, r *http.Request) {
 	var in struct {
-		Kind    string   `json:"kind"`
-		Name    string   `json:"name"`
-		Mode    string   `json:"mode"`
-		Members []string `json:"members"`
+		Kind        string   `json:"kind"`
+		Visibility  string   `json:"visibility"`
+		Name        string   `json:"name"`
+		Description string   `json:"description"`
+		Mode        string   `json:"mode"`
+		Members     []string `json:"members"`
 	}
-	r.Body = http.MaxBytesReader(w, r.Body, 4096)
+	r.Body = http.MaxBytesReader(w, r.Body, 64*1024)
 	if err := json.NewDecoder(r.Body).Decode(&in); err != nil {
 		writeErr(w, http.StatusBadRequest, "Bad request")
 		return
@@ -265,6 +267,11 @@ func (s *Server) createGroup(w http.ResponseWriter, r *http.Request) {
 	now := db.Now()
 	switch in.Kind {
 	case "", perm.KindGroup:
+		in.Description = strings.TrimSpace(in.Description)
+		if utf8.RuneCountInString(in.Description) > maxRoomDescriptionLen {
+			writeErr(w, http.StatusBadRequest, "A room description can have up to 140 characters")
+			return
+		}
 		in.Name = strings.TrimSpace(in.Name)
 		if in.Name == "" || len(in.Name) > 80 {
 			writeErr(w, http.StatusBadRequest, "A room needs a name of up to 80 characters")
@@ -273,12 +280,30 @@ func (s *Server) createGroup(w http.ResponseWriter, r *http.Request) {
 		if in.Mode == "" {
 			in.Mode = perm.ModeBoth
 		}
-		if !validMode(in.Mode) {
-			writeErr(w, http.StatusBadRequest, "Mode must be posts, chat or both")
+		if in.Mode != perm.ModeBoth {
+			writeErr(w, http.StatusBadRequest, "Rooms have posts and chat")
 			return
 		}
-		s.createGroupWith(w, r, perm.KindGroup, in.Name, in.Mode, now, map[string]string{me.ID: perm.Owner})
+		if in.Visibility == "" {
+			in.Visibility = "private"
+		}
+		if in.Visibility != "private" && in.Visibility != "open" {
+			writeErr(w, http.StatusBadRequest, "Visibility must be open or private")
+			return
+		}
+		people := map[string]string{}
+		if in.Visibility == "private" {
+			for _, uid := range in.Members {
+				people[uid] = perm.Member
+			}
+		}
+		people[me.ID] = perm.Owner
+		s.createGroupWith(w, r, perm.KindGroup, in.Name, in.Description, in.Mode, in.Visibility, now, people)
 	case perm.KindDM:
+		if in.Description != "" {
+			writeErr(w, http.StatusBadRequest, "Descriptions are for rooms")
+			return
+		}
 		people := map[string]bool{me.ID: true}
 		for _, id := range in.Members {
 			people[id] = true
@@ -380,7 +405,7 @@ func validMode(m string) bool { return m == perm.ModePosts || m == perm.ModeChat
 // createGroupWith creates a group and its memberships. The response and the
 // events are read back from the rows after the writes. loggedMany
 // personalises the response for the creator's role in the new group.
-func (s *Server) createGroupWith(w http.ResponseWriter, r *http.Request, kind, name, mode string, now int64, people map[string]string) {
+func (s *Server) createGroupWith(w http.ResponseWriter, r *http.Request, kind, name, description, mode, visibility string, now int64, people map[string]string) {
 	id, err := uuid.NewV7()
 	if err != nil {
 		writeErr(w, http.StatusInternalServerError, err.Error())
@@ -391,16 +416,24 @@ func (s *Server) createGroupWith(w http.ResponseWriter, r *http.Request, kind, n
 		if status, err := allowGroupCreation(r, qtx); err != nil {
 			return nil, nil, status, err
 		}
-		if err := qtx.CreateGroup(r.Context(), store.CreateGroupParams{ID: gid, Kind: kind, Name: name, Mode: mode, CreatedAt: now, PeopleKey: sql.NullString{}}); err != nil {
+		if err := qtx.CreateGroup(r.Context(), store.CreateGroupParams{ID: gid, Kind: kind, Name: name, Description: description, Mode: mode, CreatedAt: now, PeopleKey: sql.NullString{}}); err != nil {
 			return nil, nil, http.StatusInternalServerError, err
 		}
 		for uid, role := range people {
-			if _, err := qtx.GetUser(r.Context(), uid); errors.Is(err, sql.ErrNoRows) {
-				return nil, nil, http.StatusBadRequest, errors.New("No such person: " + uid)
+			if u, err := qtx.GetUser(r.Context(), uid); errors.Is(err, sql.ErrNoRows) || (err == nil && u.RemovedAt.Valid) {
+				return nil, nil, http.StatusBadRequest, errors.New("No such person")
 			} else if err != nil {
 				return nil, nil, http.StatusInternalServerError, err
 			}
 			if err := qtx.CreateMembership(r.Context(), store.CreateMembershipParams{GroupID: gid, UserID: uid, Role: role, JoinedAt: now}); err != nil {
+				return nil, nil, http.StatusInternalServerError, err
+			}
+		}
+		if err := qtx.SetRoomVisibility(r.Context(), store.SetRoomVisibilityParams{ID: gid, Visibility: visibility}); err != nil {
+			return nil, nil, http.StatusInternalServerError, err
+		}
+		if visibility == "open" {
+			if err := qtx.AddCommunityToRoom(r.Context(), store.AddCommunityToRoomParams{GroupID: gid, JoinedAt: now}); err != nil {
 				return nil, nil, http.StatusInternalServerError, err
 			}
 		}
@@ -414,7 +447,16 @@ func (s *Server) createGroupWith(w http.ResponseWriter, r *http.Request, kind, n
 			return nil, nil, http.StatusInternalServerError, err
 		}
 		entries := []events.Entry{{Kind: "group", Payload: &g}}
+		me, _ := userFrom(r.Context())
 		for uid := range people {
+			if uid != me.ID {
+				added, _, err := memberAddedEvents(r, qtx, gid, me.ID, uid, now)
+				if err != nil {
+					return nil, nil, http.StatusInternalServerError, err
+				}
+				entries = append(entries, added...)
+				continue
+			}
 			m, err := qtx.GetMember(r.Context(), store.GetMemberParams{GroupID: gid, UserID: uid})
 			if err != nil {
 				return nil, nil, http.StatusInternalServerError, err
@@ -443,7 +485,7 @@ func (s *Server) setGroupPicture(w http.ResponseWriter, r *http.Request) {
 		if err != nil {
 			return nil, status, err
 		}
-		if !perm.Rename(a, perm.Group{Kind: g.Kind}) {
+		if !perm.Rename(a, perm.Group{Kind: g.Kind, Visibility: g.Visibility}) {
 			return nil, http.StatusForbidden, errors.New("Not allowed")
 		}
 
@@ -463,15 +505,21 @@ func (s *Server) setGroupPicture(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// updateGroup sets a group's name and mode (perm.Rename, perm.SetMode).
+// updateGroup sets a group's name, description and mode.
 func (s *Server) updateGroup(w http.ResponseWriter, r *http.Request) {
 	var in struct {
-		Name *string `json:"name"`
-		Mode *string `json:"mode"`
+		Name        *string `json:"name"`
+		Description *string `json:"description"`
+		Mode        *string `json:"mode"`
+		Visibility  *string `json:"visibility"`
 	}
 	r.Body = http.MaxBytesReader(w, r.Body, 4096)
 	if err := json.NewDecoder(r.Body).Decode(&in); err != nil {
 		writeErr(w, http.StatusBadRequest, "Bad request")
+		return
+	}
+	if in.Visibility != nil {
+		writeErr(w, http.StatusBadRequest, "A room’s visibility cannot be changed")
 		return
 	}
 	if in.Name != nil {
@@ -482,6 +530,14 @@ func (s *Server) updateGroup(w http.ResponseWriter, r *http.Request) {
 		}
 		in.Name = &name
 	}
+	if in.Description != nil {
+		description := strings.TrimSpace(*in.Description)
+		if utf8.RuneCountInString(description) > maxRoomDescriptionLen {
+			writeErr(w, http.StatusBadRequest, "A room description can have up to 140 characters")
+			return
+		}
+		in.Description = &description
+	}
 	if in.Mode != nil && !validMode(*in.Mode) {
 		writeErr(w, http.StatusBadRequest, "Mode must be posts, chat or both")
 		return
@@ -491,12 +547,18 @@ func (s *Server) updateGroup(w http.ResponseWriter, r *http.Request) {
 		if err != nil {
 			return nil, status, err
 		}
-		pg := perm.Group{Kind: g.Kind}
+		pg := perm.Group{Kind: g.Kind, Visibility: g.Visibility}
 		if in.Name != nil {
 			if !perm.Rename(a, pg) {
 				return nil, http.StatusForbidden, errors.New("Not allowed")
 			}
 			g.Name = *in.Name
+		}
+		if in.Description != nil {
+			if !perm.Rename(a, pg) {
+				return nil, http.StatusForbidden, errors.New("Not allowed")
+			}
+			g.Description = *in.Description
 		}
 		if in.Mode != nil {
 			if g.Kind == perm.KindDM {
@@ -508,7 +570,7 @@ func (s *Server) updateGroup(w http.ResponseWriter, r *http.Request) {
 			g.Mode = *in.Mode
 		}
 
-		if err := qtx.UpdateGroup(r.Context(), store.UpdateGroupParams{Name: g.Name, Mode: g.Mode, ID: g.ID}); err != nil {
+		if err := qtx.UpdateGroup(r.Context(), store.UpdateGroupParams{Name: g.Name, Description: g.Description, Mode: g.Mode, ID: g.ID}); err != nil {
 			return nil, http.StatusInternalServerError, err
 		}
 		row, err := qtx.GetGroup(r.Context(), g.ID)
@@ -527,7 +589,7 @@ func (s *Server) deleteGroup(w http.ResponseWriter, r *http.Request) {
 		if err != nil {
 			return nil, nil, status, err
 		}
-		if !perm.DeleteGroup(a, perm.Group{Kind: g.Kind}) {
+		if !perm.DeleteGroup(a, perm.Group{Kind: g.Kind, Visibility: g.Visibility}) {
 			return nil, nil, http.StatusForbidden, errors.New("Not allowed")
 		}
 
@@ -619,7 +681,7 @@ func (s *Server) addMember(w http.ResponseWriter, r *http.Request) {
 		if err != nil {
 			return nil, nil, status, err
 		}
-		if !perm.AddMembers(a, perm.Group{Kind: g.Kind}) || g.Kind == perm.KindRoot {
+		if !perm.AddMembers(a, perm.Group{Kind: g.Kind, Visibility: g.Visibility}) || g.Kind == perm.KindRoot {
 			return nil, nil, http.StatusForbidden, errors.New("Not allowed")
 		}
 
@@ -634,26 +696,34 @@ func (s *Server) addMember(w http.ResponseWriter, r *http.Request) {
 			}
 			return nil, nil, http.StatusInternalServerError, err
 		}
-		row, err := qtx.GetMember(r.Context(), store.GetMemberParams{GroupID: g.ID, UserID: in.UserID})
+		entries, m, err := memberAddedEvents(r, qtx, g.ID, a.ID, in.UserID, now)
 		if err != nil {
 			return nil, nil, http.StatusInternalServerError, err
-		}
-		m := wireMembership(g.ID, row)
-		entries := []events.Entry{{Kind: "membership", Payload: m}}
-		// The room's chat says who added whom.
-		line, err := chatLine(r.Context(), qtx, g.ID, AddedKind, a.ID, in.UserID, now)
-		if err != nil {
-			return nil, nil, http.StatusInternalServerError, err
-		}
-		entries = append(entries, line)
-		// The added user is notified. The membership event alone does not produce a notification.
-		if told, err := notify(r, qtx, NotifyAdded, in.UserID, a.ID, g.ID, nil, now); err != nil {
-			return nil, nil, http.StatusInternalServerError, err
-		} else if told != nil {
-			entries = append(entries, *told)
 		}
 		return entries, m, http.StatusCreated, nil
 	})
+}
+
+// memberAddedEvents builds the membership event, chat line and notification after a private room member is added.
+func memberAddedEvents(r *http.Request, q *store.Queries, gid, actorID, userID string, now int64) ([]events.Entry, Membership, error) {
+	row, err := q.GetMember(r.Context(), store.GetMemberParams{GroupID: gid, UserID: userID})
+	if err != nil {
+		return nil, Membership{}, err
+	}
+	m := wireMembership(gid, row)
+	line, err := chatLine(r.Context(), q, gid, AddedKind, actorID, userID, now)
+	if err != nil {
+		return nil, Membership{}, err
+	}
+	entries := []events.Entry{{Kind: "membership", Payload: m}, line}
+	told, err := notify(r, q, NotifyAdded, userID, actorID, gid, nil, now)
+	if err != nil {
+		return nil, Membership{}, err
+	}
+	if told != nil {
+		entries = append(entries, *told)
+	}
+	return entries, m, nil
 }
 
 // setMemberRole lets the group's owner set a member's role to member or
@@ -746,12 +816,12 @@ func (s *Server) removeMember(w http.ResponseWriter, r *http.Request) {
 		if !perm.CanSee(target) {
 			return nil, nil, http.StatusNotFound, errors.New("Not a member")
 		}
-		pg := perm.Group{Kind: g.Kind}
+		pg := perm.Group{Kind: g.Kind, Visibility: g.Visibility}
 		allowed := false
 		if uid == me.ID {
 			allowed = perm.Leave(a, pg)
 		} else {
-			allowed = perm.RemoveMembers(a) && target.Role != perm.Owner && g.Kind != perm.KindRoot
+			allowed = perm.RemoveRoomMembers(a, pg) && target.Role != perm.Owner
 		}
 		if !allowed {
 			return nil, nil, http.StatusForbidden, errors.New("Not allowed")

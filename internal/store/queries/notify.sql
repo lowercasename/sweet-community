@@ -26,12 +26,10 @@ WHERE u.removed_at IS NULL AND u.email_verified_at IS NOT NULL AND u.email IS NO
   AND COALESCE(u.digest_sent_at, 0) < sqlc.arg(sent_before)
 ORDER BY u.username;
 
--- name: CountPostsSinceByTopic :many
--- Counts other users' live posts on the community's feed since a time, by topic (NULL for no topic).
-SELECT p.topic_id, COUNT(*) AS n
-FROM posts p
-WHERE p.group_id = sqlc.arg(root) AND p.deleted_at IS NULL AND p.author_id != sqlc.arg(user_id) AND p.created_at > sqlc.arg(since)
-GROUP BY p.topic_id;
+-- name: CountHomePostsSince :one
+SELECT COUNT(*) FROM posts p JOIN groups g ON g.id = p.group_id AND g.deleted_at IS NULL
+WHERE (p.group_id = sqlc.arg(root) OR (g.kind = 'group' AND g.visibility = 'open'))
+  AND p.deleted_at IS NULL AND p.author_id != sqlc.arg(user_id) AND p.created_at > sqlc.arg(since);
 
 -- name: CountRepliesSince :one
 -- Counts other users' live comments on the user's posts since a time.

@@ -7,7 +7,6 @@ import {
   useGroups,
   useRules,
   usePost,
-  useTopics,
   useUnreadNotifications,
   useSettings,
   useUnreadPlaces,
@@ -16,6 +15,7 @@ import { anyUnread } from '../data/notifications'
 import { StreamProvider } from '../hooks/StreamContext'
 import { useLayout } from '../hooks/useLayout'
 import {
+  BROWSE_ROOMS,
   COMMUNITY,
   CONVERSATIONS,
   NEW_CONVERSATION,
@@ -33,6 +33,8 @@ import { InstallPrompt } from '../components/InstallPrompt'
 import { MembersPage } from '../components/MembersPage'
 import { MenuPage } from '../components/MenuPage'
 import { MessagesPage } from '../components/MessagesPage'
+import { RoomShortcut } from '../components/RoomShortcut'
+import { BrowseRooms } from '../components/BrowseRooms'
 import { NewGroupPage } from '../components/NewGroupPage'
 import { NewMessagePage } from '../components/NewMessagePage'
 import { NotificationsPage } from '../components/NotificationsPage'
@@ -52,6 +54,7 @@ const PAGE_TITLES: Record<string, string> = {
   [CONVERSATIONS]: 'Conversations',
   [NEW_CONVERSATION]: 'New conversation',
   [NEW_ROOM]: 'New room',
+  [BROWSE_ROOMS]: 'Browse Rooms',
   [NOTIFICATIONS]: 'Notifications',
   [SEARCH]: 'Search',
   '/people': 'People',
@@ -85,14 +88,12 @@ export function Home({ me, onSignOut }: HomeProps) {
   const [atMembers, membersParams] = useRoute('/r/:id/members')
   const [atPost, postParams] = useRoute('/p/:id')
   const [atProfile, profileParams] = useRoute('/u/:name')
-  // The words searched for live in the URL, and so does the topic Home is showing.
+  // The search query is part of the URL.
   const search = new URLSearchParams(useSearch())
   const searched = search.get('q') ?? ''
   const atRoot = location === '/'
-  const topicId = atRoot ? search.get('topic') : null
   // The chat message to scroll to, from a notification.
   const focusMessage = search.get('message')
-  const { topics, loading: topicsLoading } = useTopics()
   const { settings } = useSettings()
   const rules = useRules()
   // A post's page sits over the room the post is in, once the post is known.
@@ -159,9 +160,8 @@ export function Home({ me, onSignOut }: HomeProps) {
                   }
                 : { title: PAGE_TITLES[location] ?? 'Home' }
 
-  // A group the URL names that is not mine (or is gone) does not exist to me. A topic that is gone is everything.
+  // A room that is unavailable redirects to Home.
   if (!loading && named && !groups.some((g) => g.id === named)) return <Redirect to="/" replace />
-  if (topicId && !topicsLoading && !topics.some((t) => t.id === topicId)) return <Redirect to="/" replace />
   // A conversation has no members page: it is two people, named in its bar.
   if (atMembers && current?.kind === 'dm') return <Redirect to={groupPath(current.id)} replace />
 
@@ -183,7 +183,11 @@ export function Home({ me, onSignOut }: HomeProps) {
       >
         {/* The phone's menu is the one view under no bar: it is not a place to be named. */}
         {location !== '/menu' && (
-          <PageBar title={bar.title} back={bar.back}>
+          <PageBar
+            title={bar.title}
+            back={bar.back}
+            privateRoom={(viewing || atMembers) && current?.kind === 'group' && current.visibility === 'private'}
+          >
             {narrow && viewing && current?.mode === 'both' && (
               <Segmented
                 label="View"
@@ -214,6 +218,12 @@ export function Home({ me, onSignOut }: HomeProps) {
                 Rules
               </Button>
             )}
+            {location === BROWSE_ROOMS && root?.can.create_groups && (
+              <Button variant="ghost" icon="plus" label="New room" onClick={() => navigate(NEW_ROOM)}>
+                {narrow ? undefined : 'New room'}
+              </Button>
+            )}
+            {viewing && current?.kind === 'group' && <RoomShortcut groupId={current.id} />}
             {viewing && current && current.kind === 'group' && (
               <Button
                 variant="ghost"
@@ -241,7 +251,7 @@ export function Home({ me, onSignOut }: HomeProps) {
           <Route path="/settings">{root && <SettingsPage me={me} root={root} onSignOut={onSignOut} />}</Route>
           <Route path={COMMUNITY}>
             {root &&
-              (root.can.manage_instance || root.can.manage_topics ? (
+              (root.can.manage_instance || root.can.manage_rules ? (
                 <CommunityPage root={root} editing={search.get('edit') === 'welcome' ? 'welcome' : undefined} />
               ) : (
                 <Redirect to="/" replace />
@@ -264,6 +274,9 @@ export function Home({ me, onSignOut }: HomeProps) {
           </Route>
           <Route path="/menu">
             <MenuPage me={me} groups={groups} onGo={navigate} onLogout={onSignOut} />
+          </Route>
+          <Route path={BROWSE_ROOMS}>
+            <BrowseRooms onGo={navigate} />
           </Route>
           <Route path={NEW_ROOM}>
             <NewGroupPage onCreated={(g) => navigate(groupPath(g.id, root?.id))} />
@@ -297,7 +310,6 @@ export function Home({ me, onSignOut }: HomeProps) {
             key={current.id}
             group={current}
             hidden={!viewing}
-            topicId={topicId}
             focusMessage={viewing ? focusMessage : null}
             onFocused={() => navigate(location, { replace: true })}
           />

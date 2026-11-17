@@ -593,3 +593,104 @@ func TestNotificationUpgradeGroupsUnreadAndReconcilesChatMarkers(t *testing.T) {
 		t.Fatalf("user content changed: %q %v", body, err)
 	}
 }
+
+func TestOpenRoomsUpgradePreservesPrivateContent(t *testing.T) {
+	d, err := Open(filepath.Join(t.TempDir(), "sweet.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer d.Close()
+	migratedTo(t, d, "017")
+	const root = "00000000-0000-7000-8000-000000000000"
+	for _, query := range []string{
+		`INSERT INTO users (id, username, created_at) VALUES ('u', 'kit', 1)`,
+		`INSERT INTO groups (id, kind, name, mode, created_at) VALUES ('room', 'group', 'Private plans', 'chat', 1)`,
+		`INSERT INTO memberships (group_id, user_id, role, joined_at) VALUES ('room', 'u', 'owner', 1)`,
+		`INSERT INTO topics (id, name, created_at) VALUES ('t', 'Practice question', 1)`,
+		`INSERT INTO posts (id, group_id, author_id, topic_id, body_html, body_text, created_at) VALUES ('p', '` + root + `', 'u', 't', '<p>Original post</p>', 'Original post', 1)`,
+		`INSERT INTO messages (id, group_id, author_id, body_html, body_text, created_at) VALUES ('m', 'room', 'u', '<p>Private chat</p>', 'Private chat', 1)`,
+		`INSERT INTO events (kind, payload, created_at) VALUES ('group', '{"id":"room","mode":"chat"}', 1)`,
+	} {
+		if _, err := d.Exec(query); err != nil {
+			t.Fatal(err)
+		}
+	}
+	migratedTo(t, d, "018")
+	var private, content, home bool
+	if err := d.QueryRow(`SELECT visibility = 'private' AND mode = 'both' AND name = 'Private plans' FROM groups WHERE id = 'room'`).Scan(&private); err != nil || !private {
+		t.Fatalf("private room retained: %v %v", private, err)
+	}
+	if err := d.QueryRow(`SELECT group_id = ? AND topic_id = 't' AND body_html = '<p>Original post</p>' FROM posts WHERE id = 'p'`, root).Scan(&content); err != nil || !content {
+		t.Fatalf("post retained: %v %v", content, err)
+	}
+	if err := d.QueryRow(`SELECT visibility = 'open' FROM groups WHERE id = ?`, root).Scan(&home); err != nil || !home {
+		t.Fatalf("community audience: %v %v", home, err)
+	}
+	var body string
+	if err := d.QueryRow(`SELECT body_html FROM messages WHERE id = 'm'`).Scan(&body); err != nil || body != "<p>Private chat</p>" {
+		t.Fatalf("message retained: %q %v", body, err)
+	}
+	var n int
+	if err := d.QueryRow(`SELECT COUNT(*) FROM events WHERE kind = 'group'`).Scan(&n); err != nil || n != 0 {
+		t.Fatalf("stale group events: %d %v", n, err)
+	}
+}
+
+func TestRoomPreferencesUpgradePreservesShortcutsAndAlertChoices(t *testing.T) {
+	d, err := Open(filepath.Join(t.TempDir(), "upgrade.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer d.Close()
+	migratedTo(t, d, "018")
+	_, err = d.Exec(`
+ INSERT INTO users(id,username,created_at) VALUES('reader','reader',1),('quiet','quiet',1);
+ INSERT INTO groups(id,kind,name,mode,visibility,created_at) VALUES('room','group','Existing room','both','open',1);
+ INSERT INTO memberships(group_id,user_id,role,joined_at) VALUES('room','reader','owner',1),('room','quiet','member',1);
+ INSERT INTO room_notification_preferences(user_id,group_id,mode) VALUES('quiet','room','off');
+ `)
+	if err != nil {
+		t.Fatal(err)
+	}
+	migratedTo(t, d, "019")
+	var saved int
+	var reader, quiet, role string
+	err = d.QueryRow(`SELECT (SELECT SUM(in_sidebar) FROM memberships WHERE group_id='room'),
+ (SELECT mode FROM room_notification_preferences WHERE group_id='room' AND user_id='reader'),
+ (SELECT mode FROM room_notification_preferences WHERE group_id='room' AND user_id='quiet'),
+ (SELECT role FROM memberships WHERE group_id='room' AND user_id='reader')`).Scan(&saved, &reader, &quiet, &role)
+	if err != nil || saved != 2 || reader != "all" || quiet != "off" || role != "owner" {
+		t.Fatalf("migration: %d %q %q %q %v", saved, reader, quiet, role, err)
+	}
+}
+
+func TestRoomDescriptionsUpgradeKeepsExistingRooms(t *testing.T) {
+	d, err := Open(filepath.Join(t.TempDir(), "upgrade.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer d.Close()
+	migratedTo(t, d, "019")
+	_, err = d.Exec(`
+ INSERT INTO users(id,username,created_at) VALUES('owner','owner',1);
+ INSERT INTO groups(id,kind,name,mode,visibility,created_at) VALUES('room','group','Existing room','both','private',1);
+ INSERT INTO memberships(group_id,user_id,role,joined_at) VALUES('room','owner','owner',1);
+ INSERT INTO posts(id,group_id,author_id,body_html,body_text,created_at) VALUES('post','room','owner','<p>Existing text</p>','Existing text',1);
+ INSERT INTO events(kind,payload,key,created_at) VALUES('group','{"id":"room","name":"Existing room"}','group:room',1);
+ `)
+	if err != nil {
+		t.Fatal(err)
+	}
+	migratedTo(t, d, "020")
+	var name, description, visibility, body string
+	if err := d.QueryRow(`SELECT g.name,g.description,g.visibility,p.body_html FROM groups g JOIN posts p ON p.group_id=g.id WHERE g.id='room'`).Scan(&name, &description, &visibility, &body); err != nil {
+		t.Fatal(err)
+	}
+	if name != "Existing room" || description != "" || visibility != "private" || body != "<p>Existing text</p>" {
+		t.Fatal("upgrade changed existing content or visibility")
+	}
+	var snapshots int
+	if err := d.QueryRow(`SELECT COUNT(*) FROM events WHERE kind='group'`).Scan(&snapshots); err != nil || snapshots != 0 {
+		t.Fatal("stale group snapshots survived")
+	}
+}

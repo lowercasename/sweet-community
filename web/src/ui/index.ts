@@ -72,3 +72,9 @@ export { Tour, type TourCard } from './Tour'
 export { Colophon } from './Colophon'
 
 export { ReadPoint } from './ReadPoint'
+
+export { RadioCards } from './RadioCards'
+export { PeoplePicker } from './PeoplePicker'
+export { PrivateMark } from './PrivateMark'
+
+export { DestinationPicker } from './DestinationPicker'

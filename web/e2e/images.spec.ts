@@ -1,4 +1,4 @@
-import { article, expect, member, open, png, ROOT, test, uniq } from './helpers'
+import { anyView, article, expect, member, open, png, ROOT, test, uniq } from './helpers'
 
 test.describe('images', () => {
   test('images added to a post are shown as cards with alt text in the editor, then as a gallery in the post @dev', async ({
@@ -98,13 +98,15 @@ test.describe('images', () => {
           expect(commentBox.height).toBeCloseTo(commentBox.width, 0)
           await kit.page.screenshot({ path: info.outputPath('square-comment.png'), animations: 'disabled' })
         }
-        const room = await kit.context.request.post('/api/groups', { data: { name: uniq('Images '), mode: 'chat' } })
+        const room = await kit.context.request.post('/api/groups', { data: { name: uniq('Images '), mode: 'both' } })
+        expect(room.status()).toBe(201)
         const gid = (await room.json()).id
         expect(
           (await kit.context.request.post(`/api/groups/${gid}/messages`, { data: { body_html: body } })).status(),
         ).toBe(201)
         await kit.page.route(`**/img/${image.id}`, () => {})
         await open(kit.page, `/r/${gid}`)
+        if (info.project.use.isMobile) await anyView(kit.page, 'Chat').click()
         await img.scrollIntoViewIfNeeded()
         await fits(360)
         await kit.page.unroute(`**/img/${image.id}`)

@@ -50,9 +50,9 @@ test.describe('roles', () => {
     await open(kit.page, '/people')
     await expect(kit.page.getByRole('button', { name: 'Create invite link' })).toBeVisible()
     await expect(kit.page.getByRole('button', { name: /Make / })).toHaveCount(0)
-    // A moderator may manage topics, so the Community page is in their nav, with the Topics card only.
+    // A moderator can manage rules, but cannot change the community settings.
     await kit.page.getByRole('navigation', { name: 'Main' }).getByRole('button', { name: 'Community' }).click()
-    await expect(kit.page.getByRole('heading', { name: 'Topics' })).toBeVisible()
+    await expect(kit.page.getByRole('heading', { name: 'Rules', exact: true })).toBeVisible()
     await expect(kit.page.getByRole('heading', { name: 'About this community' })).toHaveCount(0)
 
     await open(kit.page)
@@ -77,6 +77,7 @@ test.describe('roles', () => {
     await open(kit.page, '/rooms/new')
     const name = uniq('Kits room ')
     await kit.page.getByLabel('Room name').fill(name)
+    await kit.page.getByRole('radio', { name: 'Private', exact: true }).check()
     await kit.page.getByRole('button', { name: 'Create room' }).click()
     await kit.page.getByRole('button', { name: 'Members and settings' }).click()
     await kit.page.getByLabel('Add someone').selectOption({ label: mo.username })
@@ -105,7 +106,7 @@ test.describe('roles', () => {
     await expect(o.page.getByText(text)).toHaveCount(0)
     // Ownership of the room passed to mo.
     await open(mo.page, roomURL)
-    await expect(mo.page.getByRole('listitem').filter({ hasText: mo.username })).toContainText('owner')
+    await expect(mo.page.getByRole('region', { name: 'Owner', exact: true })).toContainText(mo.username)
     await expect(mo.page.getByRole('listitem').filter({ hasText: kit.username })).toHaveCount(0)
 
     // Mo removes themselves from Settings, after a confirmation.

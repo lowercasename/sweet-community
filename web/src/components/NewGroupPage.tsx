@@ -1,32 +1,49 @@
 import { useState } from 'react'
-import type { Group, GroupMode } from '../api'
-import { useGroupActions } from '../data/hooks'
-import { Alert, Button, Card, Field, Form, Input, Measure, Pane, Row, ScrollArea, Select, Stack, Text } from '../ui'
+import { useLocation } from 'wouter'
+import type { Group, RoomVisibility } from '../api'
+import { useGroupActions, useMe, useUsers } from '../data/hooks'
+import {
+  Alert,
+  Button,
+  Card,
+  Field,
+  Form,
+  Input,
+  Measure,
+  Pane,
+  Row,
+  ScrollArea,
+  RadioCards,
+  PeoplePicker,
+  Stack,
+  Text,
+  Textarea,
+} from '../ui'
 
 interface NewGroupPageProps {
   onCreated: (group: Group) => void
 }
 
-const MODES: { value: GroupMode; label: string }[] = [
-  { value: 'both', label: 'Posts and chat' },
-  { value: 'posts', label: 'Posts only' },
-  { value: 'chat', label: 'Chat only' },
-]
-
-/** The page for creating a group. A group needs a name and a mode. Everything else is set through memberships. */
+/** The page for creating a group. A room has a name and an audience. Both audiences have posts and chat. */
 export function NewGroupPage({ onCreated }: NewGroupPageProps) {
   const { create } = useGroupActions()
   const [name, setName] = useState('')
-  const [mode, setMode] = useState<GroupMode>('both')
+  const [description, setDescription] = useState('')
+  const [visibility, setVisibility] = useState<RoomVisibility>('open')
+  const [members, setMembers] = useState<string[]>([])
+  const { data: me } = useMe()
+  const users = useUsers()
+  const [, navigate] = useLocation()
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const waitingForPeople = visibility === 'private' && (!users.data || !me || !!users.error)
 
   const submit = async () => {
-    if (busy || !name.trim()) return
+    if (busy || !name.trim() || waitingForPeople) return
     setBusy(true)
     setError(null)
     try {
-      onCreated(await create(name.trim(), mode))
+      onCreated(await create(name.trim(), visibility, visibility === 'private' ? members : [], description.trim()))
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Could not create the room')
     } finally {
@@ -40,22 +57,63 @@ export function NewGroupPage({ onCreated }: NewGroupPageProps) {
         <Measure>
           <Card>
             <Stack gap={2}>
-              <Text variant="secondary">
-                Rooms are private and only visible to their members. You can add new members from the room settings.
-              </Text>
               <Form onSubmit={() => void submit()}>
                 <Field label="Room name">
-                  <Input value={name} onChange={setName} autoFocus required />
+                  <Input value={name} onChange={setName} autoFocus required maxLength={80} readOnly={busy} />
                 </Field>
-                <Field
-                  label="Mode"
-                  hint="Posts are longer pieces that people comment on. Chat is a running conversation."
-                >
-                  <Select value={mode} options={MODES} onChange={setMode} />
+                <Field label="Description" hint="Optional. Up to 140 characters.">
+                  <Textarea value={description} onChange={setDescription} maxLength={140} rows={3} readOnly={busy} />
                 </Field>
+                <RadioCards
+                  label="Visibility"
+                  value={visibility}
+                  onChange={setVisibility}
+                  disabled={busy}
+                  options={[
+                    {
+                      value: 'open',
+                      label: 'Open',
+                      icon: 'globe',
+                      description: 'Everyone in the community. Posts also appear on Home.',
+                    },
+                    {
+                      value: 'private',
+                      label: 'Private',
+                      icon: 'lock',
+                      description: 'Only people you invite.',
+                    },
+                  ]}
+                />
+                <Text variant="small">Visibility can’t be changed later.</Text>
+                {visibility === 'private' &&
+                  (users.error ? (
+                    <Stack gap={2}>
+                      <Alert tone="error">{users.error.message}</Alert>
+                      <Row>
+                        <Button variant="secondary" onClick={() => void users.refetch()}>
+                          Try again
+                        </Button>
+                      </Row>
+                    </Stack>
+                  ) : !users.data || !me ? (
+                    <Text variant="small">Loading people…</Text>
+                  ) : (
+                    <PeoplePicker
+                      people={[...users.data.values()]
+                        .filter((person) => person.id !== me.id)
+                        .map((person) => ({ id: person.id, name: person.username, picture: person.picture }))
+                        .sort((a, b) => a.name.localeCompare(b.name))}
+                      value={members}
+                      onChange={setMembers}
+                      disabled={busy}
+                    />
+                  ))}
                 {error && <Alert tone="error">{error}</Alert>}
                 <Row justify="end">
-                  <Button type="submit" disabled={!name.trim()} busy={busy}>
+                  <Button variant="ghost" disabled={busy} onClick={() => navigate('/')}>
+                    Cancel
+                  </Button>
+                  <Button type="submit" disabled={!name.trim() || waitingForPeople} busy={busy}>
                     Create room
                   </Button>
                 </Row>

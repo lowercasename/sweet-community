@@ -190,6 +190,19 @@ func insertNotification(r *http.Request, qtx *store.Queries, p store.CreateNotif
 		}
 		p.Scope = "post:" + p.PostID.String
 	} else if p.Kind == NotifyMessage || p.Kind == NotifyMention || p.Kind == NotifyReply {
+		g, err := qtx.GetGroup(r.Context(), p.GroupID)
+		if err != nil {
+			return nil, err
+		}
+		if g.Kind != perm.KindDM {
+			pref, err := qtx.GetRoomNotificationPreference(r.Context(), store.GetRoomNotificationPreferenceParams{UserID: p.UserID, GroupID: p.GroupID})
+			if err != nil {
+				return nil, err
+			}
+			if !chatNotificationAllowed(pref.Mode, p.Kind) {
+				return nil, nil
+			}
+		}
 		p.Scope = streamChatPrefix + p.GroupID
 	}
 	if err := saveNotification(r, qtx, &p); err != nil {
@@ -431,4 +444,9 @@ func (s *Server) setMarker(w http.ResponseWriter, r *http.Request) {
 		}
 		return entries, &m, http.StatusOK, nil
 	})
+}
+
+// chatNotificationAllowed applies the chat preference to both notification creation and device delivery.
+func chatNotificationAllowed(mode, kind string) bool {
+	return mode != "off" && (mode != "mentions" || kind != NotifyMessage)
 }

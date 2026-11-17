@@ -136,8 +136,12 @@ func (q *Queries) GetChatMarker(ctx context.Context, arg GetChatMarkerParams) (G
 
 const getFeedMarker = `-- name: GetFeedMarker :one
 SELECT m.user_id, CAST('feed:' || m.group_id AS TEXT) AS stream, CAST(COALESCE(r.read_at, m.joined_at) AS INTEGER) AS read_at,
-       (SELECT COUNT(*) FROM posts x WHERE x.group_id = m.group_id AND x.deleted_at IS NULL AND x.author_id != m.user_id
-          AND x.created_at > COALESCE(r.read_at, m.joined_at)) AS unread
+       (SELECT COUNT(*) FROM posts x JOIN groups room ON room.id = x.group_id AND room.deleted_at IS NULL
+        WHERE (x.group_id = m.group_id OR (m.group_id = '00000000-0000-7000-8000-000000000000' AND room.kind = 'group' AND room.visibility = 'open')) AND x.deleted_at IS NULL AND x.author_id != m.user_id
+          AND x.created_at > MAX(COALESCE(r.read_at, m.joined_at),
+            COALESCE((SELECT own.read_at FROM read_markers own WHERE own.user_id = m.user_id AND own.stream = 'feed:' || x.group_id), 0),
+            CASE WHEN room.visibility = 'open' THEN COALESCE((SELECT home.read_at FROM read_markers home
+              WHERE home.user_id = m.user_id AND home.stream = 'feed:00000000-0000-7000-8000-000000000000'), 0) ELSE 0 END)) AS unread
 FROM memberships m LEFT JOIN read_markers r ON r.user_id = m.user_id AND r.stream = 'feed:' || m.group_id
 WHERE m.user_id = ?1 AND m.group_id = ?2 AND m.hidden_at IS NULL
 `
@@ -281,16 +285,19 @@ LEFT JOIN read_markers r ON r.user_id = m.user_id AND r.stream = 'chat:' || m.gr
 WHERE m.user_id = ?1 AND m.hidden_at IS NULL
 UNION ALL
 SELECT m.user_id, CAST('feed:' || m.group_id AS TEXT) AS stream, CAST(COALESCE(r.read_at, m.joined_at) AS INTEGER) AS read_at,
-       (SELECT COUNT(*) FROM posts x WHERE x.group_id = m.group_id AND x.deleted_at IS NULL AND x.author_id != m.user_id
-          AND x.created_at > COALESCE(r.read_at, m.joined_at)) AS unread
+       (SELECT COUNT(*) FROM posts x JOIN groups room ON room.id = x.group_id AND room.deleted_at IS NULL
+        WHERE (x.group_id = m.group_id OR (m.group_id = '00000000-0000-7000-8000-000000000000' AND room.kind = 'group' AND room.visibility = 'open')) AND x.deleted_at IS NULL AND x.author_id != m.user_id
+          AND x.created_at > MAX(COALESCE(r.read_at, m.joined_at),
+            COALESCE((SELECT own.read_at FROM read_markers own WHERE own.user_id = m.user_id AND own.stream = 'feed:' || x.group_id), 0),
+            CASE WHEN room.visibility = 'open' THEN COALESCE((SELECT home.read_at FROM read_markers home
+              WHERE home.user_id = m.user_id AND home.stream = 'feed:00000000-0000-7000-8000-000000000000'), 0) ELSE 0 END)) AS unread
 FROM memberships m JOIN groups g ON g.id = m.group_id AND g.deleted_at IS NULL
 LEFT JOIN read_markers r ON r.user_id = m.user_id AND r.stream = 'feed:' || m.group_id
 WHERE m.user_id = ?1 AND m.hidden_at IS NULL
 UNION ALL
 SELECT r.user_id, r.stream, r.read_at,
        (SELECT COUNT(*) FROM comments c WHERE c.post_id = p.id AND c.deleted_at IS NULL AND c.author_id != r.user_id
-          AND c.created_at > r.read_at
-          AND NOT EXISTS (SELECT 1 FROM post_notification_preferences n WHERE n.user_id = r.user_id AND n.post_id = p.id AND n.enabled = 0)) AS unread
+          AND c.created_at > r.read_at) AS unread
 FROM read_markers r JOIN posts p ON p.id = substr(r.stream, 6)
 JOIN memberships m ON m.group_id = p.group_id AND m.user_id = r.user_id
 WHERE r.user_id = ?1 AND r.stream LIKE 'post:%' AND p.deleted_at IS NULL
@@ -306,7 +313,7 @@ type ListMarkersRow struct {
 // The notifications row has no marker time. Its unread count is the number
 // of notifications not yet opened. A post has a row only once the user has a
 // marker for it. Its unread count is other users' live comments since that
-// marker, and none if the user muted the discussion. The post is found by its id, so the query reads only the user's
+// marker. The post is found by its id, so the query reads only the user's
 // markers and not every post in their rooms.
 func (q *Queries) ListMarkers(ctx context.Context, userID string) ([]ListMarkersRow, error) {
 	rows, err := q.db.QueryContext(ctx, listMarkers, userID)
@@ -451,6 +458,22 @@ func (q *Queries) ListUnreadNotificationsUpTo(ctx context.Context, arg ListUnrea
 		return nil, err
 	}
 	return items, nil
+}
+
+const movePostNotifications = `-- name: MovePostNotifications :exec
+UPDATE notifications SET group_id = ?1
+WHERE post_id = ?2 AND scope = 'post:' || ?2
+`
+
+type MovePostNotificationsParams struct {
+	GroupID string
+	PostID  sql.NullString
+}
+
+// Moving a discussion changes its location without creating notification activity.
+func (q *Queries) MovePostNotifications(ctx context.Context, arg MovePostNotificationsParams) error {
+	_, err := q.db.ExecContext(ctx, movePostNotifications, arg.GroupID, arg.PostID)
+	return err
 }
 
 const readNotification = `-- name: ReadNotification :exec

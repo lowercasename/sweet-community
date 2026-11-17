@@ -10,8 +10,6 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	"sort"
-	"strings"
 	"time"
 
 	"sweet/internal/mail"
@@ -64,17 +62,9 @@ func Run(ctx context.Context, d *sql.DB, send mail.Sender, baseURL string, now t
 	if err != nil {
 		return 0, err
 	}
-	topics, err := q.ListTopics(ctx)
-	if err != nil {
-		return 0, err
-	}
-	names := map[string]string{}
-	for _, t := range topics {
-		names[t.ID] = t.Name
-	}
 	sent := 0
 	for _, p := range people {
-		c, ok, err := compose(ctx, q, p, community, baseURL, names)
+		c, ok, err := compose(ctx, q, p, community, baseURL)
 		if err != nil {
 			return sent, err
 		}
@@ -101,9 +91,9 @@ func communityName(ctx context.Context, q *store.Queries) (string, error) {
 }
 
 // compose builds one user's digest. ok is false when there is nothing to report.
-func compose(ctx context.Context, q *store.Queries, p store.ListDigestCandidatesRow, community, baseURL string, topicNames map[string]string) (mail.Content, bool, error) {
+func compose(ctx context.Context, q *store.Queries, p store.ListDigestCandidatesRow, community, baseURL string) (mail.Content, bool, error) {
 	var c mail.Content
-	posts, err := q.CountPostsSinceByTopic(ctx, store.CountPostsSinceByTopicParams{Root: perm.Root, UserID: p.ID, Since: p.Since})
+	posts, err := q.CountHomePostsSince(ctx, store.CountHomePostsSinceParams{Root: perm.Root, UserID: p.ID, Since: p.Since})
 	if err != nil {
 		return c, false, err
 	}
@@ -120,7 +110,7 @@ func compose(ctx context.Context, q *store.Queries, p store.ListDigestCandidates
 		return c, false, err
 	}
 	var lines []string
-	if line := postsLine(posts, topicNames); line != "" {
+	if line := postsLine(posts); line != "" {
 		lines = append(lines, line)
 	}
 	if replies > 0 {
@@ -145,48 +135,12 @@ func compose(ctx context.Context, q *store.Queries, p store.ListDigestCandidates
 	return c, true, nil
 }
 
-// postsLine returns a line such as "12 new posts: 5 in Practice, 3 in Reading, 4 without a topic.", or "" when there are no posts.
-func postsLine(rows []store.CountPostsSinceByTopicRow, topicNames map[string]string) string {
-	var total, untopiced int64
-	type part struct {
-		name string
-		n    int64
-	}
-	var parts []part
-	for _, r := range rows {
-		total += r.N
-		if !r.TopicID.Valid {
-			untopiced += r.N
-			continue
-		}
-		name, ok := topicNames[r.TopicID.String]
-		if !ok {
-			untopiced += r.N
-			continue
-		}
-		parts = append(parts, part{name, r.N})
-	}
+// postsLine describes the number of new posts on Home.
+func postsLine(total int64) string {
 	if total == 0 {
 		return ""
 	}
-	line := plural(total, "new post", "new posts")
-	if len(parts) == 0 {
-		return line + "."
-	}
-	sort.Slice(parts, func(i, j int) bool {
-		if parts[i].n != parts[j].n {
-			return parts[i].n > parts[j].n
-		}
-		return parts[i].name < parts[j].name
-	})
-	var bits []string
-	for _, p := range parts {
-		bits = append(bits, fmt.Sprintf("%d in %s", p.n, p.name))
-	}
-	if untopiced > 0 {
-		bits = append(bits, fmt.Sprintf("%d without a topic", untopiced))
-	}
-	return line + ": " + strings.Join(bits, ", ") + "."
+	return plural(total, "new post", "new posts") + "."
 }
 
 func plural(n int64, one, many string) string {

@@ -1,6 +1,14 @@
 // @vitest-environment happy-dom
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { clearDraft, clearDrafts, loadDraft, pruneDrafts, saveDraft } from './drafts'
+import {
+  loadDraftDestination,
+  saveDraftDestination,
+  clearDraft,
+  clearDrafts,
+  loadDraft,
+  pruneDrafts,
+  saveDraft,
+} from './drafts'
 
 afterEach(() => {
   vi.restoreAllMocks()
@@ -55,4 +63,15 @@ describe('drafts', () => {
     expect(loadDraft('kit', 'post:room')).toBeNull()
     expect(() => pruneDrafts()).not.toThrow()
   })
+})
+
+it('keeps the destination with the draft through edits and deletes both together', () => {
+  saveDraft('kit', 'home', '<p>Draft</p>')
+  saveDraftDestination('kit', 'home', 'room')
+  saveDraft('kit', 'home', '<p>Edited</p>')
+  expect(loadDraftDestination('kit', 'home')).toBe('room')
+  expect(loadDraft('kit', 'home')).toBe('<p>Edited</p>')
+  expect(loadDraftDestination('mo', 'home')).toBeNull()
+  clearDraft('kit', 'home')
+  expect(loadDraftDestination('kit', 'home')).toBeNull()
 })

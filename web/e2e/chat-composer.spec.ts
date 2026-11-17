@@ -1,13 +1,15 @@
 import type { Editor } from '@tiptap/react'
-import { article, chatEditor, expect, member, open, png, test, uniq } from './helpers'
+import { anyView, article, chatEditor, expect, member, open, png, test, uniq } from './helpers'
 
 for (const tag of ['@dev', '@phone']) {
   test(`chat keeps its controls beside the last line and opens tools above it ${tag}`, async ({ browser }, info) => {
     const kit = await member(browser, info)
     await kit.page.setViewportSize({ width: info.project.use.isMobile ? 360 : 1280, height: 800 })
-    const created = await kit.context.request.post('/api/groups', { data: { name: uniq('Composer '), mode: 'chat' } })
+    const created = await kit.context.request.post('/api/groups', { data: { name: uniq('Composer '), mode: 'both' } })
+    expect(created.status()).toBe(201)
     const gid = (await created.json()).id
     await open(kit.page, `/r/${gid}`)
+    if (info.project.use.isMobile) await anyView(kit.page, 'Chat').click()
     const field = chatEditor(kit.page)
     const form = kit.page.locator('form').filter({ has: field })
     const tools = form.getByRole('button', { name: 'Formatting and attachments', exact: true })
@@ -90,6 +92,7 @@ for (const tag of ['@dev', '@phone']) {
     await expect(send).toHaveAttribute('aria-busy', 'true')
     await expect(field).toBeFocused()
     await kit.page.screenshot({ path: info.outputPath('sending.png'), scale: 'css' })
+    await expect.poll(() => typeof rejectSend).toBe('function')
     await rejectSend!()
     await expect(form.getByRole('alert')).toContainText('Could not send message')
     await expect(field).toContainText('Selected words')
@@ -113,6 +116,7 @@ for (const tag of ['@dev', '@phone']) {
     // A short viewport checks layout space, without claiming to emulate a native keyboard.
     await kit.page.setViewportSize({ width: info.project.use.isMobile ? 360 : 600, height: 420 })
     await expect(kit.page.getByRole('navigation', { name: 'Main', exact: true })).toBeVisible()
+    await anyView(kit.page, 'Chat').click()
     await field.fill('A message in a short viewport')
     await aligned()
     await expect(send).toBeInViewport()

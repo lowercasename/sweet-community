@@ -20,7 +20,7 @@ var errImageUnavailable = errors.New("One of the images is no longer available. 
 func recordUses(ctx context.Context, qtx *store.Queries, kind, id, writer, body string) (int, error) {
 	imgs := sanitize.Images(body)
 	// The images are checked before the body's old uses are replaced, so an image that the writer sees only through
-	// this body can stay in it. The body's group does not change, so this shows the image to no one new.
+	// this body can stay in it. Moving a post between public destinations does not change who can see its images.
 	for _, img := range imgs {
 		visible, err := qtx.ImageVisibleTo(ctx, store.ImageVisibleToParams{ImageID: img, ViewerID: writer})
 		if err != nil {

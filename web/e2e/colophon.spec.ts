@@ -1,5 +1,5 @@
 import type { Page } from '@playwright/test'
-import { anyView, expect, member, open, owner, test, uniq, writePost } from './helpers'
+import { anyView, expect, member, open, ROOT, test, uniq, writePost } from './helpers'
 
 /**
  * The line at the bottom of Home's feed: the release, a link to Sweet's
@@ -33,28 +33,18 @@ async function atPaneBottom(page: Page) {
   expect(Math.abs(pane.y + pane.height - 16 - (line.y + line.height))).toBeLessThan(2)
 }
 
-/** Creates a topic with no posts, so the feed filtered to it is short. */
-async function emptyTopic(browser: Parameters<typeof owner>[0], testInfo: Parameters<typeof owner>[1]) {
-  const o = await owner(browser, testInfo)
-  const made = await o.context.request.post('/api/topics', { data: { name: uniq('Quiet '), description: '' } })
-  expect(made.ok()).toBeTruthy()
-  const id = ((await made.json()) as { id: string }).id
-  return {
-    id,
-    remove: async () => {
-      await o.context.request.delete(`/api/topics/${id}`)
-      await o.context.close()
-    },
-  }
+/** Supplies an empty first page to test the footer's short-feed layout. Writes still use the real server. */
+async function emptyHome(page: Page) {
+  await page.route(`**/api/groups/${ROOT}/posts?*`, (route) => route.fulfill({ json: { posts: [], next_before: null } }))
 }
 
 test.describe('colophon', () => {
   test('the line sits at the bottom of a short feed, and follows the last post of a long one', async ({
     browser,
   }, testInfo) => {
-    const topic = await emptyTopic(browser, testInfo)
     const kit = await member(browser, testInfo)
-    await open(kit.page, `/?topic=${topic.id}`)
+    await emptyHome(kit.page)
+    await open(kit.page)
     await checkLine(kit.page)
     await atPaneBottom(kit.page)
     await kit.page.screenshot({ path: 'test-results/colophon-desktop-short.png' })
@@ -68,15 +58,14 @@ test.describe('colophon', () => {
     expect(line.y).toBeGreaterThanOrEqual(last.y + last.height)
     await kit.page.screenshot({ path: 'test-results/colophon-desktop-long.png' })
     await kit.context.close()
-    await topic.remove()
   })
 
   test('@phone the posts view of Home ends with the same line at the bottom of a short feed, and the menu does not name the release', async ({
     browser,
   }, testInfo) => {
-    const topic = await emptyTopic(browser, testInfo)
     const kit = await member(browser, testInfo)
-    await open(kit.page, `/?topic=${topic.id}`)
+    await emptyHome(kit.page)
+    await open(kit.page)
     await anyView(kit.page, 'Posts').click()
     const line = await checkLine(kit.page)
     await atPaneBottom(kit.page)
@@ -88,6 +77,5 @@ test.describe('colophon', () => {
     await expect(kit.page.getByRole('button', { name: /Sign out/ })).toBeVisible()
     await expect(kit.page.getByText(/^Sweet dev$/)).toHaveCount(0)
     await kit.context.close()
-    await topic.remove()
   })
 })

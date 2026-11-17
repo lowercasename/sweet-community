@@ -1,4 +1,4 @@
-import { expect, member, open, sendMessage, test, uniq, type Person } from './helpers'
+import { article, expect, member, open, owner, png, sendMessage, test, uniq, type Person } from './helpers'
 
 const nav = (p: Person) => p.page.getByRole('navigation', { name: 'Main' })
 
@@ -11,6 +11,180 @@ async function messageFromPeople(p: Person, who: string) {
 }
 
 test.describe('nav', () => {
+  for (const suffix of [' @dev', ' @phone']) {
+    test('privacy tooltips are shared and separate from room names' + suffix, async ({ browser }, info) => {
+      const kit = await member(browser, info, 'privacytip')
+      const phone = !!info.project.use.isMobile
+      const name = "It's A Room, Mario, But Not As You Know It"
+      const room = await (
+        await kit.context.request.post('/api/groups', {
+          data: { name, visibility: 'private' },
+        })
+      ).json()
+      const body = uniq('Private post ')
+      await kit.context.request.post(`/api/groups/${room.id}/posts`, { data: { body_html: `<p>${body}</p>` } })
+      await open(kit.page, phone ? '/menu' : `/r/${room.id}`)
+      const row = kit.page.getByRole('group', { name: 'Rooms', exact: true }).getByRole('button', { name, exact: true })
+      const lock = row.getByRole('img', { name: 'Private room', exact: true })
+      await expect(lock).not.toHaveAttribute('title')
+      if (!phone) {
+        await row.getByText(name, { exact: true }).hover()
+        await expect(kit.page.getByRole('tooltip')).toHaveText(name)
+        await lock.hover()
+        await expect(kit.page.getByRole('tooltip')).toHaveText('Private room')
+        await kit.page.screenshot({
+          path: `test-results/privacy-nav-${info.project.name}.png`,
+          animations: 'disabled',
+          scale: 'css',
+        })
+        await row.getByText(name, { exact: true }).hover()
+        await expect(kit.page.getByRole('tooltip')).toHaveText(name)
+        await lock.hover()
+        await expect(kit.page.getByRole('tooltip')).toHaveText('Private room')
+        await kit.page.getByRole('heading', { name, exact: true }).hover()
+        // Wait past the hover delay to catch a pending room-name tooltip.
+        await kit.page.waitForTimeout(500)
+        await expect(kit.page.getByRole('tooltip')).toHaveCount(0)
+        await lock.hover()
+        await expect(kit.page.getByRole('tooltip')).toHaveText('Private room')
+      }
+      await open(kit.page, `/r/${room.id}`)
+      const headerLock = kit.page
+        .getByRole('heading', { name, exact: true })
+        .locator('..')
+        .getByRole('img', { name: 'Private room', exact: true })
+      await expect(headerLock).not.toHaveAttribute('title')
+      await kit.page.keyboard.press('Tab')
+      await headerLock.focus()
+      await expect(kit.page.getByRole('tooltip')).toHaveText('Private room')
+      await kit.page.screenshot({
+        path: `test-results/privacy-header-${info.project.name}.png`,
+        animations: 'disabled',
+        scale: 'css',
+      })
+      await kit.page.keyboard.press('Escape')
+      await expect(kit.page.getByRole('tooltip')).toHaveCount(0)
+      await open(kit.page, `/u/${kit.username}`)
+      const postLock = article(kit.page, body).getByRole('img', { name: 'Private room', exact: true })
+      await expect(postLock).not.toHaveAttribute('title')
+      await kit.page.keyboard.press('Tab')
+      await postLock.focus()
+      await expect(kit.page.getByRole('tooltip')).toHaveText('Private room')
+      await kit.page.screenshot({
+        path: `test-results/privacy-post-${info.project.name}.png`,
+        animations: 'disabled',
+        scale: 'css',
+      })
+      await kit.context.close()
+    })
+
+    test('private room locks align beside short and truncated names' + suffix, async ({ browser }, info) => {
+      const kit = await member(browser, info, 'navcheck')
+      const long = "It's A Room, Mario, But Not As You Know It"
+      for (const name of [long, 'Mod Team']) {
+        expect(
+          (await kit.context.request.post('/api/groups', { data: { name, visibility: 'private' } })).status(),
+        ).toBe(201)
+      }
+      await open(kit.page, info.project.use.isMobile ? '/menu' : '/')
+      const area = info.project.use.isMobile
+        ? kit.page.getByRole('group', { name: 'Rooms' })
+        : nav(kit).getByRole('group', { name: 'Rooms' })
+      const first = area.getByRole('button', { name: long, exact: true })
+      const second = area.getByRole('button', { name: 'Mod Team', exact: true })
+      const tabToFirst = async () => {
+        await nav(kit).getByRole('button', { name: 'Home', exact: true }).focus()
+        const count = await nav(kit).getByRole('button').count()
+        for (let step = 0; step < count; step++) {
+          await kit.page.keyboard.press('Tab')
+          if (await first.evaluate((el) => el === document.activeElement)) break
+        }
+        await expect(first).toBeFocused()
+      }
+      if (!info.project.use.isMobile) await first.click()
+      await kit.page.screenshot({
+        path: `test-results/nav-private-${info.project.name}.png`,
+        scale: 'css',
+        animations: 'disabled',
+      })
+      const a = await first.getByRole('img', { name: 'Private room', exact: true }).boundingBox()
+      const b = await second.getByRole('img', { name: 'Private room', exact: true }).boundingBox()
+      expect(Math.abs(a!.x - b!.x)).toBeLessThan(1)
+      await expect(first.getByText('I', { exact: true })).toBeVisible()
+      await expect(second.getByText('M', { exact: true })).toBeVisible()
+      if (!info.project.use.isMobile) {
+        await first.hover()
+        await expect(kit.page.getByRole('tooltip', { name: long, exact: true })).toBeVisible()
+        await kit.page.screenshot({
+          path: `test-results/nav-private-hover-${info.project.name}.png`,
+          scale: 'css',
+          animations: 'disabled',
+        })
+        await second.click()
+        await expect(second).toHaveAttribute('aria-current', 'page')
+        await kit.page.screenshot({
+          path: `test-results/nav-private-short-selected-${info.project.name}.png`,
+          scale: 'css',
+          animations: 'disabled',
+        })
+        await tabToFirst()
+        await expect(kit.page.getByRole('tooltip', { name: long, exact: true })).toBeVisible()
+        await nav(kit).getByRole('button', { name: 'Collapse', exact: true }).click()
+        await tabToFirst()
+        await expect(kit.page.getByRole('tooltip', { name: long, exact: true })).toBeVisible()
+        await kit.page.screenshot({
+          path: `test-results/nav-private-collapsed-${info.project.name}.png`,
+          scale: 'css',
+          animations: 'disabled',
+        })
+      }
+      await kit.context.close()
+    })
+
+    test(
+      'a missing room picture shows its initial and a replacement picture loads' + suffix,
+      async ({ browser }, info) => {
+        const kit = await member(browser, info, 'picturecheck')
+        const room = await (
+          await kit.context.request.post('/api/groups', {
+            data: { name: "It's A Room, Mario, But Not As You Know It", visibility: 'private' },
+          })
+        ).json()
+        const pictures = []
+        for (const rgb of [
+          [200, 20, 20],
+          [20, 20, 200],
+        ] as [number, number, number][]) {
+          const upload = await kit.context.request.post('/api/images', {
+            multipart: { file: { name: 'room.png', mimeType: 'image/png', buffer: png(20, 20, rgb) } },
+          })
+          expect(upload.status()).toBe(201)
+          pictures.push(await upload.json())
+        }
+        await kit.context.request.put(`/api/groups/${room.id}/picture`, { data: { image_id: pictures[0].id } })
+        await kit.page.route(`**${pictures[0].url}`, (route) =>
+          route.fulfill({ status: 404, contentType: 'text/plain', body: '404 page not found' }),
+        )
+        await open(kit.page, info.project.use.isMobile ? '/menu' : `/r/${room.id}`)
+        const item = kit.page
+          .getByRole('group', { name: 'Rooms', exact: true })
+          .getByRole('button', { name: room.name, exact: true })
+        await expect(item.getByText('I', { exact: true })).toBeVisible()
+        await kit.page.screenshot({
+          path: `test-results/nav-picture-fallback-${info.project.name}.png`,
+          scale: 'css',
+          animations: 'disabled',
+        })
+        await kit.context.request.put(`/api/groups/${room.id}/picture`, { data: { image_id: pictures[1].id } })
+        await expect(item.locator('img')).toHaveAttribute('src', pictures[1].url)
+        await expect
+          .poll(() => item.locator('img').evaluate((el: HTMLImageElement) => el.complete && el.naturalWidth > 0))
+          .toBe(true)
+        await kit.context.close()
+      },
+    )
+  }
+
   test('nav labels are dark text at regular weight, and a section title is the lighter grey', async ({
     browser,
   }, testInfo) => {
@@ -174,3 +348,67 @@ test.describe('nav', () => {
     await mo.context.close()
   })
 })
+
+for (const suffix of [' @dev', ' @phone']) {
+  test('navigation labels and marks align across icons, rooms and people' + suffix, async ({ browser }, info) => {
+    const kit = await owner(browser, info)
+    const mo = await member(browser, info, 'aligned')
+    const long = uniq('Alignment ').padEnd(40, 'x')
+    const short = uniq('Room ')
+    for (const name of [long, short]) {
+      const response = await kit.context.request.post('/api/groups', { data: { name, visibility: 'private' } })
+      expect(response.status()).toBe(201)
+      if (name === short) {
+        const room = await response.json()
+        const upload = await kit.context.request.post('/api/images', {
+          multipart: { file: { name: 'room.png', mimeType: 'image/png', buffer: png(24, 24, [80, 120, 180]) } },
+        })
+        const picture = await upload.json()
+        expect(
+          (await kit.context.request.put(`/api/groups/${room.id}/picture`, { data: { image_id: picture.id } })).ok(),
+        ).toBe(true)
+      }
+    }
+    const person = await (await mo.context.request.get('/api/me')).json()
+    await kit.context.request.post('/api/groups', { data: { kind: 'dm', members: [person.id] } })
+    const phone = !!info.project.use.isMobile
+    if (phone) await kit.page.setViewportSize({ width: 360, height: 800 })
+    await open(kit.page, phone ? '/menu' : '/')
+    const names = [long, short, mo.username, 'Browse Rooms', 'Home', 'People', 'Community', kit.username]
+    if (!phone) names.push('Search', 'Notifications', 'Collapse')
+    const rows = names.map((name) =>
+      kit.page.getByRole('button', { name: new RegExp('^' + name + '(?:, unread)?$') }).first(),
+    )
+    const labelEdges: number[] = []
+    const markCenters: number[] = []
+    for (let i = 0; i < rows.length; i++) {
+      const label = rows[i].getByText(names[i], { exact: true })
+      await expect(label).toBeVisible()
+      labelEdges.push((await label.boundingBox())!.x)
+      const mark = rows[i].locator('svg, img, span[aria-hidden="true"]').first()
+      const box = (await mark.boundingBox())!
+      markCenters.push(box.x + box.width / 2)
+    }
+    expect(Math.max(...labelEdges) - Math.min(...labelEdges)).toBeLessThan(1)
+    expect(Math.max(...markCenters) - Math.min(...markCenters)).toBeLessThan(1)
+    await kit.page.screenshot({ path: info.outputPath('navigation-aligned.png'), scale: 'css', animations: 'disabled' })
+    if (!phone) {
+      await nav(kit).getByRole('button', { name: 'Collapse', exact: true }).click()
+      await expect(nav(kit)).toHaveCSS('width', '56px')
+      const centers = []
+      for (const name of [long, short, mo.username, 'Browse Rooms', 'Home', 'People', kit.username]) {
+        const row = nav(kit).getByRole('button', { name: new RegExp('^' + name + '(?:, unread)?$') })
+        const box = (await row.locator('svg, img, span[aria-hidden="true"]').first().boundingBox())!
+        centers.push(box.x + box.width / 2)
+      }
+      expect(Math.max(...centers) - Math.min(...centers)).toBeLessThan(1)
+      await kit.page.screenshot({
+        path: info.outputPath('navigation-collapsed.png'),
+        scale: 'css',
+        animations: 'disabled',
+      })
+    }
+    await kit.context.close()
+    await mo.context.close()
+  })
+}

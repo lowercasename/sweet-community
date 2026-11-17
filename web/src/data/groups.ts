@@ -20,3 +20,14 @@ export const roomsOf = (groups: Group[]) =>
   groups
     .filter((g) => g.kind === 'group')
     .sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }))
+
+/** Home and open rooms share the same destinations in new posts and edits. */
+export const postDestinations = (groups: Group[]) =>
+  groups
+    .filter((g) => g.kind === 'root' || (g.kind === 'group' && g.visibility === 'open'))
+    .map((g) => ({
+      id: g.id,
+      name: g.kind === 'root' ? 'Home' : g.name,
+      picture: g.picture,
+      icon: g.kind === 'root' ? ('home' as const) : undefined,
+    }))

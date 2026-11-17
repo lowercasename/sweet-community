@@ -146,7 +146,7 @@ func TestDigestGoesToTheAwayWithSomethingToTell(t *testing.T) {
 	}
 	for _, want := range []string{
 		"Since you were last at Thursday Group",
-		"2 new posts: 1 in Practice, 1 without a topic.",
+		"2 new posts.",
 		"1 reply to your posts.",
 		"sam joined.",
 		"2 conversations with new messages.",
@@ -185,19 +185,14 @@ func TestDigestGoesToTheAwayWithSomethingToTell(t *testing.T) {
 }
 
 func TestWordsForNumbersAndNames(t *testing.T) {
-	names := map[string]string{"t1": "Practice", "t2": "Reading"}
-	rows := []store.CountPostsSinceByTopicRow{
-		{TopicID: sql.NullString{}, N: 4},
-		{TopicID: sql.NullString{String: "t1", Valid: true}, N: 5},
-		{TopicID: sql.NullString{String: "t2", Valid: true}, N: 3},
-	}
-	if got := postsLine(rows, names); got != "12 new posts: 5 in Practice, 3 in Reading, 4 without a topic." {
+
+	if got := postsLine(12); got != "12 new posts." {
 		t.Errorf("posts line: %q", got)
 	}
-	if got := postsLine([]store.CountPostsSinceByTopicRow{{N: 1}}, names); got != "1 new post." {
+	if got := postsLine(1); got != "1 new post." {
 		t.Errorf("one post: %q", got)
 	}
-	if got := postsLine(nil, names); got != "" {
+	if got := postsLine(0); got != "" {
 		t.Errorf("no posts: %q", got)
 	}
 	for _, c := range []struct {

@@ -3,29 +3,28 @@ import { tourSteps, type TourContext } from './steps'
 
 /**
  * The welcome tour's steps (docs/tour-script.md). Which steps a user gets depends on the width, on whether they are
- * the owner, and on the community: its topics, its rules, and who may create rooms.
+ * the owner, and on the community: its rules and who may create rooms.
  */
 const member: TourContext = {
   community: 'Knitting Circle',
   phone: false,
   owner: false,
   canCreateRooms: true,
-  topic: 'Introductions',
   hasRules: true,
 }
 const ids = (c: TourContext) => tourSteps(c).map((s) => s.id)
 
 describe('tourSteps', () => {
   it('gives a member on a desktop every step that applies, ending with the rules', () => {
-    expect(ids(member)).toEqual(['posts', 'chat', 'divider', 'topics', 'rooms', 'conversations', 'rules'])
+    expect(ids(member)).toEqual(['posts', 'chat', 'divider', 'rooms', 'conversations', 'rules'])
   })
 
   it('leaves out the divider on a phone, which shows one column at a time', () => {
-    expect(ids({ ...member, phone: true })).toEqual(['posts', 'chat', 'topics', 'rooms', 'conversations', 'rules'])
+    expect(ids({ ...member, phone: true })).toEqual(['posts', 'chat', 'rooms', 'conversations', 'rules'])
   })
 
-  it('leaves out topics, rooms and rules when they do not apply', () => {
-    expect(ids({ ...member, topic: undefined, canCreateRooms: false, hasRules: false })).toEqual([
+  it('leaves out rooms and rules when they do not apply', () => {
+    expect(ids({ ...member, canCreateRooms: false, hasRules: false })).toEqual([
       'posts',
       'chat',
       'divider',
@@ -38,7 +37,6 @@ describe('tourSteps', () => {
       'posts',
       'chat',
       'divider',
-      'topics',
       'rooms',
       'conversations',
       'community',
@@ -52,7 +50,6 @@ describe('tourSteps', () => {
       posts: 'posts',
       chat: 'chat',
       divider: 'divider',
-      topics: 'topics',
       rooms: 'rooms',
       conversations: 'conversations',
       community: 'community',
@@ -61,7 +58,6 @@ describe('tourSteps', () => {
     expect(at({ ...member, phone: true })).toEqual({
       posts: 'view-posts',
       chat: 'view-chat',
-      topics: 'topics',
       rooms: 'menu',
       conversations: 'menu',
       rules: 'menu',
@@ -79,7 +75,6 @@ describe('tourSteps', () => {
       'This column is the chat. Everyone in Knitting Circle can read and write in it. Use it for quick messages.',
     )
     expect(step('divider').title).toBe('Resize the columns')
-    expect(step('topics').body[0]).toMatch(/^A post can have a topic, such as Introductions\. /)
     expect(step('rooms').body[0]).toContain('You could make one to bring together a few people who share an interest.')
     expect(step('rules').body).toEqual([
       "You agreed to Knitting Circle's rules when you joined. You can read them again here.",

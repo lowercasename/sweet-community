@@ -10,6 +10,23 @@ import (
 	"database/sql"
 )
 
+const addCommunityToRoom = `-- name: AddCommunityToRoom :exec
+INSERT INTO memberships (group_id, user_id, role, joined_at, in_sidebar)
+SELECT ?1, user_id, 'member', ?2, 0
+FROM memberships WHERE group_id = '00000000-0000-7000-8000-000000000000'
+ON CONFLICT (group_id, user_id) DO NOTHING
+`
+
+type AddCommunityToRoomParams struct {
+	GroupID  string
+	JoinedAt int64
+}
+
+func (q *Queries) AddCommunityToRoom(ctx context.Context, arg AddCommunityToRoomParams) error {
+	_, err := q.db.ExecContext(ctx, addCommunityToRoom, arg.GroupID, arg.JoinedAt)
+	return err
+}
+
 const countMembers = `-- name: CountMembers :one
 SELECT COUNT(*) FROM memberships WHERE group_id = ?1 AND hidden_at IS NULL
 `
@@ -22,17 +39,18 @@ func (q *Queries) CountMembers(ctx context.Context, groupID string) (int64, erro
 }
 
 const createGroup = `-- name: CreateGroup :exec
-INSERT INTO groups (id, kind, name, mode, created_at, people_key)
-VALUES (?1, ?2, ?3, ?4, ?5, ?6)
+INSERT INTO groups (id, kind, name, description, mode, created_at, people_key)
+VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)
 `
 
 type CreateGroupParams struct {
-	ID        string
-	Kind      string
-	Name      string
-	Mode      string
-	CreatedAt int64
-	PeopleKey sql.NullString
+	ID          string
+	Kind        string
+	Name        string
+	Description string
+	Mode        string
+	CreatedAt   int64
+	PeopleKey   sql.NullString
 }
 
 func (q *Queries) CreateGroup(ctx context.Context, arg CreateGroupParams) error {
@@ -40,6 +58,7 @@ func (q *Queries) CreateGroup(ctx context.Context, arg CreateGroupParams) error 
 		arg.ID,
 		arg.Kind,
 		arg.Name,
+		arg.Description,
 		arg.Mode,
 		arg.CreatedAt,
 		arg.PeopleKey,
@@ -69,7 +88,7 @@ func (q *Queries) CreateMembership(ctx context.Context, arg CreateMembershipPara
 }
 
 const deleteGroup = `-- name: DeleteGroup :exec
-UPDATE groups SET deleted_at = ?1, name = '', picture_id = NULL
+UPDATE groups SET deleted_at = ?1, name = '', description = '', picture_id = NULL
 WHERE id = ?2 AND deleted_at IS NULL
 `
 
@@ -130,7 +149,7 @@ func (q *Queries) DeleteMembership(ctx context.Context, arg DeleteMembershipPara
 }
 
 const getDMByPeople = `-- name: GetDMByPeople :one
-SELECT g.id, g.kind, g.name, g.mode, g.created_at, g.picture_id,
+SELECT g.id, g.kind, g.name, g.description, g.mode, g.visibility, g.created_at, g.picture_id,
        (SELECT MAX(created_at) FROM messages WHERE group_id = g.id AND deleted_at IS NULL AND kind = 'message') AS last_message_at
 FROM groups g WHERE g.kind = 'dm' AND g.people_key = ?1 AND g.deleted_at IS NULL
 `
@@ -139,7 +158,9 @@ type GetDMByPeopleRow struct {
 	ID            string
 	Kind          string
 	Name          string
+	Description   string
 	Mode          string
+	Visibility    string
 	CreatedAt     int64
 	PictureID     sql.NullString
 	LastMessageAt interface{}
@@ -154,7 +175,9 @@ func (q *Queries) GetDMByPeople(ctx context.Context, peopleKey sql.NullString) (
 		&i.ID,
 		&i.Kind,
 		&i.Name,
+		&i.Description,
 		&i.Mode,
+		&i.Visibility,
 		&i.CreatedAt,
 		&i.PictureID,
 		&i.LastMessageAt,
@@ -164,7 +187,7 @@ func (q *Queries) GetDMByPeople(ctx context.Context, peopleKey sql.NullString) (
 
 const getGroup = `-- name: GetGroup :one
 
-SELECT g.id, g.kind, g.name, g.mode, g.created_at, g.picture_id,
+SELECT g.id, g.kind, g.name, g.description, g.mode, g.visibility, g.created_at, g.picture_id,
        (SELECT MAX(created_at) FROM messages WHERE group_id = g.id AND deleted_at IS NULL AND kind = 'message') AS last_message_at
 FROM groups g WHERE g.id = ?1 AND g.deleted_at IS NULL
 `
@@ -173,7 +196,9 @@ type GetGroupRow struct {
 	ID            string
 	Kind          string
 	Name          string
+	Description   string
 	Mode          string
+	Visibility    string
 	CreatedAt     int64
 	PictureID     sql.NullString
 	LastMessageAt interface{}
@@ -189,7 +214,9 @@ func (q *Queries) GetGroup(ctx context.Context, id string) (GetGroupRow, error) 
 		&i.ID,
 		&i.Kind,
 		&i.Name,
+		&i.Description,
 		&i.Mode,
+		&i.Visibility,
 		&i.CreatedAt,
 		&i.PictureID,
 		&i.LastMessageAt,
@@ -265,6 +292,28 @@ func (q *Queries) GetMembership(ctx context.Context, arg GetMembershipParams) (G
 	return i, err
 }
 
+const getRoomSidebar = `-- name: GetRoomSidebar :one
+SELECT group_id, user_id, in_sidebar FROM memberships WHERE group_id = ? AND user_id = ?
+`
+
+type GetRoomSidebarParams struct {
+	GroupID string
+	UserID  string
+}
+
+type GetRoomSidebarRow struct {
+	GroupID   string
+	UserID    string
+	InSidebar int64
+}
+
+func (q *Queries) GetRoomSidebar(ctx context.Context, arg GetRoomSidebarParams) (GetRoomSidebarRow, error) {
+	row := q.db.QueryRowContext(ctx, getRoomSidebar, arg.GroupID, arg.UserID)
+	var i GetRoomSidebarRow
+	err := row.Scan(&i.GroupID, &i.UserID, &i.InSidebar)
+	return i, err
+}
+
 const hideMembership = `-- name: HideMembership :exec
 UPDATE memberships SET hidden_at = ?1 WHERE group_id = ?2 AND user_id = ?3
 `
@@ -278,6 +327,23 @@ type HideMembershipParams struct {
 // Hiding a conversation keeps the row and sets hidden_at.
 func (q *Queries) HideMembership(ctx context.Context, arg HideMembershipParams) error {
 	_, err := q.db.ExecContext(ctx, hideMembership, arg.HiddenAt, arg.GroupID, arg.UserID)
+	return err
+}
+
+const joinOpenRooms = `-- name: JoinOpenRooms :exec
+INSERT INTO memberships (group_id, user_id, role, joined_at, in_sidebar)
+SELECT id, ?1, 'member', ?2, 0
+FROM groups WHERE kind = 'group' AND visibility = 'open' AND deleted_at IS NULL
+ON CONFLICT (group_id, user_id) DO NOTHING
+`
+
+type JoinOpenRoomsParams struct {
+	UserID   string
+	JoinedAt int64
+}
+
+func (q *Queries) JoinOpenRooms(ctx context.Context, arg JoinOpenRoomsParams) error {
+	_, err := q.db.ExecContext(ctx, joinOpenRooms, arg.UserID, arg.JoinedAt)
 	return err
 }
 
@@ -391,7 +457,7 @@ func (q *Queries) ListMyGroupIDs(ctx context.Context, userID string) ([]string, 
 }
 
 const listMyGroups = `-- name: ListMyGroups :many
-SELECT g.id, g.kind, g.name, g.mode, g.created_at, g.picture_id, m.role, m.hidden_at,
+SELECT g.id, g.kind, g.name, g.description, g.mode, g.visibility, g.created_at, g.picture_id, m.role, m.hidden_at,
        (SELECT MAX(created_at) FROM messages WHERE group_id = g.id AND deleted_at IS NULL AND kind = 'message') AS last_message_at
 FROM memberships m JOIN groups g ON g.id = m.group_id
 WHERE m.user_id = ?1 AND g.deleted_at IS NULL
@@ -402,7 +468,9 @@ type ListMyGroupsRow struct {
 	ID            string
 	Kind          string
 	Name          string
+	Description   string
 	Mode          string
+	Visibility    string
 	CreatedAt     int64
 	PictureID     sql.NullString
 	Role          string
@@ -425,13 +493,49 @@ func (q *Queries) ListMyGroups(ctx context.Context, userID string) ([]ListMyGrou
 			&i.ID,
 			&i.Kind,
 			&i.Name,
+			&i.Description,
 			&i.Mode,
+			&i.Visibility,
 			&i.CreatedAt,
 			&i.PictureID,
 			&i.Role,
 			&i.HiddenAt,
 			&i.LastMessageAt,
 		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listRoomSidebar = `-- name: ListRoomSidebar :many
+SELECT m.group_id, m.user_id, m.in_sidebar FROM memberships m JOIN groups g ON g.id = m.group_id
+WHERE m.user_id = ? AND g.kind = 'group' AND g.deleted_at IS NULL
+`
+
+type ListRoomSidebarRow struct {
+	GroupID   string
+	UserID    string
+	InSidebar int64
+}
+
+func (q *Queries) ListRoomSidebar(ctx context.Context, userID string) ([]ListRoomSidebarRow, error) {
+	rows, err := q.db.QueryContext(ctx, listRoomSidebar, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListRoomSidebarRow{}
+	for rows.Next() {
+		var i ListRoomSidebarRow
+		if err := rows.Scan(&i.GroupID, &i.UserID, &i.InSidebar); err != nil {
 			return nil, err
 		}
 		items = append(items, i)
@@ -528,6 +632,35 @@ func (q *Queries) SetMembershipRole(ctx context.Context, arg SetMembershipRolePa
 	return err
 }
 
+const setRoomSidebar = `-- name: SetRoomSidebar :exec
+UPDATE memberships SET in_sidebar = ? WHERE group_id = ? AND user_id = ?
+`
+
+type SetRoomSidebarParams struct {
+	InSidebar int64
+	GroupID   string
+	UserID    string
+}
+
+func (q *Queries) SetRoomSidebar(ctx context.Context, arg SetRoomSidebarParams) error {
+	_, err := q.db.ExecContext(ctx, setRoomSidebar, arg.InSidebar, arg.GroupID, arg.UserID)
+	return err
+}
+
+const setRoomVisibility = `-- name: SetRoomVisibility :exec
+UPDATE groups SET visibility = ?1 WHERE id = ?2 AND kind = 'group'
+`
+
+type SetRoomVisibilityParams struct {
+	Visibility string
+	ID         string
+}
+
+func (q *Queries) SetRoomVisibility(ctx context.Context, arg SetRoomVisibilityParams) error {
+	_, err := q.db.ExecContext(ctx, setRoomVisibility, arg.Visibility, arg.ID)
+	return err
+}
+
 const showMembership = `-- name: ShowMembership :exec
 UPDATE memberships SET hidden_at = NULL WHERE group_id = ?1 AND user_id = ?2
 `
@@ -543,16 +676,22 @@ func (q *Queries) ShowMembership(ctx context.Context, arg ShowMembershipParams) 
 }
 
 const updateGroup = `-- name: UpdateGroup :exec
-UPDATE groups SET name = ?1, mode = ?2 WHERE id = ?3 AND deleted_at IS NULL
+UPDATE groups SET name = ?1, description = ?2, mode = ?3 WHERE id = ?4 AND deleted_at IS NULL
 `
 
 type UpdateGroupParams struct {
-	Name string
-	Mode string
-	ID   string
+	Name        string
+	Description string
+	Mode        string
+	ID          string
 }
 
 func (q *Queries) UpdateGroup(ctx context.Context, arg UpdateGroupParams) error {
-	_, err := q.db.ExecContext(ctx, updateGroup, arg.Name, arg.Mode, arg.ID)
+	_, err := q.db.ExecContext(ctx, updateGroup,
+		arg.Name,
+		arg.Description,
+		arg.Mode,
+		arg.ID,
+	)
 	return err
 }

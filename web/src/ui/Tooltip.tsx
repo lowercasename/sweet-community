@@ -52,9 +52,17 @@ export function useTooltip(label: string, enabled: boolean, placement: Placement
   )
   return {
     ref: refs.setReference,
+    /** Positions the tooltip beside a containing control instead of its inner pointer target. */
+    positionRef: refs.setPositionReference,
     props: (own?: HTMLProps<HTMLElement>) => getReferenceProps(own),
+    /** Focus handlers for a control whose inner label is the pointer target. */
+    focusProps: {
+      onFocus: focus.reference?.onFocus,
+      onBlur: focus.reference?.onBlur,
+    },
     tooltip,
     /** Opens the tooltip, for a press and hold on a touch screen. */
     show: () => setOpen(true),
+    hide: () => setOpen(false),
   }
 }

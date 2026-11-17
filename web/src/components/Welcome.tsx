@@ -1,15 +1,7 @@
 import { useMemo, useState } from 'react'
 import { useLocation } from 'wouter'
 import type { Group } from '../api'
-import {
-  useMembers,
-  useMySettings,
-  useRules,
-  useSetMySettings,
-  useSettings,
-  useTopics,
-  useWelcome,
-} from '../data/hooks'
+import { useMembers, useMySettings, useRules, useSetMySettings, useSettings, useWelcome } from '../data/hooks'
 import { useLayout } from '../hooks/useLayout'
 import { COMMUNITY } from '../routes'
 import { tourSteps, type TourStep } from '../tour/steps'
@@ -37,7 +29,6 @@ export function Welcome({ root, atHome, asked, onClosed }: WelcomeProps) {
   const { settings } = useSettings()
   const welcome = useWelcome()
   const rules = useRules()
-  const { topics } = useTopics()
   const { members } = useMembers(root.id)
   const { narrow, layout, setLayout, navExpanded, toggleNav } = useLayout()
   const [, navigate] = useLocation()
@@ -62,17 +53,12 @@ export function Welcome({ root, atHome, asked, onClosed }: WelcomeProps) {
         phone: narrow,
         owner: root.role === 'owner',
         canCreateRooms: root.can.create_groups === true,
-        topic: topics[0]?.name,
         hasRules: !!rules,
       }),
     )
   }
 
   const cards = useMemo(() => steps ?? [], [steps])
-  const before = (i: number) => {
-    // On a phone the topic menu is in the posts view.
-    if (narrow && cards[i]?.id === 'topics') setLayout('posts')
-  }
   const end = (finished: boolean) => {
     const last = cards.at(-1)
     setSteps(null)
@@ -110,7 +96,7 @@ export function Welcome({ root, atHome, asked, onClosed }: WelcomeProps) {
         )}
         <Text variant="small">Would you like a quick tour? You can start it again from Settings at any time.</Text>
       </ConfirmDialog>
-      <Tour cards={cards} run={steps !== null} before={before} onEnd={end} />
+      <Tour cards={cards} run={steps !== null} onEnd={end} />
     </>
   )
 }

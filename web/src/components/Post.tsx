@@ -1,19 +1,21 @@
 import { useState } from 'react'
 import type { Post as PostData } from '../api'
-import { useAuthor, useMarkers, useTopics, usePostNotificationPreference } from '../data/hooks'
-import { ROOT_ID } from '../data/keys'
+import { useAuthor, useGroups, useMe, useMarkers, usePostNotificationPreference } from '../data/hooks'
+import { postDestinations } from '../data/groups'
+import { loadDraftDestination } from '../editor/drafts'
 import { hasUnread, postStream } from '../data/notifications'
 import { postExtensions } from '../editor/extensions'
-import { groupPath, postPath, topicPath } from '../routes'
+import { groupPath, postPath } from '../routes'
 import {
   Alert,
   Button,
   Card,
   ConfirmDialog,
+  DestinationPicker,
   Link,
+  PrivateMark,
   Menu,
   type MenuItem,
-  Pill,
   Row,
   shieldText,
   Stack,
@@ -42,23 +44,12 @@ interface PostProps {
   /** True while offline. Disables saving. */
   disabled: boolean
   /** Resolves when the server has stored the new body. */
-  onEdit: (bodyHtml: string) => Promise<void>
+  onEdit: (bodyHtml: string, groupId?: string) => Promise<void>
   /** Resolves when the server has deleted the post. The post is then removed from the query cache. */
   onDelete: () => Promise<void>
-  /** Sets the post's topic, or clears it. Called from the editor when the author saves. */
-  onSetTopic?: (topicId: string | null) => Promise<void>
 }
 
-export function Post({
-  post,
-  linked = true,
-  expanded = false,
-  place,
-  disabled,
-  onEdit,
-  onDelete,
-  onSetTopic,
-}: PostProps) {
+export function Post({ post, linked = true, expanded = false, place, disabled, onEdit, onDelete }: PostProps) {
   const [optionsOpen, setOptionsOpen] = useState(false)
   const preference = usePostNotificationPreference(post.id, optionsOpen)
   const [notificationError, setNotificationError] = useState<string | null>(null)
@@ -75,11 +66,14 @@ export function Post({
     }
   }
   const author = useAuthor(post.author)
-  // The topic name is read from the topics cache, so a rename updates every pill at once.
-  const { topics } = useTopics()
-  const topic = topics.find((t) => t.id === post.topic_id)
-  const [draftTopic, setDraftTopic] = useState<string | null>(post.topic_id)
   const [editing, setEditing] = useState(false)
+  const { data: me } = useMe()
+  const { groups } = useGroups()
+  const choices = postDestinations(groups)
+  const draft = `post-edit:${post.id}`
+  const [destination, setDestination] = useState(post.group_id)
+  const [saving, setSaving] = useState(false)
+  const valid = !post.can.move || choices.some((g) => g.id === destination)
   const [open, setOpen] = useState(expanded)
   // Other users' comments the user has not read. The dot shows on the comments button while the comments are closed.
   const unread = hasUnread(useMarkers().markers, postStream(post.id))
@@ -92,23 +86,19 @@ export function Post({
   const [reporting, setReporting] = useState(false)
 
   const save = async (bodyHtml: string) => {
-    await onEdit(bodyHtml)
-    if (draftTopic !== post.topic_id && onSetTopic) await onSetTopic(draftTopic)
-    setEditing(false)
+    if (!valid) throw new Error('Choose a room before saving')
+    setSaving(true)
+    try {
+      await onEdit(bodyHtml, post.can.move ? destination : undefined)
+      setEditing(false)
+    } finally {
+      setSaving(false)
+    }
   }
   const startEditing = () => {
-    setDraftTopic(post.topic_id)
+    setDestination(post.can.move && me ? (loadDraftDestination(me.id, draft) ?? post.group_id) : post.group_id)
     setEditing(true)
   }
-
-  // The topic pill comes after the time in the author line, which shows who, when and
-  // where. For every user, the pill links to the topic. The card's right edge holds the menu, which is hidden until
-  // hovered. The topic is changed while editing the post.
-  const pill = topic ? (
-    <Pill href={topicPath(topic.id)} label={`Topic: ${topic.name}`}>
-      {topic.name}
-    </Pill>
-  ) : null
 
   const remove = async () => {
     setDeleting(true)
@@ -165,18 +155,33 @@ export function Post({
     <Card
       as="article"
       head={
-        place && (
-          <Row gap={2} align="center">
-            <Tile name={place.name} picture={place.picture} />
-            <Text as="span" variant="small">
-              Posted in{' '}
-              <Link href={groupPath(place.id)}>
-                <Text as="span" variant="body" weight="bold">
-                  {place.name}
-                </Text>
-              </Link>
-            </Text>
-          </Row>
+        editing && post.can.move ? (
+          <DestinationPicker
+            value={destination}
+            choices={choices}
+            disabled={disabled || saving || choices.length === 0}
+            onChange={setDestination}
+          />
+        ) : (
+          place && (
+            <Row gap={2} align="center" wrap="never">
+              <Tile name={place.name} picture={place.picture} />
+              <Text as="span" variant="small">
+                Posted in{' '}
+                <Link href={groupPath(place.id)}>
+                  <Text as="span" variant="body" weight="bold">
+                    {place.name}
+                  </Text>
+                </Link>
+                {post.group_visibility === 'private' && (
+                  <>
+                    {'\u00a0'}
+                    <PrivateMark />
+                  </>
+                )}
+              </Text>
+            </Row>
+          )
         )
       }
     >
@@ -188,7 +193,6 @@ export function Post({
               <Text as="span" variant="small">
                 {linked ? <Link href={postPath(post.id)}>{when}</Link> : when}
               </Text>
-              {!editing && pill}
             </Row>
             {items.length > 0 && !editing && !disabled && (
               <Menu
@@ -200,24 +204,22 @@ export function Post({
               />
             )}
           </Row>
+          {editing && !valid && choices.length > 0 && (
+            <Alert tone="error">That room is no longer available. Choose another room to save.</Alert>
+          )}
           {editing ? (
             // The stored HTML is passed to the editor as its input. There is no separate document format.
             <BodyEditor
-              groupId={post.group_id}
-              key={post.edited_at ?? 0}
+              groupId={destination}
               extensions={postExtensions}
               size="post"
               submitLabel="Save"
               initialHtml={post.body_html}
-              draft={`post-edit:${post.id}`}
-              disabled={disabled}
+              draft={draft}
+              draftDestination={destination}
+              disabled={disabled || !valid}
               onSubmit={save}
               onCancel={() => setEditing(false)}
-              topic={
-                post.group_id === ROOT_ID && onSetTopic
-                  ? { topics, value: draftTopic, onChange: setDraftTopic }
-                  : undefined
-              }
             />
           ) : (
             <Body html={post.body_html} />

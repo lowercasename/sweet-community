@@ -21,7 +21,6 @@ import type {
   Report,
   CommunityText,
   Settings,
-  Topic,
   User,
 } from '../api'
 import { dismissDeviceNotifications } from '../reading'
@@ -51,12 +50,11 @@ export const EVENT_KINDS = [
   'my_settings',
   'post_notification_preference',
   'room_notification_preference',
+  'room_sidebar',
   'notification',
   'notification_delete',
   'marker',
   'profile',
-  'topic',
-  'topic_delete',
   'report',
   'report_delete',
 ] as const
@@ -74,7 +72,7 @@ export function applyEvent(qc: QueryClient, kind: string, data: unknown): void {
       if (isPost(data)) upsertPost(qc, data)
       break
     case 'post_delete':
-      if (hasId(data) && typeof data.group_id === 'string') deletePost(qc, data.id, data.group_id)
+      if (hasId(data) && typeof data.group_id === 'string') deletePost(qc, data.id)
       break
     case 'comment':
       if (isComment(data)) upsertComment(qc, data)
@@ -96,6 +94,7 @@ export function applyEvent(qc: QueryClient, kind: string, data: unknown): void {
       if (isUser(data)) upsertUser(qc, data)
       break
     case 'group':
+      void qc.invalidateQueries({ queryKey: keys.roomSidebar })
       if (isGroup(data)) upsertGroup(qc, data)
       break
     case 'group_delete':
@@ -105,9 +104,11 @@ export function applyEvent(qc: QueryClient, kind: string, data: unknown): void {
       }
       break
     case 'membership':
+      void qc.invalidateQueries({ queryKey: keys.roomSidebar })
       if (isMembership(data)) upsertMembership(qc, data)
       break
     case 'membership_delete':
+      void qc.invalidateQueries({ queryKey: keys.roomSidebar })
       if (isMembershipRef(data)) deleteMembership(qc, data.group_id, data.user_id)
       break
     case 'my_settings':
@@ -116,10 +117,11 @@ export function applyEvent(qc: QueryClient, kind: string, data: unknown): void {
     case 'post_notification_preference': {
       const preference = data as PostNotificationPreference
       qc.setQueryData(keys.postNotifications(preference.post_id), preference)
-      // A muted discussion has no unread comments, so the post's marker changes.
-      void qc.invalidateQueries({ queryKey: keys.markers })
       break
     }
+    case 'room_sidebar':
+      void qc.invalidateQueries({ queryKey: keys.roomSidebar })
+      break
     case 'room_notification_preference': {
       const preference = data as RoomNotificationPreference
       qc.setQueryData(keys.roomNotifications(preference.group_id), preference)
@@ -150,12 +152,6 @@ export function applyEvent(qc: QueryClient, kind: string, data: unknown): void {
         void qc.invalidateQueries({ queryKey: keys.groups })
       }
       break
-    case 'topic':
-      if (isTopic(data)) upsertTopic(qc, data)
-      break
-    case 'topic_delete':
-      if (hasId(data)) deleteTopic(qc, data.id)
-      break
     case 'report':
       if (isReport(data)) upsertReport(qc, data)
       break
@@ -178,41 +174,6 @@ function dropReport(qc: QueryClient, kind: string, id: string) {
   qc.setQueryData<Reports>(keys.reports, (old) =>
     old ? { reports: old.reports.filter((x) => x.kind !== kind || x.id !== id) } : old,
   )
-}
-
-type Topics = { topics: Topic[] }
-
-/**
- * A topic event from the stream does not say whether the user follows the
- * topic, so the cached `following` value is kept. The reply to the user's own
- * follow or unfollow does carry it, and is applied through `applyFollowing`.
- */
-function upsertTopic(qc: QueryClient, t: Topic, following?: boolean) {
-  qc.setQueryData<Topics>(keys.topics, (old) => {
-    const known = old?.topics.find((x) => x.id === t.id)
-    const next = { ...t, following: following ?? known?.following ?? false }
-    const rest = (old?.topics ?? []).filter((x) => x.id !== t.id)
-    return { topics: [...rest, next].sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' })) }
-  })
-}
-
-/** Applies the server's reply to the user's own follow or unfollow, which is the topic as the user now sees it. */
-export function applyFollowing(qc: QueryClient, t: Topic) {
-  upsertTopic(qc, t, t.following)
-}
-
-/** Removes a deleted topic from the list and clears topic_id on the posts that had it. */
-function deleteTopic(qc: QueryClient, id: string) {
-  qc.setQueryData<Topics>(keys.topics, (old) => old && { topics: old.topics.filter((x) => x.id !== id) })
-  const unfiled = (p: Post) => (p.topic_id === id ? { ...p, topic_id: null } : p)
-  qc.setQueriesData<Posts>({ queryKey: ['posts'] }, (old) => eachPage(old, 'posts', (ps) => ps.map(unfiled)))
-  qc.setQueriesData<Posts>({ queryKey: ['userPosts'] }, (old) => eachPage(old, 'posts', (ps) => ps.map(unfiled)))
-  qc.setQueriesData<Post>({ queryKey: ['post'] }, (old) => old && unfiled(old))
-  qc.removeQueries({ queryKey: ['posts'], predicate: (q) => q.queryKey[2] === id })
-}
-
-function isTopic(v: unknown): v is Topic {
-  return hasId(v) && typeof (v as { name?: unknown }).name === 'string'
 }
 
 type Posts = InfiniteData<PostPage>
@@ -261,29 +222,60 @@ function upsertInPages<
 
 /** Upserts a post into its author's posts list, if that list is loaded. */
 function upsertUserPost(qc: QueryClient, post: Post) {
-  qc.setQueryData<Posts>(keys.userPosts(post.author.username), (old) => upsertInPages(old, 'posts', post))
+  qc.setQueryData<Posts>(keys.userPosts(post.author.username), (old) => upsertPostInPages(old, post))
+}
+
+/** Inserts a moved post at its original date, including across loaded page boundaries. */
+function upsertPostInPages(old: Posts | undefined, post: Post): Posts | undefined {
+  const updated = upsertInPages(old, 'posts', post)
+  if (!updated || holds(old, 'posts', post.id)) return updated
+  const sorted = updated.pages
+    .flatMap((p) => p.posts)
+    .sort((a, b) => b.created_at - a.created_at || b.id.localeCompare(a.id))
+  let offset = 0
+  return {
+    ...updated,
+    pages: updated.pages.map((p) => {
+      const posts = sorted.slice(offset, offset + p.posts.length)
+      offset += p.posts.length
+      return { ...p, posts }
+    }),
+  }
 }
 
 function upsertPost(qc: QueryClient, post: Post) {
   upsertUserPost(qc, post)
   void qc.invalidateQueries({ queryKey: keys.markers })
-  // The post's page query, if loaded, gets the same post.
   qc.setQueryData<Post>(keys.post(post.id), (old) => (old ? post : old))
-  // Update the group's feed and each loaded topic view of it. The post goes
-  // into the view of the topic it is filed under and out of every other view.
-  for (const [key] of qc.getQueriesData<Posts>({ queryKey: keys.posts(post.group_id) })) {
-    const topicId = key[2]
-    const belongs = topicId === undefined || topicId === post.topic_id
-    qc.setQueryData<Posts>(key, (old) =>
-      belongs ? upsertInPages(old, 'posts', post) : eachPage(old, 'posts', (ps) => ps.filter((x) => x.id !== post.id)),
-    )
+  // A move removes the post from every feed except its new room and Home.
+  qc.setQueriesData<Posts>(
+    {
+      queryKey: ['posts'],
+      predicate: (q) =>
+        q.queryKey[1] !== post.group_id && !(q.queryKey[1] === ROOT_ID && post.group_visibility === 'open'),
+    },
+    (old) => eachPage(old, 'posts', (ps) => ps.filter((p) => p.id !== post.id)),
+  )
+  qc.setQueryData<Posts>(keys.posts(post.group_id), (old) => upsertPostInPages(old, post))
+  if (post.group_id !== ROOT_ID && post.group_visibility === 'open')
+    qc.setQueryData<Posts>(keys.posts(ROOT_ID), (old) => upsertPostInPages(old, post))
+  if (post.edited_at != null) {
+    // Replies inherit the post's room permissions. Notification locations and search results can change too.
+    void qc.invalidateQueries({ queryKey: keys.comments(post.id) })
+    void qc.invalidateQueries({ queryKey: keys.notifications })
+    void qc.invalidateQueries({ queryKey: ['search'] })
+    void qc.invalidateQueries({ queryKey: keys.reports })
   }
 }
 
-function deletePost(qc: QueryClient, id: string, groupId: string) {
+function deletePost(qc: QueryClient, id: string) {
   void qc.invalidateQueries({ queryKey: keys.markers })
+  // A deletion can replace a move in the replay log.
+  void qc.invalidateQueries({ queryKey: keys.notifications })
+  void qc.invalidateQueries({ queryKey: ['search'] })
+  void qc.invalidateQueries({ queryKey: keys.reports })
   const without = (old: Posts | undefined) => eachPage(old, 'posts', (ps) => ps.filter((x) => x.id !== id))
-  qc.setQueriesData<Posts>({ queryKey: keys.posts(groupId) }, without)
+  qc.setQueriesData<Posts>({ queryKey: ['posts'] }, without)
   qc.removeQueries({ queryKey: keys.comments(id) })
   qc.removeQueries({ queryKey: keys.post(id) })
   qc.setQueriesData<Posts>({ queryKey: ['userPosts'] }, without)
@@ -294,7 +286,7 @@ function setReactions(qc: QueryClient, r: Reactions) {
   const set = <T extends { id: string; reactions: Reaction[] }>(items: T[]) =>
     items.map((x) => (x.id === r.id ? { ...x, reactions: r.reactions } : x))
   if (r.kind === 'post') {
-    qc.setQueriesData<Posts>({ queryKey: keys.posts(r.group_id) }, (old) => eachPage(old, 'posts', set))
+    qc.setQueriesData<Posts>({ queryKey: ['posts'] }, (old) => eachPage(old, 'posts', set))
     qc.setQueriesData<Posts>({ queryKey: ['userPosts'] }, (old) => eachPage(old, 'posts', set))
     qc.setQueryData<Post>(keys.post(r.id), (old) => old && { ...old, reactions: r.reactions })
   } else if (r.kind === 'comment' && r.post_id) {
@@ -311,6 +303,7 @@ function refreshCommentCount(qc: QueryClient, postId: string, groupId: string) {
     void qc.invalidateQueries({ queryKey: keys.markers })
   void qc.invalidateQueries({ queryKey: keys.post(postId) })
   void qc.invalidateQueries({ queryKey: keys.posts(groupId) })
+  if (groupId !== ROOT_ID) void qc.invalidateQueries({ queryKey: keys.posts(ROOT_ID) })
   void qc.invalidateQueries({ queryKey: ['userPosts'] })
 }
 
@@ -455,6 +448,7 @@ function upsertMarker(qc: QueryClient, m: Marker) {
       markers: known ? markers.map((x) => (x.stream === m.stream && x.read_at <= m.read_at ? m : x)) : [...markers, m],
     }
   })
+  if (m.stream.startsWith('feed:')) void qc.invalidateQueries({ queryKey: keys.markers })
 }
 
 /** Removes the marker of a stream the user no longer has. */
@@ -481,6 +475,9 @@ function upsertGroup(qc: QueryClient, g: Group) {
 function dropGroup(qc: QueryClient, id: string) {
   qc.setQueryData<Groups>(keys.groups, (old) => (old ? { groups: old.groups.filter((x) => x.id !== id) } : old))
   qc.removeQueries({ queryKey: keys.posts(id) })
+  qc.setQueryData<Posts>(keys.posts(ROOT_ID), (old) =>
+    eachPage(old, 'posts', (ps) => ps.filter((p) => p.group_id !== id)),
+  )
   qc.removeQueries({ queryKey: keys.messages(id) })
   qc.removeQueries({ queryKey: keys.members(id) })
   qc.removeQueries({
@@ -557,8 +554,13 @@ export function refetchForOwnRole(qc: QueryClient, groupId: string) {
   void qc.invalidateQueries({ queryKey: keys.markers })
   void qc.invalidateQueries({ queryKey: keys.groups })
   void qc.invalidateQueries({ queryKey: keys.posts(groupId) })
+  if (groupId !== ROOT_ID) void qc.invalidateQueries({ queryKey: keys.posts(ROOT_ID) })
   void qc.invalidateQueries({ queryKey: keys.messages(groupId) })
   void qc.invalidateQueries({ queryKey: keys.members(groupId) })
+  void qc.invalidateQueries({ queryKey: ['userPosts'] })
+  void qc.invalidateQueries({
+    predicate: (q) => q.queryKey[0] === 'post' && (q.state.data as Post | undefined)?.group_id === groupId,
+  })
   void qc.invalidateQueries({
     predicate: (q) => q.queryKey[0] === 'comments' && inGroup(qc, q.queryKey[1], groupId),
   })
@@ -598,7 +600,11 @@ function deleteMembership(qc: QueryClient, groupId: string, userId: string) {
 
 /** Whether the post with this id is in this group's loaded feed. */
 function inGroup(qc: QueryClient, postId: unknown, groupId: string): boolean {
-  return typeof postId === 'string' && holds(qc.getQueryData<Posts>(keys.posts(groupId)), 'posts', postId)
+  if (typeof postId !== 'string') return false
+  if (qc.getQueryData<Post>(keys.post(postId))?.group_id === groupId) return true
+  return qc
+    .getQueriesData<Posts>({ queryKey: ['posts'] })
+    .some(([, data]) => data?.pages.some((page) => page.posts.some((p) => p.id === postId && p.group_id === groupId)))
 }
 
 /** Whether the id is the root group's fixed id. Used when the groups list is not loaded yet. */

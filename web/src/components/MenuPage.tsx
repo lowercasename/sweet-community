@@ -1,8 +1,8 @@
 import type { Group, User } from '../api'
 import { roomsOf } from '../data/groups'
-import { useAuthor, useRules, useUnreadPlaces } from '../data/hooks'
+import { useRoomSidebar, useAuthor, useRules, useUnreadPlaces } from '../data/hooks'
 import { anyUnread } from '../data/notifications'
-import { NEW_ROOM, RULES, groupPath, profilePath, COMMUNITY } from '../routes'
+import { BROWSE_ROOMS, NEW_ROOM, RULES, groupPath, profilePath, COMMUNITY } from '../routes'
 import { Avatar, Card, Hairline, NavItem, NavSection, Pane, shieldText, Stack, Tile } from '../ui'
 import { ConversationsSection } from './ConversationsSection'
 
@@ -25,7 +25,9 @@ export function MenuPage({ me, groups, onGo, onLogout }: MenuPageProps) {
   const live = useAuthor(me)
   const places = useUnreadPlaces()
   const root = groups.find((g) => g.kind === 'root')
-  const mine = roomsOf(groups)
+  const sidebar = useRoomSidebar()
+  const saved = new Set(sidebar.data?.rooms.filter((r) => r.in_sidebar).map((r) => r.group_id))
+  const mine = roomsOf(groups).filter((g) => saved.has(g.id))
   const canCreate = root?.can.create_groups === true
   return (
     <Pane flush>
@@ -45,29 +47,29 @@ export function MenuPage({ me, groups, onGo, onLogout }: MenuPageProps) {
             dot={!!root && anyUnread(places.get(root.id))}
             onClick={() => onGo('/')}
           />
-          {(mine.length > 0 || canCreate) && (
-            <NavSection
-              title="Rooms"
-              expanded
-              action={canCreate ? { icon: 'plus', label: 'New room', onClick: () => onGo(NEW_ROOM) } : undefined}
-            >
-              {mine.map((g) => (
-                <NavItem
-                  key={g.id}
-                  mark={<Tile name={g.name} picture={g.picture} />}
-                  label={g.name}
-                  expanded
-                  size="sm"
-                  dot={anyUnread(places.get(g.id))}
-                  onClick={() => onGo(groupPath(g.id))}
-                />
-              ))}
-            </NavSection>
-          )}
+          <NavSection
+            title="Rooms"
+            expanded
+            action={canCreate ? { icon: 'plus', label: 'New room', onClick: () => onGo(NEW_ROOM) } : undefined}
+          >
+            {mine.map((g) => (
+              <NavItem
+                key={g.id}
+                mark={<Tile name={g.name} picture={g.picture} />}
+                label={g.name}
+                privateRoom={g.visibility === 'private'}
+                expanded
+                size="sm"
+                dot={anyUnread(places.get(g.id))}
+                onClick={() => onGo(groupPath(g.id))}
+              />
+            ))}
+            <NavItem icon="browse" label="Browse Rooms" expanded size="sm" onClick={() => onGo(BROWSE_ROOMS)} />
+          </NavSection>
           <ConversationsSection groups={groups} me={me} places={places} expanded onGo={onGo} />
           <Hairline />
           <NavItem icon="people" label="People" expanded onClick={() => onGo('/people')} />
-          {(root?.can.manage_instance || root?.can.manage_topics) && (
+          {(root?.can.manage_instance || root?.can.manage_rules) && (
             <NavItem
               icon="settings"
               label="Community"

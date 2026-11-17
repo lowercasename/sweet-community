@@ -1,4 +1,4 @@
-import type { Group, Marker, Notification, Topic } from '../api'
+import type { Group, Marker, Notification } from '../api'
 import { COMMUNITY, groupPath, postPath, profilePath } from '../routes'
 
 /** The user's markers, as the server lists them. */
@@ -61,12 +61,10 @@ export function unreadPlaces(markers: Marker[]): Map<string, UnreadPlace> {
 export const anyUnread = (p: UnreadPlace | undefined) => p !== undefined && (p.chat || p.feed)
 
 /** The notification's description, shown after the actor's name. A room the user is no longer in has no name in the cache. */
-export function describe(n: Notification, groups: Group[], topics: Topic[] = []): string {
+export function describe(n: Notification, groups: Group[]): string {
   switch (n.kind) {
-    case 'topic_post': {
-      const topic = topics.find((t) => t.id === n.topic_id)
-      return topic ? `posted in ${topic.name}` : 'posted in a topic'
-    }
+    case 'topic_post':
+      return 'posted'
     case 'comment':
       return 'commented in a discussion you follow'
     case 'added': {

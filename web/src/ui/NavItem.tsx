@@ -1,9 +1,10 @@
-import type { ReactNode } from 'react'
+import { useCallback, useLayoutEffect, useRef, useState, type PointerEvent, type ReactNode } from 'react'
 import { GHOST_CURRENT, GHOST_HOVER } from './Button'
 import { Dotted } from './Dotted'
 import { Icon, type IconName } from './Icon'
 import { ShieldMark } from './ShieldMark'
 import { useTooltip } from './Tooltip'
+import { PrivateMark } from './PrivateMark'
 
 interface NavItemProps {
   /** A feature's icon. */
@@ -11,6 +12,9 @@ interface NavItemProps {
   /** A group's or user's image (a Tile or an Avatar), drawn in place of the icon. */
   mark?: ReactNode
   label: string
+  /** Secondary text for room listings. Navigation rows omit it. */
+  description?: string
+  privateRoom?: boolean
   /** Whether the nav bar is expanded. When it is collapsed, the label is hidden and shown in a tooltip instead. */
   expanded: boolean
   /** The item for the page being viewed. */
@@ -34,32 +38,96 @@ export function NavItem({
   icon,
   mark,
   label,
+  description,
   expanded,
   current,
   size = 'md',
   dot = false,
   shield,
+  privateRoom = false,
   tour,
   onClick,
 }: NavItemProps) {
-  const tip = useTooltip(label, !expanded, 'right')
+  const labelRef = useRef<HTMLSpanElement | null>(null)
+  const [truncated, setTruncated] = useState(false)
+  useLayoutEffect(() => {
+    const node = labelRef.current
+    if (!node) {
+      setTruncated(false)
+      return
+    }
+    const measure = () => setTruncated(node.scrollWidth > node.clientWidth)
+    measure()
+    const observer = new ResizeObserver(measure)
+    observer.observe(node)
+    return () => observer.disconnect()
+  }, [label, expanded])
+  // Keep each tooltip's target stable when the navigation expands or collapses.
+  const nameTip = useTooltip(label, expanded && truncated, 'right', true)
+  const collapsedTip = useTooltip(label, !expanded, 'right', true)
+  const tip = expanded ? nameTip : collapsedTip
+  const labelTarget = useCallback(
+    (node: HTMLSpanElement | null) => {
+      labelRef.current = node
+      nameTip.ref(node)
+    },
+    [nameTip.ref],
+  )
+  const controlTarget = useCallback(
+    (node: HTMLButtonElement | null) => {
+      nameTip.positionRef(node)
+      collapsedTip.ref(node)
+    },
+    [nameTip.positionRef, collapsedTip.ref],
+  )
   const name = dot ? `${label}, unread` : label
   const glyph = mark ?? (icon && <Icon name={icon} size={20} />)
   return (
     <>
       <button
-        ref={tip.ref}
+        ref={controlTarget}
         type="button"
         aria-current={current ? 'page' : undefined}
-        aria-label={name === label && expanded ? undefined : name}
-        aria-description={shield}
+        aria-label={name}
+        aria-description={privateRoom ? 'Private room' : shield}
         data-tour={tour}
-        className={`group flex cursor-pointer items-center gap-3 rounded-[4px] text-mute transition-colors ${GHOST_HOVER} focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-pink ${GHOST_CURRENT} ${size === 'sm' ? 'h-8 text-sm' : 'h-10'} ${expanded ? 'px-3' : 'justify-center'}`}
-        {...tip.props({ onClick })}
+        className={`group flex cursor-pointer gap-3 rounded-[4px] text-mute transition-colors ${GHOST_HOVER} focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-pink ${GHOST_CURRENT} ${description && expanded ? 'min-h-10 items-start py-2' : `items-center ${size === 'sm' ? 'h-8 text-sm' : 'h-10'}`} ${expanded ? 'px-3' : 'justify-center'}`}
+        {...(expanded
+          ? {
+              ...tip.focusProps,
+              onClick,
+              onPointerLeave: tip.hide,
+              onPointerMove: (event: PointerEvent<HTMLButtonElement>) => {
+                if (!labelRef.current?.contains(event.target as Node)) tip.hide()
+              },
+            }
+          : tip.props({ onClick }))}
       >
-        <Dotted shown={dot}>{glyph}</Dotted>
+        <span className="flex size-6 shrink-0 items-center justify-center">
+          <Dotted shown={dot}>{glyph}</Dotted>
+        </span>
         {/* The label is ink at regular weight, and the icon stays grey. The current item's label is red, as its icon is. */}
-        {expanded && <span className="truncate text-ink group-aria-[current=page]:text-sweet">{label}</span>}
+        {expanded && (
+          <span className="min-w-0 flex-1 text-left">
+            <span
+              ref={labelTarget}
+              className="block truncate text-ink group-aria-[current=page]:text-sweet"
+              {...tip.props()}
+            >
+              {label}
+            </span>
+            {description && (
+              <span className="mt-0.5 block text-sm text-mute whitespace-pre-line [overflow-wrap:anywhere]">
+                {description}
+              </span>
+            )}
+          </span>
+        )}
+        {expanded && privateRoom && (
+          <span className="flex h-6 shrink-0 items-center">
+            <PrivateMark focusable={false} />
+          </span>
+        )}
         {expanded && shield !== undefined && <ShieldMark size={16} />}
       </button>
       {tip.tooltip}

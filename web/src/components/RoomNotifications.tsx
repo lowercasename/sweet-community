@@ -30,7 +30,7 @@ export function RoomNotifications({ groupId }: { groupId: string }) {
     <>
       <Row pad="compact" justify="end" align="center" shrink={false}>
         <Menu
-          label={`Chat device alerts: ${label}`}
+          label={`Chat notifications: ${label}`}
           heading="Notifications for this chat"
           icon={data?.mode === 'off' ? 'bell-off' : 'bell'}
           disabled={disabled || busy || !data}

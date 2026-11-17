@@ -30,6 +30,15 @@ import { ApiError } from '../api'
  * group's flag.
  */
 vi.mock('../api', async (importOriginal) => ({
+  listRoomSidebar: vi.fn(() =>
+    Promise.resolve({
+      rooms: ['knit', 'wool', 'mods', 'adhd', 'its'].map((group_id) => ({
+        group_id,
+        user_id: 'raphael',
+        in_sidebar: true,
+      })),
+    }),
+  ),
   getFrequentReactions: vi.fn(() => Promise.resolve({ emoji: [] })),
   ApiError: (await importOriginal<typeof import('../api')>()).ApiError,
   getMe: vi.fn(() => Promise.resolve({ id: 'raphael', username: 'raphael', picture: null })),
@@ -129,7 +138,7 @@ describe('Home', () => {
   it('shows the root group and fetches its posts and its messages once each', async () => {
     const { getPosts, getMessages } = await import('../api')
     await home()
-    expect(getPosts).toHaveBeenCalledWith(ROOT, null, 20, null)
+    expect(getPosts).toHaveBeenCalledWith(ROOT, null, 20)
     expect(getMessages).toHaveBeenCalledWith(ROOT, null)
   })
 

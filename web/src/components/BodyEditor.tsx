@@ -4,13 +4,11 @@ import { DEFAULT_PLACEHOLDER, withPlaceholder } from '../editor/extensions'
 import { mentionSuggestionKey, withMentions } from '../editor/mentions'
 import { useMe, useMembers, useUsers } from '../data/hooks'
 import { clearDraft, loadDraft, saveDraft, watchDraft } from '../editor/drafts'
-import type { Topic } from '../api'
 import { Alert, Button, EditorLayout, EditorSurface, Form, ImageCard, Stack } from '../ui'
 import { convertAndUpload, failedUploads, failureReason, imageFiles, imagesHtml, insertImages } from '../editor/images'
 import type { UploadedImage } from '../api'
 import { EditorToolbar } from './EditorToolbar'
 import { embedLinks } from '../editor/embed'
-import { TopicMenu } from './TopicMenu'
 
 /**
  * An image attached to a chat message. `file` is the chosen file, kept for Try again. `preview` is the address of its
@@ -61,12 +59,6 @@ interface BodyEditorProps {
   onCancel?: () => void
   /** Allows submitting an empty body, for example a cleared bio. */
   allowEmpty?: boolean
-  /**
-   * The topic control in the post edit form, for posts on the community's feed. It is a
-   * pill after the toolbar, with the formatting controls and apart from Cancel and Save. The composer for new posts
-   * does not pass it. Nothing is shown while no topics exist.
-   */
-  topic?: { topics: Topic[]; value: string | null; onChange: (topicId: string | null) => void }
   /** Shown above the editor, such as the message being replied to. */
   head?: ReactNode
   /** Called on Escape in a new message, such as to cancel a reply. An edit's Escape calls onCancel instead. */
@@ -79,6 +71,8 @@ interface BodyEditorProps {
    * an edit deletes the draft. Attached images are not kept.
    */
   draft?: string
+  /** The selected posting destination, saved with this draft. */
+  draftDestination?: string
 }
 
 /**
@@ -98,11 +92,11 @@ export function BodyEditor({
   initialHtml,
   onCancel,
   allowEmpty = false,
-  topic,
   head,
   onEscape,
   focus,
   draft,
+  draftDestination,
 }: BodyEditorProps) {
   const editing = initialHtml !== undefined
   const [busy, setBusy] = useState(false)
@@ -139,13 +133,13 @@ export function BodyEditor({
   // The draft's owner and key, read by the editor's update handler, which TipTap creates once. Each change is saved
   // at once. An editor that has not changed writes nothing.
   const { data: me } = useMe()
-  const draftRef = useRef<{ user: string; key: string } | null>(null)
-  draftRef.current = draft && me ? { user: me.id, key: draft } : null
+  const draftRef = useRef<{ user: string; key: string; destination?: string } | null>(null)
+  draftRef.current = draft && me ? { user: me.id, key: draft, destination: draftDestination } : null
   const keepDraft = (ed: Editor) => {
     const d = draftRef.current
     if (!d) return
     if (ed.isEmpty) clearDraft(d.user, d.key, ed)
-    else saveDraft(d.user, d.key, ed.getHTML(), ed)
+    else saveDraft(d.user, d.key, ed.getHTML(), ed, d.destination)
   }
   const forgetDraft = () => {
     const d = draftRef.current
@@ -170,7 +164,7 @@ export function BodyEditor({
   const peopleRef = useRef(members)
   peopleRef.current = members
   // TipTap reads its extensions once, when the editor is created. The placeholder reads the latest prop through a
-  // ref, and the effect below redraws it when the prop changes, for example when Home's composer changes topic.
+  // ref, and the effect below redraws it when the prop changes.
   const placeholderRef = useRef(placeholder)
   placeholderRef.current = placeholder
   const editor = useEditor({
@@ -214,6 +208,14 @@ export function BodyEditor({
       handleDrop: (_view, event) => takeImages(event.dataTransfer, event),
     },
   })
+  const savedDestination = useRef(draftDestination)
+  useEffect(() => {
+    const d = draftRef.current
+    if (!editing || !editor || !d || savedDestination.current === draftDestination) return
+    savedDestination.current = draftDestination
+    // A destination-only edit must keep the editor's text, even when the user has emptied it.
+    saveDraft(d.user, d.key, editor.getHTML(), editor, draftDestination)
+  }, [editor, draftDestination, editing])
   useEffect(() => {
     if (focus) editor?.commands.focus('end')
   }, [focus, editor])
@@ -389,20 +391,6 @@ export function BodyEditor({
               linkOpen={linkOpen}
               onLinkOpenChange={setLinkOpen}
             />
-          }
-          extraControls={
-            topic &&
-            topic.topics.length > 0 && (
-              <TopicMenu
-                topics={topic.topics}
-                value={topic.value}
-                onChange={topic.onChange}
-                noneLabel="No topic"
-                emptyLabel="Set topic"
-                label="Topic"
-                disabled={busy || disabled}
-              />
-            )
           }
           actions={
             <>

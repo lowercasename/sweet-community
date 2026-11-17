@@ -9,6 +9,8 @@ export function groupPath(id: string, rootId?: string): string {
   return id === rootId ? '/' : `/r/${encodeURIComponent(id)}`
 }
 
+export const BROWSE_ROOMS = '/rooms'
+
 export const NEW_ROOM = '/rooms/new'
 
 /** The list of the user's conversations, and the page for starting a new one. */
@@ -26,9 +28,6 @@ export const COMMUNITY = '/community'
 
 /** The community's rules. */
 export const RULES = '/rules'
-
-/** The community's feed filtered to one topic. */
-export const topicPath = (id: string) => `/?topic=${encodeURIComponent(id)}`
 
 /** A user's profile page. */
 export const profilePath = (name: string) => `/u/${encodeURIComponent(name)}`

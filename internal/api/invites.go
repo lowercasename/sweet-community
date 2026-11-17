@@ -193,6 +193,11 @@ func (s *Server) register(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusInternalServerError, err.Error())
 		return
 	}
+	if err := qtx.JoinOpenRooms(ctx, store.JoinOpenRoomsParams{UserID: u.ID, JoinedAt: now}); err != nil {
+		writeErr(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
 	joined, err := qtx.GetMember(ctx, store.GetMemberParams{GroupID: perm.Root, UserID: u.ID})
 	if err != nil {
 		writeErr(w, http.StatusInternalServerError, err.Error())
@@ -204,6 +209,25 @@ func (s *Server) register(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		writeErr(w, http.StatusInternalServerError, err.Error())
 		return
+	}
+	rooms, err := qtx.ListMyGroupIDs(ctx, u.ID)
+	if err != nil {
+		writeErr(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	for _, gid := range rooms {
+		if gid == perm.Root {
+			continue
+		}
+		member, err := qtx.GetMember(ctx, store.GetMemberParams{GroupID: gid, UserID: u.ID})
+		if err != nil {
+			writeErr(w, http.StatusInternalServerError, err.Error())
+			return
+		}
+		if _, err := events.Log(ctx, tx, "membership", wireMembership(gid, member), now); err != nil {
+			writeErr(w, http.StatusInternalServerError, err.Error())
+			return
+		}
 	}
 	// The community's chat says that they joined.
 	line, err := chatLine(ctx, qtx, perm.Root, JoinedKind, u.ID, "", now)
