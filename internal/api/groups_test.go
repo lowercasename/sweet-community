@@ -85,7 +85,7 @@ func TestPrivateGroupIsInvisibleToNonMembers(t *testing.T) {
 	kit, _ := registerMember(t, ts, owner, "kit")
 	mo, moID := registerMember(t, ts, owner, "mo")
 
-	g := kit.mustStatus(201, "POST", "/api/groups", map[string]string{"name": "Knitting"})
+	g := kit.mustStatus(201, "POST", "/api/groups", map[string]string{"name": "Knitting", "mode": "both"})
 	gid := g["id"].(string)
 	if g["kind"] != "group" || g["role"] != "owner" || !groupCan(g, "add_members") || !groupCan(g, "rename") || !groupCan(g, "delete") || groupCan(g, "leave") {
 		t.Fatalf("new group for its creator: %v", g)
@@ -356,7 +356,7 @@ func TestGroupModeAndInstanceSetting(t *testing.T) {
 
 	// Room owners choose posts, chat or both independently of visibility.
 	kit.mustStatus(400, "POST", "/api/groups", map[string]string{"name": "Room", "mode": "invalid"})
-	room := kit.mustStatus(201, "POST", "/api/groups", map[string]string{"name": "Room"})
+	room := kit.mustStatus(201, "POST", "/api/groups", map[string]string{"name": "Room", "mode": "both"})
 	rid := room["id"].(string)
 	kit.mustStatus(201, "POST", "/api/groups/"+rid+"/posts", map[string]string{"body_html": "<p>x</p>"})
 	kit.mustStatus(201, "POST", "/api/groups/"+rid+"/messages", map[string]string{"body_html": "<p>hi</p>"})

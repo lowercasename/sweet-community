@@ -8,7 +8,7 @@ import (
 func TestStreamReadsMembershipBeforeEachEvent(t *testing.T) {
 	ts, owner, srv := newTestServerWith(t)
 	member, uid := registerMember(t, ts, owner, "kit")
-	room := owner.mustStatus(201, "POST", "/api/groups", map[string]string{"name": "Private"})["id"].(string)
+	room := owner.mustStatus(201, "POST", "/api/groups", map[string]string{"name": "Private", "mode": "both"})["id"].(string)
 	owner.mustStatus(201, "POST", "/api/groups/"+room+"/members", map[string]string{"user_id": uid})
 	stream := member.liveStream()
 	// Change the database without delivering an event, as when a subscriber misses a removal.

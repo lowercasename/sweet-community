@@ -24,8 +24,7 @@ describe('NewGroupPage', () => {
     fireEvent.change(screen.getByLabelText('Room name'), { target: { value: 'Knitting' } })
     expect(screen.getByRole('radio', { name: 'Open' })).toHaveProperty('checked', true)
     fireEvent.change(screen.getByLabelText('Description'), { target: { value: 'Patterns and projects' } })
-    expect(screen.getByLabelText('Mode')).toHaveProperty('value', 'both')
-    fireEvent.change(screen.getByLabelText('Mode'), { target: { value: 'posts' } })
+    expect(screen.getByLabelText('Mode')).toHaveProperty('value', 'posts')
     fireEvent.click(screen.getByRole('button', { name: 'Create room' }))
     expect(createGroup).toHaveBeenCalledWith('Knitting', 'open', [], 'Patterns and projects', 'posts')
     await vi.waitFor(() =>
@@ -50,6 +49,6 @@ describe('NewGroupPage', () => {
     expect(screen.getByRole('checkbox', { name: 'mo' })).toHaveProperty('checked', true)
     fireEvent.change(screen.getByLabelText('Room name'), { target: { value: 'Private plans' } })
     fireEvent.click(screen.getByRole('button', { name: 'Create room' }))
-    await vi.waitFor(() => expect(createGroup).toHaveBeenCalledWith('Private plans', 'private', ['mo'], '', 'both'))
+    await vi.waitFor(() => expect(createGroup).toHaveBeenCalledWith('Private plans', 'private', ['mo'], '', 'posts'))
   })
 })

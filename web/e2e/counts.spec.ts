@@ -80,7 +80,7 @@ for (const suffix of ['', ' @phone']) {
       await profile.close()
 
       const roomName = uniq('Unread room ')
-      const room = await kit.context.request.post('/api/groups', { data: { name: roomName } })
+      const room = await kit.context.request.post('/api/groups', { data: { name: roomName, mode: 'both' } })
       expect(room.status()).toBe(201)
       const gid = ((await room.json()) as { id: string }).id
       const uid = ((await (await mo.context.request.get('/api/me')).json()) as { id: string }).id

@@ -8,7 +8,9 @@ for (const suffix of ['', ' @phone']) {
     const m = await member(browser, info)
     const uid = ((await (await m.context.request.get('/api/me')).json()) as { id: string }).id
     const name = uniq('Private ')
-    const room = ((await (await o.context.request.post('/api/groups', { data: { name } })).json()) as { id: string }).id
+    const room = (
+      (await (await o.context.request.post('/api/groups', { data: { name, mode: 'both' } })).json()) as { id: string }
+    ).id
     expect((await o.context.request.post(`/api/groups/${room}/members`, { data: { user_id: uid } })).status()).toBe(201)
     await open(m.page, info.project.name === 'phone' ? '/menu' : '/')
     await expect(m.page.getByRole('button', { name: new RegExp(`^${name}`) })).toBeVisible()

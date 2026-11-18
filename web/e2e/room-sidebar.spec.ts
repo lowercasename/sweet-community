@@ -7,7 +7,9 @@ for (const tag of ['@dev', '@phone'])
     const phone = !!info.project.use.isMobile
     if (phone) await reader.page.setViewportSize({ width: 360, height: 800 })
     const name = uniq('Room ').padEnd(40, 'x')
-    const room = await (await owner.context.request.post('/api/groups', { data: { name, visibility: 'open' } })).json()
+    const room = await (
+      await owner.context.request.post('/api/groups', { data: { name, visibility: 'open', mode: 'both' } })
+    ).json()
     await open(reader.page, '/rooms')
     await expect(reader.page.getByRole('heading', { name: 'Browse Rooms', exact: true })).toBeVisible()
     await reader.page.getByRole('textbox', { name: 'Search rooms' }).fill(name)

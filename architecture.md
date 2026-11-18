@@ -54,7 +54,7 @@ Feature flags are planned. The owner will turn posts, chat, images, embeds and a
 
 ### Rooms
 
-A room has posts, chat or both under one shared header. The owner chooses the mode when creating the room and can change it later. New rooms default to both. Open and private rooms offer the same choices. Selecting a room shows its enabled panes. The header names the room. Disabling a pane prevents new posts or messages in it but preserves existing content. Enabling it again shows that content. A person can also collapse either pane for themselves. (Raphael, 2026-11-17. Restoring room modes lets a community organise posts without creating a separate chat for every subject.)
+A room has posts, chat or both under one shared header. The owner chooses the mode when creating the room and can change it later. New rooms default to posts only. Chat is an explicit choice. Open and private rooms offer the same choices. Selecting a room shows its enabled panes. The header names the room. Disabling a pane prevents new posts or messages in it but preserves existing content. Enabling it again shows that content. A person can also collapse either pane for themselves. (Raphael, 2026-11-17. Restoring room modes lets a community organise posts without creating a separate chat for every subject.)
 
 - Every community member can discover, read and participate in open rooms without asking to join. New community members gain access to existing open rooms.
 - Sidebar shortcuts are personal. Adding or removing one changes neither access, Home, roles nor notifications. Browse Rooms lists all open rooms and the private rooms the viewer belongs to. A star in the room header adds or removes its shortcut. The star is filled when added. (Raphael, 2026-11-16. Add to sidebar names the action clearly.)
@@ -480,6 +480,8 @@ These decisions came from a security audit (2026-11-08).
 - The server never lists a directory of the app's files.
 
 ## Record
+
+- **New room default (Raphael, 2026-11-18).** New open and private rooms default to posts only instead of posts and chat. Organising posts should not create another chat unless the creator chooses one. Share in chat will offer Home first to encourage shared conversation.
 
 - **Room modes restored (Raphael, 2026-11-17).** Room owners can choose posts only, chat only or both. This reverses the removal of room modes during the open-room change. Personal pane controls did not replace a room-wide choice. Existing content is preserved when a mode changes.
 

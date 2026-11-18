@@ -410,7 +410,7 @@ export function createGroup(
   visibility: RoomVisibility,
   members: string[] = [],
   description = '',
-  mode: GroupMode = 'both',
+  mode: GroupMode = 'posts',
 ): Promise<Group> {
   return request<Group>('/api/groups', json('POST', { name, visibility, members, description, mode }))
 }

@@ -278,7 +278,7 @@ func (s *Server) createGroup(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		if in.Mode == "" {
-			in.Mode = perm.ModeBoth
+			in.Mode = perm.ModePosts
 		}
 		if !validMode(in.Mode) {
 			writeErr(w, http.StatusBadRequest, "Mode must be posts, chat or both")

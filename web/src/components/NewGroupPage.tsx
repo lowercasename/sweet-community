@@ -31,7 +31,7 @@ export function NewGroupPage({ onCreated }: NewGroupPageProps) {
   const { create } = useGroupActions()
   const [name, setName] = useState('')
   const [description, setDescription] = useState('')
-  const [mode, setMode] = useState<GroupMode>('both')
+  const [mode, setMode] = useState<GroupMode>('posts')
   const [visibility, setVisibility] = useState<RoomVisibility>('open')
   const [members, setMembers] = useState<string[]>([])
   const { data: me } = useMe()

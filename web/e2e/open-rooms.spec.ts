@@ -10,6 +10,7 @@ for (const tag of ['@dev', '@phone'])
     if (phone) await anyView(reader.page, 'Posts').click()
     await open(creator.page, '/rooms/new')
     await creator.page.getByLabel('Room name', { exact: true }).fill(name)
+    await creator.page.getByRole('combobox', { name: 'Mode', exact: true }).selectOption('both')
     await expect(creator.page.getByRole('radio', { name: 'Open', exact: true })).toBeChecked()
     await creator.page.screenshot({
       animations: 'disabled',
@@ -66,7 +67,6 @@ for (const tag of ['@dev', '@phone'])
     await expect(article(reader.page, secret)).toHaveCount(0)
     await open(reader.page, `/r/${privateID}`)
     await expect(reader.page.getByRole('img', { name: 'Private room', exact: true }).first()).toBeVisible()
-    if (phone) await anyView(reader.page, 'Posts').click()
     await expect(article(reader.page, secret)).toBeVisible()
     await reader.page.screenshot({
       animations: 'disabled',

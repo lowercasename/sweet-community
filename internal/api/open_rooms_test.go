@@ -11,7 +11,7 @@ func TestOpenRoomsShareAccessButKeepChatSeparate(t *testing.T) {
 	ts, owner := newTestServer(t)
 	kit, kitID := registerMember(t, ts, owner, "kit")
 	mo, _ := registerMember(t, ts, owner, "mo")
-	g := kit.mustStatus(201, "POST", "/api/groups", map[string]string{"name": "Conference", "visibility": "open"})
+	g := kit.mustStatus(201, "POST", "/api/groups", map[string]string{"name": "Conference", "visibility": "open", "mode": "both"})
 	gid := g["id"].(string)
 	gp := "/api/groups/" + gid
 	if g["visibility"] != "open" {
@@ -159,6 +159,11 @@ func TestRoomModesPreserveContentAndRejectDisabledWrites(t *testing.T) {
 			}
 			g := kit.mustStatus(201, "POST", "/api/groups", map[string]string{"name": "Room", "visibility": visibility})
 			gp := "/api/groups/" + g["id"].(string)
+			if g["mode"] != "posts" {
+				t.Fatalf("new room mode: want posts, got %v", g["mode"])
+			}
+			kit.mustStatus(403, "POST", gp+"/messages", map[string]string{"body_html": "<p>Chat is off by default</p>"})
+			kit.mustStatus(200, "PUT", gp, map[string]string{"mode": "both"})
 			if visibility == "private" {
 				kit.mustStatus(201, "POST", gp+"/members", map[string]string{"user_id": moID})
 			}

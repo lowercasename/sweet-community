@@ -339,7 +339,7 @@ export function useGroupActions() {
       visibility: RoomVisibility,
       members: string[] = [],
       description = '',
-      mode: GroupMode = 'both',
+      mode: GroupMode = 'posts',
     ): Promise<Group> {
       const g = await createGroup(name, visibility, members, description, mode)
       applyEvent(qc, 'group', g)
