@@ -1,5 +1,10 @@
 # Changelog
 
+## v1.10.2 (2026-11-19)
+
+- Add click-to-load players to link preview cards
+- Default new rooms to posts only
+
 ## v1.10.1 (2026-11-17)
 
 - Restore posts-only and chat-only room modes
