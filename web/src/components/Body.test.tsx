@@ -9,7 +9,17 @@ vi.mock('../api', () => ({
   listUsers: vi.fn(() => Promise.resolve({ users: [member('kit')] })),
   getLinkPreview: vi.fn((url: string) =>
     Promise.resolve(
-      url.endsWith('/open-day') ? { url, title: 'Open day', description: 'Bring a trowel.', image: null } : null,
+      url.endsWith('/open-day')
+        ? { url, title: 'Open day', description: 'Bring a trowel.', image: null, player: null }
+        : url.endsWith('/film')
+          ? {
+              url,
+              title: 'A film',
+              description: '',
+              image: null,
+              player: { url: 'https://films.test/embed/7?h=1', width: 1280, height: 720 },
+            }
+          : null,
     ),
   ),
 }))
@@ -44,6 +54,29 @@ describe('Body', () => {
     // The page with no preview keeps its plain link, and no card is drawn for it.
     expect(screen.getByRole('link', { name: 'https://plots.test/nothing' })).toBeTruthy()
     expect(document.querySelectorAll('.link-preview')).toHaveLength(1)
+    // A page with no player has no play button.
+    expect(screen.queryByRole('button', { name: /^Play/ })).toBeNull()
+  })
+
+  it('loads a player only after the reader presses play, in a sandboxed frame', async () => {
+    const { Body } = await import('./Body')
+    renderWithQuery(<Body html={embedParagraph('https://plots.test/film')} />)
+    const play = await screen.findByRole('button', { name: 'Play A film' })
+    // The whole card is the play button, so it holds the title and the domain.
+    expect(play.textContent).toContain('A film')
+    expect(play.textContent).toContain('plots.test')
+    expect(document.querySelector('iframe')).toBeNull()
+    fireEvent.click(play)
+    const frame = screen.getByTitle('A film') as HTMLIFrameElement
+    expect(frame.tagName).toBe('IFRAME')
+    expect(frame.getAttribute('src')).toBe('https://films.test/embed/7?h=1&autoplay=1')
+    // The frame may not navigate Sweet's page, open dialogs or submit forms.
+    expect(frame.getAttribute('sandbox')).not.toMatch(/allow-(top-navigation|modals|forms)/)
+    // The play button is gone, so the frame takes the keyboard focus.
+    expect(document.activeElement).toBe(frame)
+    expect(screen.queryByRole('button', { name: 'Play A film' })).toBeNull()
+    // The domain under the player is the link that opens the page.
+    expect(screen.getByRole('link', { name: 'plots.test' }).getAttribute('href')).toBe('https://plots.test/film')
   })
 })
 

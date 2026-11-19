@@ -1,6 +1,7 @@
 import {
   ArrowLeft,
   ArrowUp,
+  Play,
   Compass,
   Star,
   LockKeyhole,
@@ -86,6 +87,7 @@ export type IconName =
   | 'send'
   | 'tag'
   | 'chevron'
+  | 'play'
   | 'check'
   | 'user'
   | 'spinner'
@@ -135,6 +137,7 @@ const ICONS: Record<IconName, LucideIcon> = {
   send: ArrowUp,
   tag: Tag,
   chevron: ChevronDown,
+  play: Play,
   check: Check,
   user: User,
   spinner: LoaderCircle,
@@ -157,7 +160,7 @@ export function Icon({ name, size = 18 }: IconProps) {
   const Glyph = ICONS[name]
   return (
     <Glyph
-      fill={name === 'star-filled' ? 'currentColor' : 'none'}
+      fill={name === 'star-filled' || name === 'play' ? 'currentColor' : 'none'}
       size={size}
       strokeWidth={2}
       aria-hidden="true"

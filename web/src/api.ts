@@ -856,13 +856,21 @@ export function setPicture(imageId: string | null): Promise<User> {
 
 /**
  * A link's preview card, as the server keeps it. `image` is the address of Sweet's copy of the page's picture. The
- * card shows the page's domain, read from `url`.
+ * card shows the page's domain, read from `url`. `player` is the page's player for its video or audio, or null.
  */
 export interface LinkPreview {
   url: string
   title: string
   description: string
   image: string | null
+  player: LinkPlayer | null
+}
+
+/** A player that a page gives: an https address to show in a frame, and the width and height that give its shape. */
+export interface LinkPlayer {
+  url: string
+  width: number
+  height: number
 }
 
 /** The preview of a link, or null when the page gives none. The server fetches the page the first time it is asked. */

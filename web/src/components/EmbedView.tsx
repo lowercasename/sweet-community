@@ -19,7 +19,6 @@ export function EmbedView({ editor, node, getPos, selected }: NodeViewProps) {
     // Only a change of the answer turns the card back. unembed reads the node's current position when it runs.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [data])
-  const preview = data ? { title: data.title, description: data.description, image: data.image } : undefined
   const note = isPending ? 'Getting a preview…' : isError ? 'No preview right now' : undefined
-  return <EditorEmbed url={url} preview={preview} note={note} selected={selected} onUnembed={unembed} />
+  return <EditorEmbed url={url} preview={data ?? undefined} note={note} selected={selected} onUnembed={unembed} />
 }

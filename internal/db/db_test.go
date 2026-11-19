@@ -736,3 +736,34 @@ func TestMigrationPreservesReplyQuotesAndMessageBodies(t *testing.T) {
 		t.Fatalf("deleted quote retained: %v %v", cleared, err)
 	}
 }
+
+// The upgrade that adds players deletes the previews kept until then, so each is fetched again with its player. The
+// post that shows the card, and the record that it shows it, are unchanged.
+func TestLinkPlayersUpgradeDeletesKeptPreviewsAndKeepsPosts(t *testing.T) {
+	d, err := Open(filepath.Join(t.TempDir(), "upgrade.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer d.Close()
+	migratedTo(t, d, "021")
+	_, err = d.Exec(`
+ INSERT INTO users(id,username,created_at) VALUES('owner','owner',1);
+ INSERT INTO groups(id,kind,name,mode,visibility,created_at) VALUES('room','group','Existing room','both','private',1);
+ INSERT INTO images(id,uploader_id,content_type,width,height,bytes,created_at) VALUES('pic','owner','image/png',40,20,100,1);
+ INSERT INTO posts(id,group_id,author_id,body_html,body_text,created_at) VALUES('post','room','owner','<p data-embed><a href="https://films.test/w/7">https://films.test/w/7</a></p>','https://films.test/w/7',1);
+ INSERT INTO link_previews(url,found,title,image_id,fetched_at) VALUES('https://films.test/w/7',1,'A film','pic',1);
+ INSERT INTO link_uses(url,kind,id) VALUES('https://films.test/w/7','post','post');
+ `)
+	if err != nil {
+		t.Fatal(err)
+	}
+	migratedTo(t, d, "022")
+	var previews, uses int
+	var body string
+	if err := d.QueryRow(`SELECT (SELECT COUNT(*) FROM link_previews), (SELECT COUNT(*) FROM link_uses), (SELECT body_html FROM posts WHERE id='post')`).Scan(&previews, &uses, &body); err != nil {
+		t.Fatal(err)
+	}
+	if previews != 0 || uses != 1 || body != `<p data-embed><a href="https://films.test/w/7">https://films.test/w/7</a></p>` {
+		t.Fatalf("previews %d, uses %d, body %q", previews, uses, body)
+	}
+}

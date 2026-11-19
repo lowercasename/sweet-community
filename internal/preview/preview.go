@@ -11,6 +11,7 @@ import (
 	"net"
 	"net/http"
 	"net/url"
+	"strconv"
 	"strings"
 	"time"
 
@@ -21,6 +22,10 @@ import (
 const (
 	maxTitle       = 200
 	maxDescription = 300
+	// A player address longer than this is not kept.
+	maxPlayerURL = 2048
+	// A player's width and height are each at most this. A larger or unreadable size gives the default shape.
+	maxPlayerSide = 10000
 	// The tags are in the page's head, so at most the first megabyte of a page is read.
 	maxPageBytes = 1 << 20
 	// MaxImageBytes is the largest picture that is downloaded.
@@ -34,12 +39,17 @@ const (
 // HTML page, or the page gives no title.
 var ErrNoPreview = errors.New("no preview")
 
-// Preview is what a page says about itself. ImageURL is the address of its picture, or empty.
+// Preview is what a page says about itself. ImageURL is the address of its picture, or empty. PlayerURL is the https
+// address of a player for the page's video or audio, made to be shown in a frame, or empty. PlayerWidth and
+// PlayerHeight give the player's shape, and are 0 when there is no player.
 type Preview struct {
-	URL         string
-	Title       string
-	Description string
-	ImageURL    string
+	URL          string
+	Title        string
+	Description  string
+	ImageURL     string
+	PlayerURL    string
+	PlayerWidth  int
+	PlayerHeight int
 }
 
 // Client returns the HTTP client for previews. Its dialer refuses internal and special-purpose addresses, and every
@@ -135,7 +145,8 @@ func FetchImage(ctx context.Context, c *http.Client, rawURL string) ([]byte, err
 }
 
 // parse reads the page's head. OpenGraph tags come first. Twitter's tags, the <title>, the meta description and a
-// schema.org image fill gaps. Reading stops at the end of the head or the start of the body.
+// schema.org image fill gaps. The player is the twitter:player tag. Reading stops at the end of the head or the start
+// of the body.
 func parse(r io.Reader, base string) (Preview, error) {
 	z := html.NewTokenizer(r)
 	meta := map[string]string{}
@@ -216,6 +227,19 @@ read:
 				p.ImageURL = abs.String()
 			}
 		}
+	}
+	// A browser refuses an http frame in an https page, and a frame address that holds a username, so neither is
+	// kept. A player with no size, or a size that cannot be read or is out of range, is 16 by 9, the shape of most
+	// video.
+	raw := meta["twitter:player"]
+	if player, err := url.Parse(raw); err == nil && len(raw) <= maxPlayerURL && player.Scheme == "https" && player.Host != "" && player.User == nil {
+		p.PlayerURL = player.String()
+		w, errW := strconv.Atoi(meta["twitter:player:width"])
+		h, errH := strconv.Atoi(meta["twitter:player:height"])
+		if errW != nil || errH != nil || w < 1 || h < 1 || w > maxPlayerSide || h > maxPlayerSide {
+			w, h = 16, 9
+		}
+		p.PlayerWidth, p.PlayerHeight = w, h
 	}
 	return p, nil
 }

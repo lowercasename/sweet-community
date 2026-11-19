@@ -90,6 +90,7 @@ func (s *Server) fetchPreview(ctx context.Context, raw, uploader string) (store.
 	save := store.SaveLinkPreviewParams{Url: raw, FetchedAt: db.Now()}
 	if p, err := preview.Fetch(ctx, c, raw); err == nil {
 		save.Found, save.Title, save.Description = 1, p.Title, p.Description
+		save.Player, save.PlayerWidth, save.PlayerHeight = p.PlayerURL, int64(p.PlayerWidth), int64(p.PlayerHeight)
 		if p.ImageURL != "" && s.Images != nil {
 			save.ImageID = s.previewPicture(ctx, c, p.ImageURL, uploader)
 		}

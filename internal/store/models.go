@@ -19,12 +19,15 @@ type Image struct {
 }
 
 type LinkPreview struct {
-	Url         string
-	Found       int64
-	Title       string
-	Description string
-	ImageID     sql.NullString
-	FetchedAt   int64
+	Url          string
+	Found        int64
+	Title        string
+	Description  string
+	ImageID      sql.NullString
+	FetchedAt    int64
+	Player       string
+	PlayerWidth  int64
+	PlayerHeight int64
 }
 
 type PushSubscription struct {

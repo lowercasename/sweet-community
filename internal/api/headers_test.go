@@ -22,6 +22,10 @@ func TestSecurityHeaders(t *testing.T) {
 			t.Errorf("Content-Security-Policy %q lacks %q", csp, want)
 		}
 	}
+	// A link preview's player is a frame from the page's own site, over https only.
+	if !strings.Contains(csp, "frame-src https:;") {
+		t.Errorf("Content-Security-Policy %q lacks %q", csp, "frame-src https:")
+	}
 	if strings.Contains(csp, "script-src 'self' 'unsafe-inline'") {
 		t.Errorf("scripts may not run inline: %q", csp)
 	}

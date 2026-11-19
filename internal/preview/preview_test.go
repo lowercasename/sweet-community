@@ -57,6 +57,37 @@ func TestParse(t *testing.T) {
 	}
 }
 
+// A page that gives a player address in its twitter:player tag gets it in its preview, with the tag's size. A player
+// with no size, or a size out of range, is 16 by 9. Only an https address with no username, of at most 2048
+// characters, is kept.
+func TestParsePlayer(t *testing.T) {
+	head := func(tags string) string { return `<head><title>A film</title>` + tags + `</head>` }
+	p, err := parse(strings.NewReader(head(`<meta name="twitter:player" content="https://films.test/embed/7?h=1&amp;t=2">
+		<meta name="twitter:player:width" content="435"><meta name="twitter:player:height" content="400">`)), "https://films.test/w/7")
+	if err != nil || p.PlayerURL != "https://films.test/embed/7?h=1&t=2" || p.PlayerWidth != 435 || p.PlayerHeight != 400 {
+		t.Fatalf("player with a size: %+v %v", p, err)
+	}
+	p, _ = parse(strings.NewReader(head(`<meta property="twitter:player" content="https://films.test/embed/7">
+		<meta property="twitter:player:width" content="wide">`)), "https://films.test/w/7")
+	if p.PlayerURL != "https://films.test/embed/7" || p.PlayerWidth != 16 || p.PlayerHeight != 9 {
+		t.Fatalf("player with no size: %+v", p)
+	}
+	for _, size := range [][2]string{{"0", "9"}, {"-16", "9"}, {"99999999999999999999", "9"}, {"100000", "1"}, {"16", ""}} {
+		p, _ = parse(strings.NewReader(head(`<meta name="twitter:player" content="https://films.test/embed/7">
+			<meta name="twitter:player:width" content="`+size[0]+`"><meta name="twitter:player:height" content="`+size[1]+`">`)), "https://films.test/w/7")
+		if p.PlayerWidth != 16 || p.PlayerHeight != 9 {
+			t.Fatalf("size %v gave %d by %d", size, p.PlayerWidth, p.PlayerHeight)
+		}
+	}
+	long := "https://films.test/embed/" + strings.Repeat("a", maxPlayerURL)
+	for _, bad := range []string{"http://films.test/embed/7", "javascript:alert(1)", "/embed/7", "data:text/html,hi", "https://kit:secret@films.test/embed/7", long} {
+		p, _ = parse(strings.NewReader(head(`<meta name="twitter:player" content="`+bad+`">`)), "http://films.test/w/7")
+		if p.PlayerURL != "" || p.PlayerWidth != 0 || p.PlayerHeight != 0 {
+			t.Fatalf("player %q was kept: %+v", bad, p)
+		}
+	}
+}
+
 // Fetch reads a page over HTTP. A page that is not HTML gives no preview.
 func TestFetch(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

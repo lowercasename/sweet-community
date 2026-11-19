@@ -68,9 +68,12 @@ function drawCard(url: string) {
   return <BodyCard url={url} />
 }
 
-/** A link preview card in a body. Nothing is drawn while the preview loads or when the page gives none. */
+/**
+ * A link preview card in a body. Nothing is drawn while the preview loads or when the page gives none. A page that
+ * gives a player gets a play button on its card.
+ */
 function BodyCard({ url }: { url: string }) {
   const { data } = useLinkPreview(url)
   if (!data) return null
-  return <LinkPreview url={url} preview={{ title: data.title, description: data.description, image: data.image }} />
+  return <LinkPreview url={url} preview={data} />
 }

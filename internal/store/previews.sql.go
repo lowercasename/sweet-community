@@ -56,7 +56,7 @@ func (q *Queries) DeleteUnusedLinkPreviews(ctx context.Context, before int64) (i
 }
 
 const getLinkPreview = `-- name: GetLinkPreview :one
-SELECT url, found, title, description, image_id, fetched_at FROM link_previews WHERE url = ?1
+SELECT url, found, title, description, image_id, fetched_at, player, player_width, player_height FROM link_previews WHERE url = ?1
 `
 
 func (q *Queries) GetLinkPreview(ctx context.Context, url string) (LinkPreview, error) {
@@ -69,24 +69,32 @@ func (q *Queries) GetLinkPreview(ctx context.Context, url string) (LinkPreview, 
 		&i.Description,
 		&i.ImageID,
 		&i.FetchedAt,
+		&i.Player,
+		&i.PlayerWidth,
+		&i.PlayerHeight,
 	)
 	return i, err
 }
 
 const saveLinkPreview = `-- name: SaveLinkPreview :exec
-INSERT INTO link_previews (url, found, title, description, image_id, fetched_at)
-VALUES (?1, ?2, ?3, ?4, ?5, ?6)
+INSERT INTO link_previews (url, found, title, description, image_id, fetched_at, player, player_width, player_height)
+VALUES (?1, ?2, ?3, ?4, ?5, ?6,
+    ?7, ?8, ?9)
 ON CONFLICT (url) DO UPDATE SET found = excluded.found, title = excluded.title, description = excluded.description,
-    image_id = excluded.image_id, fetched_at = excluded.fetched_at
+    image_id = excluded.image_id, fetched_at = excluded.fetched_at, player = excluded.player,
+    player_width = excluded.player_width, player_height = excluded.player_height
 `
 
 type SaveLinkPreviewParams struct {
-	Url         string
-	Found       int64
-	Title       string
-	Description string
-	ImageID     sql.NullString
-	FetchedAt   int64
+	Url          string
+	Found        int64
+	Title        string
+	Description  string
+	ImageID      sql.NullString
+	FetchedAt    int64
+	Player       string
+	PlayerWidth  int64
+	PlayerHeight int64
 }
 
 func (q *Queries) SaveLinkPreview(ctx context.Context, arg SaveLinkPreviewParams) error {
@@ -97,6 +105,9 @@ func (q *Queries) SaveLinkPreview(ctx context.Context, arg SaveLinkPreviewParams
 		arg.Description,
 		arg.ImageID,
 		arg.FetchedAt,
+		arg.Player,
+		arg.PlayerWidth,
+		arg.PlayerHeight,
 	)
 	return err
 }

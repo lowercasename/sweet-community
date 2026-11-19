@@ -9,6 +9,8 @@ import { article, chatEditor, expect, member, open, png, postEditor, test, uniq 
 const OPEN_DAY = 'https://plots.example/open-day'
 const LOGO = 'https://plots.example/logo'
 const NOTHING = 'https://plots.example/nothing'
+const FILM = 'https://films.example/w/harvest'
+const PLAYER = 'https://films.example/embed/harvest'
 
 /** Uploads a picture to the test server and returns its address. */
 async function upload(page: Page, name: string, w: number, h: number) {
@@ -36,6 +38,17 @@ async function previews(page: Page) {
           description:
             'Come and see what grows at Weald Stray. Tours start at ten, the seed swap runs all morning, and there will be tea and cake in the shed for anyone who stays.',
           image,
+        },
+      })
+    } else if (url === FILM) {
+      await route.fulfill({
+        json: {
+          url,
+          title: 'Harvest at Weald Stray: a short film about the last week of the season on the plots',
+          description:
+            'Twelve minutes filmed over the final week of the season, with the pumpkin weigh-in, the shed clear-out and the bonfire that ends the year for everyone on the site.',
+          image,
+          player: { url: PLAYER, width: 1280, height: 720 },
         },
       })
     } else if (url === LOGO) {
@@ -250,6 +263,61 @@ test.describe('link preview cards', () => {
     await kit.page.screenshot({ path: 'test-results/embed-post-phone.png' })
     await kit.context.close()
   })
+})
+
+test.describe('a link preview with a player', () => {
+  for (const name of ['desktop', 'phone']) {
+    const tag = name === 'phone' ? '@phone ' : ''
+    test(`${tag}the play button loads the page's player in place of the card (${name})`, async ({
+      browser,
+    }, testInfo) => {
+      const kit = await member(browser, testInfo)
+      await previews(kit.page)
+      // The player's site is asked for nothing until the reader presses play.
+      let asked = 0
+      await kit.page.route('https://films.example/**', async (route) => {
+        asked++
+        await route.fulfill({
+          contentType: 'text/html',
+          body: '<body style="margin:0;background:#222;color:#fff">Player</body>',
+        })
+      })
+      await open(kit.page)
+      if (name === 'phone') {
+        await kit.page
+          .getByRole('group', { name: 'View' })
+          .getByRole('button', { name: /^Posts/ })
+          .click()
+      }
+      await postEditor(kit.page).click()
+      const words = uniq('Film night ')
+      await kit.page.keyboard.type(words)
+      await kit.page.keyboard.press('Enter')
+      await kit.page.keyboard.type(FILM)
+      await kit.page.getByRole('button', { name: 'Post', exact: true }).click()
+      const post = article(kit.page, words)
+      const play = post.getByRole('button', { name: /^Play Harvest at Weald Stray/ })
+      await expect(play).toBeVisible()
+      // The whole card is the play button.
+      await expect(play).toContainText('films.example')
+      const cardBox = (await card(post).boundingBox())!
+      await kit.page.screenshot({ path: `test-results/embed-player-card-${name}.png` })
+      expect(asked).toBe(0)
+
+      // A click on the card's text plays, as a click on the picture does.
+      await play.getByText('films.example').click()
+      const frame = post.locator('iframe')
+      await expect(frame).toHaveAttribute('src', PLAYER + '?autoplay=1')
+      await expect(post.frameLocator('iframe').getByText('Player')).toBeVisible()
+      // The player is as wide as the card was and has the shape the page gave, 16 by 9.
+      const box = (await frame.boundingBox())!
+      expect(Math.abs(box.width - cardBox.width)).toBeLessThan(1.5)
+      expect(Math.abs(box.width / box.height - 16 / 9)).toBeLessThan(0.02)
+      await expect(post.getByRole('link', { name: 'films.example', exact: true })).toHaveAttribute('href', FILM)
+      await kit.page.screenshot({ path: `test-results/embed-player-open-${name}.png` })
+      await kit.context.close()
+    })
+  }
 })
 
 test.describe('the link panel', () => {

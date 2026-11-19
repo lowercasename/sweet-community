@@ -161,9 +161,12 @@ func Protect(next http.Handler) http.Handler {
 // contentSecurityPolicy allows scripts, images, fonts, connections, the
 // manifest and the service worker from the server's own origin only. Styles
 // may also be inline, because the editor (TipTap) adds its own style element.
-// No page may frame Sweet, and plugins and base URLs are refused.
+// A frame may show any https page, because a link preview's player comes from
+// the linked page's own site. No page may frame Sweet, and plugins and base
+// URLs are refused.
 const contentSecurityPolicy = "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; " +
 	"img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self'; manifest-src 'self'; worker-src 'self'; " +
+	"frame-src https:; " +
 	"object-src 'none'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'"
 
 // SecurityHeaders sets the security headers on every response. HSTS is sent only over

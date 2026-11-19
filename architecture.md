@@ -186,7 +186,13 @@ A link on its own line becomes a preview card, as in WhatsApp and Signal. The ca
 - The server fetches the page and keeps a copy of its picture, so readers' browsers never contact the other site. The fetcher refuses internal addresses. A preview is fetched once for each address and kept while a post, comment or message shows it as a card. The server records which cards each body shows when it is saved.
 - Every member can see a preview's picture, because it comes from a public page.
 - The card data is the server's, not the body's. The body holds only the link and a mark that it is a card, so a client cannot invent a preview.
-- Videos get the same card for now. A player that loads only when clicked was planned, and Raphael deferred it (2026-11-10).
+- A page that gives a player for its video or audio gets a play mark on its card's picture, and the whole card is the play button. Pressing it replaces the card with the page's player, in a frame, with the page's domain as a link under it. That link opens the page. A click anywhere on a video's card plays it, because a reader who clicks a video expects it to play.
+- The player is whatever the page names in its player tag, the tag that YouTube, Vimeo, SoundCloud and PeerTube pages give. There is no list of sites. PeerTube and similar software run on any domain, so a list could not cover them, and a list would be a rule for each vendor. Sweet adds a request for playback to start and changes nothing else in the address. On the sites that honour the request, one click loads and plays. On others the reader presses play again inside the player. A page that gives only an oEmbed address, such as Spotify, keeps a plain card for now.
+- Nothing is requested from the player's site until the reader presses play. Before that the card shows only the server's copy of the picture.
+- The frame is restricted. It cannot navigate Sweet's page, open dialogs or submit forms, and it cannot use the camera, microphone or location. Only an https player is kept. One risk remains. Any page can name any https page as its player, so a member can post a link whose player imitates part of Sweet, such as a sign-in form, inside a post. It appears only after the reader presses play. A list of allowed sites would remove the risk and was not chosen, for the reasons above.
+- The frame tells the player's site the community's address, without the page's path. Sweet's pages otherwise send other sites no referrer. YouTube's player refuses to play without it.
+- The upgrade that added players deleted the previews kept until then. Each is fetched again, with its player, the next time its card is shown. This needs no code that exists only for old previews. A card whose page has since gone becomes a plain link. No post, comment or message changes.
+- The editor shows the play mark on the card without loading a player.
 
 ## Accounts
 
@@ -471,7 +477,7 @@ An approval queue and a list of posts with no reply are planned. Nothing more el
 
 These decisions came from a security audit (2026-11-08).
 
-- A content security policy allows only the instance's own origin. The sanitiser remains the main defence.
+- A content security policy allows only the instance's own origin, except that a frame may show any https page, for a link preview's player. The sanitiser remains the main defence.
 - Wrong invite codes are rate-limited per client address, as wrong passwords already were.
 - Behind proxies, the operator states how many proxies there are. The client address is read that many entries from the right, because a visitor can forge only the entries on the left.
 - Images that are too large are refused before decoding.
@@ -480,6 +486,8 @@ These decisions came from a security audit (2026-11-08).
 - The server never lists a directory of the app's files.
 
 ## Record
+
+- **Link preview players (2026-11-19).** A link preview card for a page that gives a player has a play button, and the player loads in a frame only when it is pressed. This ends the deferral of 2026-11-10. Any page that names a player gets one, with no list of sites, so that PeerTube and other software on any domain work and no vendor needs its own rule. The Embeds section holds the rules and the remaining risk.
 
 - **New room default (Raphael, 2026-11-18).** New open and private rooms default to posts only instead of posts and chat. Organising posts should not create another chat unless the creator chooses one. Share in chat will offer Home first to encourage shared conversation.
 

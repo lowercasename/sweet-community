@@ -236,16 +236,30 @@ func wireReports(rows []store.ListOpenReportsRow) []Report {
 }
 
 // LinkPreview is a link's preview card: what the page gives in its OpenGraph tags, and the address of Sweet's copy
-// of its picture, or nil. The card shows the page's domain, which the client reads from the address.
+// of its picture, or nil. The card shows the page's domain, which the client reads from the address. Player is nil
+// when the page gives no player.
 type LinkPreview struct {
-	URL         string  `json:"url"`
-	Title       string  `json:"title"`
-	Description string  `json:"description"`
-	Image       *string `json:"image"`
+	URL         string      `json:"url"`
+	Title       string      `json:"title"`
+	Description string      `json:"description"`
+	Image       *string     `json:"image"`
+	Player      *LinkPlayer `json:"player"`
+}
+
+// LinkPlayer is the player that a page gives for its video or audio: an https address to show in a frame, and the
+// width and height that give the frame's shape.
+type LinkPlayer struct {
+	URL    string `json:"url"`
+	Width  int64  `json:"width"`
+	Height int64  `json:"height"`
 }
 
 func wireLinkPreview(row store.LinkPreview) LinkPreview {
-	return LinkPreview{URL: row.Url, Title: row.Title, Description: row.Description, Image: pictureURL(row.ImageID)}
+	p := LinkPreview{URL: row.Url, Title: row.Title, Description: row.Description, Image: pictureURL(row.ImageID)}
+	if row.Player != "" {
+		p.Player = &LinkPlayer{URL: row.Player, Width: row.PlayerWidth, Height: row.PlayerHeight}
+	}
+	return p
 }
 
 func wirePostNotificationPreference(userID string, row store.GetPostNotificationPreferenceRow) PostNotificationPreference {

@@ -24,6 +24,9 @@ func previewSite(t *testing.T) (*httptest.Server, *atomic.Int32) {
 			fetches.Add(1)
 			w.Header().Set("Content-Type", "text/html; charset=utf-8")
 			w.Write([]byte(`<head><meta property="og:title" content="Open day"><meta property="og:description" content="Bring a trowel."><meta property="og:image" content="/beans.png"></head>`))
+		case "/film":
+			w.Header().Set("Content-Type", "text/html; charset=utf-8")
+			w.Write([]byte(`<head><meta property="og:title" content="A film"><meta name="twitter:player" content="https://films.test/embed/7"><meta name="twitter:player:width" content="1280"><meta name="twitter:player:height" content="720"></head>`))
 		case "/beans.png":
 			w.Header().Set("Content-Type", "image/png")
 			w.Write(testPNG(40, 20))
@@ -107,4 +110,21 @@ func TestPreviewsStayWhileABodyShowsThemAsCards(t *testing.T) {
 	}
 	// A deleted preview's picture goes in the same sweep.
 	owner.mustStatus(404, "GET", pictures["plain"], nil)
+}
+
+// A preview carries the page's player address and size when the page gives one, and null when it does not.
+func TestLinkPreviewPlayer(t *testing.T) {
+	_, owner, srv := newTestServerWith(t)
+	site, _ := previewSite(t)
+	srv.PreviewClient = site.Client()
+	ask := func(u string) string { return "/api/previews?url=" + url.QueryEscape(u) }
+
+	film := owner.mustStatus(200, "GET", ask(site.URL+"/film"), nil)
+	player, _ := film["player"].(map[string]any)
+	if player["url"] != "https://films.test/embed/7" || player["width"] != float64(1280) || player["height"] != float64(720) {
+		t.Fatalf("a page with a player: %v", film)
+	}
+	if plain := owner.mustStatus(200, "GET", ask(site.URL+"/open-day"), nil); plain["player"] != nil {
+		t.Fatalf("a page with no player: %v", plain)
+	}
 }
